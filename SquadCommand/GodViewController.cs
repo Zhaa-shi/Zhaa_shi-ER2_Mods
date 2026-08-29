@@ -664,7 +664,6 @@ internal static class GodViewController
 	/// <summary>移动：只对选中步兵逐单位 moveTo（AI 命令通道）。</summary>
 	internal static int MoveUnits(List<Soldier> units, Vector3 point)
 	{
-		string extra = "";
 		int n = 0;
 		if (units == null) return 0;
 		foreach (Soldier s in units)
@@ -1321,6 +1320,7 @@ internal static class GodViewController
 		// 0.7.70 关键修复：此处【不发】boardVehicle——0.7.67 重构遗漏了删除本调用，
 		// 导致原生登车路线（分散→走登车点）与我们的环形接近引导双源竞争（先分散/乱走/到车旁不上车）。
 		// boardVehicle 统一在 BoardPendingTick 阶段2（距车 8m 内）才发出。
+		string extra = "";
 		int n = 0;
 		List<Soldier> overflow = new List<Soldier>(); // 0.7.72：超员落选者——原地停止待命，消除乱走
 		foreach (Soldier s in units)
