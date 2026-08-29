@@ -1,0 +1,97 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Build LimbTweaks",
+      "type": "shell",
+      "command": "dotnet build -c Release limbtweaks.csproj",
+      "options": { "cwd": "${workspaceFolder}/LimbTweaks" },
+      "group": "build",
+      "problemMatcher": ["$msCompile"]
+    },
+    {
+      "label": "Build WeatherControl",
+      "type": "shell",
+      "command": "dotnet build -c Release weather.csproj",
+      "options": { "cwd": "${workspaceFolder}/WeatherControl" },
+      "group": "build",
+      "problemMatcher": ["$msCompile"]
+    },
+    {
+      "label": "Build SquadCommand",
+      "type": "shell",
+      "command": "dotnet build -c Release SquadCommand.csproj",
+      "options": { "cwd": "${workspaceFolder}/SquadCommand" },
+      "group": "build",
+      "problemMatcher": ["$msCompile"]
+    },
+    {
+      "label": "Build HighValueTarget",
+      "type": "shell",
+      "command": "dotnet build -c Release HighValueTarget.csproj",
+      "options": { "cwd": "${workspaceFolder}/HighValueTarget" },
+      "group": "build",
+      "problemMatcher": ["$msCompile"]
+    },
+    {
+      "label": "Build All (via scripts/build.ps1)",
+      "type": "shell",
+      "command": "powershell -ExecutionPolicy Bypass -File ${workspaceFolder}/scripts/build.ps1 -Mod LimbTweaks -SkipDeploy -SkipPackage; if($?) { powershell -ExecutionPolicy Bypass -File ${workspaceFolder}/scripts/build.ps1 -Mod SquadCommand -SkipDeploy -SkipPackage }",
+      "group": "build",
+      "problemMatcher": ["$msCompile"]
+    },
+    {
+      "label": "Deploy LimbTweaks",
+      "type": "shell",
+      "command": "powershell -NoProfile -Command \"$src='${workspaceFolder}/LimbTweaks/bin/Release/net6.0/ER2_LimbTweaks.dll'; $dst='E:/SteamLibrary/steamapps/common/Easy Red 2/BepInEx/plugins/ER2_LimbTweaks.dll'; $deadline=(Get-Date).AddMinutes(5); $ok=$false; while((Get-Date)-lt $deadline){ try { Copy-Item $src $dst -Force -ErrorAction Stop; $ok=$true; break } catch { Start-Sleep -Seconds 10 } }; if($ok){ Write-Host 'Deployed' } else { Write-Host 'FAILED: locked' }; Remove-Item 'E:/SteamLibrary/steamapps/common/Easy Red 2/BepInEx/config/er2.limbtweaks.cfg' -Force -ErrorAction SilentlyContinue\"",
+      "dependsOn": ["Build LimbTweaks"],
+      "problemMatcher": []
+    },
+    {
+      "label": "Deploy WeatherControl",
+      "type": "shell",
+      "command": "powershell -NoProfile -Command \"$src='${workspaceFolder}/WeatherControl/bin/Release/net6.0/ER2_WeatherControl.dll'; $dst='E:/SteamLibrary/steamapps/common/Easy Red 2/BepInEx/plugins/ER2_WeatherControl.dll'; $deadline=(Get-Date).AddMinutes(5); $ok=$false; while((Get-Date)-lt $deadline){ try { Copy-Item $src $dst -Force -ErrorAction Stop; $ok=$true; break } catch { Start-Sleep -Seconds 10 } }; if($ok){ Write-Host 'Deployed' } else { Write-Host 'FAILED: locked' }; Remove-Item 'E:/SteamLibrary/steamapps/common/Easy Red 2/BepInEx/config/er2.weathercontrol.cfg' -Force -ErrorAction SilentlyContinue\"",
+      "dependsOn": ["Build WeatherControl"],
+      "problemMatcher": []
+    },
+    {
+      "label": "Deploy SquadCommand (standard workflow)",
+      "type": "shell",
+      "command": "powershell -ExecutionPolicy Bypass -File ${workspaceFolder}/scripts/build.ps1 -Mod SquadCommand",
+      "dependsOn": ["Build SquadCommand"],
+      "problemMatcher": []
+    },
+    {
+      "label": "Build+Deploy SquadCommand (SkipPackage)",
+      "type": "shell",
+      "command": "powershell -ExecutionPolicy Bypass -File ${workspaceFolder}/scripts/build.ps1 -Mod SquadCommand -SkipPackage",
+      "problemMatcher": []
+    },
+    {
+      "label": "View Game Log",
+      "type": "shell",
+      "command": "powershell -NoProfile -Command \"Get-Content 'E:/SteamLibrary/steamapps/common/Easy Red 2/BepInEx/LogOutput.log' -Tail 100\"",
+      "problemMatcher": []
+    },
+    {
+      "label": "View SquadCommand Log",
+      "type": "shell",
+      "command": "powershell -NoProfile -Command \"Select-String 'E:/SteamLibrary/steamapps/common/Easy Red 2/BepInEx/LogOutput.log' -Pattern 'SquadCmd' | Select-Object -Last 80\"",
+      "problemMatcher": []
+    },
+    {
+      "label": "Package SquadCommand",
+      "type": "shell",
+      "command": "powershell -ExecutionPolicy Bypass -File ${workspaceFolder}/scripts/build.ps1 -Mod SquadCommand -SkipDeploy",
+      "dependsOn": ["Build SquadCommand"],
+      "problemMatcher": []
+    },
+    {
+      "label": "Package LimbTweaks",
+      "type": "shell",
+      "command": "powershell -NoProfile -Command \"Copy-Item '${workspaceFolder}/LimbTweaks/bin/Release/net6.0/ER2_LimbTweaks.dll' 'C:/Users/71011/Downloads/ER2_LimbTweaks/ER2_LimbTweaks.dll' -Force; Compress-Archive -Path 'C:/Users/71011/Downloads/ER2_LimbTweaks/*' -DestinationPath 'C:/Users/71011/Downloads/ER2_LimbTweaks_v2.13.54.zip' -Force\"",
+      "dependsOn": ["Build LimbTweaks"],
+      "problemMatcher": []
+    }
+  ]
+}

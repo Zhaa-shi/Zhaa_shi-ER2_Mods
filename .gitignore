@@ -1,0 +1,32 @@
+# 构建产物
+[Bb]in/
+[Oo]bj/
+*.user
+*.suo
+
+# 大型研究/反编译产物（不进版本库，需要时另行归档）
+research_out/deployed_dump/
+research_out/battle/
+research_out/code/
+research_out/code2/
+research_out/code_rm/
+research_out/code_sgui/
+research_out/dev_unitinfo_interop/
+research_out/directcontrol/
+research_out/hvt_diag/
+research_out/hvt_shots/
+research_out/killfeed_ref/
+research_out/morephysics_diag/
+research_out/morephysics_v0147/
+research_out/mp017_decompiled/
+research_out/mp017_original/
+research_out/openfracture/
+research_out/redump/
+research_out/sounds/
+research_out/squad_camera/
+research_out/thirdparty/
+
+# 临时文件
+*.tmp
+patch_*.py
+rebuild_*.py

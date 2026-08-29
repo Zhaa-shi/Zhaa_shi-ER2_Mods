@@ -1,0 +1,25 @@
+{
+  "folders": [
+    { "name": "ER2_Mods", "path": "D:/Users/71011/Documents/ER2_Mods" }
+  ],
+  "settings": {
+    "files.encoding": "utf8",
+    "dotnet.defaultSolution": "",
+    "omnisharp.enableEditorConfigSupport": true,
+    "search.exclude": {
+      "**/bin": true,
+      "**/obj": true
+    },
+    "files.watcherExclude": {
+      "**/bin/**": true,
+      "**/obj/**": true
+    },
+    "editor.formatOnSave": true
+  },
+  "extensions": {
+    "recommendations": [
+      "ms-dotnettools.csharp",
+      "ms-vscode.powershell"
+    ]
+  }
+}
