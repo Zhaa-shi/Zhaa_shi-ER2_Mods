@@ -872,6 +872,7 @@ internal static class GodViewController
 	private static float pendingBoardNext;
 	private static HashSet<long> pendingBoardIssued = new HashSet<long>();
 	private static readonly Dictionary<long, float> issuedAt = new Dictionary<long, float>();
+	private static readonly Dictionary<long, float> guideAt = new Dictionary<long, float>();
 	private static Vector3? lastGuideVehPos;
 
 	/// <summary>标记后：选中单位向目标推进（借 M7 修正循环），到达交战距离即停由原生接战。</summary>
@@ -1159,11 +1160,17 @@ internal static class GodViewController
 						new Lua_Soldier(bs).boardVehicle(new Lua_Vehicle(veh));
 						SquadCmdLogic.Log("[BoardPending] boardVehicle " + (issued ? "重发 " : "") + SafeName(bs));
 					}
-					else if (refresh || !issued)
+					else
 					{
-						// 阶段1：就近方位直线追车（车不动则不重发；未发过者始终引导）
-						Vector3 p = NearSideApproachPoint(bs, veh);
-						new Lua_Soldier(bs).moveTo(p);
+						// 0.7.76：接近命令只在 车移动>2m 或 距上次引导>3s 时才发——
+						// moveTo 是持久命令，0.5s 重发会不断打断原生移动（登车卡顿根因）
+						guideAt.TryGetValue(k, out float g0);
+						if (refresh || Time.unscaledTime - g0 > 3f)
+						{
+							guideAt[k] = Time.unscaledTime;
+							Vector3 p = NearSideApproachPoint(bs, veh);
+							new Lua_Soldier(bs).moveTo(p);
+						}
 					}
 				}
 				catch { } // 单兵异常跳过，不取消整批登车
