@@ -1329,6 +1329,7 @@ internal static class GodViewController
 		}
 		if (overflow.Count > 0)
 		{
+			string extra = "";
 			// 0.7.73：落选者自动编入"待命分队"——脱离原队 S 的跟随/任务链（乱走根因），
 			// 原地待命；玩家之后可正常选中他们（已在 rtsSquadSet，走原生链移动/合并）
 			Squad waitSq = CreateNewSquad();
@@ -1351,7 +1352,6 @@ internal static class GodViewController
 		}
 		// 0.7.67：两段式登车——阶段1 纯步兵直线接近（不与原生登车移动源打架，杜绝"先分散"）；
 		// 阶段2 距车 6m 内才发 boardVehicle（原生立即塞入）。转队/登记在完成后执行。
-		string extra = "";
 		if (n > 0)
 		{
 			List<Soldier> wait = new List<Soldier>();
