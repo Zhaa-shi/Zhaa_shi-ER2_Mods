@@ -1329,6 +1329,21 @@ internal static class GodViewController
 		}
 		if (overflow.Count > 0)
 		{
+			// 0.7.73：落选者自动编入"待命分队"——脱离原队 S 的跟随/任务链（乱走根因），
+			// 原地待命；玩家之后可正常选中他们（已在 rtsSquadSet，走原生链移动/合并）
+			Squad waitSq = CreateNewSquad();
+			if (waitSq != null)
+			{
+				int moved = 0;
+				foreach (Soldier s in overflow)
+				{
+					try { if (AddInfantryToSquadTo(s, waitSq)) moved++; } catch { }
+				}
+				rtsSquadSet.Add((long)waitSq.Pointer);
+				try { new Lua_Soldier(overflow[0]).stop(); } catch { }
+				SquadCmdLogic.Log("[BoardPending] 待命分队建立 人数=" + moved + " 队=0x" + ((long)waitSq.Pointer).ToString("X") + "（脱离原队跟随链，原地待命）");
+				extra = "，余 " + moved + " 人入待命组";
+			}
 			foreach (Soldier s in overflow)
 			{
 				try { new Lua_Soldier(s).stop(); } catch { }
