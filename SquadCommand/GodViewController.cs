@@ -170,6 +170,7 @@ internal static class GodViewController
 	private static readonly Dictionary<long, double> mvPathAcc = new Dictionary<long, double>();
 	private static float mvQualityStart = -10f;
 	private static int mvFixCount;
+	private static float mvArriveDist = 8f; // 0.7.75：本次移动的到达判定半径（fast=30m，避免与原生散开拉扯）
 	private static float mvLastCheck = -10f;
 	private static readonly List<Soldier> rushNoEngage = new List<Soldier>(); // 冲锋期禁索敌名单
 
@@ -250,7 +251,7 @@ internal static class GodViewController
 				float d = (u.transform.position - mvTarget).magnitude;
 				long key = (long)u.Pointer;
 				bool prev = mvLastDist.TryGetValue(key, out float pd);
-				if (d <= Plugin.radius.Value) { arrived++; mvLastDist[key] = d; continue; }
+				if (d <= mvArriveDist) { arrived++; mvLastDist[key] = d; continue; }
 				if (!prev || d < pd - 0.5f) mvLastDist[key] = d;      // 在接近：不打扰
 				else { stalled++; fix.Add(u); }                        // 停滞/被抢任务：待修正
 			}
@@ -880,6 +881,7 @@ internal static class GodViewController
 		mvUnits.Clear();
 		foreach (Soldier s in GetSelectedInfantry()) if (s != null && s.IsAlive) mvUnits.Add(s);
 		mvLastDist.Clear(); mvActive = mvUnits.Count > 0; mvFromMark = mvActive; mvLastCheck = Time.unscaledTime;
+		mvArriveDist = Plugin.radius.Value; // 标记推进精确到位
 	}
 
 	internal static bool SuppressingUi
@@ -3061,6 +3063,7 @@ internal static class GodViewController
 			mvLastPos.Clear();
 			foreach (Soldier s3 in mvUnits) try { mvLastPos[(long)s3.Pointer] = s3.transform.position; } catch { }
 			mvQualityStart = Time.unscaledTime; mvFixCount = 0;
+			mvArriveDist = fast ? 30f : Plugin.radius.Value; // 0.7.75：快速模式到达半径拉大（30m 内即算到位，不与原生散开拉扯）
 		}
 		mvFromMark = false;
 		RecordCmdTarget(point);
