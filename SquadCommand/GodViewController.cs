@@ -664,6 +664,7 @@ internal static class GodViewController
 	/// <summary>移动：只对选中步兵逐单位 moveTo（AI 命令通道）。</summary>
 	internal static int MoveUnits(List<Soldier> units, Vector3 point)
 	{
+		string extra = "";
 		int n = 0;
 		if (units == null) return 0;
 		foreach (Soldier s in units)
@@ -1329,7 +1330,6 @@ internal static class GodViewController
 		}
 		if (overflow.Count > 0)
 		{
-			string extra = "";
 			// 0.7.73：落选者自动编入"待命分队"——脱离原队 S 的跟随/任务链（乱走根因），
 			// 原地待命；玩家之后可正常选中他们（已在 rtsSquadSet，走原生链移动/合并）
 			Squad waitSq = CreateNewSquad();
