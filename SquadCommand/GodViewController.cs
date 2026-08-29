@@ -870,6 +870,7 @@ internal static class GodViewController
 	private static float pendingBoardUntil;
 	private static float pendingBoardNext;
 	private static HashSet<long> pendingBoardIssued = new HashSet<long>();
+	private static readonly Dictionary<long, float> issuedAt = new Dictionary<long, float>();
 	private static Vector3? lastGuideVehPos;
 
 	/// <summary>标记后：选中单位向目标推进（借 M7 修正循环），到达交战距离即停由原生接战。</summary>
@@ -1130,32 +1131,48 @@ internal static class GodViewController
 			bool refresh = !lastGuideVehPos.HasValue
 				|| (veh.transform.position - lastGuideVehPos.Value).sqrMagnitude > 4f;
 			if (refresh) lastGuideVehPos = veh.transform.position;
+			// 0.7.74：车内成员实时集合（完成判据=全员真实在车，而非"已发命令"）
+			HashSet<long> inCar = new HashSet<long>();
+			try
+			{
+				Soldier[] occ = veh.GetComponentsInChildren<Soldier>();
+				if (occ != null) for (int i = 0; i < occ.Length; i++) if (occ[i] != null && occ[i].IsAlive) inCar.Add((long)occ[i].Pointer);
+			}
+			catch { }
 			foreach (Soldier bs in pendingBoardUnits)
 			{
 				try
 				{
 					if (bs == null || !bs.IsAlive) continue;
 					long k = (long)bs.Pointer;
-					if (pendingBoardIssued.Contains(k)) continue;
+					if (inCar.Contains(k)) continue; // 已真实在车
 					float d = (bs.transform.position - veh.transform.position).magnitude;
-					if (d < 8f)
+					bool issued = pendingBoardIssued.Contains(k);
+					if (d < 10f)
 					{
-						new Lua_Soldier(bs).boardVehicle(new Lua_Vehicle(veh)); // 阶段2：近距离原生塞入
+						// 阶段2：近距离登车。已发但 8s 未进车（原生登车被打断/失败）→ 自动重发
+						if (issued && issuedAt.TryGetValue(k, out float t0) && Time.unscaledTime - t0 < 8f) continue;
+						issuedAt[k] = Time.unscaledTime;
 						pendingBoardIssued.Add(k);
+						new Lua_Soldier(bs).boardVehicle(new Lua_Vehicle(veh));
+						SquadCmdLogic.Log("[BoardPending] boardVehicle " + (issued ? "重发 " : "") + SafeName(bs));
 					}
-					else if (refresh)
+					else if (refresh || !issued)
 					{
-						// 阶段1：就近方位直线追车（车不动则不重发命令）
+						// 阶段1：就近方位直线追车（车不动则不重发；未发过者始终引导）
 						Vector3 p = NearSideApproachPoint(bs, veh);
 						new Lua_Soldier(bs).moveTo(p);
 					}
 				}
 				catch { } // 单兵异常跳过，不取消整批登车
 			}
-			if (pendingBoardIssued.Count >= pendingBoardUnits.Count)
+			// 完成判据：全部存活乘员真实在车
+			bool allIn = true;
+			foreach (Soldier bs in pendingBoardUnits)
 			{
-				FinishBoardPending("全员登车");
+				try { if (bs != null && bs.IsAlive && !inCar.Contains((long)bs.Pointer)) { allIn = false; break; } } catch { }
 			}
+			if (allIn) { FinishBoardPending("全员在车"); return; }
 		}
 		catch { } // 0.7.69：单轮异常跳过本轮，不取消整批登车
 	}
@@ -3026,34 +3043,8 @@ internal static class GodViewController
 			return;
 		}
 		List<Soldier> infantry = GetSelectedInfantry();
-		int movedInf = 0;
-		// 0.7.69：按所属小队分组下发——RTS 分队（∈rtsSquadSet）走 Squad 原生订单链：
-		// 原生队形+原生驱动，无逐兵 stop 修正，不卡顿。未分队散兵走逐兵直奔。双击右键=全部直奔（fast）。
-		Dictionary<long, List<Soldier>> bySquad = new Dictionary<long, List<Soldier>>();
-		List<Soldier> loose = new List<Soldier>();
-		foreach (Soldier u in infantry)
-		{
-			if (u == null || !u.IsAlive) continue;
-			Squad q = null; try { q = u.joinedSquad; } catch { }
-			if (!fast && q != null && rtsSquadSet.Contains((long)q.Pointer))
-			{
-				long k = (long)q.Pointer;
-				if (!bySquad.ContainsKey(k)) bySquad[k] = new List<Soldier>();
-				bySquad[k].Add(u);
-			}
-			else loose.Add(u);
-		}
-		foreach (var kv in bySquad)
-		{
-			try
-			{
-				new Lua_Squad(kv.Value[0].joinedSquad).moveTo(point, Plugin.radius.Value);
-				movedInf += kv.Value.Count;
-				SquadCmdLogic.Log("[SquadMove] 队=0x" + kv.Key.ToString("X") + " 目标=" + point.ToString("0.0") + " via=Lua_Squad 人数=" + kv.Value.Count);
-			}
-			catch (Exception ex) { SquadCmdLogic.Log("[SquadMove] 失败: " + ex.Message + "（该组回退逐兵）"); movedInf += MoveUnits(kv.Value, point); }
-		}
-		if (loose.Count > 0) movedInf += MoveUnits(loose, point);
+		// 0.7.74：步兵全部逐兵直奔（Squad 链的"整队等队友"太慢，实测放弃）
+		int movedInf = MoveUnits(infantry, point);
 		int driven = 0;
 		foreach (Vehicle vv in new List<Vehicle>(selVehicleRefs))
 		{
@@ -3062,9 +3053,9 @@ internal static class GodViewController
 		if (movedInf > 0 || driven > 0)
 		{
 			SquadCmdLogic.StartTrackingUnits(infantry.Count > 0 ? infantry : null, point);
-			// M7：仅登记"逐兵组"（Squad 链单位由原生驱动，无需修正）
+			// M7：登记全部步兵
 			mvTarget = point; mvUnits.Clear();
-			foreach (Soldier s3 in loose) if (s3 != null && s3.IsAlive) mvUnits.Add(s3);
+			foreach (Soldier s3 in infantry) if (s3 != null && s3.IsAlive) mvUnits.Add(s3);
 			mvLastDist.Clear(); mvActive = mvUnits.Count > 0; mvLastCheck = fast ? -10f : Time.unscaledTime; // fast：立即修正一轮
 			// 0.7.62：路径质量统计复位
 			mvLastPos.Clear();
