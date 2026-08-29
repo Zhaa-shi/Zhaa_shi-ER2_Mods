@@ -1186,7 +1186,7 @@ internal static class GodViewController
 		try { pendingBoardIssued.Clear(); } catch { }
 	}
 
-	/// <summary>0.7.71：登车接近点=士兵当前方位一侧距车 2.5m 处（就近接近，无穿插无分散）。</summary>
+	/// <summary>0.7.72：登车接近点=士兵当前方位一侧距车 4m 处（就近接近；太近会落在车体碰撞内引发寻路抖动）。</summary>
 	private static Vector3 NearSideApproachPoint(Soldier s, Vehicle veh)
 	{
 		Vector3 vp = veh.transform.position;
@@ -1194,7 +1194,7 @@ internal static class GodViewController
 		Vector3 dir = sp - vp; dir.y = 0f;
 		if (dir.sqrMagnitude < 0.01f) dir = veh.transform.forward; // 士兵恰在车上：用车头方向
 		dir.Normalize();
-		return vp + dir * 2.5f;
+		return vp + dir * 4f;
 	}
 
 	private static void CancelBoardPending(string reason)
@@ -1321,10 +1321,18 @@ internal static class GodViewController
 		// 导致原生登车路线（分散→走登车点）与我们的环形接近引导双源竞争（先分散/乱走/到车旁不上车）。
 		// boardVehicle 统一在 BoardPendingTick 阶段2（距车 8m 内）才发出。
 		int n = 0;
+		List<Soldier> overflow = new List<Soldier>(); // 0.7.72：超员落选者——原地停止待命，消除乱走
 		foreach (Soldier s in units)
 		{
-			if (n >= seats) { cmdFlash = "上车 → " + n + " 人（载具已满，余 " + (units.Count - n) + " 人等待）"; cmdFlashUntil = Time.unscaledTime + 3f; break; }
+			if (n >= seats) { overflow.Add(s); continue; }
 			n++;
+		}
+		if (overflow.Count > 0)
+		{
+			foreach (Soldier s in overflow)
+			{
+				try { new Lua_Soldier(s).stop(); } catch { }
+			}
 		}
 		// 0.7.67：两段式登车——阶段1 纯步兵直线接近（不与原生登车移动源打架，杜绝"先分散"）；
 		// 阶段2 距车 6m 内才发 boardVehicle（原生立即塞入）。转队/登记在完成后执行。
@@ -1366,7 +1374,7 @@ internal static class GodViewController
 		RecordCmdTarget(veh.transform.position);
 		// 保持选择连续性：上车的士兵会被原生移出原小队编入车组，步兵选择会凭空消失——
 		// 这里把选择转换为该车组的载具选择（座位不够时只保留实际上车者）
-		cmdFlash = "上车 → " + n + " 人（登车中…）" + extra; cmdFlashUntil = Time.unscaledTime + 3f;
+		cmdFlash = "上车 → " + n + " 人（登车中…）" + (overflow.Count > 0 ? "，余 " + overflow.Count + " 人原地待命" : "") + extra; cmdFlashUntil = Time.unscaledTime + 3f;
 		SquadCmdLogic.Log("[SquadCmd] 上车发起 " + veh.name + " 人数=" + n + " 空位=" + seats + "（boardVehicle 延迟至阶段2）");
 		RTSTrace("BoardVehicleExit", "vehicle=" + veh.name + " boarded=" + n);
 		return n;
