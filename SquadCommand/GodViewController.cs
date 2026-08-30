@@ -3054,6 +3054,18 @@ internal static class GodViewController
 			}
 		}
 		ClearFollow("下达移动", false);
+		// 0.7.78：玩家新命令优先——把选中的、尚未发出 boardVehicle 的乘员从登车 pending 摘除，
+		// 否则登车引导（阶段1）会持续拉他们回车边，与本次移动命令竞争（原地踏步根因）。
+		if (pendingBoardVeh != null && pendingBoardUnits != null)
+		{
+			List<Soldier> sel = GetSelectedInfantry();
+			int removed = pendingBoardUnits.RemoveAll(s =>
+			{
+				try { if (s == null) return true; return sel.Any(x => x != null && (long)x.Pointer == (long)s.Pointer); } catch { return false; }
+			});
+			if (pendingBoardUnits.Count == 0) CancelBoardPending("玩家下达了新命令");
+			else if (removed > 0) SquadCmdLogic.Log("[BoardPending] 摘除 " + removed + " 名改令乘员（余 " + pendingBoardUnits.Count + " 人继续登车）");
+		}
 		ResetEngagement();
 		RestoreFireWill();
 		if (SelTotal == 0)
