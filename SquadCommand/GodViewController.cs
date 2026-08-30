@@ -2052,12 +2052,12 @@ internal static class GodViewController
 		}
 
 		// 输入先处理，避免相机/原生对象访问异常阻断鼠标手势收尾。
-		try { HandleGroupHotkeys(); } catch { }
+		try { if (!NativePanelBlocking()) HandleGroupHotkeys(); } catch { }
 		// 0.9.4：RTS 内 M 键开关原生大地图——直接调 MapGUI.OpenMap/CloseMap
 		//（0.9.3 已确认 MiniMapOpened 是死 API：全程序集无人调用，显隐由 MapGUI 管理）
 		try
 		{
-			if (Input.GetKeyDown(KeyCode.M))
+			if (Input.GetKeyDown(KeyCode.M) && !NativePanelBlocking())
 			{
 				if (mapGuiCached == null) { try { mapGuiCached = UnityEngine.Object.FindObjectOfType(Il2CppInterop.Runtime.Il2CppType.Of<MapGUI>()) as MapGUI; } catch { } }
 				if (mapGuiCached != null)
@@ -2076,10 +2076,21 @@ internal static class GodViewController
 			SquadCmdLogic.LogAlways("[SquadCmd] 输入处理失败，已复位 RTS 手势: " + ex.Message);
 		}
 
+		// 0.9.5：RTS 内 ESC 打开原生暂停/设置菜单（无面板时才响应；关闭菜单由原生恢复时间流速）
 		try
 		{
-			// 空格暂停
-			if (Input.GetKeyDown(KeyCode.Space)) TogglePause();
+			if (Input.GetKeyDown(KeyCode.Escape) && !Pause.HavePanel())
+			{
+				Pause.SetPause(true);
+				SquadCmdLogic.LogAlways("[SquadCmd] ESC 打开原生菜单");
+			}
+		}
+		catch (Exception ex) { SquadCmdLogic.LogAlways("[SquadCmd] ESC 菜单打开失败: " + ex.Message); }
+
+		try
+		{
+			// 空格暂停（0.9.5：原生面板打开期间让位）
+			if (!NativePanelBlocking() && Input.GetKeyDown(KeyCode.Space)) TogglePause();
 			// 用 unscaledDeltaTime：空格暂停（timeScale=0）时镜头仍可移动
 			float dt = Mathf.Min(Time.unscaledDeltaTime, 0.05f);
 			HandleMove(dt);
@@ -2290,6 +2301,12 @@ internal static class GodViewController
 		try { return Active && MiniMapGUI.MiniMapOpened; } catch { return false; }
 	}
 
+	/// <summary>0.9.5：原生暂停/设置面板打开期间，本 mod 的按键与战场点击全部让位。</summary>
+	private static bool NativePanelBlocking()
+	{
+		try { return Pause.HavePanel(); } catch { return false; }
+	}
+
 	private static void HandleClickCore()
 	{
 		bool leftDown = Input.GetMouseButtonDown(0);
@@ -2298,7 +2315,7 @@ internal static class GodViewController
 		bool rightDown = Input.GetMouseButtonDown(1);
 		bool rightHeld = Input.GetMouseButton(1);
 		bool rightUp = Input.GetMouseButtonUp(1);
-		bool guiNow = IsMouseOverGui() || MiniMapGuiBlocking(); // 0.9.0：RTS 内大地图打开时点击归地图
+		bool guiNow = IsMouseOverGui() || MiniMapGuiBlocking() || NativePanelBlocking(); // 0.9.5：地图/原生面板打开时点击让位
 
 		// 轮盘打开期间，Update 只负责收尾手势；按钮点击和右键关闭由 OnGUI 处理。
 		// 不能让旧的 rightHoldActive 卡在轮盘状态里。
