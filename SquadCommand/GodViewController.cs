@@ -429,6 +429,7 @@ internal static class GodViewController
 
 	// ===== 0.7.68 重建段：0.7.68 误删段恢复（选择/命令/标记方法与字段，源=各历史版本最终形态）=====
 	private static Vector2 lastRightBlankClickPos;
+	private static Vector3? lastMovePoint; // 0.7.77：最近一次移动目标（双击第二击复用，避免重新 raycast 使标记乱飞）
 	private static bool isDragging;
 	private static Vector2 pressStart;
 	// 手感
@@ -2160,8 +2161,17 @@ internal static class GodViewController
 					&& Vector2.Distance(MouseGui(), lastRightBlankClickPos) < 40f; // 0.7.64：双击右键=快速模式
 				lastRightBlankClickTime = nowR;
 				lastRightBlankClickPos = MouseGui();
-				IssueDirectCommand(rightDownScreenPos, dbl);
-				if (dbl) { cmdFlash = "快速移动"; cmdFlashUntil = Time.unscaledTime + 1.5f; }
+				if (dbl && lastMovePoint.HasValue)
+				{
+					// 0.7.77：双击第二击=对第一击的同一目标切快速模式（复用目标点，不重新 raycast——
+					// 远距离时 40px 屏幕偏移对应地面几十米，重新取点会让目标标记乱飞）
+					MoveCommandTo(lastMovePoint.Value, true);
+					cmdFlash = "快速移动（同一目标）"; cmdFlashUntil = Time.unscaledTime + 1.5f;
+				}
+				else
+				{
+					IssueDirectCommand(rightDownScreenPos);
+				}
 			}
 			rightHoldActive = false;
 		}
@@ -3073,6 +3083,7 @@ internal static class GodViewController
 			mvArriveDist = fast ? 30f : Plugin.radius.Value; // 0.7.75：快速模式到达半径拉大（30m 内即算到位，不与原生散开拉扯）
 		}
 		mvFromMark = false;
+		lastMovePoint = point;
 		RecordCmdTarget(point);
 		cmdFlash = "移动 → 步兵 " + movedInf + " + 载具 " + driven + (fast ? "（快速）" : ""); cmdFlashUntil = Time.unscaledTime + 3f;
 		SquadCmdLogic.Log("[SquadCmd] 移动 point=" + point.ToString("0.0") + " 步兵=" + movedInf + " 载具=" + driven + (fast ? " 快速" : ""));
