@@ -739,6 +739,8 @@ internal static class GodViewController
 	private static Vector3 obsTarget;
 	private static readonly List<Soldier> obsUnits = new List<Soldier>();
 	private static readonly List<Vehicle> obsVehicles = new List<Vehicle>();
+	// 0.9.10：行军禁索敌名单——移动命令优先于自动交火（到位/超时/改令即恢复）
+	private static readonly List<Soldier> obsNoEngage = new List<Soldier>();
 	private static float obsUntil = -10f;
 	private static float obsNext = -10f;
 	internal static int ObsArrived; // HUD 进度行用
@@ -807,6 +809,15 @@ internal static class GodViewController
 		if (unit == null) return;
 		try { persistentMarkUnits.RemoveAll(s => s == null || s.Pointer == unit.Pointer); } catch { }
 		try { obsUnits.RemoveAll(s => s == null || s.Pointer == unit.Pointer); } catch { } // 接管单位不再计入移动完成度
+		try
+		{
+			// 0.9.10：被接管单位若在行军禁索敌名单中，恢复索敌再移除
+			if (obsNoEngage.RemoveAll(s => s == null || s.Pointer == unit.Pointer) > 0)
+			{
+				try { new Lua_Soldier(unit).getAiParams().allowCheckForEnemies(true); } catch { }
+			}
+		}
+		catch { }
 		// 接管车内单位时，连同该单位所在的持久载具标记一起摘除，
 		// 避免 FPS 接管后仍由本 Mod 改写玩家载具的目标。
 		try
@@ -1124,20 +1135,38 @@ internal static class GodViewController
 		if (selVehicleRefs.Count == 0) SquadCmdLogic.Log("[SplitCheck] 无选中载具（纯步兵分队）");
 	}
 
-	/// <summary>0.7.99：下达移动后登记完成度观测（纯观察，不动 AI）。</summary>
+	/// <summary>0.7.99：下达移动后登记完成度观测（纯观察，不动 AI）。0.9.10：同时关闭行军单位索敌。</summary>
 	private static void RegisterMoveObservation(Vector3 point, List<Soldier> units)
 	{
 		obsTarget = point;
 		obsUnits.Clear();
-		if (units != null) foreach (Soldier s in units) if (s != null && s.IsAlive) obsUnits.Add(s);
+		foreach (Soldier s in units)
+		{
+			if (s == null || !s.IsAlive) continue;
+			obsUnits.Add(s);
+			try
+			{
+				// 0.9.10：移动优先——行军期间禁索敌（原生没有"优先级"旋钮，到位即恢复）
+				SquadCmdLogic.RegisterControlledUnit(s);
+				new Lua_Soldier(s).getAiParams().allowCheckForEnemies(false);
+				if (!obsNoEngage.Contains(s)) obsNoEngage.Add(s);
+			}
+			catch { }
+		}
 		obsUntil = Time.unscaledTime + 45f;
 		obsNext = Time.unscaledTime + 1f;
-		ObsTotal = obsUnits.Count;
+		ObsTotal = obsUnits.Count + obsVehicles.Count;
 		ObsArrived = 0;
 	}
 
 	private static void ClearMoveObservation()
 	{
+		// 0.9.10：观测结束（到位/超时/改令）恢复行军单位自动交火
+		foreach (Soldier s in obsNoEngage)
+		{
+			try { if (s != null && s.IsAlive) new Lua_Soldier(s).getAiParams().allowCheckForEnemies(true); } catch { }
+		}
+		obsNoEngage.Clear();
 		obsUnits.Clear();
 		obsVehicles.Clear();
 		obsUntil = -10f;
@@ -2182,6 +2211,30 @@ internal static class GodViewController
 
 	internal static void FrameEndGuard()
 	{
+		if (Active)
+		{
+			// 0.9.10：战斗结束/返回主菜单检测——BattleManager 已销毁时强制退出上帝视角，
+			// 解除原生相机/输入跳过（否则菜单里视角残留俯视）。此方法经 DontDestroyOnLoad
+			// 的 FrameEndRunner 每帧调用，跨场景存活，是唯一的清理时机。
+			try
+			{
+				BattleManager bm = BattleManager.instance;
+				if (bm == null || bm.transform == null)
+				{
+					Active = false;
+					EnsureTimeResumed();
+					escMenuOpen = false;
+					SetCursor(false);
+					ResetInputState(false);
+					ClearMoveObservation();
+					ClearSelection();
+					SquadCmdLogic.ClearControlledSelection();
+					mapGuiCached = null;
+					SquadCmdLogic.LogAlways("[SquadCmd] 检测到战斗结束/返回主菜单，上帝视角已自动退出并还原相机");
+				}
+			}
+			catch { }
+		}
 		if (!Active) return;
 		try
 		{
