@@ -35,3 +35,4 @@ research_out/real_ilspy_squad/
 *.tmp
 patch_*.py
 rebuild_*.py
+mm_toggle_dump/

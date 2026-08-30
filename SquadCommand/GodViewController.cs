@@ -2052,8 +2052,29 @@ internal static class GodViewController
 
 		// 输入先处理，避免相机/原生对象访问异常阻断鼠标手势收尾。
 		try { HandleGroupHotkeys(); } catch { }
-		// 0.9.0：RTS 内 M 键开关原生大地图（原生输入链被跳过，这里代触发）
-		try { if (Input.GetKeyDown(KeyCode.M)) MiniMapGUI.MiniMapOpened = !MiniMapGUI.MiniMapOpened; } catch { }
+		// 0.9.3：RTS 内 M 键开关原生大地图——属性翻转 + 容器/CanvasGroup 强可视兜底 + 诊断日志
+		try
+		{
+			if (Input.GetKeyDown(KeyCode.M))
+			{
+				MiniMapGUI.MiniMapOpened = !MiniMapGUI.MiniMapOpened;
+				var inst = MiniMapGUI.Instance;
+				if (inst != null && inst.miniMap != null)
+				{
+					GameObject go = inst.miniMap.gameObject;
+					go.SetActive(MiniMapGUI.MiniMapOpened);
+					CanvasGroup cg = inst.miniMap.GetComponent<CanvasGroup>();
+					if (cg == null) cg = inst.miniMap.GetComponentInChildren<CanvasGroup>();
+					if (cg != null) cg.alpha = MiniMapGUI.MiniMapOpened ? 1f : 0f;
+					SquadCmdLogic.LogAlways("[SquadCmd] M 地图 open=" + MiniMapGUI.MiniMapOpened
+						+ " 容器=" + go.name + " activeSelf=" + go.activeSelf
+						+ " scale=" + inst.miniMap.localScale.ToString("0.00")
+						+ " cgAlpha=" + (cg != null ? cg.alpha.ToString("0.00") : "无"));
+				}
+				else SquadCmdLogic.LogAlways("[SquadCmd] M 地图 open=" + MiniMapGUI.MiniMapOpened + " 容器=null（Instance 未就绪）");
+			}
+		}
+		catch (Exception ex) { SquadCmdLogic.LogAlways("[SquadCmd] M 地图切换失败: " + ex.Message); }
 		try { HandleClick(); }
 		catch (Exception ex)
 		{
@@ -2839,7 +2860,7 @@ internal static class GodViewController
 				smFriendlyNext = t + 1f;
 				RebuildFriendlyCache();
 			}
-			Color dim = new Color(uiHover.r, uiHover.g, uiHover.b, 0.5f); // 0.9.2：中绿半透明——暗地形上也可见
+			Color dim = new Color(0.88f, 0.88f, 0.88f, 0.68f); // 0.9.3：灰白——任何地形上都可见
 			int drawn = 0;
 			foreach (Soldier s in smFriendly)
 			{
@@ -3149,13 +3170,18 @@ internal static class GodViewController
 			if (sq == null) continue;
 			Rect r = new Rect(startX, y, PanelW, PanelH);
 			bool isSel = mainSquad != null && sq.Pointer == mainSquad.Pointer;
+			// 0.9.3：行=编号单元格 + 符号区（符号在剩余宽度内居中，随数量动态调整）
 			GUI.color = isSel ? uiHover : new Color(uiBase.r, uiBase.g, uiBase.b, 0.82f);
 			GUI.DrawTexture(r, Texture2D.whiteTexture);
+			Rect numR = new Rect(r.x, r.y, 26f, r.height);
+			GUI.color = isSel ? new Color(1f, 1f, 1f, 0.55f) : new Color(uiHover.r, uiHover.g, uiHover.b, 0.4f);
+			GUI.DrawTexture(numR, Texture2D.whiteTexture);
 			GUI.color = uiText;
-			GUI.DrawTexture(new Rect(r.x, r.y, r.width, 1f), Texture2D.whiteTexture);
-			string sym = SquadSymbols(sq);
+			GUI.DrawTexture(new Rect(numR.xMax - 1f, r.y, 1f, r.height), Texture2D.whiteTexture);
 			GUI.color = isSel ? new Color(0f, 0f, 0f, 0.9f) : uiText;
-			GUI.Label(new Rect(r.x + 6f, r.y, r.width - 12f, r.height), idx + "  " + sym, st);
+			GUI.Label(numR, idx.ToString(), SquadCmdLogic.ButtonStyle());
+			GUI.color = uiText;
+			GUI.Label(new Rect(numR.xMax, r.y, r.width - numR.width, r.height), SquadSymbols(sq), SquadCmdLogic.ButtonStyle());
 			GUI.color = Color.white;
 			if (Event.current.type == EventType.MouseDown && Event.current.button == 0 && r.Contains(Event.current.mousePosition))
 			{
