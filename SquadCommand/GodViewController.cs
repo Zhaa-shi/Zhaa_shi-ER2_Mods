@@ -162,7 +162,6 @@ internal static class GodViewController
 	// ◆ 标记绘制缓存（OnGUI 每帧多 pass）
 	private static List<Soldier> markerCache = new List<Soldier>();
 	private static float markerCacheUntil = -10f;
-	private static MapGUI mapGuiCached; // 0.9.4：M 键开关大地图（FindObjectOfType 缓存一次）
 
 	// 右键长按手势状态（长按=常驻命令环，短按=直接指令）
 	private const float RightLongPressSeconds = 0.35f;
@@ -1146,9 +1145,11 @@ internal static class GodViewController
 			obsUnits.Add(s);
 			try
 			{
-				// 0.9.10：移动优先——行军期间禁索敌（原生没有"优先级"旋钮，到位即恢复）
+				// 0.9.11：移动优先——行军期间禁索敌 + 禁被压制找掩护（后者会把队伍拽出队列）
 				SquadCmdLogic.RegisterControlledUnit(s);
-				new Lua_Soldier(s).getAiParams().allowCheckForEnemies(false);
+				AiParams ap = new Lua_Soldier(s).getAiParams();
+				ap.allowCheckForEnemies(false);
+				ap.allowFindCoverWhenSuppressed(false);
 				if (!obsNoEngage.Contains(s)) obsNoEngage.Add(s);
 			}
 			catch { }
@@ -1161,10 +1162,19 @@ internal static class GodViewController
 
 	private static void ClearMoveObservation()
 	{
-		// 0.9.10：观测结束（到位/超时/改令）恢复行军单位自动交火
+		// 0.9.11：观测结束（到位/超时/改令）恢复行军单位自动交火与被压制找掩护
 		foreach (Soldier s in obsNoEngage)
 		{
-			try { if (s != null && s.IsAlive) new Lua_Soldier(s).getAiParams().allowCheckForEnemies(true); } catch { }
+			try
+			{
+				if (s != null && s.IsAlive)
+				{
+					AiParams ap = new Lua_Soldier(s).getAiParams();
+					ap.allowCheckForEnemies(true);
+					ap.allowFindCoverWhenSuppressed(true);
+				}
+			}
+			catch { }
 		}
 		obsNoEngage.Clear();
 		obsUnits.Clear();
@@ -1199,6 +1209,18 @@ internal static class GodViewController
 		if (Time.unscaledTime > obsUntil) { ClearMoveObservation(); return; }
 		if (Time.unscaledTime < obsNext) return;
 		obsNext = Time.unscaledTime + 1f;
+		// 0.9.11：每周期重申行军压制（防原生任务系统回写恢复索敌/找掩护）
+		foreach (Soldier s in obsNoEngage)
+		{
+			try
+			{
+				if (s == null || !s.IsAlive) continue;
+				AiParams ap = new Lua_Soldier(s).getAiParams();
+				ap.allowCheckForEnemies(false);
+				ap.allowFindCoverWhenSuppressed(false);
+			}
+			catch { }
+		}
 		int alive = 0, arrived = 0;
 		float r2 = Plugin.radius.Value * Plugin.radius.Value;
 		float vR = Plugin.radius.Value * 2f;
@@ -2082,51 +2104,8 @@ internal static class GodViewController
 
 		// 输入先处理，避免相机/原生对象访问异常阻断鼠标手势收尾。
 		try { if (!escMenuOpen) HandleGroupHotkeys(); } catch { }
-		// 0.9.8：M 键——不再依赖原生显隐机制（多次尝试无效），直接记录容器原态并强制显示，
-		// 关闭时恢复原态（原版状态可完整还原，不影响 FPS 正常使用）
-		try
-		{
-			if (Input.GetKeyDown(KeyCode.M) && !escMenuOpen)
-			{
-				var inst = MiniMapGUI.Instance;
-				if (inst == null || inst.miniMap == null) { SquadCmdLogic.LogAlways("[SquadCmd] M 地图：Instance/容器未就绪"); }
-				else
-				{
-					var rt = inst.miniMap;
-					GameObject go = rt.gameObject;
-					CanvasGroup cg = rt.GetComponent<CanvasGroup>();
-					if (cg == null) cg = rt.GetComponentInParent<CanvasGroup>();
-					if (!MiniMapGUI.MiniMapOpened)
-					{
-						if (!smMapCaptured)
-						{
-							smMapOrigScale = rt.localScale;
-							smMapOrigPos = rt.anchoredPosition;
-							smMapOrigAlpha = cg != null ? cg.alpha : -1f;
-							smMapCaptured = true;
-						}
-						MiniMapGUI.MiniMapOpened = true;
-						go.SetActive(true);
-						rt.localScale = Vector3.one;
-						rt.anchoredPosition = Vector2.zero;
-						if (cg != null) { cg.alpha = 1f; cg.blocksRaycasts = true; }
-						SquadCmdLogic.LogAlways("[SquadCmd] M 地图 强制显示（原态 scale=" + smMapOrigScale.ToString("0.00") + " pos=" + smMapOrigPos.ToString("0.0") + " alpha=" + smMapOrigAlpha.ToString("0.00") + "）");
-					}
-					else
-					{
-						MiniMapGUI.MiniMapOpened = false;
-						if (smMapCaptured)
-						{
-							rt.localScale = smMapOrigScale;
-							rt.anchoredPosition = smMapOrigPos;
-							if (cg != null && smMapOrigAlpha >= 0f) cg.alpha = smMapOrigAlpha;
-						}
-						SquadCmdLogic.LogAlways("[SquadCmd] M 地图 关闭（已还原原态）");
-					}
-				}
-			}
-		}
-		catch (Exception ex) { SquadCmdLogic.LogAlways("[SquadCmd] M 切换失败: " + ex.Message); }
+		// 0.9.11：原版 M 地图在 god 视角强制显示也为空（显隐机制未明），已按设计在 RTS 内禁用，
+		// 相关强制显示/还原代码一并移除；FPS 模式下 M 键走原生流程不受影响。
 		try { HandleClick(); }
 		catch (Exception ex)
 		{
@@ -2213,25 +2192,34 @@ internal static class GodViewController
 	{
 		if (Active)
 		{
-			// 0.9.10：战斗结束/返回主菜单检测——BattleManager 已销毁时强制退出上帝视角，
-			// 解除原生相机/输入跳过（否则菜单里视角残留俯视）。此方法经 DontDestroyOnLoad
-			// 的 FrameEndRunner 每帧调用，跨场景存活，是唯一的清理时机。
+			// 0.9.11：返回主菜单/战斗结束检测——BattleManager 跨场景常驻（0.9.10 判据无效），
+			// 改用"场景内无任何存活生物"（F9 紧急退出同款信号，Exit 已被实测能完整还原相机）。
+			// 连续 2s 无生物才触发，避免战斗加载间隙误判；战斗中全灭同样生效（等同紧急退出）。
 			try
 			{
-				BattleManager bm = BattleManager.instance;
-				if (bm == null || bm.transform == null)
+				int alive = 0;
+				Il2CppSystem.Collections.Generic.List<Creature> list = Creature.allCreatures;
+				if (list != null)
 				{
-					Active = false;
-					EnsureTimeResumed();
-					escMenuOpen = false;
-					SetCursor(false);
-					ResetInputState(false);
-					ClearMoveObservation();
-					ClearSelection();
-					SquadCmdLogic.ClearControlledSelection();
-					mapGuiCached = null;
-					SquadCmdLogic.LogAlways("[SquadCmd] 检测到战斗结束/返回主菜单，上帝视角已自动退出并还原相机");
+					for (int i = 0; i < list.Count; i++)
+					{
+						Creature c = list[i];
+						if (c == null || !c.IsAlive) continue;
+						alive++;
+						break;
+					}
 				}
+				if (alive == 0)
+				{
+					if (smEmptyWorldSince < 0f) smEmptyWorldSince = Time.unscaledTime;
+					else if (Time.unscaledTime - smEmptyWorldSince > 2f)
+					{
+						SquadCmdLogic.LogAlways("[SquadCmd] 检测到返回主菜单/无存活单位，自动退出上帝视角并还原相机");
+						smEmptyWorldSince = -10f;
+						Exit();
+					}
+				}
+				else smEmptyWorldSince = -10f;
 			}
 			catch { }
 		}
@@ -2394,21 +2382,11 @@ internal static class GodViewController
 		}
 	}
 
-	private static bool MiniMapGuiBlocking()
-	{
-		try { return Active && MiniMapGUI.MiniMapOpened; } catch { return false; }
-	}
-
 	// 0.9.6：ESC 菜单自持状态。0.9.5 的 Pause.HavePanel() 在 RTS 下恒为 true（常驻面板被计入），
 	// 把全部让位守卫锁死（鼠标失灵/设置地图打不开的根因）——改为只信自己开的菜单。
+	// 0.9.11：原版 M 地图在 god 视角强制显示也为空（机制未明），已按设计在 RTS 内禁用。
 	private static bool escMenuOpen;
-	private static Pause pauseInstance;
-
-	// 0.9.8：M 地图强制显示的原态备份（关闭时还原，不污染原版状态）
-	private static bool smMapCaptured;
-	private static Vector3 smMapOrigScale = Vector3.one;
-	private static Vector2 smMapOrigPos;
-	private static float smMapOrigAlpha = -1f;
+	private static float smEmptyWorldSince = -10f; // 0.9.11：无存活生物连续计时（返回主菜单检测）
 
 	private static void HandleClickCore()
 	{
@@ -2418,7 +2396,7 @@ internal static class GodViewController
 		bool rightDown = Input.GetMouseButtonDown(1);
 		bool rightHeld = Input.GetMouseButton(1);
 		bool rightUp = Input.GetMouseButtonUp(1);
-		bool guiNow = IsMouseOverGui() || MiniMapGuiBlocking() || escMenuOpen; // 0.9.6：地图/ESC 菜单打开时点击让位
+		bool guiNow = IsMouseOverGui() || escMenuOpen; // 0.9.11：ESC 菜单打开时点击让位（地图已在 RTS 禁用）
 
 		// 轮盘打开期间，Update 只负责收尾手势；按钮点击和右键关闭由 OnGUI 处理。
 		// 不能让旧的 rightHoldActive 卡在轮盘状态里。
@@ -3136,7 +3114,7 @@ internal static class GodViewController
 			string info = cam != null ? "  高度 " + cam.transform.position.y.ToString("0") + "m" : "";
 
 			// 底部指令提示（0.9.1：分组拉开间距）
-			string hint = "WASD 移动    滚轮 缩放    中键 旋转    Q/E 升降    │    左键 选择/框选    右键 指令    长按空地 命令环    │    空格 暂停    M 地图" + info;
+			string hint = "WASD 移动    滚轮 缩放    中键 旋转    Q/E 升降    │    左键 选择/框选    右键 指令    长按空地 命令环    │    空格 暂停    ESC 设置" + info;
 			GUIStyle hs = SquadCmdLogic.HudStyleSmall();
 			GUI.color = new Color(0.03f, 0.06f, 0.03f, 0.72f);
 			GUI.DrawTexture(new Rect((Screen.width - 1150f) * 0.5f, Screen.height - 30f, 1150f, 22f), Texture2D.whiteTexture);
