@@ -9,7 +9,7 @@ namespace ER2SquadCommand;
 ///   左键：单击选友军（临时指挥，不建队）/拖框/双击选队/空白清选/Shift 追加
 ///   右键短按：空白=移动(M7)｜敌军=叛徒标记+推进｜友军载具/车内兵=交互环｜徒步友军=视为地面移动（合并已上移顶栏）
 ///   右键长按 0.35s（仅按在空地/无效目标时）：单位环（站起[resetPose]/蹲下/趴下[setPose+还原名单]/停止）；按在单位上=短按指令，不弹环
-///   交互环：上车（成功后转选车组）/下车/修理（原生 OrderRepairVehicle）/合并（12 上限，坦克可并）
+///   交互环：上车（成功后转选车组）/下车/修理（原生 OrderRepairVehicle）；合并只保留顶栏入口（0.7.96 移出轮盘）
 ///   顶栏按钮：控制该小队 / 分队（显式新建组）/ 合并（并入当前激活 RTS 组）
 ///   空格暂停；F9 进入/紧急退出；顶部按钮接管（保护窗+独苗转移）
 ///   退出 RTS 不清除已下达的移动、登车、车辆同步和集火任务；FPS 原生输入照常运行
@@ -1187,9 +1187,10 @@ internal static class GodViewController
 				{
 					try
 					{
-						if (bs == null || !bs.IsAlive || pendingBoardIssued.Contains((long)bs.Pointer)) continue;
+						if (bs == null || !bs.IsAlive) continue;
+						// 0.7.96：超时强制=对未在车成员一律重发 boardVehicle（旧逻辑跳过已发者，
+						// 卡在引导循环里的单位拿不到最后一发强制令）
 						new Lua_Soldier(bs).boardVehicle(new Lua_Vehicle(veh));
-						pendingBoardIssued.Add((long)bs.Pointer);
 					}
 					catch { }
 				}
@@ -1218,22 +1219,34 @@ internal static class GodViewController
 					long k = (long)bs.Pointer;
 					if (inCar.Contains(k)) continue; // 已真实在车
 					// 0.7.82：0.7.80 的选择门已删——登车途中乘员必然"不在选择中"（换选/清选是常态），
-					// 该门会停摆引导与重发，导致剩人卡路+25s 超时强制。玩家改令由 MoveCommandTo 摘除机制处理。
+					// 玩家改令由 MoveCommandTo 摘除机制处理。
 					float d = (bs.transform.position - veh.transform.position).magnitude;
-					bool issued = pendingBoardIssued.Contains(k);
+					// 0.7.96 核心修复：boardVehicle 一经发出，移动指挥权完全交给原生登车链
+					// （分散→绕车门→进车）。原生登车路线会让欧氏距离暂时拉回 10m 外，
+					// 旧逻辑此时重发接近引导，把原生登车反复打断——"走到车边不上车"根因。
+					if (pendingBoardIssued.Contains(k))
+					{
+						// 已发登车令：只做 8s 无进展重发（原生登车被打断/静默失败），任何距离都允许
+						if (issuedAt.TryGetValue(k, out float t0) && Time.unscaledTime - t0 >= 8f)
+						{
+							issuedAt[k] = Time.unscaledTime;
+							new Lua_Soldier(bs).boardVehicle(new Lua_Vehicle(veh));
+							SquadCmdLogic.LogAlways("[BoardPending] boardVehicle 重发 " + SafeName(bs));
+						}
+						continue;
+					}
 					if (d < 10f)
 					{
-						// 阶段2：近距离登车。已发但 8s 未进车（原生登车被打断/失败）→ 自动重发
-						if (issued && issuedAt.TryGetValue(k, out float t0) && Time.unscaledTime - t0 < 8f) continue;
+						// 阶段2：首次近距离登车
 						issuedAt[k] = Time.unscaledTime;
 						pendingBoardIssued.Add(k);
 						new Lua_Soldier(bs).boardVehicle(new Lua_Vehicle(veh));
-						SquadCmdLogic.LogAlways("[BoardPending] boardVehicle " + (issued ? "重发 " : "") + SafeName(bs));
+						SquadCmdLogic.LogAlways("[BoardPending] boardVehicle " + SafeName(bs));
 					}
 					else
 					{
-						// 0.7.76：接近命令只在 车移动>2m 或 距上次引导>3s 时才发——
-						// moveTo 是持久命令，0.5s 重发会不断打断原生移动（登车卡顿根因）
+						// 阶段1：接近引导（仅限从未发过登车令的单位）。0.7.76：只在 车移动>2m
+						// 或 距上次引导>3s 时发——moveTo 是持久命令，高频重发会打断原生移动
 						guideAt.TryGetValue(k, out float g0);
 						if (refresh || Time.unscaledTime - g0 > 3f)
 						{
@@ -3560,8 +3573,8 @@ internal static class GodViewController
 		wheelTargetSoldier = sol;
 		hasWheelAnchor = false; // 0.7.80：清除单位环遗留锚定，否则交互环被钉死在旧鼠标落点（不跟随载具）
 		wheelKind = 0;
-		wheelItemCount = 4;
-		WheelItemLabels[0] = "上车"; WheelItemLabels[1] = "下车"; WheelItemLabels[2] = "修理"; WheelItemLabels[3] = "合并";
+		wheelItemCount = 3;
+		WheelItemLabels[0] = "上车"; WheelItemLabels[1] = "下车"; WheelItemLabels[2] = "修理";
 		bool hasSelInf = GetSelectedInfantry().Count > 0;
 		bool hasSelVeh = selVehicles.Count > 0;
 		PruneVehicleRefs();
@@ -3572,11 +3585,8 @@ internal static class GodViewController
 		// （单击虚拟选择没有受控小队——原生 Squad 修理订单会牵动未选中队友，故不启用）
 		Vehicle repairTarget = veh != null ? veh : VehicleOfCrew(crew);
 		WheelItemEnabled[2] = repairTarget != null && NativeRepairSquad() != null && VehicleCanBeRepaired(repairTarget);
-		// 跟随：目标是友军/中立载具（非本方已选车组），且选中了任意步兵或车组
-		Vehicle mTgt = veh != null ? veh : VehicleOfCrew(crew);
-		WheelItemEnabled[3] = mTgt != null && CrewOf(FirstCrew(mTgt)) != null && (hasSelInf || hasSelVeh);
 		FinishWheelOpen("交互", "选择=步兵" + YN(hasSelInf) + "/载具" + YN(hasSelVeh)
-			+ " 可用项=[上车" + YN(WheelItemEnabled[0]) + " 下车" + YN(WheelItemEnabled[1]) + " 修理" + YN(WheelItemEnabled[2]) + " 合并" + YN(WheelItemEnabled[3]) + "]");
+			+ " 可用项=[上车" + YN(WheelItemEnabled[0]) + " 下车" + YN(WheelItemEnabled[1]) + " 修理" + YN(WheelItemEnabled[2]) + "]");
 	}
 
 	/// <summary>打开友军上下文环（右键徒步友军士兵；合并进目标所在小队）。</summary>
@@ -3592,11 +3602,11 @@ internal static class GodViewController
 		if (swallowLeft) swallowLeftGesture = true;
 	}
 
-	/// <summary>执行轮盘选中的动作（按 wheelKind 映射：交互环 0/1/2=上车/下车/修理，槽3=合并；友军环槽0=合并；单位环 4..7=站/蹲/趴/停止）。</summary>
+	/// <summary>执行轮盘选中的动作（按 wheelKind 映射：交互环 0/1/2=上车/下车/修理；单位环 4..7=站/蹲/趴/停止）。</summary>
 	private static void ExecuteWheelAction(int index)
 	{
 		string actionName = index >= 0 && index < wheelItemCount ? WheelItemLabels[index] : "?";
-		int actionId = index;                    // 默认=交互环槽位（上车/下车/修理/合并）
+		int actionId = index;                    // 默认=交互环槽位（上车/下车/修理）
 		if (wheelKind == 2) actionId = 4 + index; // 单位环槽0..3 = 站起/蹲下/趴下/停止
 		SquadCmdLogic.Log("[SquadCmd] 轮盘 EXECUTE 动作=" + actionName + " 目标=" + WheelTargetDesc());
 		switch (actionId)
@@ -3640,61 +3650,7 @@ internal static class GodViewController
 					}
 				}
 				break;
-			case 3: // 合并：选中步兵/其他载具乘员并入目标小队；上限12人，多余保持原队
-				{
-					Squad tsq = null;
-					try { tsq = wheelTargetSoldier != null ? wheelTargetSoldier.joinedSquad : null; } catch { }
-					if (tsq == null)
-					{
-						Vehicle tv = wheelTargetVehicle != null ? wheelTargetVehicle : VehicleOfCrew(wheelTargetVehicleCrew);
-						try { Squad cs = CrewOf(FirstCrew(tv)); if (cs != null) tsq = cs; } catch { }
-					}
-					if (tsq != null)
-					{
-						int cap = 12 - AliveCount(tsq);
-						int mgd = 0, skip = 0;
-						foreach (Soldier s2 in GetSelectedInfantry())
-							if (s2 != null && s2.IsAlive)
-							{
-								if (cap <= 0) { skip++; continue; }
-								try { if (AddInfantryToSquadTo(s2, tsq)) { mgd++; cap--; } } catch { }
-							}
-						bool vehMerged = false;
-						foreach (Squad csq in new List<Squad>(GetSelectedVehicleCrews()))
-						{
-							if (csq == null || (tsq != null && csq.Pointer == tsq.Pointer)) continue;
-							Vehicle mv = VehicleOfCrew(csq);
-							Vehicle tvv = wheelTargetVehicle != null ? wheelTargetVehicle : VehicleOfCrew(wheelTargetVehicleCrew);
-							if (mv == null || mv.transform == null || tvv == null) { skip++; continue; }
-							try
-							{
-								Soldier[] occ = mv.GetComponentsInChildren<Soldier>();
-								for (int i = 0; i < occ.Length; i++)
-								{
-									if (occ[i] == null || !occ[i].IsAlive) continue;
-									if (cap <= 0) { skip++; continue; }
-									if (AddInfantryToSquadTo(occ[i], tsq)) { mgd++; cap--; }
-								}
-								selVehicles.Remove(csq);
-								if (!selVehicles.Contains(tsq)) selVehicles.Add(tsq);
-								if (tvv != null) AddVehicleRef(tvv);
-								vehMerged = true;
-							}
-							catch { skip++; }
-						}
-						if (vehMerged)
-						{
-							mainSquad = null; virtualUnits.Clear();
-						}
-						else { mainSquad = null; virtualUnits.Clear(); }
-						ClearFollow("合并", false);
-						cmdFlash = "已合并 " + mgd + " 人入目标小队" + (skip > 0 ? "（超出上限留下 " + skip + "）" : "");
-						cmdFlashUntil = Time.unscaledTime + 2.5f;
-						SquadCmdLogic.Log("[SquadCmd] 合并 入队=" + mgd + " 溢出=" + skip + " 队ptr=0x" + ((long)tsq.Pointer).ToString("X"));
-					}
-					else { cmdFlash = "目标没有所属小队"; cmdFlashUntil = Time.unscaledTime + 2f; }
-				}
-				break;
+			// 0.7.96：载具轮盘"合并"已移除——合并只保留顶栏入口（与"合并上移顶栏"设计一致）
 			case 4: ResetPoseToSelection(); break;
 			case 5: ApplyPoseToSelection(SoldierPose.Crouch); break;
 			case 6: ApplyPoseToSelection(SoldierPose.Prone); break;
