@@ -112,6 +112,53 @@ internal static class SceneMarkers
 			go.transform.rotation = Quaternion.LookRotation(go.transform.position - cam.transform.position);
 	}
 
+	/// <summary>
+	/// 0.9.2：地面实心圆点（程序化圆盘 Mesh，顶色烘焙，GUI/Text Shader 无视深度）。
+	/// </summary>
+	public static void Dot(string key, Vector3 groundPos, float radius, Color c, bool visible)
+	{
+		if (!visible || radius <= 0f) return;
+		used.Add(key);
+		if (!pool.TryGetValue(key, out GameObject go) || go == null)
+		{
+			go = new GameObject("SCMD_" + key);
+			UnityEngine.Object.DontDestroyOnLoad(go);
+			MeshFilter mf = go.AddComponent<MeshFilter>();
+			MeshRenderer mr = go.AddComponent<MeshRenderer>();
+			mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+			mr.receiveShadows = false;
+			Material m = LineMat() != null ? new Material(LineMat().shader) : null;
+			if (m != null) { m.SetColor("_Color", c); mr.material = m; }
+			// 圆盘网格（单位半径 1m），顶点色烘焙成目标色，避免依赖 shader _Color 通道
+			Mesh mesh = new Mesh();
+			int seg = 28;
+			Il2CppStructArray<Vector3> verts = new Il2CppStructArray<Vector3>(seg + 1);
+			Il2CppStructArray<int> tris = new Il2CppStructArray<int>(seg * 3);
+			Il2CppStructArray<Color> cols = new Il2CppStructArray<Color>(seg + 1);
+			verts[0] = Vector3.zero;
+			cols[0] = c;
+			for (int i = 0; i < seg; i++)
+			{
+				float a = (float)i / seg * Mathf.PI * 2f;
+				verts[i + 1] = new Vector3(Mathf.Cos(a), 0f, Mathf.Sin(a));
+				cols[i + 1] = c;
+				tris[i * 3] = 0;
+				tris[i * 3 + 1] = i + 1;
+				tris[i * 3 + 2] = (i + 1) % seg + 1;
+			}
+			mesh.vertices = verts;
+			mesh.triangles = tris;
+			mesh.colors = cols;
+			mesh.RecalculateNormals();
+			mesh.RecalculateBounds();
+			mf.sharedMesh = mesh;
+			pool[key] = go;
+		}
+		go.SetActive(true);
+		go.transform.localScale = new Vector3(radius, 1f, radius);
+		go.transform.position = groundPos;
+	}
+
 	/// <summary>帧末：本轮未被刷新的标记全部隐藏（由 GodViewController.Tick 调用）。</summary>
 	public static void EndFrame()
 	{

@@ -2839,7 +2839,7 @@ internal static class GodViewController
 				smFriendlyNext = t + 1f;
 				RebuildFriendlyCache();
 			}
-			Color dim = new Color(uiBase.r, uiBase.g, uiBase.b, 0.5f);
+			Color dim = new Color(uiHover.r, uiHover.g, uiHover.b, 0.5f); // 0.9.2：中绿半透明——暗地形上也可见
 			int drawn = 0;
 			foreach (Soldier s in smFriendly)
 			{
@@ -2849,7 +2849,7 @@ internal static class GodViewController
 					if (s == null || !s.IsAlive || s.transform == null) continue;
 					long k = (long)s.Pointer;
 					if (smSelected.Contains(k)) continue; // 选中角括号更醒目，不叠画
-					SceneMarkers.Ring("F" + k, s.transform.position + Vector3.up * 0.1f, 0.45f, dim, 0.045f, true);
+					SceneMarkers.Ring("F" + k, s.transform.position + Vector3.up * 0.1f, 0.5f, dim, 0.05f, true);
 					drawn++;
 				}
 				catch { }
@@ -2874,7 +2874,7 @@ internal static class GodViewController
 				{
 					if (s == null || !s.IsAlive || s.transform == null) continue;
 					if (s.GetComponentInParent<Vehicle>() != null) continue;
-					SceneMarkers.Bracket("S" + (long)s.Pointer, s.transform.position + Vector3.up * 0.1f, 1.0f * pulse, uiHover, 0.1f, true);
+					SceneMarkers.Bracket("S" + (long)s.Pointer, s.transform.position + Vector3.up * 0.1f, 0.6f * pulse, uiHover, 0.08f, true);
 				}
 				catch { }
 			}
@@ -2883,7 +2883,7 @@ internal static class GodViewController
 				try
 				{
 					if (v == null || v.transform == null) continue;
-					SceneMarkers.Bracket("SV" + (long)v.Pointer, v.transform.position + Vector3.up * 0.12f, VehicleRingRadius(v) * pulse, uiHover, 0.12f, true);
+					SceneMarkers.Bracket("SV" + (long)v.Pointer, v.transform.position + Vector3.up * 0.12f, VehicleRingRadius(v) * pulse, uiHover, 0.1f, true);
 				}
 				catch { }
 			}
@@ -2902,11 +2902,16 @@ internal static class GodViewController
 		}
 		catch { }
 
-		// 移动目标环：RTS/FPS 都显示
+		// 移动目标点：RTS/FPS 都显示——0.9.2 黄色小圈 + 中心圆点（不再是孤零零的大圈）
 		try
 		{
 			bool show = hasCmdTarget && t < cmdTargetUntil;
-			if (show) SceneMarkers.Ring("MT", cmdTarget + Vector3.up * 0.1f, 1.1f * pulse, uiHover, 0.1f, true);
+			if (show)
+			{
+				Color yellow = new Color(1f, 0.85f, 0.35f, 0.95f);
+				SceneMarkers.Ring("MT", cmdTarget + Vector3.up * 0.1f, 0.45f * pulse, yellow, 0.07f, true);
+				SceneMarkers.Dot("MTD", cmdTarget + Vector3.up * 0.1f, 0.11f * pulse, yellow, true);
+			}
 		}
 		catch { }
 
@@ -2922,11 +2927,11 @@ internal static class GodViewController
 			if (col != null)
 			{
 				Vector3 e = col.bounds.extents;
-				return Mathf.Clamp(Mathf.Max(e.x, e.z) + 0.6f, 2.2f, 7f);
+				return Mathf.Clamp(Mathf.Max(e.x, e.z) + 0.3f, 1.6f, 4.2f);
 			}
 		}
 		catch { }
-		return 3.5f;
+		return 3f;
 	}
 
 	private static void RebuildFriendlyCache()
