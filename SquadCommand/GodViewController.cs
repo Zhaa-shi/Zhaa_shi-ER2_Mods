@@ -467,6 +467,7 @@ internal static class GodViewController
 		// 左键点空白（stopUnits=true）= 明确的取消手势，全部停止。
 		if (stopUnits)
 		{
+			CancelBoardPending("左键空白取消"); // 0.7.82：明确取消手势——登车引导同步停止（否则 stop 后又被引导拉走）
 			try { foreach (Soldier s in GetSelectedInfantry()) { try { new Lua_Soldier(s).stop(); } catch { } } } catch { }
 			foreach (Vehicle rv in selVehicleRefs)
 			{
@@ -1161,7 +1162,8 @@ internal static class GodViewController
 					if (bs == null || !bs.IsAlive) continue;
 					long k = (long)bs.Pointer;
 					if (inCar.Contains(k)) continue; // 已真实在车
-					if (!IsSelectedUnit(bs)) continue; // 0.7.80：已不在选择中的乘员不再引导/发射
+					// 0.7.82：0.7.80 的选择门已删——登车途中乘员必然"不在选择中"（换选/清选是常态），
+					// 该门会停摆引导与重发，导致剩人卡路+25s 超时强制。玩家改令由 MoveCommandTo 摘除机制处理。
 					float d = (bs.transform.position - veh.transform.position).magnitude;
 					bool issued = pendingBoardIssued.Contains(k);
 					if (d < 10f)
