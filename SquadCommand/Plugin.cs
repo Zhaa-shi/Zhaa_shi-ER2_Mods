@@ -9,7 +9,7 @@ using UnityEngine;
 
 namespace ER2SquadCommand;
 
-[BepInPlugin("er2.squadcommand", "ER2 Squad Command", "0.8.1")]
+[BepInPlugin("er2.squadcommand", "ER2 Squad Command", "0.8.2")]
 public class Plugin : BasePlugin
 {
 	internal static ManualLogSource ModLog;
@@ -30,7 +30,7 @@ public class Plugin : BasePlugin
 
 		new Harmony("er2.squadcommand").PatchAll(typeof(Plugin).Assembly);
 		FrameEndRunner.Ensure();
-		ModLog.LogInfo("ER2 Squad Command 0.8.1 loaded. godKey=" + godKey.Value);
+		ModLog.LogInfo("ER2 Squad Command 0.8.2 loaded. godKey=" + godKey.Value);
 	}
 }
 

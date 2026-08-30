@@ -868,6 +868,13 @@ internal static class GodViewController
 		// 载具车组是不可拆分的选择单元；显式分队只处理徒步步兵。
 		// GetCommandUnits() 会展开选中载具的乘员，拿它分队会破坏车组归属。
 		List<Soldier> units = GetSelectedInfantry();
+		List<Squad> crews = GetSelectedVehicleCrews();
+		// 0.8.2：混编队（步兵+坦克合成一队后）只选车 → 把车内乘员分进新小队，徒步步兵留原队
+		if (units.Count == 0 && crews.Count > 0)
+		{
+			SplitCrewFromSquad(crews[0]);
+			return;
+		}
 		if (units.Count == 0) { cmdFlash = "先选中要分队的步兵"; cmdFlashUntil = Time.unscaledTime + 2f; return; }
 		Squad ns = CreateNewSquad();
 		if (ns == null) { cmdFlash = "新建小队失败"; cmdFlashUntil = Time.unscaledTime + 2f; return; }
@@ -888,6 +895,59 @@ internal static class GodViewController
 		cmdFlash = "分队 → " + moved + " 人入新队（原队 " + oldSet.Count + " 个，其余未动）";
 		cmdFlashUntil = Time.unscaledTime + 3f;
 		SquadCmdLogic.LogAlways("[Split] 分队 入队=" + moved + " 原队数=" + oldSet.Count + " newSquad=0x" + ((long)ns.Pointer).ToString("X"));
+		SplitCheck(ns);
+	}
+
+	/// <summary>
+	/// 0.8.2：混编队拆分——把车内乘员分进新小队（squadInside 跟随改写），徒步步兵留在原队。
+	/// 用于撤销 0.8.1 的"步兵并入车组"：选车点 [分队] 即可拆回两队。
+	/// </summary>
+	private static void SplitCrewFromSquad(Squad crewSquad)
+	{
+		Squad ns = CreateNewSquad();
+		if (ns == null) { cmdFlash = "新建小队失败"; cmdFlashUntil = Time.unscaledTime + 2f; return; }
+		bool hasFoot = false;
+		List<Vehicle> vehicles = new List<Vehicle>();
+		int moved = 0;
+		int count = 0;
+		try { count = crewSquad.CountMembers; } catch { }
+		for (int i = 0; i < count; i++)
+		{
+			Soldier m = null;
+			try { m = crewSquad.GetMemberClamped(i); } catch { }
+			if (m == null || !m.IsAlive) continue;
+			Vehicle vIn = null;
+			try { vIn = m.GetComponentInParent<Vehicle>(); } catch { }
+			if (vIn == null) { hasFoot = true; continue; } // 徒步步兵留原队
+			try { crewSquad.Leave(m, false); } catch { }
+			try { ns.Join(m); moved++; } catch { }
+			try { if (vIn.transform != null && !vehicles.Contains(vIn)) vehicles.Add(vIn); } catch { }
+		}
+		if (moved == 0 || !hasFoot)
+		{
+			cmdFlash = "车组已是独立小队，无可拆分"; cmdFlashUntil = Time.unscaledTime + 2f;
+			return;
+		}
+		// 车辆归属跟随：squadInside 改指新队，驾驶资格同步
+		foreach (Vehicle v in vehicles)
+		{
+			try
+			{
+				AIVehicle ai = v.GetComponent<AIVehicle>();
+				if (ai == null) ai = v.GetComponentInChildren<AIVehicle>();
+				if (ai != null) ai.squadInside = ns;
+			}
+			catch { }
+		}
+		rtsSquad = ns;
+		rtsSquadSet.Add((long)ns.Pointer);
+		try { selVehicles.Remove(crewSquad); } catch { }
+		try { if (!selVehicles.Contains(ns)) selVehicles.Add(ns); } catch { }
+		foreach (Vehicle v in vehicles) AddVehicleRef(v);
+		cmdFlash = "分队 → 车组 " + moved + " 人入新队（徒步步兵留原队）";
+		cmdFlashUntil = Time.unscaledTime + 3f;
+		selFlash = Time.unscaledTime + 3f;
+		SquadCmdLogic.LogAlways("[Split] 车组拆分 moved=" + moved + " vehicles=" + vehicles.Count + " newSquad=0x" + ((long)ns.Pointer).ToString("X"));
 		SplitCheck(ns);
 	}
 
@@ -969,6 +1029,57 @@ internal static class GodViewController
 		cmdFlash = "合并 → " + moved + " 人入" + tgtDesc + (skip > 0 ? "，已在队 " + skip : "") + (overflow > 0 ? "，超员留下 " + overflow : "");
 		cmdFlashUntil = Time.unscaledTime + 2.5f;
 		SquadCmdLogic.LogAlways("[Merge] 收编 入队=" + moved + " 已在队=" + skip + " 超员=" + overflow + " 目标=" + tgtDesc + "=0x" + ((long)target.Pointer).ToString("X") + " 目标人数=" + best);
+	}
+
+	/// <summary>
+	/// 0.8.2：【分散】——选中步兵按所属原生小队编组，以各队自身中心为圆心就地散开找掩护
+	/// （原生 SendUnitsToCovers，与命令环"掩体"的区别：掩体以你指定的落点为中心，分散以队为中心）。
+	/// </summary>
+	private static void ScatterSelected()
+	{
+		HashSet<long> done = new HashSet<long>();
+		int n = 0;
+		foreach (Soldier s in GetSelectedInfantry())
+		{
+			try
+			{
+				if (s == null || !s.IsAlive) continue;
+				Squad sq = s.joinedSquad;
+				if (sq == null || !done.Add((long)sq.Pointer)) continue;
+				Vector3 c = SquadCenterLocal(sq);
+				if (c == Vector3.zero) continue;
+				SquadCmdLogic.RegisterControlledSquad(sq);
+				sq.SendUnitsToCovers(c, 30f);
+				n++;
+			}
+			catch { }
+		}
+		if (n > 0)
+		{
+			ClearMoveObservation();
+			cmdFlash = "分散 → " + n + " 队就地找掩护"; cmdFlashUntil = Time.unscaledTime + 2.5f;
+			SquadCmdLogic.LogAlways("[SquadCmd] 分散 squads=" + n);
+		}
+		else { cmdFlash = "无可用步兵小队"; cmdFlashUntil = Time.unscaledTime + 2f; }
+	}
+
+	private static Vector3 SquadCenterLocal(Squad sq)
+	{
+		Vector3 sum = Vector3.zero;
+		int n = 0;
+		try
+		{
+			int count = sq.CountMembers;
+			for (int i = 0; i < count; i++)
+			{
+				Soldier m = sq.GetMemberClamped(i);
+				if (m == null || m.transform == null) continue;
+				sum += m.transform.position;
+				n++;
+			}
+		}
+		catch { }
+		return n > 0 ? sum / n : Vector3.zero;
 	}
 
 	/// <summary>0.7.46：分队后立即读取载具 AIVehicle.squadInside，验证原生是否跟随新 Squad。</summary>
@@ -2302,6 +2413,7 @@ internal static class GodViewController
 				if (btn.Contains(m)) return true;
 				if (SplitButtonRect().Contains(m)) return true;
 				if (MergeButtonRect().Contains(m)) return true;
+				if (ScatterRect().Contains(m)) return true;
 			}
 			if (squadPanelHit.height > 0f && squadPanelHit.Contains(m)) return true;
 		}
@@ -2326,6 +2438,13 @@ internal static class GodViewController
 	{
 		Rect b = ControlButtonRect();
 		return new Rect(b.x - 8f - 120f, 12f, 120f, 36f);
+	}
+
+	/// <summary>0.8.2：【分散】按钮（分队按钮右侧）——选中步兵就地散开找掩护（原生 SendUnitsToCovers）。</summary>
+	private static Rect ScatterRect()
+	{
+		Rect b = SplitButtonRect();
+		return new Rect(b.xMax + 8f, 12f, 120f, 36f);
 	}
 
 	/// <summary>左键单击：只负责选择/取消选择（友军=选中，其余=清空选择）。</summary>
@@ -2763,6 +2882,24 @@ internal static class GodViewController
 				{
 					Event.current.Use();
 					MergeSelectedToRts();
+					return;
+				}
+				// 0.8.2：【分散】按钮——选中步兵就地散开找掩护
+				Rect scbtn = ScatterRect();
+				bool scover = scbtn.Contains(Event.current.mousePosition);
+				GUI.color = scover ? new Color(0.13f, 0.27f, 0.30f, 0.9f) : new Color(0.09f, 0.18f, 0.20f, 0.82f);
+				GUI.DrawTexture(scbtn, Texture2D.whiteTexture);
+				GUI.color = new Color(0.5f, 0.95f, 1f, 0.85f);
+				GUI.DrawTexture(new Rect(scbtn.x, scbtn.y, scbtn.width, 1.5f), Texture2D.whiteTexture);
+				GUI.DrawTexture(new Rect(scbtn.x, scbtn.yMax - 1.5f, scbtn.width, 1.5f), Texture2D.whiteTexture);
+				GUI.DrawTexture(new Rect(scbtn.x, scbtn.y, 1.5f, scbtn.height), Texture2D.whiteTexture);
+				GUI.DrawTexture(new Rect(scbtn.xMax - 1.5f, scbtn.y, 1.5f, scbtn.height), Texture2D.whiteTexture);
+				GUI.color = Color.white;
+				GUI.Label(scbtn, "分散", st);
+				if (Event.current.type == EventType.MouseDown && Event.current.button == 0 && scover)
+				{
+					Event.current.Use();
+					ScatterSelected();
 					return;
 				}
 			}
