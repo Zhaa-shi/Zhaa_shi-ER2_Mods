@@ -894,11 +894,18 @@ internal static class GodViewController
 	/// <summary>0.7.57：把当前选中 Soldier[] 并入按选中成员多数决定的目标小队。</summary>
 	private static void MergeSelectedToRts()
 	{
-		// 0.7.61：合并目标不再用隐藏的 rtsSquad 指针（0.7.57 事故：已"取消选择"的队被 rtsSquad 拖入合并）。
-		// 新语义：目标 = 选中单位中人数最多的原生小队——合并永远只影响被选中的单位。
-		// 0.8.00：合并只在步兵与步兵之间——载具车组不参与统计也不被合并。
+		// 0.8.1 合并语义：
+		//  - 只选步兵：单队 → 并入当前激活 RTS 组（须为步兵队）；跨队 → 多数队吸收少数队
+		//  - 选了载具车组：车组即合并目标——选中步兵并入该车组（上限 12，超员留下）。
+		//    车组成员绝不会被移出车组（破坏 squadInside 结构），所以"并方向"永远是步兵→车组。
 		List<Soldier> units = GetSelectedInfantry();
-		if (units.Count == 0) { cmdFlash = "先选中要合并的步兵"; cmdFlashUntil = Time.unscaledTime + 2f; return; }
+		List<Squad> crews = GetSelectedVehicleCrews();
+		if (units.Count == 0)
+		{
+			cmdFlash = crews.Count > 0 ? "没有可并入车组的步兵" : "先选中要合并的步兵";
+			cmdFlashUntil = Time.unscaledTime + 2f;
+			return;
+		}
 		Dictionary<long, Squad> tally = new Dictionary<long, Squad>();
 		Dictionary<long, int> cnt = new Dictionary<long, int>();
 		foreach (Soldier u in units)
@@ -918,41 +925,50 @@ internal static class GodViewController
 		{
 			if (kv.Value > best) { best = kv.Value; target = tally[kv.Key]; }
 		}
-		// 0.7.99：只选了一个小队时，并入"当前激活 RTS 组"（0.7.57 语义）——
-		// 旧多数语义下目标=选中队自己，合并 0 人（用户视角=按钮失效）。
-		// 多数语义仅用于跨队选择（0.7.61：避免取消选择后的残留 rtsSquad 劫持合并）。
-		// 0.8.00：激活组若是载具车组则不作为合并目标（合并只在步兵与步兵之间）。
-		if (cnt.Count == 1 && rtsSquad != null && target != null
+		if (crews.Count > 0)
+		{
+			// 选了载具：车组即目标（用户场景：步兵+坦克 → 合成一队）
+			target = crews[0];
+			best = AliveCount(target);
+		}
+		else if (cnt.Count == 1 && rtsSquad != null && target != null
 			&& (long)rtsSquad.Pointer != (long)target.Pointer && AliveCount(rtsSquad) > 0
 			&& VehicleOfCrew(rtsSquad) == null)
 		{
+			// 0.7.99：单队选择并入当前激活 RTS 组（多数语义下目标=自己=0 人合并）
 			target = rtsSquad;
 			best = AliveCount(target);
 		}
 		if (target == null) { cmdFlash = "选中单位没有所属小队"; cmdFlashUntil = Time.unscaledTime + 2f; return; }
-		int moved = 0, skip = 0;
+		int cap = 12 - AliveCount(target);
+		int moved = 0, skip = 0, overflow = 0;
 		foreach (Soldier u in units)
 		{
-			// 顶栏合并不拆载具车组；车辆乘员只能通过专用车辆交互环处理。
-			if (u == null || !u.IsAlive || !IsInfantry(u)) { if (u != null && u.IsAlive && !IsInfantry(u)) skip++; continue; }
+			if (u == null || !u.IsAlive || !IsInfantry(u)) continue;
 			try
 			{
 				Squad cur = u.joinedSquad;
 				if (cur != null && (long)cur.Pointer == (long)target.Pointer) { skip++; continue; }
-				if (AddInfantryToSquadTo(u, target)) moved++;
+				if (cap <= 0) { overflow++; continue; }
+				if (AddInfantryToSquadTo(u, target)) { moved++; cap--; }
 			}
 			catch { }
 		}
-		if (rtsSquad != null && (long)target.Pointer == (long)rtsSquad.Pointer) { /* 目标=激活组，无需变更 */ }
+		if (moved > 0)
+		{
+			rtsSquad = target;
+			rtsSquadSet.Add((long)target.Pointer);
+		}
+		string tgtDesc = VehicleOfCrew(target) != null ? "车组" : "步兵队";
 		if (moved == 0)
 		{
 			cmdFlash = "无可合并（选中单位已在同一小队）"; cmdFlashUntil = Time.unscaledTime + 2f;
 			SquadCmdLogic.Log("[Merge] 收编 入队=0 已在队=" + skip + " 目标=0x" + ((long)target.Pointer).ToString("X"));
 			return;
 		}
-		cmdFlash = "合并 → " + moved + " 人入目标队（" + best + " 人队）" + (skip > 0 ? "，已在队 " + skip : "");
+		cmdFlash = "合并 → " + moved + " 人入" + tgtDesc + (skip > 0 ? "，已在队 " + skip : "") + (overflow > 0 ? "，超员留下 " + overflow : "");
 		cmdFlashUntil = Time.unscaledTime + 2.5f;
-		SquadCmdLogic.LogAlways("[Merge] 收编 入队=" + moved + " 已在队=" + skip + " 目标=0x" + ((long)target.Pointer).ToString("X") + " 目标人数=" + best);
+		SquadCmdLogic.LogAlways("[Merge] 收编 入队=" + moved + " 已在队=" + skip + " 超员=" + overflow + " 目标=" + tgtDesc + "=0x" + ((long)target.Pointer).ToString("X") + " 目标人数=" + best);
 	}
 
 	/// <summary>0.7.46：分队后立即读取载具 AIVehicle.squadInside，验证原生是否跟随新 Squad。</summary>
@@ -3513,7 +3529,7 @@ internal static class GodViewController
 					else { cmdFlash = "无可用步兵小队"; cmdFlashUntil = Time.unscaledTime + 2f; }
 				}
 				break;
-			case 9: // 集合：原生 FollowLeader，各小队向自己的队长集结
+			case 9: // 集合：各步兵小队向自己的班长（原生 getLeader）位置集结
 				{
 					HashSet<long> doneF = new HashSet<long>();
 					int nF = 0;
@@ -3524,17 +3540,17 @@ internal static class GodViewController
 							if (s == null || !s.IsAlive) continue;
 							Squad sq = s.joinedSquad;
 							if (sq == null || !doneF.Add((long)sq.Pointer)) continue;
-							sq.FollowLeader();
+							Soldier leader = null;
+							try { leader = new Lua_Squad(sq).getLeader()?.connectedSoldier; } catch { }
+							if (leader == null || !leader.IsAlive || leader.transform == null) continue;
+							SquadCmdLogic.RegisterControlledSquad(sq);
+							new Lua_Squad(sq).moveTo(leader.transform.position, Plugin.radius.Value);
 							nF++;
 						}
 						catch { }
 					}
-					foreach (Squad csq in GetSelectedVehicleCrews())
-					{
-						try { if (csq != null && doneF.Add((long)csq.Pointer)) { csq.FollowLeader(); nF++; } } catch { }
-					}
-					if (nF > 0) SquadCmdLogic.LogAlways("[SquadCmd] 集合（跟随队长） squads=" + nF);
-					else { cmdFlash = "无可用小队"; cmdFlashUntil = Time.unscaledTime + 2f; }
+					if (nF > 0) SquadCmdLogic.LogAlways("[SquadCmd] 集合（向班长集结） squads=" + nF);
+					else { cmdFlash = "无可用小队（找不到班长）"; cmdFlashUntil = Time.unscaledTime + 2f; }
 				}
 				break;
 			case 10: // 停火/开火切换：有停火的小队→全部恢复开火；全部开火中→全部停火
