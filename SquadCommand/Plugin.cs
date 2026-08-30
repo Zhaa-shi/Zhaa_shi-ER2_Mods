@@ -9,7 +9,7 @@ using UnityEngine;
 
 namespace ER2SquadCommand;
 
-[BepInPlugin("er2.squadcommand", "ER2 Squad Command", "0.7.83")]
+[BepInPlugin("er2.squadcommand", "ER2 Squad Command", "0.7.84")]
 public class Plugin : BasePlugin
 {
 	internal static ManualLogSource ModLog;
@@ -17,6 +17,7 @@ public class Plugin : BasePlugin
 	internal static ConfigEntry<bool> enabled;
 	internal static ConfigEntry<float> radius;
 	internal static ConfigEntry<float> trackSeconds;
+	internal static ConfigEntry<bool> debugLog;
 	internal static ConfigEntry<float> m7Interval;
 	internal static ConfigEntry<KeyCode> godKey;
 	internal static ConfigEntry<float> markDuration;
@@ -28,13 +29,14 @@ public class Plugin : BasePlugin
 		enabled = Config.Bind("General", "enabled", true, "主开关。");
 		radius = Config.Bind("General", "radius", 8f, new ConfigDescription("moveTo 半径（米）。", new AcceptableValueRange<float>(1f, 60f)));
 		trackSeconds = Config.Bind("General", "trackSeconds", 14f, new ConfigDescription("移动后追踪小队中心点的秒数（被动监控，不重发移动命令）。", new AcceptableValueRange<float>(2f, 45f)));
+		debugLog = Config.Bind("General", "debugLog", false, new ConfigDescription("诊断日志开关。关闭后 [SquadCmd]/[BoardPending] 等诊断日志静默。"));
 		m7Interval = Config.Bind("General", "m7Interval", 2f, new ConfigDescription("M7 移动修正检查间隔（秒）。越小越及时，过大则被打断后恢复慢。", new AcceptableValueRange<float>(0.5f, 10f)));
 		godKey = Config.Bind("General", "godKey", KeyCode.F9, "上帝视角开关（仅进入）。退出＝选中小队后点顶部[控制该小队]随机接管一人；全军覆没时按键紧急退出。空格＝暂停/继续世界。");
 		markDuration = Config.Bind("General", "markDuration", 20f, new ConfigDescription("标记敌军集火的持续秒数：期间选中的本阵营单位会把被标记目标当作最佳可见敌人优先攻击（走原生目标选择，替代从未生效的 forceTarget）。", new AcceptableValueRange<float>(5f, 60f)));
 
 		new Harmony("er2.squadcommand").PatchAll(typeof(Plugin).Assembly);
 		FrameEndRunner.Ensure();
-		ModLog.LogInfo("ER2 Squad Command 0.7.83 loaded. godKey=" + godKey.Value + " markDuration=" + markDuration.Value);
+		ModLog.LogInfo("ER2 Squad Command 0.7.84 loaded. godKey=" + godKey.Value + " markDuration=" + markDuration.Value);
 	}
 }
 
@@ -76,7 +78,7 @@ internal class FrameEndRunner : MonoBehaviour
 	}
 }
 
-/// <summary>0.7.83：Squad 引用三方对比工具（纯读）。</summary>
+/// <summary>0.7.84：Squad 引用三方对比工具（纯读）。</summary>
 internal static class SquadTrace
 {
 	private static string Ref(string name, Squad sq)
@@ -114,7 +116,7 @@ internal static class SquadTrace
 	}
 }
 
-/// <summary>0.7.83：DeathPanel.ShowDeath 纯观察 Postfix（不改行为、不调重生）。</summary>
+/// <summary>0.7.84：DeathPanel.ShowDeath 纯观察 Postfix（不改行为、不调重生）。</summary>
 [HarmonyPatch(typeof(DeathPanel), "ShowDeath")]
 public static class DeathTracePatch
 {
@@ -141,7 +143,7 @@ public static class DeathTracePatch
 	}
 }
 
-/// <summary>0.7.83：监控 ClearSquadList 是否仍被执行（本版本应永为 0）。</summary>
+/// <summary>0.7.84：监控 ClearSquadList 是否仍被执行（本版本应永为 0）。</summary>
 [HarmonyPatch(typeof(PlayerGUI), "ClearSquadList")]
 public static class ClearSquadListWatchPatch
 {
@@ -151,7 +153,7 @@ public static class ClearSquadListWatchPatch
 	}
 }
 
-/// <summary>0.7.83：ShowSquadList 纯观察（进/出各一条，含调用栈快照；不改行为）。</summary>
+/// <summary>0.7.84：ShowSquadList 纯观察（进/出各一条，含调用栈快照；不改行为）。</summary>
 [HarmonyPatch(typeof(PlayerGUI), "ShowSquadList")]
 public static class ShowSquadListTracePatch
 {
@@ -177,7 +179,7 @@ public static class ShowSquadListTracePatch
 	}
 }
 
-/// <summary>0.7.83：ShowSwitchMemberSelection 纯日志 Prefix（不改返回值、不拦截）。</summary>
+/// <summary>0.7.84：ShowSwitchMemberSelection 纯日志 Prefix（不改返回值、不拦截）。</summary>
 [HarmonyPatch(typeof(PlayerController), "ShowSwitchMemberSelection")]
 public static class SwitchMemberTracePatch
 {
@@ -193,7 +195,7 @@ public static class SwitchMemberTracePatch
 	}
 }
 
-/// <summary>0.7.83 B：受控单位死亡瞬间（原生 Update 前）修复 Squad 归属，防空候选。</summary>
+/// <summary>0.7.84 B：受控单位死亡瞬间（原生 Update 前）修复 Squad 归属，防空候选。</summary>
 [HarmonyPatch(typeof(PlayerController), "Update")]
 public static class DeathGuardPatch
 {
@@ -225,7 +227,7 @@ public static class InputPatch
 			}
 			SquadCmdLogic.TickTracker();
 			GodViewController.EnsureTakeoverProtection();
-			// GodViewController.EnsurePlayerSquadHasCandidates(); // 0.7.83 停用：全灭时劫持原生"选择新小队"流程（0.7.34 遗留，真因已由 ClearSquadList 修复取代）
+			// GodViewController.EnsurePlayerSquadHasCandidates(); // 0.7.84 停用：全灭时劫持原生"选择新小队"流程（0.7.34 遗留，真因已由 ClearSquadList 修复取代）
 		}
 		catch (Exception ex)
 		{
@@ -283,7 +285,7 @@ public static class GodViewBlockSquadListPatch
 	private static bool Prefix(Squad squad)
 	{
 		if (GodViewController.SuppressingUi) return false;
-		// 0.7.83：不再拦"空候选"——原生 ShowSquadList 内含空候选兜底（转增援/重生），
+		// 0.7.84：不再拦"空候选"——原生 ShowSquadList 内含空候选兜底（转增援/重生），
 		// 拦掉它 = 兜底永远不跑 = 卡死在选择提示。只在接管抑制窗内拦。
 		return true;
 	}
@@ -295,7 +297,7 @@ public static class GodViewBlockSquadUpdatePatch
 {
 	private static bool Prefix()
 	{
-		return !GodViewController.SuppressingUi; // 0.7.83：撤销——重生推进也在这些回调里，屏蔽会冻结流程
+		return !GodViewController.SuppressingUi; // 0.7.84：撤销——重生推进也在这些回调里，屏蔽会冻结流程
 	}
 }
 
@@ -306,7 +308,7 @@ public static class GodViewBlockSquadStartPatch
 	private static bool Prefix()
 	{
 		if (GodViewController.SuppressingUi) return false;
-		// 0.7.83：同 ShowSquadList——空候选交给原生兜底
+		// 0.7.84：同 ShowSquadList——空候选交给原生兜底
 		return true;
 	}
 }
@@ -317,7 +319,7 @@ public static class GodViewBlockSwitchMemberPatch
 {
 	private static bool Prefix()
 	{
-		return !GodViewController.SuppressingUi; // 0.7.83：撤销——重生推进也在这些回调里，屏蔽会冻结流程
+		return !GodViewController.SuppressingUi; // 0.7.84：撤销——重生推进也在这些回调里，屏蔽会冻结流程
 	}
 }
 
@@ -327,7 +329,7 @@ public static class GodViewSkipPlayerGuiLatePatch
 {
 	private static bool Prefix()
 	{
-		return !GodViewController.SuppressingUi; // 0.7.83：撤销——重生推进也在这些回调里，屏蔽会冻结流程 // 0.7.83：拔掉空候选面板的重开驱动
+		return !GodViewController.SuppressingUi; // 0.7.84：撤销——重生推进也在这些回调里，屏蔽会冻结流程 // 0.7.84：拔掉空候选面板的重开驱动
 	}
 }
 
@@ -433,7 +435,7 @@ public static class GodViewSkipCineCamFixedPatch
 	}
 }
 
-/// <summary>0.7.83：上帝视角 SetPlayer(null) 使原生 Vehicle.PlayerIsInside 空引用（每帧 NRE 且中断 AIVehicle.Update）——
+/// <summary>0.7.84：上帝视角 SetPlayer(null) 使原生 Vehicle.PlayerIsInside 空引用（每帧 NRE 且中断 AIVehicle.Update）——
 /// 玩家不受控时直接视为"不在车内"，其余情况放行原生。仅此一个保护点，不动驾驶链。</summary>
 [HarmonyPatch(typeof(Vehicle), "PlayerIsInside")]
 public static class VehiclePlayerIsInsideGuardPatch
@@ -442,7 +444,7 @@ public static class VehiclePlayerIsInsideGuardPatch
 	{
 		try
 		{
-			// 0.7.83：保护窗=上帝视角 或 接管后抑制窗（这两种状态玩家可能不受控）
+			// 0.7.84：保护窗=上帝视角 或 接管后抑制窗（这两种状态玩家可能不受控）
 			bool guard = GodViewController.Active || Time.unscaledTime < GodViewController.SuppressSwitchMemberUntil;
 			if (!guard) return true; // 正常游戏：放行原生
 			PlayerController pc = PlayerController.currentController;

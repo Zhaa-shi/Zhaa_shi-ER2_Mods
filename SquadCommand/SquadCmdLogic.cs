@@ -672,6 +672,7 @@ internal static class SquadCmdLogic
 	{
 		try
 		{
+			if (Plugin.debugLog == null || !Plugin.debugLog.Value) return; // 0.7.84：发布默认静默，cfg 开 debugLog 查看诊断
 			Plugin.ModLog.LogInfo(msg);
 		}
 		catch

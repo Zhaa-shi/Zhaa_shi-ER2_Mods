@@ -1033,81 +1033,6 @@ internal static class GodViewController
 		if (selVehicleRefs.Count == 0) SquadCmdLogic.Log("[SplitCheck] 无选中载具（纯步兵分队）");
 	}
 
-	// 0.7.49 诊断：车辆状态演变观察（1.5s，每 0.25s）
-	private static Vehicle diagVeh2;
-	private static float diagTick2;
-	private static int diagCount2;
-
-	/// <summary>0.7.49 诊断：打印车辆运行时类型栈 / VAI 组件 / 驾驶员 / 能力标志。</summary>
-	private static void VehicleTypeDiagnose(Vehicle veh, AIVehicle ai)
-	{
-		try
-		{
-			string vt = "?", avt = "?", en = "?", active = "?", vaiTypes = "none", drv = "null", drvSq = "null";
-			try { vt = veh.GetType().Name; } catch { }
-			try { avt = ai.GetType().Name; en = ai.enabled ? "true" : "false"; active = ai.gameObject.activeInHierarchy ? "true" : "false"; } catch { }
-			try
-			{
-				System.Text.StringBuilder sb = new System.Text.StringBuilder();
-				foreach (MonoBehaviour mb in veh.GetComponentsInChildren<MonoBehaviour>(true))
-				{
-					if (mb == null) continue;
-					string tn = mb.GetType().Name;
-					if (tn.Contains("VAI_") || tn.Contains("Turret") || tn == "AIVehicle")
-					{
-						if (sb.Length > 0) sb.Append(',');
-						sb.Append(tn);
-					}
-				}
-				vaiTypes = sb.Length > 0 ? sb.ToString() : "none";
-			}
-			catch { }
-			try
-			{
-				Soldier d = FirstCrew(veh);
-				if (d != null)
-				{
-					drv = d.name + "/" + SafeName(d);
-					if (d.joinedSquad != null) drvSq = "0x" + ((long)d.joinedSquad.Pointer).ToString("X");
-				}
-			}
-			catch { }
-			SquadCmdLogic.Log("[VehicleDiagnose] vehicle=" + veh.name
-				+ " vehicleType=" + vt
-				+ " aiType=" + avt + " aiEnabled=" + en + " activeInHierarchy=" + active
-				+ " vaiComponents=[" + vaiTypes + "]"
-				+ " driver=" + drv + " driverSquad=" + drvSq);
-		}
-		catch (Exception ex) { SquadCmdLogic.Log("[VehicleDiagnose] 异常 " + ex.Message); }
-	}
-
-	/// <summary>0.7.49 诊断：moveTo 后低频观察 destination/destinationActive/IsArrived/DestinationHasChanged（只读）。</summary>
-	private static void VehicleStateTick2()
-	{
-		if (diagVeh2 == null) return;
-		if (Time.unscaledTime < diagTick2) return;
-		diagTick2 = Time.unscaledTime + 0.25f;
-		if (--diagCount2 <= 0) { diagVeh2 = null; return; }
-		try
-		{
-			if (diagVeh2.transform == null) { diagVeh2 = null; return; }
-			AIVehicle ai = diagVeh2.GetComponent<AIVehicle>();
-			if (ai == null) ai = diagVeh2.GetComponentInChildren<AIVehicle>();
-			if (ai == null) { diagVeh2 = null; return; }
-			string dest = "?", destAct = "?", arrived = "?", changed = "?", si = "null";
-			try { dest = ai.setVehicleDestination.ToString("0.0"); } catch { }
-			try { destAct = ai.destinationActive ? "true" : "false"; } catch { }
-			try { arrived = ai.IsArrivedToDestination() ? "true" : "false"; } catch { }
-			try { changed = ai.DestinationHasChanged ? "true" : "false"; } catch { }
-			try { if (ai.squadInside != null) si = "0x" + ((long)ai.squadInside.Pointer).ToString("X"); } catch { }
-			SquadCmdLogic.Log("[VehicleStateCheck] vehicle=" + diagVeh2.name
-				+ " destination=" + dest + " destinationActive=" + destAct
-				+ " arrived=" + arrived + " changed=" + changed + " squadInside=" + si);
-		}
-		catch { diagVeh2 = null; }
-	}
-
-	/// <summary>0.7.53：上车转队的异步完成——等乘员真正进入车辆 transform（IsInfantry 翻转）后执行 Leave/Join/登记。</summary>
 	private static void BoardPendingTick()
 	{
 		if (pendingBoardVeh == null || pendingBoardSq == null || pendingBoardUnits == null) return;
@@ -1259,8 +1184,6 @@ internal static class GodViewController
 			new Lua_Squad(tgt).moveTo(pendPoint, Plugin.radius.Value);
 			SquadCmdLogic.Log("[VehicleMove] vehicle=" + pendVeh.name + " squadInside=0x" + ((long)tgt.Pointer).ToString("X")
 				+ " target=" + pendPoint.ToString("0.0") + " via=Lua_Squad（同步窗口重试）");
-			VehicleTypeDiagnose(pendVeh, ai);
-			diagVeh2 = pendVeh; diagTick2 = Time.unscaledTime + 0.25f; diagCount2 = 6;
 			pendVeh = null;
 		}
 		catch { pendVeh = null; }
@@ -1935,7 +1858,6 @@ internal static class GodViewController
 			TickMove();
 			BoardPendingTick();
 			VehiclePendingTick();
-			VehicleStateTick2();
 
 			// 空格暂停
 			if (Input.GetKeyDown(KeyCode.Space))
