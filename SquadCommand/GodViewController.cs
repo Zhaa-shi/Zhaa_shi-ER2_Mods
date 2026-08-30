@@ -259,7 +259,7 @@ internal static class GodViewController
 			{
 				mvActive = false; mvLastDist.Clear();
 				ResetEngagement(); // 0.7.66：到达恢复交战
-				SquadCmdLogic.Log("[SquadCmd] MOVE 完成 " + arrived + " 单位");
+				SquadCmdLogic.LogAlways("[SquadCmd] MOVE 完成 " + arrived + " 单位");
 				EmitMoveQuality();
 				return;
 			}
@@ -754,7 +754,7 @@ internal static class GodViewController
 		RecordCmdTarget(target.transform.position);
 		BeginMarkAdvance();
 		cmdFlash = "叛徒标记 → " + mark.Name + "（持续到死亡/失控）"; cmdFlashUntil = Time.unscaledTime + 3f;
-		SquadCmdLogic.Log("[SquadCmd] 叛徒标记(持久) " + mark.Name + " 阵营=" + fac);
+		SquadCmdLogic.LogAlways("[SquadCmd] 叛徒标记(持久) " + mark.Name + " 阵营=" + fac);
 	}
 
 	private static void MarkEnemyVehicle(Vehicle veh)
@@ -784,7 +784,7 @@ internal static class GodViewController
 		RecordCmdTarget(veh.transform.position);
 		BeginMarkAdvance();
 		cmdFlash = "叛徒标记 → " + mark.Name + "（持续到死亡/失控）"; cmdFlashUntil = Time.unscaledTime + 3f;
-		SquadCmdLogic.Log("[SquadCmd] 叛徒标记(持久) 载具 " + veh.name);
+		SquadCmdLogic.LogAlways("[SquadCmd] 叛徒标记(持久) 载具 " + veh.name);
 	}
 
 	/// <summary>标记任意 Spottable（中立物品/设施）：标谁打谁。</summary>
@@ -941,7 +941,7 @@ internal static class GodViewController
 		mainSquad = null; virtualUnits.Clear(); // 分队后控制组=NewSquad（选择显示仍按 selVehicleRefs 车辆乘员）
 		cmdFlash = "分队 → " + moved + " 人入新队（原队 " + oldSet.Count + " 个，其余未动）";
 		cmdFlashUntil = Time.unscaledTime + 3f;
-		SquadCmdLogic.Log("[Split] 分队 入队=" + moved + " 原队数=" + oldSet.Count + " newSquad=0x" + ((long)ns.Pointer).ToString("X"));
+		SquadCmdLogic.LogAlways("[Split] 分队 入队=" + moved + " 原队数=" + oldSet.Count + " newSquad=0x" + ((long)ns.Pointer).ToString("X"));
 		SplitCheck(ns);
 	}
 
@@ -1088,7 +1088,7 @@ internal static class GodViewController
 						issuedAt[k] = Time.unscaledTime;
 						pendingBoardIssued.Add(k);
 						new Lua_Soldier(bs).boardVehicle(new Lua_Vehicle(veh));
-						SquadCmdLogic.Log("[BoardPending] boardVehicle " + (issued ? "重发 " : "") + SafeName(bs));
+						SquadCmdLogic.LogAlways("[BoardPending] boardVehicle " + (issued ? "重发 " : "") + SafeName(bs));
 					}
 					else
 					{
@@ -1131,7 +1131,7 @@ internal static class GodViewController
 				selVehicles.Add(sq);
 				AddVehicleRef(veh);
 			}
-			SquadCmdLogic.Log("[BoardPending] 完成（" + reason + "） vehicle=" + (veh != null ? veh.name : "?"));
+			SquadCmdLogic.LogAlways("[BoardPending] 完成（" + reason + "） vehicle=" + (veh != null ? veh.name : "?"));
 			cmdFlash = "登车完成 → 可直接驾驶"; cmdFlashUntil = Time.unscaledTime + 2.5f;
 			selFlash = Time.unscaledTime + 3f;
 		}
@@ -1294,7 +1294,7 @@ internal static class GodViewController
 				}
 				rtsSquadSet.Add((long)waitSq.Pointer);
 				try { new Lua_Soldier(overflow[0]).stop(); } catch { }
-				SquadCmdLogic.Log("[BoardPending] 待命分队建立 人数=" + moved + " 队=0x" + ((long)waitSq.Pointer).ToString("X") + "（脱离原队跟随链，原地待命）");
+				SquadCmdLogic.LogAlways("[BoardPending] 待命分队建立 人数=" + moved + " 队=0x" + ((long)waitSq.Pointer).ToString("X") + "（脱离原队跟随链，原地待命）");
 				extra = "，余 " + moved + " 人入待命组";
 			}
 			foreach (Soldier s in overflow)
@@ -1332,7 +1332,7 @@ internal static class GodViewController
 				selVehicleRefs.Clear();
 				selVehicles.Add(pendingBoardSq);
 				AddVehicleRef(veh);
-				SquadCmdLogic.Log("[BoardPending] 转队同帧完成 moved=" + moved + " rtsSquad=0x" + ((long)pendingBoardSq.Pointer).ToString("X"));
+				SquadCmdLogic.LogAlways("[BoardPending] 转队同帧完成 moved=" + moved + " rtsSquad=0x" + ((long)pendingBoardSq.Pointer).ToString("X"));
 			}
 			foreach (Soldier s in wait)
 			{
@@ -2872,6 +2872,7 @@ internal static class GodViewController
 	/// </summary>
 	private static void IssueDirectCommand(Vector2 screenPos, bool fast = false)
 	{
+		if (SelTotal == 0) return; // 0.7.86：无选中单位不响应右键指令（弹环/标记/驾驶都会穿帮）
 		Camera cam = MainCam(); if (cam == null) return;
 		try
 		{
@@ -3045,7 +3046,7 @@ internal static class GodViewController
 		lastMovePoint = point;
 		RecordCmdTarget(point);
 		cmdFlash = "移动 → 步兵 " + movedInf + " + 载具 " + driven + (fast ? "（快速）" : ""); cmdFlashUntil = Time.unscaledTime + 3f;
-		SquadCmdLogic.Log("[SquadCmd] 移动 point=" + point.ToString("0.0") + " 步兵=" + movedInf + " 载具=" + driven + (fast ? " 快速" : ""));
+		SquadCmdLogic.LogAlways("[SquadCmd] 移动 point=" + point.ToString("0.0") + " 步兵=" + movedInf + " 载具=" + driven + (fast ? " 快速" : ""));
 	}
 
 	/// <summary>停止（选中单位停下，清移动命令）。</summary>

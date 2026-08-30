@@ -668,6 +668,11 @@ internal static class SquadCmdLogic
 		return res;
 	}
 
+	internal static void LogAlways(string msg)
+	{
+		try { Plugin.ModLog.LogInfo(msg); } catch { }
+	}
+
 	internal static void Log(string msg)
 	{
 		try
