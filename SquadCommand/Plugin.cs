@@ -9,16 +9,14 @@ using UnityEngine;
 
 namespace ER2SquadCommand;
 
-[BepInPlugin("er2.squadcommand", "ER2 Squad Command", "0.7.97")]
+[BepInPlugin("er2.squadcommand", "ER2 Squad Command", "0.7.98")]
 public class Plugin : BasePlugin
 {
 	internal static ManualLogSource ModLog;
 
 	internal static ConfigEntry<bool> enabled;
 	internal static ConfigEntry<float> radius;
-	internal static ConfigEntry<float> trackSeconds;
 	internal static ConfigEntry<bool> debugLog;
-	internal static ConfigEntry<float> m7Interval;
 	internal static ConfigEntry<KeyCode> godKey;
 
 	public override void Load()
@@ -27,14 +25,12 @@ public class Plugin : BasePlugin
 
 		enabled = Config.Bind("General", "enabled", true, "主开关。");
 		radius = Config.Bind("Control", "moveRadius", 8f, new ConfigDescription("移动到达判定半径（米）；双击右键「前往并防守」的防守半径同用此值。", new AcceptableValueRange<float>(1f, 60f)));
-		trackSeconds = Config.Bind("Control", "moveTimeout", 14f, new ConfigDescription("移动任务超时（秒）：超时后停止修正并输出路径质量报告。", new AcceptableValueRange<float>(2f, 45f)));
-		m7Interval = Config.Bind("Control", "moveCheckInterval", 2f, new ConfigDescription("移动任务检查间隔（秒）。只在单位停滞时修正，不会每帧重发命令。", new AcceptableValueRange<float>(0.25f, 5f)));
 		debugLog = Config.Bind("Debug", "debugLog", false, new ConfigDescription("调试日志开关（发布版保持关闭）。开启后输出全部指挥/登车/标记诊断日志，用于问题排查。"));
 		godKey = Config.Bind("General", "godKey", KeyCode.F9, "上帝视角开关（仅进入）。退出＝选中小队后点顶部[控制该小队]随机接管一人；全军覆没时按键紧急退出。空格＝暂停/继续世界。");
 
 		new Harmony("er2.squadcommand").PatchAll(typeof(Plugin).Assembly);
 		FrameEndRunner.Ensure();
-		ModLog.LogInfo("ER2 Squad Command 0.7.97 loaded. godKey=" + godKey.Value);
+		ModLog.LogInfo("ER2 Squad Command 0.7.98 loaded. godKey=" + godKey.Value);
 	}
 }
 
@@ -106,7 +102,6 @@ public static class InputPatch
 				GodViewController.Toggle();
 				return;
 			}
-			SquadCmdLogic.TickTracker();
 			GodViewController.EnsureTakeoverProtection();
 			// GodViewController.EnsurePlayerSquadHasCandidates(); // 0.7.86 停用：全灭时劫持原生"选择新小队"流程（0.7.34 遗留，真因已由 ClearSquadList 修复取代）
 		}
@@ -345,7 +340,6 @@ public static class DrawPatch
 	{
 		try
 		{
-			SquadCmdLogic.DrawHud();
 			GodViewController.DrawHud();
 		}
 		catch (Exception ex)

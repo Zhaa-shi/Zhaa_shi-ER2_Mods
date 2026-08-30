@@ -5,10 +5,10 @@
 
 ## 1. 项目是什么
 
-按 F9 进入"上帝视角"（自由俯瞰战场的 RTS 视角），用鼠标框选友军单位组建真实小队，右键下达指令（移动/标记集火/上车），空格暂停，顶部按钮接管任意选中单位继续第一人称战斗。
+按 F9 进入"上帝视角"（自由俯瞰战场的 RTS 视角），长按左键框选友军做临时选择（不拆原生小队），右键下达指令（移动/集火标记/上车/前往并防守），空格暂停，顶部按钮接管任意选中单位继续第一人称战斗。行动逻辑尽量走游戏原生命令链（moveTo/HoldArea/Charge/boardVehicle），Mod 不自建移动编排。
 
-- 插件名：`ER2 Squad Command`，GUID `er2.squadcommand`，当前版本 **0.7.97**（扁平结构，对齐其它 mod）
-- 源码：`Plugin.cs`（Harmony patch 装配）、`GodViewController.cs`（上帝视角/选择/指令核心，最大）、`SquadCmdLogic.cs`（小队查询/HUD/追踪）
+- 插件名：`ER2 Squad Command`，GUID `er2.squadcommand`，当前版本 **0.7.98**（扁平结构，对齐其它 mod）
+- 源码：`Plugin.cs`（Harmony patch 装配）、`GodViewController.cs`（上帝视角/选择/指令核心，最大）、`SquadCmdLogic.cs`（小队查询/控制登记/日志）
 - 构建：`scripts/build.ps1 -Mod SquadCommand`（构建+部署+清cfg+打包；游戏在跑会自动轮询）或 `dotnet build -c Release SquadCommand.csproj`
 - csproj 引用游戏 interop：`E:\SteamLibrary\steamapps\common\Easy Red 2\BepInEx\interop\*.dll`，已排除 `research/docs/bin/obj/src/deps` 避免污染
 

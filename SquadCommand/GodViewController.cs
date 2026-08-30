@@ -13,7 +13,7 @@ namespace ER2SquadCommand;
 ///   顶栏按钮：控制该小队 / 分队（显式新建组）/ 合并（并入当前激活 RTS 组）
 ///   空格暂停；F9 进入/紧急退出；顶部按钮接管（保护窗+独苗转移）
 ///   退出 RTS 不清除已下达的移动、登车、车辆同步和集火任务；FPS 原生输入照常运行
-///   标记=持久集火（GetBestVisibleEnemy/CurrentVisibleTarget Postfix + LOS 缓存）+ 推进状态机
+///   标记=持久集火（GetBestVisibleEnemy/CurrentVisibleTarget Postfix + LOS 缓存）+ 原生冲锋推进（Charge）
 ///   死亡/换队链已冻结（0.7.40/41：停用 ClearSquadList 与 EnsurePlayerSquadHasCandidates）
 ///   光标防闪烁：Cursor set_lockState/visible patch + FrameEndRunner 兜底
 /// </summary>
@@ -165,145 +165,6 @@ internal static class GodViewController
 	private static List<Soldier> markerCache = new List<Soldier>();
 	private static float markerCacheUntil = -10f;
 
-	// ===== M7：移动 Command State =====
-	private static bool mvActive;
-	private static Vector3 mvTarget;
-	private static readonly List<Soldier> mvUnits = new List<Soldier>();
-	private static readonly Dictionary<long, float> mvLastDist = new Dictionary<long, float>();
-	// 0.7.62 P2：移动路径质量统计（直线距离 vs 实际路程 vs 修正次数）
-	private static readonly Dictionary<long, Vector3> mvLastPos = new Dictionary<long, Vector3>();
-	private static readonly Dictionary<long, double> mvPathAcc = new Dictionary<long, double>();
-	private static float mvQualityStart = -10f;
-	private static int mvFixCount;
-	private static float mvArriveDist = 8f; // 0.7.75：本次移动的到达判定半径（fast=30m，避免与原生散开拉扯）
-	private static float mvLastCheck = -10f;
-	private static readonly List<Soldier> rushNoEngage = new List<Soldier>(); // 冲锋期禁索敌名单
-
-	/// <summary>M7：每 2s 检查移动状态——只对"未在接近目标"的单位做必要修正，不整队轰炸。</summary>
-	/// <summary>0.7.62 P2：每帧累积选中单位实际路程（绕路量化的采样源）。</summary>
-	private static void MoveQualityTick()
-	{
-		if (!mvActive || mvQualityStart < 0f) return;
-		foreach (Soldier u in mvUnits)
-		{
-			try
-			{
-				if (u == null || u.transform == null) continue;
-				long k = (long)u.Pointer;
-				if (mvLastPos.TryGetValue(k, out Vector3 prev))
-				{
-					mvPathAcc.TryGetValue(k, out double acc);
-					mvPathAcc[k] = acc + (u.transform.position - prev).magnitude; // 累积实际路程
-				}
-				mvLastPos[k] = u.transform.position;
-			}
-			catch { }
-		}
-	}
-
-	/// <summary>0.7.62 P2：移动结束输出路径质量（直线/路程/绕路系数/修正次数/用时）。</summary>
-	private static void EmitMoveQuality()
-	{
-		try
-		{
-			double path = 0; double line = 0; int n = 0;
-			foreach (Soldier u in mvUnits)
-			{
-				if (u == null || u.transform == null) continue;
-				long k = (long)u.Pointer;
-				line += (u.transform.position - mvTarget).magnitude;
-				if (mvPathAcc.TryGetValue(k, out double acc)) path += acc;
-				n++;
-			}
-			double ratio = path > 0.01 && line > 0.01 ? path / line : 1.0;
-			SquadCmdLogic.Log("[MoveQuality] 单位=" + n + " 直线剩余=" + line.ToString("0.0") + "m"
-				+ " 尾段路程=" + path.ToString("0.0") + "m"
-				+ " 修正次数=" + mvFixCount
-				+ " 用时=" + (Time.unscaledTime - mvQualityStart).ToString("0.0") + "s"
-				+ "（对照：直线剩余/路程 比值越小越直接）");
-		}
-		catch { }
-		mvLastPos.Clear(); mvPathAcc.Clear(); mvFixCount = 0; mvQualityStart = -10f;
-	}
-
-	private static void TickMove()
-	{
-		if (!mvActive) return;
-		if (mvFromMark)
-		{
-			try { var m = CurrentMark; if (m == null) { mvActive = false; ResetEngagement(); return; } mvTarget = m.Position; }
-			catch { mvActive = false; ResetEngagement(); return; }
-		}
-		float now = Time.unscaledTime;
-		if (now - mvLastCheck < Plugin.m7Interval.Value) return;
-		mvLastCheck = now;
-		try
-		{
-			for (int i = mvUnits.Count - 1; i >= 0; i--)
-				if (mvUnits[i] == null || !mvUnits[i].IsAlive || mvUnits[i].transform == null) mvUnits.RemoveAt(i);
-			if (mvUnits.Count == 0) { mvActive = false; return; }
-			if (Time.unscaledTime - mvQualityStart > Plugin.trackSeconds.Value)
-			{
-				mvActive = false; mvLastDist.Clear();
-				ResetEngagement(); // 超时结束同样要恢复交战，否则被修正单位永久禁索敌
-				SquadCmdLogic.Log("[SquadCmd] MOVE 超时 " + Plugin.trackSeconds.Value + "s");
-				EmitMoveQuality();
-				return;
-			}
-			int arrived = 0, stalled = 0;
-			List<Soldier> fix = new List<Soldier>();
-			foreach (Soldier u in mvUnits)
-			{
-				float d = (u.transform.position - mvTarget).magnitude;
-				long key = (long)u.Pointer;
-				bool prev = mvLastDist.TryGetValue(key, out float pd);
-				if (d <= mvArriveDist) { arrived++; mvLastDist[key] = d; continue; }
-				if (!prev || d < pd - 0.5f) mvLastDist[key] = d;      // 在接近：不打扰
-				else { stalled++; fix.Add(u); }                        // 停滞/被抢任务：待修正
-			}
-			if (arrived >= mvUnits.Count)
-			{
-				mvActive = false; mvLastDist.Clear();
-				ResetEngagement(); // 0.7.66：到达恢复交战
-				SquadCmdLogic.LogAlways("[SquadCmd] MOVE 完成 " + arrived + " 单位");
-				EmitMoveQuality();
-				return;
-			}
-			if (stalled > 0)
-			{
-				mvFixCount += stalled;
-				foreach (Soldier u in fix)
-				{
-					try
-					{
-						new Lua_Soldier(u).stop();
-						AiParams ap = new Lua_Soldier(u).getAiParams();
-						try { ap.followCustomSquadOrders(); } catch { }
-						try { ap.followCustomDirectCommands(); } catch { }
-						try { ap.allowMovements(true); } catch { }
-						// 0.7.66 任务优先：被修正的单位途中禁索敌（战斗不再拉停任务），到达后恢复
-						try { ap.allowCheckForEnemies(false); if (!rushNoEngage.Contains(u)) rushNoEngage.Add(u); } catch { }
-						new Lua_Soldier(u).moveTo(mvTarget);
-						mvLastDist[(long)u.Pointer] = (u.transform.position - mvTarget).magnitude;
-					}
-					catch { }
-				}
-				SquadCmdLogic.Log("[SquadCmd] MOVE 修正 单位=" + stalled + "/" + mvUnits.Count + " 距目标=" + ((fix.Count > 0 ? (fix[0].transform.position - mvTarget).magnitude : 0f)).ToString("0.0") + "m");
-			}
-		}
-		catch { }
-	}
-
-	/// <summary>恢复交战能力（普通移动/停止时解除冲锋禁索敌）。</summary>
-	private static void ResetEngagement()
-	{
-		foreach (Soldier s in rushNoEngage)
-		{
-			try { new Lua_Soldier(s).getAiParams().allowCheckForEnemies(true); } catch { }
-		}
-		rushNoEngage.Clear();
-	}
-
 	// 右键长按手势状态（长按=常驻命令环，短按=直接指令）
 	private const float RightLongPressSeconds = 0.35f;
 	private static bool rightHoldActive;
@@ -333,7 +194,6 @@ internal static class GodViewController
 	internal static MarkedTarget CurrentMark => (mark != null && mark.Active && !mark.Downgraded) ? mark : null;
 	/// <summary>标记生效半径（米，集火距离）。</summary>
 	internal static float MarkRadius = 500f;
-	private static bool mvFromMark;
 	private static float markLostSightSince = -1f;
 	private const float MarkLoseSightGraceSeconds = 6f;
 	private static float pruneMarkNext;
@@ -465,8 +325,6 @@ internal static class GodViewController
 	private static Vector3 pendPoint;
 	private static float pendUntil;
 	private static float pendNextRetry;
-	// M5 原队映射
-	private static readonly Dictionary<long, Squad> originSquadMap = new Dictionary<long, Squad>();
 
 	private static bool HasSelection => SelInfantryCount() > 0 || selVehicles.Count > 0;
 
@@ -738,7 +596,6 @@ internal static class GodViewController
 				return 0;
 			}
 			RTSTrace("DriveDecision", "vehicle=" + vehRef.name + " canDrive=true squadInside=rtsSquad");
-			SquadCmdLogic.StopTracking();
 			if (SquadCmdLogic.TryIssueNativeMove(tgt, point, Plugin.radius.Value))
 			{
 				SquadCmdLogic.LogAlways("[VehicleMove] vehicle=" + vehRef.name + " squadInside=0x" + ((long)tgt.Pointer).ToString("X")
@@ -857,60 +714,10 @@ internal static class GodViewController
 	{
 		// 这里只清理本 Mod 的 RTS 状态；不向原生 Squad 发送取消/替换订单，
 		// 也不触碰 FPS 模式下的原生 AI。
-		SquadCmdLogic.StopTracking();
-		mvActive = false;
-		mvFromMark = false;
-		mvUnits.Clear();
-		mvLastDist.Clear();
-		mvLastPos.Clear();
-		mvPathAcc.Clear();
-		mvQualityStart = -10f;
-		mvFixCount = 0;
-		mvLastCheck = -10f;
 		pendVeh = null;
 		pendUntil = -10f;
 		pendNextRetry = -10f;
-		ResetEngagement();
-		if (logIt) SquadCmdLogic.Log("[SquadCmd] 清理 RTS 跟随/移动状态：" + reason);
-	}
-
-	/// <summary>历史遗留的单位→原小队映射；当前框选不拆原生小队，保留供旧分队流程使用。</summary>
-	private static void RestoreOriginalSquads()
-	{
-		if (originSquadMap.Count == 0) return;
-		int restored = 0;
-		foreach (var kv in originSquadMap)
-		{
-			Soldier s = null;
-			try
-			{
-				Il2CppSystem.Collections.Generic.List<Creature> all = Creature.allCreatures;
-				if (all == null) continue;
-				for (int i = 0; i < all.Count; i++)
-				{
-					Creature c = all[i]; if (c == null) continue;
-					Soldier cs = c.TryCast<Soldier>();
-					if (cs == null || cs.Pointer != (IntPtr)kv.Key) continue;
-					s = cs; break;
-				}
-			}
-			catch { continue; }
-			Squad orig = kv.Value;
-			try
-			{
-				if (s == null || !s.IsAlive || orig == null) continue;
-				Squad cur = s.joinedSquad;
-				if (cur != null && orig != null && cur.Pointer == orig.Pointer) continue;
-				if (cur != null) cur.Leave(s, false);
-				orig.Join(s);
-				restored++;
-			}
-			catch { }
-		}
-		originSquadMap.Clear();
-		mainSquad = null;
-		virtualUnits.Clear();
-		SquadCmdLogic.Log("[SquadCmd] M5 退队还原 成员=" + restored);
+		if (logIt) SquadCmdLogic.Log("[SquadCmd] 清理 RTS 状态：" + reason);
 	}
 
 	private static Spottable GetSpottable(Soldier s)
@@ -925,7 +732,7 @@ internal static class GodViewController
 	private static float pendingBoardUntil;
 	private static float pendingBoardNext;
 
-	/// <summary>标记后：选中单位向目标推进（借 M7 修正循环），到达交战距离即停由原生接战。</summary>
+	/// <summary>标记后：选中单位按所属原生小队编组冲锋（Squad.Charge）向目标推进接战，全原生无修正状态机。</summary>
 	private static void BeginMarkAdvance()
 	{
 		persistentMarkUnits.Clear();
@@ -959,33 +766,28 @@ internal static class GodViewController
 			foreach (Vehicle old in persistentMarkVehicles) { try { if (old != null && old.Pointer == v.Pointer) { exists = true; break; } } catch { } }
 			if (!exists) persistentMarkVehicles.Add(v);
 		}
-		mvTarget = mark != null ? mark.Position : Vector3.zero;
-		mvUnits.Clear();
-		foreach (Soldier s in GetSelectedInfantry()) if (s != null && s.IsAlive) mvUnits.Add(s);
-		mvLastDist.Clear(); mvActive = mvUnits.Count > 0; mvFromMark = mvActive; mvLastCheck = Time.unscaledTime;
-		mvArriveDist = Plugin.radius.Value; // 标记推进精确到位
+		// 0.7.98：推进改用原生冲锋（Squad.Charge）——按所属原生小队分组单条命令，
+		// Mod 不再自建推进/停滞修正状态机。
+		if (mark == null) return;
+		HashSet<long> done = new HashSet<long>();
+		foreach (Soldier s in GetSelectedInfantry())
+		{
+			try
+			{
+				if (s == null || !s.IsAlive) continue;
+				Squad sq = s.joinedSquad;
+				if (sq == null || !done.Add((long)sq.Pointer)) continue;
+				SquadCmdLogic.RegisterControlledSquad(sq);
+				sq.Charge(mark.Position, Plugin.radius.Value);
+			}
+			catch { }
+		}
 	}
 
 	private static void RemovePersistentUnit(Soldier unit)
 	{
 		if (unit == null) return;
 		try { persistentMarkUnits.RemoveAll(s => s == null || s.Pointer == unit.Pointer); } catch { }
-		try { mvUnits.RemoveAll(s => s == null || s.Pointer == unit.Pointer); } catch { }
-		// 被接管单位若在禁索敌名单中：先恢复索敌再摘除——否则它回归 AI 后永不自动接战。
-		try
-		{
-			if (rushNoEngage.RemoveAll(s => s == null || s.Pointer == unit.Pointer) > 0)
-			{
-				try { new Lua_Soldier(unit).getAiParams().allowCheckForEnemies(true); } catch { }
-			}
-		}
-		catch { }
-		try
-		{
-			long k = (long)unit.Pointer;
-			mvLastDist.Remove(k); mvLastPos.Remove(k); mvPathAcc.Remove(k);
-		}
-		catch { }
 		// 接管车内单位时，连同该单位所在的持久载具标记一起摘除，
 		// 避免 FPS 接管后仍由本 Mod 改写玩家载具的目标。
 		try
@@ -995,16 +797,6 @@ internal static class GodViewController
 			{
 				long vp = (long)parentVehicle.Pointer;
 				persistentMarkVehicles.RemoveAll(v => v == null || (long)v.Pointer == vp);
-			}
-		}
-		catch { }
-		try
-		{
-			if (mvUnits.Count == 0)
-			{
-				mvActive = false;
-				mvFromMark = false;
-				ResetEngagement();
 			}
 		}
 		catch { }
@@ -1270,7 +1062,6 @@ internal static class GodViewController
 				if (playerVehicle != null && playerVehicle.Pointer == pendVeh.Pointer) { pendVeh = null; return; }
 			}
 			catch { }
-			SquadCmdLogic.StopTracking();
 			Vehicle retryVeh = pendVeh;
 			if (SquadCmdLogic.TryIssueNativeMove(tgt, pendPoint, Plugin.radius.Value))
 			{
@@ -1446,7 +1237,6 @@ internal static class GodViewController
 	private static int DismountAllVehicles()
 	{
 		int n = 0;
-		SquadCmdLogic.StopTracking(); // 先停追踪重发
 		ClearFollow("下车", false);
 		PruneVehicleRefs();
 		foreach (Vehicle v in new List<Vehicle>(selVehicleRefs))
@@ -1752,7 +1542,6 @@ internal static class GodViewController
 			if (best == null) { SquadCmdLogic.Log("[" + tag + "] 无可用友军小队（全灭？）交原生流程"); return; }
 			if (cur != null)
 			{
-				originSquadMap[(long)c.Pointer] = cur;
 				cur.Leave(c, false);
 			}
 			best.Join(c);
@@ -1864,7 +1653,6 @@ internal static class GodViewController
 					}
 					if (best != null)
 					{
-						originSquadMap[(long)pick.Pointer] = sq;
 						sq.Leave(pick, false);
 						best.Join(pick);
 						sq = pick.joinedSquad;
@@ -1934,8 +1722,6 @@ internal static class GodViewController
 		try
 		{
 			PruneMark();
-			MoveQualityTick();
-			TickMove();
 			BoardPendingTick();
 			VehiclePendingTick();
 		}
@@ -3056,7 +2842,7 @@ internal static class GodViewController
 		catch { return false; }
 	}
 
-	private static void IssueDirectCommand(Vector2 screenPos, bool fast = false)
+	private static void IssueDirectCommand(Vector2 screenPos)
 	{
 		if (SelTotal == 0) return; // 0.7.86：无选中单位不响应右键指令（弹环/标记/驾驶都会穿帮）
 		Camera cam = MainCam(); if (cam == null) return;
@@ -3104,7 +2890,7 @@ internal static class GodViewController
 						OpenInteractionWheel(screenPos, veh: vIn, sol: sol);
 						return;
 					}
-					MoveCommandTo(hit.point, fast);
+					MoveCommandTo(hit.point);
 					return;
 				}
 				else
@@ -3145,26 +2931,9 @@ internal static class GodViewController
 				cmdFlash = "先框选/选中要指挥的单位"; cmdFlashUntil = Time.unscaledTime + 2f;
 				return;
 			}
-			MoveCommandTo(hit.point, fast);
+			MoveCommandTo(hit.point);
 		}
 		catch (Exception ex) { SquadCmdLogic.Log("[SquadCmd] 右键指令失败: " + ex.Message); }
-	}
-
-	/// <summary>普通移动前恢复开火（解除不交战状态的 holdFire）。</summary>
-	private static void RestoreFireWill()
-	{
-		foreach (Soldier s in GetSelectedInfantry())
-		{
-			try { Squad g = s.joinedSquad; if (g != null) new Lua_Squad(g).fireAtWill(true); } catch { }
-		}
-	}
-
-	/// <summary>整队释放+移动 到目标点。</summary>
-	private static void RegisterAndMove(Squad sq, Vector3 p)
-	{
-		SquadCmdLogic.RegisterControlledSquad(sq);
-		SquadCmdLogic.DisableNativeOrders(sq);
-		new Lua_Squad(sq).moveTo(p, Plugin.radius.Value);
 	}
 
 	/// <summary>
@@ -3197,19 +2966,9 @@ internal static class GodViewController
 	}
 
 	/// <summary>移动指令：选中步兵走 + 选中载具开过去（到点击点，标点就在点击处）。移动会解除跟随。</summary>
-	private static void MoveCommandTo(Vector3 point, bool fast = false)
+	private static void MoveCommandTo(Vector3 point)
 	{
 		if (!Active) return;
-		// 0.7.47 诊断：移动前选择状态核对
-		{
-			List<Soldier> cu = GetCommandUnits();
-			SquadCmdLogic.Log("[SelectionCheck] infantry=" + GetSelectedInfantry().Count + " vehicles=" + selVehicles.Count + " commandUnits=" + cu.Count);
-			foreach (Vehicle rv in selVehicleRefs)
-			{
-				int occ = 0; try { Soldier[] os = rv != null && rv.transform != null ? rv.GetComponentsInChildren<Soldier>() : null; if (os != null) for (int i = 0; i < os.Length; i++) if (os[i] != null && os[i].IsAlive) occ++; } catch { }
-				SquadCmdLogic.Log("[SelectionCheck] selectedVehicleRef=" + (rv != null ? rv.name : "?") + " occupants=" + occ);
-			}
-		}
 		ClearFollow("下达移动", false);
 		// 0.7.78：玩家新命令优先——把选中的乘员从登车 pending 摘除，否则完成判定会一直等待
 		// 他们（本次移动命令已覆盖原生 boardVehicle，他们不会再上车）。
@@ -3230,8 +2989,6 @@ internal static class GodViewController
 			if (pendingBoardUnits.Count == 0) CancelBoardPending("玩家下达了新命令");
 			else if (removed > 0) SquadCmdLogic.Log("[BoardPending] 摘除 " + removed + " 名改令乘员（余 " + pendingBoardUnits.Count + " 人继续登车）");
 		}
-		ResetEngagement();
-		RestoreFireWill();
 		if (SelTotal == 0)
 		{
 			cmdFlash = "先框选/选中要指挥的单位"; cmdFlashUntil = Time.unscaledTime + 2f;
@@ -3257,31 +3014,16 @@ internal static class GodViewController
 		{
 			driven += DriveVehicleTo(vv, point);
 		}
-		if (movedInf > 0)
-		{
-			// 原生 Squad 订单仍是首选；M7 只做低频观察，确认单位停滞后才逐兵修正。
-			// 这样既保留原生编队行为，也覆盖“Lua_Squad.moveTo 返回成功但 AI 没启动”的情况。
-			SquadCmdLogic.StartTrackingUnits(infantry, point);
-			mvTarget = point; mvUnits.Clear();
-			foreach (Soldier s3 in infantry) if (s3 != null && s3.IsAlive) mvUnits.Add(s3);
-			mvLastDist.Clear(); mvActive = mvUnits.Count > 0; mvLastCheck = fast ? -10f : Time.unscaledTime; // fast：立即检查一轮
-			mvLastPos.Clear();
-			foreach (Soldier s3 in mvUnits) try { mvLastPos[(long)s3.Pointer] = s3.transform.position; } catch { }
-			mvQualityStart = Time.unscaledTime; mvFixCount = 0;
-			mvArriveDist = fast ? 30f : Plugin.radius.Value;
-		}
-		mvFromMark = false;
 		lastMovePoint = point;
 		RecordCmdTarget(point);
-		cmdFlash = "移动 → 步兵 " + movedInf + " + 载具 " + driven + (fast ? "（快速）" : ""); cmdFlashUntil = Time.unscaledTime + 3f;
-		SquadCmdLogic.LogAlways("[SquadCmd] 移动 point=" + point.ToString("0.0") + " 步兵=" + movedInf + " 载具=" + driven + (fast ? " 快速" : ""));
+		cmdFlash = "移动 → 步兵 " + movedInf + " + 载具 " + driven; cmdFlashUntil = Time.unscaledTime + 3f;
+		SquadCmdLogic.LogAlways("[SquadCmd] 移动 point=" + point.ToString("0.0") + " 步兵=" + movedInf + " 载具=" + driven);
 	}
 
 	/// <summary>停止（选中单位停下，清移动命令）。</summary>
 	private static void StopSelected()
 	{
 		int n = 0;
-		SquadCmdLogic.StopTracking();
 		// 0.7.45 分层停止：徒步步兵 Soldier.stop；选中载具走 AIVehicle.StopAndClearPath
 		foreach (Soldier s in GetSelectedInfantry())
 		{
@@ -3428,7 +3170,6 @@ internal static class GodViewController
 			Squad old = s.joinedSquad;
 			if (old != null && old.Pointer != target.Pointer)
 			{
-				originSquadMap[(long)s.Pointer] = old;
 				old.Leave(s, false);
 			}
 			target.Join(s);
@@ -3533,12 +3274,11 @@ internal static class GodViewController
 				{
 					Vehicle rv = WheelRepairTarget();
 					Squad rsq = NativeRepairSquad();
-					if (rv != null && rsq != null)
-					{
-						try
+						if (rv != null && rsq != null)
 						{
-							SquadCmdLogic.StopTracking();
-							SquadCmdLogic.RegisterControlledSquad(rsq);
+							try
+							{
+								SquadCmdLogic.RegisterControlledSquad(rsq);
 							rsq.OrderRepairVehicle(rv);
 							cmdFlash = "修理 → " + SafeName(rv); cmdFlashUntil = Time.unscaledTime + 2f;
 							SquadCmdLogic.Log("[SquadCmd] 修理订单 " + rv.name + " 队 ptr=0x" + ((long)rsq.Pointer).ToString("X"));
@@ -3558,8 +3298,6 @@ internal static class GodViewController
 			case 7: // 停止：取消当前 RTS 行为（移动/标记），作用于全部选中单位
 				ClearFollow("停止", false);
 				ClearMark();
-				ResetEngagement();
-				mvActive = false;
 				StopSelected();
 				break;
 		}
