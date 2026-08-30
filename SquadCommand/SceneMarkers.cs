@@ -23,8 +23,9 @@ internal static class SceneMarkers
 	private static Material LineMat()
 	{
 		if (lineMat != null) return lineMat;
-		// 0.9.1：GUI/Text Shader 无视深度测试——脚环不会被地形/草丛埋住
-		foreach (string sn in new[] { "GUI/Text Shader", "Sprites/Default", "Universal Render Pipeline/Unlit", "Particles/Standard Unlit" })
+		// 0.9.4：按用户要求回归深度测试（环不再盖在单位/一切物体上面），
+		// 环体抬高到 0.15m 缓解缓坡地形裁切
+		foreach (string sn in new[] { "Sprites/Default", "Universal Render Pipeline/Unlit", "Particles/Standard Unlit" })
 		{
 			Shader sh = null;
 			try { sh = Shader.Find(sn); } catch { }

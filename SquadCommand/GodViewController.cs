@@ -162,6 +162,7 @@ internal static class GodViewController
 	// ◆ 标记绘制缓存（OnGUI 每帧多 pass）
 	private static List<Soldier> markerCache = new List<Soldier>();
 	private static float markerCacheUntil = -10f;
+	private static MapGUI mapGuiCached; // 0.9.4：M 键开关大地图（FindObjectOfType 缓存一次）
 
 	// 右键长按手势状态（长按=常驻命令环，短按=直接指令）
 	private const float RightLongPressSeconds = 0.35f;
@@ -2052,26 +2053,19 @@ internal static class GodViewController
 
 		// 输入先处理，避免相机/原生对象访问异常阻断鼠标手势收尾。
 		try { HandleGroupHotkeys(); } catch { }
-		// 0.9.3：RTS 内 M 键开关原生大地图——属性翻转 + 容器/CanvasGroup 强可视兜底 + 诊断日志
+		// 0.9.4：RTS 内 M 键开关原生大地图——直接调 MapGUI.OpenMap/CloseMap
+		//（0.9.3 已确认 MiniMapOpened 是死 API：全程序集无人调用，显隐由 MapGUI 管理）
 		try
 		{
 			if (Input.GetKeyDown(KeyCode.M))
 			{
-				MiniMapGUI.MiniMapOpened = !MiniMapGUI.MiniMapOpened;
-				var inst = MiniMapGUI.Instance;
-				if (inst != null && inst.miniMap != null)
+				if (mapGuiCached == null) { try { mapGuiCached = UnityEngine.Object.FindObjectOfType(Il2CppInterop.Runtime.Il2CppType.Of<MapGUI>()) as MapGUI; } catch { } }
+				if (mapGuiCached != null)
 				{
-					GameObject go = inst.miniMap.gameObject;
-					go.SetActive(MiniMapGUI.MiniMapOpened);
-					CanvasGroup cg = inst.miniMap.GetComponent<CanvasGroup>();
-					if (cg == null) cg = inst.miniMap.GetComponentInChildren<CanvasGroup>();
-					if (cg != null) cg.alpha = MiniMapGUI.MiniMapOpened ? 1f : 0f;
-					SquadCmdLogic.LogAlways("[SquadCmd] M 地图 open=" + MiniMapGUI.MiniMapOpened
-						+ " 容器=" + go.name + " activeSelf=" + go.activeSelf
-						+ " scale=" + inst.miniMap.localScale.ToString("0.00")
-						+ " cgAlpha=" + (cg != null ? cg.alpha.ToString("0.00") : "无"));
+					if (MiniMapGUI.MiniMapOpened) { mapGuiCached.CloseMap(); SquadCmdLogic.LogAlways("[SquadCmd] M 地图 关"); }
+					else { mapGuiCached.OpenMap(); SquadCmdLogic.LogAlways("[SquadCmd] M 地图 开"); }
 				}
-				else SquadCmdLogic.LogAlways("[SquadCmd] M 地图 open=" + MiniMapGUI.MiniMapOpened + " 容器=null（Instance 未就绪）");
+				else SquadCmdLogic.LogAlways("[SquadCmd] M 地图：场景中未找到 MapGUI");
 			}
 		}
 		catch (Exception ex) { SquadCmdLogic.LogAlways("[SquadCmd] M 地图切换失败: " + ex.Message); }
@@ -2821,13 +2815,14 @@ internal static class GodViewController
 		return fallback;
 	}
 
-	/// <summary>0.9.0：统一按钮绘制——主题色底板+描边+居中文字；enabled=false 用禁用色。</summary>
+	/// <summary>0.9.0：统一按钮绘制——主题色底板+描边+居中文字。0.9.4：禁用态高对比（近黑底+暗淡文字）。</summary>
 	private static void DrawUiButton(Rect r, string label, bool enabled, bool hover)
 	{
-		Color fill = !enabled ? uiDisabled : (hover ? uiHover : uiBase);
+		Color fill = enabled ? (hover ? uiHover : uiBase) : new Color(0f, 0f, 0f, 0.55f);
+		Color txt = enabled ? uiText : new Color(0.7f, 0.7f, 0.7f, 0.4f);
 		GUI.color = fill;
 		GUI.DrawTexture(r, Texture2D.whiteTexture);
-		GUI.color = uiText;
+		GUI.color = txt;
 		GUI.DrawTexture(new Rect(r.x, r.y, r.width, 1.5f), Texture2D.whiteTexture);
 		GUI.DrawTexture(new Rect(r.x, r.yMax - 1.5f, r.width, 1.5f), Texture2D.whiteTexture);
 		GUI.DrawTexture(new Rect(r.x, r.y, 1.5f, r.height), Texture2D.whiteTexture);
@@ -2860,7 +2855,8 @@ internal static class GodViewController
 				smFriendlyNext = t + 1f;
 				RebuildFriendlyCache();
 			}
-			Color dim = new Color(0.88f, 0.88f, 0.88f, 0.68f); // 0.9.3：灰白——任何地形上都可见
+			Color dim = new Color(0.62f, 0.62f, 0.62f, 0.55f); // 0.9.4：半透明灰
+			Color selWhite = new Color(0.93f, 0.93f, 0.93f, 0.95f); // 0.9.4：选中=灰白
 			int drawn = 0;
 			foreach (Soldier s in smFriendly)
 			{
@@ -2870,7 +2866,7 @@ internal static class GodViewController
 					if (s == null || !s.IsAlive || s.transform == null) continue;
 					long k = (long)s.Pointer;
 					if (smSelected.Contains(k)) continue; // 选中角括号更醒目，不叠画
-					SceneMarkers.Ring("F" + k, s.transform.position + Vector3.up * 0.1f, 0.5f, dim, 0.05f, true);
+					SceneMarkers.Ring("F" + k, s.transform.position + Vector3.up * 0.15f, UnitRingRadius(s), dim, 0.05f, true);
 					drawn++;
 				}
 				catch { }
@@ -2883,19 +2879,19 @@ internal static class GodViewController
 					if (v == null || v.transform == null) continue;
 					long k = (long)v.Pointer;
 					if (smSelected.Contains(k)) continue;
-					SceneMarkers.Ring("FV" + k, v.transform.position + Vector3.up * 0.12f, VehicleRingRadius(v), dim, 0.07f, true);
+					SceneMarkers.Ring("FV" + k, v.transform.position + Vector3.up * 0.15f, VehicleRingRadius(v), dim, 0.07f, true);
 					drawn++;
 				}
 				catch { }
 			}
-			// 选中步兵：角括号 + 呼吸脉动（载具上面已画）
+			// 选中步兵：灰白角括号 + 呼吸脉动（载具上面已画）
 			foreach (Soldier s in markerCache)
 			{
 				try
 				{
 					if (s == null || !s.IsAlive || s.transform == null) continue;
 					if (s.GetComponentInParent<Vehicle>() != null) continue;
-					SceneMarkers.Bracket("S" + (long)s.Pointer, s.transform.position + Vector3.up * 0.1f, 0.6f * pulse, uiHover, 0.08f, true);
+					SceneMarkers.Bracket("S" + (long)s.Pointer, s.transform.position + Vector3.up * 0.15f, UnitRingRadius(s) * 1.3f * pulse, selWhite, 0.08f, true);
 				}
 				catch { }
 			}
@@ -2904,7 +2900,7 @@ internal static class GodViewController
 				try
 				{
 					if (v == null || v.transform == null) continue;
-					SceneMarkers.Bracket("SV" + (long)v.Pointer, v.transform.position + Vector3.up * 0.12f, VehicleRingRadius(v) * pulse, uiHover, 0.1f, true);
+					SceneMarkers.Bracket("SV" + (long)v.Pointer, v.transform.position + Vector3.up * 0.15f, VehicleRingRadius(v) * pulse, selWhite, 0.1f, true);
 				}
 				catch { }
 			}
@@ -2953,6 +2949,23 @@ internal static class GodViewController
 		}
 		catch { }
 		return 3f;
+	}
+
+	/// <summary>0.9.4：按单位碰撞体尺寸取环半径（步兵间也有大小区分）。</summary>
+	private static float UnitRingRadius(Soldier s)
+	{
+		try
+		{
+			Collider col = s.GetComponent<Collider>();
+			if (col == null) col = s.GetComponentInChildren<Collider>();
+			if (col != null)
+			{
+				Vector3 e = col.bounds.extents;
+				return Mathf.Clamp(Mathf.Max(e.x, e.z) + 0.25f, 0.35f, 1.1f);
+			}
+		}
+		catch { }
+		return 0.5f;
 	}
 
 	private static void RebuildFriendlyCache()
