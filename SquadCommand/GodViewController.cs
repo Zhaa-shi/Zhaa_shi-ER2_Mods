@@ -461,13 +461,17 @@ internal static class GodViewController
 
 	private static int SelTotal => SelInfantryCount() + selVehicles.Count;
 
-	private static void ClearSelection()
+	private static void ClearSelection(bool stopUnits = false)
 	{
-		// 0.7.80：失去选择 = 停止执行旧任务（换选后旧单位不再走向旧目标/被拉回）
-		try { foreach (Soldier s in GetSelectedInfantry()) { try { new Lua_Soldier(s).stop(); } catch { } } } catch { }
-		foreach (Vehicle rv in selVehicleRefs)
+		// 0.7.81：换选（stopUnits=false）旧队继续走完原命令（RTS 标准）；
+		// 左键点空白（stopUnits=true）= 明确的取消手势，全部停止。
+		if (stopUnits)
 		{
-			try { AIVehicle ai = rv.GetComponent<AIVehicle>(); if (ai == null) ai = rv.GetComponentInChildren<AIVehicle>(); if (ai != null) ai.StopAndClearPath(); } catch { }
+			try { foreach (Soldier s in GetSelectedInfantry()) { try { new Lua_Soldier(s).stop(); } catch { } } } catch { }
+			foreach (Vehicle rv in selVehicleRefs)
+			{
+				try { AIVehicle ai = rv.GetComponent<AIVehicle>(); if (ai == null) ai = rv.GetComponentInChildren<AIVehicle>(); if (ai != null) ai.StopAndClearPath(); } catch { }
+			}
 		}
 		mvActive = false; mvUnits.Clear(); mvLastDist.Clear(); mvLastPos.Clear(); mvPathAcc.Clear();
 		mainSquad = null;
@@ -2289,8 +2293,8 @@ internal static class GodViewController
 					return;
 				}
 			}
-			// 敌军/中立/空白 → 取消选择
-			ClearSelection();
+			// 敌军/中立/空白 → 取消选择（主动取消手势：同时停止旧队移动）
+			ClearSelection(true);
 			cmdFlash = "已清空选择"; cmdFlashUntil = Time.unscaledTime + 1.5f;
 		}
 		catch { }
