@@ -1160,6 +1160,12 @@ internal static class GodViewController
 		ObsArrived = 0;
 	}
 
+	/// <summary>0.9.12：该行军单位是否处于"移动优先"压制中（GetBestVisibleEnemy 前缀用）。</summary>
+	internal static bool MoveSuppressingTarget(Soldier s)
+	{
+		try { return s != null && obsNoEngage.Contains(s); } catch { return false; }
+	}
+
 	private static void ClearMoveObservation()
 	{
 		// 0.9.11：观测结束（到位/超时/改令）恢复行军单位自动交火与被压制找掩护
@@ -1210,6 +1216,7 @@ internal static class GodViewController
 		if (Time.unscaledTime < obsNext) return;
 		obsNext = Time.unscaledTime + 1f;
 		// 0.9.11：每周期重申行军压制（防原生任务系统回写恢复索敌/找掩护）
+		HashSet<long> doneSq = new HashSet<long>();
 		foreach (Soldier s in obsNoEngage)
 		{
 			try
@@ -1218,6 +1225,9 @@ internal static class GodViewController
 				AiParams ap = new Lua_Soldier(s).getAiParams();
 				ap.allowCheckForEnemies(false);
 				ap.allowFindCoverWhenSuppressed(false);
+				// 0.9.12：控制点 2——受控小队任务置空（防班长例程/战役任务覆盖行军）
+				Squad sq = s.joinedSquad;
+				if (sq != null && doneSq.Add((long)sq.Pointer)) sq.currentTask = null;
 			}
 			catch { }
 		}

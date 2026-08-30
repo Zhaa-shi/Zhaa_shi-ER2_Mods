@@ -9,7 +9,7 @@ using UnityEngine;
 
 namespace ER2SquadCommand;
 
-[BepInPlugin("er2.squadcommand", "ER2 Battlefield Commander", "0.9.11")]
+[BepInPlugin("er2.squadcommand", "ER2 Battlefield Commander", "0.9.12")]
 public class Plugin : BasePlugin
 {
 	internal static ManualLogSource ModLog;
@@ -44,7 +44,7 @@ public class Plugin : BasePlugin
 
 		new Harmony("er2.squadcommand").PatchAll(typeof(Plugin).Assembly);
 		FrameEndRunner.Ensure();
-		ModLog.LogInfo("ER2 Battlefield Commander 0.9.11 loaded. godKey=" + godKey.Value);
+		ModLog.LogInfo("ER2 Battlefield Commander 0.9.12 loaded. godKey=" + godKey.Value);
 	}
 }
 
@@ -380,6 +380,30 @@ public static class CursorVisiblePatch
 	private static void Prefix(ref bool value)
 	{
 		if (GodViewController.Active) value = true;
+	}
+}
+
+/// <summary>
+/// 0.9.12：移动优先（逆向控制点 1）——行军单位无法获取目标（GetBestVisibleEnemy 返回 null）。
+/// 目标获取是"班长例程下发攻击任务"与"士兵驻足还击"的共同触发源，切断后移动命令
+/// 不再被自动交火打断；到位/超时/改令/接管即恢复（obsNoEngage 生命周期）。
+/// 集火 Postfix 在其后运行：若单位同时被标记集火，集火目标优先生效。
+/// </summary>
+[HarmonyPatch(typeof(Soldier), "GetBestVisibleEnemy")]
+internal static class MovePriorityTargetPatch
+{
+	private static bool Prefix(Soldier __instance, ref Spottable __result)
+	{
+		try
+		{
+			if (!GodViewController.MoveSuppressingTarget(__instance)) return true; // 非行军单位走原逻辑
+			__result = null;
+			return false; // 跳过原方法
+		}
+		catch
+		{
+			return true;
+		}
 	}
 }
 
