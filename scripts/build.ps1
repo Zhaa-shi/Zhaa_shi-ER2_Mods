@@ -76,6 +76,7 @@ if (-not $SkipPackage) {
     }
     foreach ($doc in @("README.txt", "Nexus_description.md")) {
         $docSrc = "$root\$Mod\$doc"
+        if ($Cn -and $doc -eq "README.txt" -and (Test-Path "$root\$Mod\README_CN.txt")) { $docSrc = "$root\$Mod\README_CN.txt" }
         if (Test-Path $docSrc) { Copy-Item $docSrc "$pkgDir\$doc" -Force }
     }
     $zipName = "$pkg" + $tag + "_v" + ((Select-String -Path "$root\$Mod\Plugin.cs" -Pattern '"(\d+)\.(\d+)\.(\d+)"' | Select-Object -First 1).Matches.Value.Trim('"')) + ".zip"

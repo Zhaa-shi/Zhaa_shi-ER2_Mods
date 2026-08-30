@@ -9,7 +9,7 @@ using UnityEngine;
 
 namespace ER2SquadCommand;
 
-[BepInPlugin("er2.squadcommand", "ER2 Battlefield Commander", "0.9.12")]
+[BepInPlugin("er2.squadcommand", "ER2 Battlefield Commander", "0.9.13")]
 public class Plugin : BasePlugin
 {
 	internal static ManualLogSource ModLog;
@@ -20,31 +20,28 @@ public class Plugin : BasePlugin
 	internal static ConfigEntry<KeyCode> godKey;
 	internal static ConfigEntry<string> uiColorBase;
 	internal static ConfigEntry<string> uiColorHover;
-	internal static ConfigEntry<string> uiColorDisabled;
 	internal static ConfigEntry<string> uiColorText;
 
 	public override void Load()
 	{
 		ModLog = Log;
 
-		enabled = Config.Bind("General", "enabled", true, "主开关。");
-		radius = Config.Bind("Control", "moveRadius", 8f, new ConfigDescription("移动到达判定半径（米）；双击右键「前往并防守」的防守半径同用此值。", new AcceptableValueRange<float>(1f, 60f)));
-		debugLog = Config.Bind("Debug", "debugLog", false, new ConfigDescription("调试日志开关（发布版保持关闭）。开启后输出全部指挥/登车/标记诊断日志，用于问题排查。"));
-		godKey = Config.Bind("General", "godKey", KeyCode.F9, "上帝视角开关（仅进入）。退出＝选中小队后点顶部[控制该小队]随机接管一人；全军覆没时按键紧急退出。空格＝暂停/继续世界。");
+		enabled = Config.Bind("General", "enabled", true, Ui.Tr("主开关。"));
+		radius = Config.Bind("Control", "moveRadius", 8f, new ConfigDescription(Ui.Tr("移动到达判定半径（米）；双击右键「前往并防守」的防守半径同用此值。"), new AcceptableValueRange<float>(1f, 60f)));
+		debugLog = Config.Bind("Debug", "debugLog", false, new ConfigDescription(Ui.Tr("调试日志开关（发布版保持关闭）。开启后输出全部指挥/登车/标记诊断日志，用于问题排查。")));
+		godKey = Config.Bind("General", "godKey", KeyCode.F9, Ui.Tr("上帝视角开关（仅进入）。退出＝选中小队后点顶部[控制该小队]随机接管一人；全军覆没时按键紧急退出。空格＝暂停/继续世界。"));
 
-		uiColorBase = Config.Bind("UI", "colorBase", "#0E1C0EB4", new ConfigDescription("UI 主色（#RRGGBB 或 #RRGGBBAA）：按钮底板、小队列表行。默认深绿半透明（与底部提示条一致）。"));
-		uiColorHover = Config.Bind("UI", "colorHover", "#3E703EE0", "UI 悬停/选中指示颜色（中绿）。");
-		uiColorDisabled = Config.Bind("UI", "colorDisabled", "#10181099", "UI 禁用态颜色。");
-		uiColorText = Config.Bind("UI", "colorText", "#DFF0DF", "UI 文字/描边颜色。");
+		uiColorBase = Config.Bind("UI", "colorBase", "#0E1C0EB4", new ConfigDescription(Ui.Tr("UI 主色（#RRGGBB 或 #RRGGBBAA）：按钮底板、小队列表行。默认深绿半透明（与底部提示条一致）。")));
+		uiColorHover = Config.Bind("UI", "colorHover", "#3E703EE0", Ui.Tr("UI 悬停/选中指示颜色（中绿）。"));
+		uiColorText = Config.Bind("UI", "colorText", "#DFF0DF", Ui.Tr("UI 文字/描边颜色。"));
 		uiColorBase.SettingChanged += (s, e) => GodViewController.ApplyUiTheme();
 		uiColorHover.SettingChanged += (s, e) => GodViewController.ApplyUiTheme();
-		uiColorDisabled.SettingChanged += (s, e) => GodViewController.ApplyUiTheme();
 		uiColorText.SettingChanged += (s, e) => GodViewController.ApplyUiTheme();
 		GodViewController.ApplyUiTheme();
 
 		new Harmony("er2.squadcommand").PatchAll(typeof(Plugin).Assembly);
 		FrameEndRunner.Ensure();
-		ModLog.LogInfo("ER2 Battlefield Commander 0.9.12 loaded. godKey=" + godKey.Value);
+		ModLog.LogInfo("ER2 Battlefield Commander 0.9.13 loaded. godKey=" + godKey.Value);
 	}
 }
 

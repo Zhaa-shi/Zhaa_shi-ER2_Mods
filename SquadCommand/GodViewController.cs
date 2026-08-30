@@ -120,7 +120,7 @@ internal static class GodViewController
 	private static Vector2 lastClickPos;
 
 	// 反馈
-	private static string cmdFlash = "";
+	private static string cmdFlash = Ui.Tr("");
 	private static float cmdFlashUntil = -10f;
 	private static bool flyingToSquad;
 	private static Vector3 flyTarget;
@@ -581,7 +581,7 @@ internal static class GodViewController
 			{
 				RTSTrace("DriveDecision", "vehicle=" + vehRef.name + " canDrive=false reason=noRtsSquad(未分队)");
 				SquadCmdLogic.Log("[VehicleMove] vehicle=" + vehRef.name + " 未分队：请先点【分队】再驾驶");
-				cmdFlash = "车辆未分队：先点【分队】再移动"; cmdFlashUntil = Time.unscaledTime + 2.5f;
+				cmdFlash = Ui.Tr("车辆未分队：先点【分队】再移动"); cmdFlashUntil = Time.unscaledTime + 2.5f;
 				return 0;
 			}
 			Squad tgt = null;
@@ -626,7 +626,7 @@ internal static class GodViewController
 		Spottable spot = GetSpottable(target);
 		if (spot == null)
 		{
-			cmdFlash = "标记失败：目标无 Spottable"; cmdFlashUntil = Time.unscaledTime + 2f;
+			cmdFlash = Ui.Tr("标记失败：目标无 Spottable"); cmdFlashUntil = Time.unscaledTime + 2f;
 			return;
 		}
 		string fac = SafeFaction(target.faction);
@@ -642,7 +642,7 @@ internal static class GodViewController
 		};
 		RecordCmdTarget(target.transform.position);
 		BeginMarkAdvance();
-		cmdFlash = "集火标记 → " + mark.Name + "（持续到死亡/失控）"; cmdFlashUntil = Time.unscaledTime + 3f;
+		cmdFlash = string.Format(Ui.Tr("集火标记 → {0}（持续到死亡/失控）"), mark.Name); cmdFlashUntil = Time.unscaledTime + 3f;
 		SquadCmdLogic.LogAlways("[SquadCmd] 集火标记(持久) " + mark.Name + " 阵营=" + fac);
 	}
 
@@ -655,7 +655,7 @@ internal static class GodViewController
 		{
 			Soldier crew = FirstCrew(veh);
 			if (crew != null && crew.IsAlive) { MarkEnemySoldier(crew); return; }
-			cmdFlash = "标记失败：载具无目标"; cmdFlashUntil = Time.unscaledTime + 2f;
+			cmdFlash = Ui.Tr("标记失败：载具无目标"); cmdFlashUntil = Time.unscaledTime + 2f;
 			return;
 		}
 		string fac = "";
@@ -672,7 +672,7 @@ internal static class GodViewController
 		};
 		RecordCmdTarget(veh.transform.position);
 		BeginMarkAdvance();
-		cmdFlash = "集火标记 → " + mark.Name + "（持续到死亡/失控）"; cmdFlashUntil = Time.unscaledTime + 3f;
+		cmdFlash = string.Format(Ui.Tr("集火标记 → {0}（持续到死亡/失控）"), mark.Name); cmdFlashUntil = Time.unscaledTime + 3f;
 		SquadCmdLogic.LogAlways("[SquadCmd] 集火标记(持久) 载具 " + veh.name);
 	}
 
@@ -691,7 +691,7 @@ internal static class GodViewController
 		};
 		RecordCmdTarget(pos);
 		BeginMarkAdvance();
-		cmdFlash = "标记目标物 → " + mark.Name + "（持续到失效）"; cmdFlashUntil = Time.unscaledTime + 3f;
+		cmdFlash = string.Format(Ui.Tr("标记目标物 → {0}（持续到失效）"), mark.Name); cmdFlashUntil = Time.unscaledTime + 3f;
 		SquadCmdLogic.Log("[SquadCmd] 标记目标物 " + mark.Name);
 	}
 
@@ -886,9 +886,9 @@ internal static class GodViewController
 			SplitCrewFromSquad(crews[0]);
 			return;
 		}
-		if (units.Count == 0) { cmdFlash = "先选中要分队的步兵"; cmdFlashUntil = Time.unscaledTime + 2f; return; }
+		if (units.Count == 0) { cmdFlash = Ui.Tr("先选中要分队的步兵"); cmdFlashUntil = Time.unscaledTime + 2f; return; }
 		Squad ns = CreateNewSquad();
-		if (ns == null) { cmdFlash = "新建小队失败"; cmdFlashUntil = Time.unscaledTime + 2f; return; }
+		if (ns == null) { cmdFlash = Ui.Tr("新建小队失败"); cmdFlashUntil = Time.unscaledTime + 2f; return; }
 		int moved = 0;
 		HashSet<IntPtr> oldSet = new HashSet<IntPtr>();
 		foreach (Soldier u in units)
@@ -898,12 +898,12 @@ internal static class GodViewController
 			try { Squad old = u.joinedSquad; if (old != null) oldSet.Add(old.Pointer); } catch { }
 			if (AddInfantryToSquadTo(u, ns)) moved++;
 		}
-		if (moved == 0) { cmdFlash = "分队失败：无可拆单位"; cmdFlashUntil = Time.unscaledTime + 2f; return; }
+		if (moved == 0) { cmdFlash = Ui.Tr("分队失败：无可拆单位"); cmdFlashUntil = Time.unscaledTime + 2f; return; }
 		rtsSquad = ns;
 		rtsSquadSet.Add((long)ns.Pointer);
 		RTSTrace("SplitAfter", "oldRtsSquad→newRtsSquad=0x" + ((long)ns.Pointer).ToString("X") + " selectedUnits=" + GetCommandUnits().Count);
 		mainSquad = ns; virtualUnits.Clear(); // 分队后控制组=NewSquad（选择显示仍按 selVehicleRefs 车辆乘员）
-		cmdFlash = "分队 → " + moved + " 人入新队（原队 " + oldSet.Count + " 个，其余未动）";
+		cmdFlash = string.Format(Ui.Tr("分队 → {0} 人入新队（原队 {1} 个，其余未动）"), moved, oldSet.Count);
 		cmdFlashUntil = Time.unscaledTime + 3f;
 		SquadCmdLogic.LogAlways("[Split] 分队 入队=" + moved + " 原队数=" + oldSet.Count + " newSquad=0x" + ((long)ns.Pointer).ToString("X"));
 		SplitCheck(ns);
@@ -916,7 +916,7 @@ internal static class GodViewController
 	private static void SplitCrewFromSquad(Squad crewSquad)
 	{
 		Squad ns = CreateNewSquad();
-		if (ns == null) { cmdFlash = "新建小队失败"; cmdFlashUntil = Time.unscaledTime + 2f; return; }
+		if (ns == null) { cmdFlash = Ui.Tr("新建小队失败"); cmdFlashUntil = Time.unscaledTime + 2f; return; }
 		bool hasFoot = false;
 		List<Vehicle> vehicles = new List<Vehicle>();
 		int moved = 0;
@@ -936,7 +936,7 @@ internal static class GodViewController
 		}
 		if (moved == 0 || !hasFoot)
 		{
-			cmdFlash = "车组已是独立小队，无可拆分"; cmdFlashUntil = Time.unscaledTime + 2f;
+			cmdFlash = Ui.Tr("车组已是独立小队，无可拆分"); cmdFlashUntil = Time.unscaledTime + 2f;
 			return;
 		}
 		// 车辆归属跟随：squadInside 改指新队，驾驶资格同步
@@ -955,7 +955,7 @@ internal static class GodViewController
 		try { selVehicles.Remove(crewSquad); } catch { }
 		try { if (!selVehicles.Contains(ns)) selVehicles.Add(ns); } catch { }
 		foreach (Vehicle v in vehicles) AddVehicleRef(v);
-		cmdFlash = "分队 → 车组 " + moved + " 人入新队（徒步步兵留原队）";
+		cmdFlash = string.Format(Ui.Tr("分队 → 车组 {0} 人入新队（徒步步兵留原队）"), moved);
 		cmdFlashUntil = Time.unscaledTime + 3f;
 		selFlash = Time.unscaledTime + 3f;
 		SquadCmdLogic.LogAlways("[Split] 车组拆分 moved=" + moved + " vehicles=" + vehicles.Count + " newSquad=0x" + ((long)ns.Pointer).ToString("X"));
@@ -973,7 +973,7 @@ internal static class GodViewController
 		List<Squad> crews = GetSelectedVehicleCrews();
 		if (units.Count == 0)
 		{
-			cmdFlash = crews.Count > 0 ? "没有可并入车组的步兵" : "先选中要合并的步兵";
+			cmdFlash = crews.Count > 0 ? Ui.Tr("没有可并入车组的步兵") : Ui.Tr("先选中要合并的步兵");
 			cmdFlashUntil = Time.unscaledTime + 2f;
 			return;
 		}
@@ -1010,7 +1010,7 @@ internal static class GodViewController
 			target = rtsSquad;
 			best = AliveCount(target);
 		}
-		if (target == null) { cmdFlash = "选中单位没有所属小队"; cmdFlashUntil = Time.unscaledTime + 2f; return; }
+		if (target == null) { cmdFlash = Ui.Tr("选中单位没有所属小队"); cmdFlashUntil = Time.unscaledTime + 2f; return; }
 		int cap = 12 - AliveCount(target);
 		int moved = 0, skip = 0, overflow = 0;
 		foreach (Soldier u in units)
@@ -1033,11 +1033,11 @@ internal static class GodViewController
 		string tgtDesc = VehicleOfCrew(target) != null ? "车组" : "步兵队";
 		if (moved == 0)
 		{
-			cmdFlash = "无可合并（选中单位已在同一小队）"; cmdFlashUntil = Time.unscaledTime + 2f;
+			cmdFlash = Ui.Tr("无可合并（选中单位已在同一小队）"); cmdFlashUntil = Time.unscaledTime + 2f;
 			SquadCmdLogic.Log("[Merge] 收编 入队=0 已在队=" + skip + " 目标=0x" + ((long)target.Pointer).ToString("X"));
 			return;
 		}
-		cmdFlash = "合并 → " + moved + " 人入" + tgtDesc + (skip > 0 ? "，已在队 " + skip : "") + (overflow > 0 ? "，超员留下 " + overflow : "");
+		cmdFlash = string.Format(Ui.Tr("合并 → {0} 人入{1}"), moved, tgtDesc) + (skip > 0 ? Ui.Tr("，已在队 ") + skip : "") + (overflow > 0 ? Ui.Tr("，超员留下 ") + overflow : "");
 		cmdFlashUntil = Time.unscaledTime + 2.5f;
 		SquadCmdLogic.LogAlways("[Merge] 收编 入队=" + moved + " 已在队=" + skip + " 超员=" + overflow + " 目标=" + tgtDesc + "=0x" + ((long)target.Pointer).ToString("X") + " 目标人数=" + best);
 	}
@@ -1068,10 +1068,10 @@ internal static class GodViewController
 		if (n > 0)
 		{
 			ClearMoveObservation();
-			cmdFlash = "分散 → " + n + " 队就地找掩护"; cmdFlashUntil = Time.unscaledTime + 2.5f;
+			cmdFlash = string.Format(Ui.Tr("分散 → {0} 队就地找掩护"), n); cmdFlashUntil = Time.unscaledTime + 2.5f;
 			SquadCmdLogic.LogAlways("[SquadCmd] 分散 squads=" + n);
 		}
-		else { cmdFlash = "无可用步兵小队"; cmdFlashUntil = Time.unscaledTime + 2f; }
+		else { cmdFlash = Ui.Tr("无可用步兵小队"); cmdFlashUntil = Time.unscaledTime + 2f; }
 	}
 
 	private static Vector3 SquadCenterLocal(Squad sq)
@@ -1263,7 +1263,7 @@ internal static class GodViewController
 		if (arrived >= alive)
 		{
 			SquadCmdLogic.LogAlways("[SquadCmd] MOVE 完成 " + arrived + " 单位");
-			cmdFlash = "到达 → " + arrived + " 单位"; cmdFlashUntil = Time.unscaledTime + 2.5f;
+			cmdFlash = string.Format(Ui.Tr("到达 → {0} 单位"), arrived); cmdFlashUntil = Time.unscaledTime + 2.5f;
 			ClearMoveObservation();
 		}
 	}
@@ -1331,7 +1331,7 @@ internal static class GodViewController
 				AddVehicleRef(veh);
 			}
 			SquadCmdLogic.LogAlways("[BoardPending] 完成（" + reason + "） vehicle=" + (veh != null ? veh.name : "?") + " 转选=" + (stillSelected ? "Y" : "N"));
-			cmdFlash = stillSelected ? "登车完成 → 可直接驾驶" : "登车完成"; cmdFlashUntil = Time.unscaledTime + 2.5f;
+			cmdFlash = stillSelected ? Ui.Tr("登车完成 → 可直接驾驶") : Ui.Tr("登车完成"); cmdFlashUntil = Time.unscaledTime + 2.5f;
 			if (stillSelected) selFlash = Time.unscaledTime + 3f;
 		}
 		catch { }
@@ -1493,7 +1493,7 @@ internal static class GodViewController
 		List<Soldier> units = GetSelectedInfantry();
 		if (units.Count == 0)
 		{
-			cmdFlash = "先框选/选中要指挥的单位"; cmdFlashUntil = Time.unscaledTime + 2f;
+			cmdFlash = Ui.Tr("先框选/选中要指挥的单位"); cmdFlashUntil = Time.unscaledTime + 2f;
 			return 0;
 		}
 		Lua_Vehicle lv = new Lua_Vehicle(veh);
@@ -1503,7 +1503,7 @@ internal static class GodViewController
 		try { seats = lv.countEmptySeats(); } catch { }
 		if (seats <= 0)
 		{
-			cmdFlash = "载具已满"; cmdFlashUntil = Time.unscaledTime + 2f;
+			cmdFlash = Ui.Tr("载具已满"); cmdFlashUntil = Time.unscaledTime + 2f;
 			return 0;
 		}
 		List<Soldier> wait = new List<Soldier>();
@@ -1537,7 +1537,7 @@ internal static class GodViewController
 		RecordCmdTarget(veh.transform.position);
 		// 保持选择连续性：上车的士兵会被原生编入车组，步兵选择会凭空消失——
 		// 这里把选择转换为该车组的载具选择
-		cmdFlash = "上车 → " + wait.Count + " 人（原生登车中…）" + (units.Count > wait.Count ? "，余 " + (units.Count - wait.Count) + " 人未下令" : ""); cmdFlashUntil = Time.unscaledTime + 3f;
+		cmdFlash = string.Format(Ui.Tr("上车 → {0} 人（原生登车中…）"), wait.Count) + (units.Count > wait.Count ? string.Format(Ui.Tr("，余 {0} 人未下令"), units.Count - wait.Count) : ""); cmdFlashUntil = Time.unscaledTime + 3f;
 		return wait.Count;
 	}
 
@@ -1577,7 +1577,7 @@ internal static class GodViewController
 			}
 			catch { }
 		}
-		cmdFlash = "已下车 " + n + " 辆载具"; cmdFlashUntil = Time.unscaledTime + 2f;
+		cmdFlash = string.Format(Ui.Tr("已下车 {0} 辆载具"), n); cmdFlashUntil = Time.unscaledTime + 2f;
 		SquadCmdLogic.Log("[SquadCmd] 按钮下车: " + n);
 		return n;
 	}
@@ -1698,7 +1698,7 @@ internal static class GodViewController
 			try { friendlies = SquadCmdLogic.GetAllFriendlySquads().Count; } catch { }
 			if (friendlies > 0)
 			{
-				cmdFlash = "不能按键退出：框选/选中单位 → 点顶部 [控制该小队] 接管"; cmdFlashUntil = Time.unscaledTime + 4f;
+				cmdFlash = Ui.Tr("不能按键退出：框选/选中单位 → 点顶部 [控制该小队] 接管"); cmdFlashUntil = Time.unscaledTime + 4f;
 				return;
 			}
 			SquadCmdLogic.Log("[SquadCmd] 无存活友军小队，允许紧急退出。");
@@ -1741,7 +1741,7 @@ internal static class GodViewController
 			Active = true;
 			SetCursor(true);
 			ApplyCam(MainCam());
-			cmdFlash = "上帝视角 ON（框选临时选择，右键指挥，空格暂停）"; cmdFlashUntil = Time.unscaledTime + 4f;
+			cmdFlash = Ui.Tr("上帝视角 ON（框选临时选择，右键指挥，空格暂停）"); cmdFlashUntil = Time.unscaledTime + 4f;
 			SquadCmdLogic.Log("[SquadCmd] 上帝视角 ON  pos=" + camPos.ToString("0.0") + " RTS 控制权仅绑定当前选择");
 		}
 		catch (Exception ex) { Active = false; SquadCmdLogic.Log("[SquadCmd] 上帝视角进入失败: " + ex.Message); }
@@ -1943,7 +1943,7 @@ internal static class GodViewController
 			List<Soldier> pickPool = GetCommandUnits();
 			if (pickPool.Count == 0)
 			{
-				cmdFlash = "请先框选/选中要接管的单位"; cmdFlashUntil = Time.unscaledTime + 2f;
+				cmdFlash = Ui.Tr("请先框选/选中要接管的单位"); cmdFlashUntil = Time.unscaledTime + 2f;
 				return;
 			}
 			Soldier pick = pickPool[UnityEngine.Random.Range(0, pickPool.Count)];
@@ -2039,7 +2039,7 @@ internal static class GodViewController
 				groupUnits[k] = new List<Soldier>(GetSelectedInfantry());
 				groupCrews[k] = new List<Squad>(selVehicles);
 				groupVehRefs[k] = new List<Vehicle>(selVehicleRefs);
-				cmdFlash = "编组 " + k + " 已保存（步兵 " + groupUnits[k].Count + " + 车组 " + groupCrews[k].Count + "）";
+				cmdFlash = string.Format(Ui.Tr("编组 {0} 已保存（步兵 {1} + 车组 {2}）"), k, groupUnits[k].Count, groupCrews[k].Count);
 				cmdFlashUntil = Time.unscaledTime + 2f;
 				SquadCmdLogic.LogAlways("[SquadCmd] 编组 " + k + " 保存 步兵=" + groupUnits[k].Count + " 车组=" + groupCrews[k].Count);
 			}
@@ -2053,7 +2053,7 @@ internal static class GodViewController
 					foreach (Squad c in gc) { try { if (c != null && AliveCount(c) > 0) crews.Add(c); } catch { } }
 				if (units.Count == 0 && crews.Count == 0)
 				{
-					cmdFlash = "编组 " + k + " 已无存活单位"; cmdFlashUntil = Time.unscaledTime + 2f;
+					cmdFlash = string.Format(Ui.Tr("编组 {0} 已无存活单位"), k); cmdFlashUntil = Time.unscaledTime + 2f;
 					return;
 				}
 				ClearSelection();
@@ -2061,7 +2061,7 @@ internal static class GodViewController
 				foreach (Squad c in crews) { try { if (!selVehicles.Contains(c)) selVehicles.Add(c); } catch { } }
 				if (groupVehRefs.TryGetValue(k, out List<Vehicle> gv) && gv != null)
 					foreach (Vehicle v in gv) { try { if (v != null && v.transform != null) AddVehicleRef(v); } catch { } }
-				cmdFlash = "编组 " + k + "（步兵 " + units.Count + " + 车组 " + crews.Count + "）";
+				cmdFlash = string.Format(Ui.Tr("编组 {0}（步兵 {1} + 车组 {2}）"), k, units.Count, crews.Count);
 				cmdFlashUntil = Time.unscaledTime + 2f;
 				selFlash = Time.unscaledTime + 2.5f;
 			}
@@ -2255,13 +2255,13 @@ internal static class GodViewController
 		if (Paused)
 		{
 			Time.timeScale = 1f;
-			cmdFlash = "已继续（时间恢复）"; cmdFlashUntil = Time.unscaledTime + 2f;
+			cmdFlash = Ui.Tr("已继续（时间恢复）"); cmdFlashUntil = Time.unscaledTime + 2f;
 			SquadCmdLogic.Log("[SquadCmd] 上帝视角：时间恢复。");
 		}
 		else
 		{
 			Time.timeScale = 0f;
-			cmdFlash = "已暂停（空格继续）"; cmdFlashUntil = Time.unscaledTime + 2f;
+			cmdFlash = Ui.Tr("已暂停（空格继续）"); cmdFlashUntil = Time.unscaledTime + 2f;
 			SquadCmdLogic.Log("[SquadCmd] 上帝视角：已暂停。");
 		}
 	}
@@ -2482,7 +2482,7 @@ internal static class GodViewController
 					// 0.7.97：双击右键=原生「前往并防守」（Squad.HoldArea，同一点第二击升级）——
 					// 每个涉入原生小队一条原生命令，Mod 不再做快速移动/停滞修正编排。
 					IssueNativeHoldArea(lastMovePoint.Value);
-					cmdFlash = "前往并防守（同一目标）"; cmdFlashUntil = Time.unscaledTime + 1.5f;
+					cmdFlash = Ui.Tr("前往并防守（同一目标）"); cmdFlashUntil = Time.unscaledTime + 1.5f;
 				}
 				else
 				{
@@ -2602,7 +2602,7 @@ internal static class GodViewController
 			}
 			// 敌军/中立/空白 → 取消选择（不影响进行中的任务；停止用【停止】按钮）
 			ClearSelection();
-			cmdFlash = "已清空选择"; cmdFlashUntil = Time.unscaledTime + 1.5f;
+			cmdFlash = Ui.Tr("已清空选择"); cmdFlashUntil = Time.unscaledTime + 1.5f;
 		}
 		catch { }
 	}
@@ -2631,7 +2631,7 @@ internal static class GodViewController
 				if (sol == null) sol = hit.collider.transform.GetComponent<Soldier>();
 				if (sol == null || !sol.IsAlive || !FriendlyUnit(sol))
 				{
-					cmdFlash = "双击需命中友军单位"; cmdFlashUntil = Time.unscaledTime + 2f;
+					cmdFlash = Ui.Tr("双击需命中友军单位"); cmdFlashUntil = Time.unscaledTime + 2f;
 					return;
 				}
 				Squad sq = null;
@@ -2658,12 +2658,12 @@ internal static class GodViewController
 						}
 						catch { }
 						selFlash = Time.unscaledTime + 3f;
-						cmdFlash = "已选中整队 " + virtualUnits.Count + " 名步兵"; cmdFlashUntil = Time.unscaledTime + 2f;
+						cmdFlash = string.Format(Ui.Tr("已选中整队 {0} 名步兵"), virtualUnits.Count); cmdFlashUntil = Time.unscaledTime + 2f;
 					}
 					else
 					{
 						SelectVehicleCrew(sq);
-						cmdFlash = "已选中整车组"; cmdFlashUntil = Time.unscaledTime + 2f;
+						cmdFlash = Ui.Tr("已选中整车组"); cmdFlashUntil = Time.unscaledTime + 2f;
 					}
 				}
 			}
@@ -2729,11 +2729,11 @@ internal static class GodViewController
 			int total = SelTotal;
 			if (total < 1)
 			{
-				cmdFlash = "未框到可选单位（全空或载具无车组）"; cmdFlashUntil = Time.unscaledTime + 2f;
+				cmdFlash = Ui.Tr("未框到可选单位（全空或载具无车组）"); cmdFlashUntil = Time.unscaledTime + 2f;
 				return;
 			}
 			selFlash = Time.unscaledTime + 3f;
-			cmdFlash = "临时指挥：步兵 " + SelInfantryCount() + " + 载具 " + selVehicles.Count + (addingToSelection ? "（追加）" : ""); cmdFlashUntil = Time.unscaledTime + 3f;
+			cmdFlash = string.Format(Ui.Tr("临时指挥：步兵 {0} + 载具 {1}"), SelInfantryCount(), selVehicles.Count) + (addingToSelection ? Ui.Tr("（追加）") : ""); cmdFlashUntil = Time.unscaledTime + 3f;
 			SquadCmdLogic.Log("[SquadCmd] 框选(临时): 步兵=" + infantry.Count + " 载具=" + vehSquads.Count + " 追加=" + addingToSelection);
 		}
 		catch (Exception ex) { SquadCmdLogic.Log("[SquadCmd] 框选失败: " + ex.Message); }
@@ -2899,14 +2899,12 @@ internal static class GodViewController
 	// ===== 0.9.0：统一 UI 主题（cfg "UI" 节可自定义，默认灰） =====
 	private static Color uiBase = new Color(0.55f, 0.55f, 0.55f, 0.92f);      // 按钮底板/友军脚环
 	private static Color uiHover = new Color(0.78f, 0.78f, 0.78f, 0.97f);     // 悬停/选中环
-	private static Color uiDisabled = new Color(0.28f, 0.28f, 0.28f, 0.80f);  // 禁用
 	private static Color uiText = new Color(0.94f, 0.94f, 0.94f, 1f);         // 文字/描边/移动目标环
 
 	internal static void ApplyUiTheme()
 	{
 		uiBase = ParseThemeColor(Plugin.uiColorBase.Value, uiBase);
 		uiHover = ParseThemeColor(Plugin.uiColorHover.Value, uiHover);
-		uiDisabled = ParseThemeColor(Plugin.uiColorDisabled.Value, uiDisabled);
 		uiText = ParseThemeColor(Plugin.uiColorText.Value, uiText);
 	}
 
@@ -3022,7 +3020,7 @@ internal static class GodViewController
 			{
 				Color mc = m.Downgraded ? new Color(0.8f, 0.45f, 0.25f, 0.8f) : new Color(0.95f, 0.28f, 0.22f, 0.95f);
 				SceneMarkers.Ring("MK", m.Position + Vector3.up * 0.12f, 1.5f * pulse, mc, 0.12f, true);
-				SceneMarkers.Label("MKN", m.Position + Vector3.up * 2.6f, "⚔ " + (m.Downgraded ? "[降级] " : "") + m.Name, mc, true);
+				SceneMarkers.Label("MKN", m.Position + Vector3.up * 2.6f, "⚔ " + (m.Downgraded ? Ui.Tr("[降级] ") : "") + m.Name, mc, true);
 			}
 		}
 		catch { }
@@ -3124,7 +3122,7 @@ internal static class GodViewController
 			string info = cam != null ? "  高度 " + cam.transform.position.y.ToString("0") + "m" : "";
 
 			// 底部指令提示（0.9.1：分组拉开间距）
-			string hint = "WASD 移动    滚轮 缩放    中键 旋转    Q/E 升降    │    左键 选择/框选    右键 指令    长按空地 命令环    │    空格 暂停    ESC 设置" + info;
+			string hint = Ui.Tr("WASD 移动    滚轮 缩放    中键 旋转    Q/E 升降    │    左键 选择/框选    右键 指令    长按空地 命令环    │    空格 暂停    ESC 设置") + info;
 			GUIStyle hs = SquadCmdLogic.HudStyleSmall();
 			GUI.color = new Color(0.03f, 0.06f, 0.03f, 0.72f);
 			GUI.DrawTexture(new Rect((Screen.width - 1150f) * 0.5f, Screen.height - 30f, 1150f, 22f), Texture2D.whiteTexture);
@@ -3134,11 +3132,11 @@ internal static class GodViewController
 			// 左上角：暂停 + 选择信息
 			PruneSelection();
 			string status = "";
-			if (Paused) status = "⏸ 已暂停（空格继续）";
+			if (Paused) status = Ui.Tr("⏸ 已暂停（空格继续）");
 			if (HasSelection)
 			{
-				string sel = "步兵 " + SelInfantryCount() + " + 载具 " + selVehicles.Count;
-				status = status == "" ? ("已选 " + sel) : (status + "  |  已选 " + sel);
+				string sel = Ui.Tr("步兵 ") + SelInfantryCount() + Ui.Tr(" + 载具 ") + selVehicles.Count;
+				status = status == "" ? Ui.Tr("已选 ") + sel : (status + "  |  " + Ui.Tr("已选 ") + sel);
 			}
 			if (status != "")
 			{
@@ -3154,7 +3152,7 @@ internal static class GodViewController
 			// 0.7.99：移动完成度进度行（纯观察统计，ObsMoveTick 维护）
 			if (ObsTotal > 0)
 			{
-				DrawShadowLabel(new Rect(14f, 65f, 320f, 22f), "移动 → " + ObsArrived + "/" + ObsTotal + " 已到位", st, uiHover);
+				DrawShadowLabel(new Rect(14f, 65f, 320f, 22f), Ui.Tr("移动 → ") + ObsArrived + "/" + ObsTotal + Ui.Tr(" 已到位"), st, uiHover);
 			}
 
 			// 顶部控制按钮（0.9.0：统一主题色，文字居中；分散已移入命令环）
@@ -3162,7 +3160,7 @@ internal static class GodViewController
 			{
 				Rect btn = ControlButtonRect();
 				bool hover = btn.Contains(Event.current.mousePosition);
-				DrawUiButton(btn, "控制该小队", true, hover);
+				DrawUiButton(btn, Ui.Tr("控制该小队"), true, hover);
 				if (Event.current.type == EventType.MouseDown && Event.current.button == 0 && hover)
 				{
 					Event.current.Use();
@@ -3171,7 +3169,7 @@ internal static class GodViewController
 				}
 				Rect sbtn = SplitButtonRect();
 				bool shover = sbtn.Contains(Event.current.mousePosition);
-				DrawUiButton(sbtn, "分队", true, shover);
+				DrawUiButton(sbtn, Ui.Tr("分队"), true, shover);
 				if (Event.current.type == EventType.MouseDown && Event.current.button == 0 && shover)
 				{
 					Event.current.Use();
@@ -3180,7 +3178,7 @@ internal static class GodViewController
 				}
 				Rect mbtn = MergeButtonRect();
 				bool mhover = mbtn.Contains(Event.current.mousePosition);
-				DrawUiButton(mbtn, "合并", true, mhover);
+				DrawUiButton(mbtn, Ui.Tr("合并"), true, mhover);
 				if (Event.current.type == EventType.MouseDown && Event.current.button == 0 && mhover)
 				{
 					Event.current.Use();
@@ -3354,7 +3352,7 @@ internal static class GodViewController
 		}
 		catch { }
 		selFlash = Time.unscaledTime + 3f;
-		cmdFlash = "已选中小队 " + SelTotal + " 个单位"; cmdFlashUntil = Time.unscaledTime + 2f;
+		cmdFlash = string.Format(Ui.Tr("已选中小队 {0} 个单位"), SelTotal); cmdFlashUntil = Time.unscaledTime + 2f;
 	}
 
 	private static Vector3 SquadCenterOf(Squad sq)
@@ -3408,7 +3406,7 @@ internal static class GodViewController
 			Ray ray = cam.ScreenPointToRay(screenPos);
 			if (!Physics.Raycast(ray, out RaycastHit hit, 1500f))
 			{
-				cmdFlash = "未命中地面"; cmdFlashUntil = Time.unscaledTime + 2f;
+				cmdFlash = Ui.Tr("未命中地面"); cmdFlashUntil = Time.unscaledTime + 2f;
 				return;
 			}
 			Vehicle veh = hit.collider.transform.GetComponentInParent<Vehicle>();
@@ -3485,7 +3483,7 @@ internal static class GodViewController
 			// ---- 空白地面 → 移动 ----
 			if (SelTotal == 0)
 			{
-				cmdFlash = "先框选/选中要指挥的单位"; cmdFlashUntil = Time.unscaledTime + 2f;
+				cmdFlash = Ui.Tr("先框选/选中要指挥的单位"); cmdFlashUntil = Time.unscaledTime + 2f;
 				return;
 			}
 			MoveCommandTo(hit.point);
@@ -3548,7 +3546,7 @@ internal static class GodViewController
 		}
 		if (SelTotal == 0)
 		{
-			cmdFlash = "先框选/选中要指挥的单位"; cmdFlashUntil = Time.unscaledTime + 2f;
+			cmdFlash = Ui.Tr("先框选/选中要指挥的单位"); cmdFlashUntil = Time.unscaledTime + 2f;
 			return;
 		}
 		// 新的移动命令覆盖旧的集火目标；没有有效选中时不误清除已有任务。
@@ -3574,7 +3572,7 @@ internal static class GodViewController
 		if (movedInf > 0) RegisterMoveObservation(point, infantry);
 		lastMovePoint = point;
 		RecordCmdTarget(point);
-		cmdFlash = "移动 → 步兵 " + movedInf + " + 载具 " + driven; cmdFlashUntil = Time.unscaledTime + 3f;
+		cmdFlash = string.Format(Ui.Tr("移动 → 步兵 {0} + 载具 {1}"), movedInf, driven); cmdFlashUntil = Time.unscaledTime + 3f;
 		SquadCmdLogic.LogAlways("[SquadCmd] 移动 point=" + point.ToString("0.0") + " 步兵=" + movedInf + " 载具=" + driven);
 	}
 
@@ -3598,7 +3596,7 @@ internal static class GodViewController
 			}
 			catch { }
 		}
-		cmdFlash = "停止 → " + n + " 单位"; cmdFlashUntil = Time.unscaledTime + 2f;
+		cmdFlash = string.Format(Ui.Tr("停止 → {0} 单位"), n); cmdFlashUntil = Time.unscaledTime + 2f;
 		SquadCmdLogic.Log("[SquadCmd] 轮盘停止: " + n);
 	}
 
@@ -3643,7 +3641,7 @@ internal static class GodViewController
 	/// <summary>打开常驻命令环（选中单位后长按右键）：站起/蹲下/趴下/停止，作用于当前选择；环心=选中单位的屏幕质心。</summary>
 	private static void OpenCommandRing()
 	{
-		if (SelTotal == 0) { cmdFlash = "先框选/选中单位"; cmdFlashUntil = Time.unscaledTime + 2f; return; }
+		if (SelTotal == 0) { cmdFlash = Ui.Tr("先框选/选中单位"); cmdFlashUntil = Time.unscaledTime + 2f; return; }
 		Camera cam = MainCam();
 		Vector3 c = SelCenter() + Vector3.up * 1.2f;
 		if (cam != null)
@@ -3662,8 +3660,8 @@ internal static class GodViewController
 		}
 		wheelKind = 2;
 		wheelItemCount = 8;
-		WheelItemLabels[0] = "站起"; WheelItemLabels[1] = "蹲下"; WheelItemLabels[2] = "趴下"; WheelItemLabels[3] = "停止";
-		WheelItemLabels[4] = "掩体"; WheelItemLabels[5] = "集合"; WheelItemLabels[6] = "停火"; WheelItemLabels[7] = "分散";
+		WheelItemLabels[0] = Ui.Tr("站起"); WheelItemLabels[1] = Ui.Tr("蹲下"); WheelItemLabels[2] = Ui.Tr("趴下"); WheelItemLabels[3] = Ui.Tr("停止");
+		WheelItemLabels[4] = Ui.Tr("掩体"); WheelItemLabels[5] = Ui.Tr("集合"); WheelItemLabels[6] = Ui.Tr("停火"); WheelItemLabels[7] = Ui.Tr("分散");
 		bool hasInf = GetSelectedInfantry().Count > 0;
 		WheelItemEnabled[0] = hasInf; WheelItemEnabled[1] = hasInf; WheelItemEnabled[2] = hasInf;
 		WheelItemEnabled[3] = true; // 停止对步兵+载具都有效
@@ -3691,7 +3689,7 @@ internal static class GodViewController
 			}
 			catch { }
 		}
-		cmdFlash = PoseName(pose) + " → " + n + " 单位"; cmdFlashUntil = Time.unscaledTime + 2f;
+		cmdFlash = string.Format(Ui.Tr("{0} → {1} 单位"), PoseName(pose), n); cmdFlashUntil = Time.unscaledTime + 2f;
 		SquadCmdLogic.Log("[SquadCmd] 姿态 " + PoseName(pose) + " 单位=" + n);
 	}
 
@@ -3707,7 +3705,7 @@ internal static class GodViewController
 			if (s == null || !s.IsAlive) continue;
 			try { SquadCmdLogic.RegisterControlledUnit(s); new Lua_Soldier(s).resetPose(); n++; } catch { }
 		}
-		cmdFlash = "站起（恢复 AI 姿态） → " + n + " 单位"; cmdFlashUntil = Time.unscaledTime + 2f;
+		cmdFlash = string.Format(Ui.Tr("站起（恢复 AI 姿态） → {0} 单位"), n); cmdFlashUntil = Time.unscaledTime + 2f;
 		SquadCmdLogic.Log("[SquadCmd] 姿态 站起(resetPose) 单位=" + n);
 	}
 
@@ -3766,7 +3764,7 @@ internal static class GodViewController
 
 	private static string PoseName(SoldierPose p)
 	{
-		return p == SoldierPose.Idle ? "站起" : p == SoldierPose.Crouch ? "蹲下" : "趴下";
+		return p == SoldierPose.Idle ? Ui.Tr("站起") : p == SoldierPose.Crouch ? Ui.Tr("蹲下") : Ui.Tr("趴下");
 	}
 
 	/// <summary>打开交互轮盘：右键友军/中立载具、车内士兵时调用。记录开环输入，供 DrawInteractionWheel 豁免同一次按压。</summary>
@@ -3779,7 +3777,7 @@ internal static class GodViewController
 		hasWheelAnchor = false; // 0.7.80：清除单位环遗留锚定，否则交互环被钉死在旧鼠标落点（不跟随载具）
 		wheelKind = 0;
 		wheelItemCount = 3;
-		WheelItemLabels[0] = "上车"; WheelItemLabels[1] = "下车"; WheelItemLabels[2] = "修理";
+		WheelItemLabels[0] = Ui.Tr("上车"); WheelItemLabels[1] = Ui.Tr("下车"); WheelItemLabels[2] = Ui.Tr("修理");
 		bool hasSelInf = GetSelectedInfantry().Count > 0;
 		bool hasSelVeh = selVehicles.Count > 0;
 		PruneVehicleRefs();
@@ -3848,12 +3846,12 @@ internal static class GodViewController
 							{
 								SquadCmdLogic.RegisterControlledSquad(rsq);
 							rsq.OrderRepairVehicle(rv);
-							cmdFlash = "修理 → " + SafeName(rv); cmdFlashUntil = Time.unscaledTime + 2f;
+							cmdFlash = Ui.Tr("修理 → ") + SafeName(rv); cmdFlashUntil = Time.unscaledTime + 2f;
 							SquadCmdLogic.Log("[SquadCmd] 修理订单 " + rv.name + " 队 ptr=0x" + ((long)rsq.Pointer).ToString("X"));
 						}
 						catch (Exception ex)
 						{
-							cmdFlash = "修理失败: " + ex.Message; cmdFlashUntil = Time.unscaledTime + 2f;
+							cmdFlash = Ui.Tr("修理失败: ") + ex.Message; cmdFlashUntil = Time.unscaledTime + 2f;
 							SquadCmdLogic.Log("[SquadCmd] OrderRepairVehicle 失败: " + ex.Message);
 						}
 					}
@@ -3892,7 +3890,7 @@ internal static class GodViewController
 						ClearFollow("进入掩体", false);
 						SquadCmdLogic.LogAlways("[SquadCmd] 进入掩体 squads=" + nC + " center=" + p.ToString("0.0"));
 					}
-					else { cmdFlash = "无可用步兵小队"; cmdFlashUntil = Time.unscaledTime + 2f; }
+					else { cmdFlash = Ui.Tr("无可用步兵小队"); cmdFlashUntil = Time.unscaledTime + 2f; }
 				}
 				break;
 			case 9: // 集合：各步兵小队向自己的班长（原生 getLeader）位置集结
@@ -3916,7 +3914,7 @@ internal static class GodViewController
 						catch { }
 					}
 					if (nF > 0) SquadCmdLogic.LogAlways("[SquadCmd] 集合（向班长集结） squads=" + nF);
-					else { cmdFlash = "无可用小队（找不到班长）"; cmdFlashUntil = Time.unscaledTime + 2f; }
+					else { cmdFlash = Ui.Tr("无可用小队（找不到班长）"); cmdFlashUntil = Time.unscaledTime + 2f; }
 				}
 				break;
 			case 10: // 停火/开火切换：有停火的小队→全部恢复开火；全部开火中→全部停火
@@ -3938,13 +3936,13 @@ internal static class GodViewController
 					{
 						try { if (csq != null && doneH.Add((long)csq.Pointer)) squads.Add(csq); } catch { }
 					}
-					if (squads.Count == 0) { cmdFlash = "无可用小队"; cmdFlashUntil = Time.unscaledTime + 2f; break; }
+					if (squads.Count == 0) { cmdFlash = Ui.Tr("无可用小队"); cmdFlashUntil = Time.unscaledTime + 2f; break; }
 					bool anyHolding = false;
 					foreach (Squad sq in squads) { try { if (sq.holdFire) { anyHolding = true; break; } } catch { } }
 					bool hold = !anyHolding;
 					int nH = 0;
 					foreach (Squad sq in squads) { try { sq.holdFire = hold; nH++; } catch { } }
-					cmdFlash = (hold ? "停火 → " : "开火 → ") + nH + " 队"; cmdFlashUntil = Time.unscaledTime + 2f;
+					cmdFlash = (hold ? Ui.Tr("停火 → ") : Ui.Tr("开火 → ")) + nH + Ui.Tr(" 队"); cmdFlashUntil = Time.unscaledTime + 2f;
 					SquadCmdLogic.LogAlways("[SquadCmd] " + (hold ? "停火" : "开火") + " squads=" + nH);
 				}
 				break;
