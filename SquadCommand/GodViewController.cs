@@ -463,6 +463,13 @@ internal static class GodViewController
 
 	private static void ClearSelection()
 	{
+		// 0.7.80：失去选择 = 停止执行旧任务（换选后旧单位不再走向旧目标/被拉回）
+		try { foreach (Soldier s in GetSelectedInfantry()) { try { new Lua_Soldier(s).stop(); } catch { } } } catch { }
+		foreach (Vehicle rv in selVehicleRefs)
+		{
+			try { AIVehicle ai = rv.GetComponent<AIVehicle>(); if (ai == null) ai = rv.GetComponentInChildren<AIVehicle>(); if (ai != null) ai.StopAndClearPath(); } catch { }
+		}
+		mvActive = false; mvUnits.Clear(); mvLastDist.Clear(); mvLastPos.Clear(); mvPathAcc.Clear();
 		mainSquad = null;
 		selVehicles.Clear();
 		selVehicleRefs.Clear();
@@ -1150,6 +1157,7 @@ internal static class GodViewController
 					if (bs == null || !bs.IsAlive) continue;
 					long k = (long)bs.Pointer;
 					if (inCar.Contains(k)) continue; // 已真实在车
+					if (!IsSelectedUnit(bs)) continue; // 0.7.80：已不在选择中的乘员不再引导/发射
 					float d = (bs.transform.position - veh.transform.position).magnitude;
 					bool issued = pendingBoardIssued.Contains(k);
 					if (d < 10f)
@@ -3303,6 +3311,7 @@ internal static class GodViewController
 		wheelTargetVehicle = veh;
 		wheelTargetVehicleCrew = crew;
 		wheelTargetSoldier = sol;
+		hasWheelAnchor = false; // 0.7.80：清除单位环遗留锚定，否则交互环被钉死在旧鼠标落点（不跟随载具）
 		wheelKind = 0;
 		wheelItemCount = 4;
 		WheelItemLabels[0] = "上车"; WheelItemLabels[1] = "下车"; WheelItemLabels[2] = "修理"; WheelItemLabels[3] = "合并";
