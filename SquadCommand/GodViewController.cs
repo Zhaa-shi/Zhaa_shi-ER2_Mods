@@ -2053,28 +2053,48 @@ internal static class GodViewController
 
 		// 输入先处理，避免相机/原生对象访问异常阻断鼠标手势收尾。
 		try { if (!escMenuOpen) HandleGroupHotkeys(); } catch { }
-		// 0.9.7：M 键——翻转 MiniMapOpened（HVT 以它为"地图已打开"判据，原版 M 流程确实写它），
-		// 并输出 miniMap 容器完整可视状态诊断，一次测试即可定位原生的隐藏手段
+		// 0.9.8：M 键——不再依赖原生显隐机制（多次尝试无效），直接记录容器原态并强制显示，
+		// 关闭时恢复原态（原版状态可完整还原，不影响 FPS 正常使用）
 		try
 		{
 			if (Input.GetKeyDown(KeyCode.M) && !escMenuOpen)
 			{
-				MiniMapGUI.MiniMapOpened = !MiniMapGUI.MiniMapOpened;
 				var inst = MiniMapGUI.Instance;
-				string d = "Instance=null";
-				if (inst != null && inst.miniMap != null)
+				if (inst == null || inst.miniMap == null) { SquadCmdLogic.LogAlways("[SquadCmd] M 地图：Instance/容器未就绪"); }
+				else
 				{
 					var rt = inst.miniMap;
 					GameObject go = rt.gameObject;
 					CanvasGroup cg = rt.GetComponent<CanvasGroup>();
 					if (cg == null) cg = rt.GetComponentInParent<CanvasGroup>();
-					d = "activeSelf=" + go.activeSelf + " activeInHier=" + go.activeInHierarchy
-						+ " scale=" + rt.localScale.ToString("0.00") + " size=" + rt.sizeDelta.ToString("0.0")
-						+ " pos=" + rt.anchoredPosition.ToString("0.0")
-						+ " cg=" + (cg != null ? cg.alpha.ToString("0.00") + (cg.blocksRaycasts ? "+ray" : "-ray") : "无")
-						+ " mode=" + inst.mode;
+					if (!MiniMapGUI.MiniMapOpened)
+					{
+						if (!smMapCaptured)
+						{
+							smMapOrigScale = rt.localScale;
+							smMapOrigPos = rt.anchoredPosition;
+							smMapOrigAlpha = cg != null ? cg.alpha : -1f;
+							smMapCaptured = true;
+						}
+						MiniMapGUI.MiniMapOpened = true;
+						go.SetActive(true);
+						rt.localScale = Vector3.one;
+						rt.anchoredPosition = Vector2.zero;
+						if (cg != null) { cg.alpha = 1f; cg.blocksRaycasts = true; }
+						SquadCmdLogic.LogAlways("[SquadCmd] M 地图 强制显示（原态 scale=" + smMapOrigScale.ToString("0.00") + " pos=" + smMapOrigPos.ToString("0.0") + " alpha=" + smMapOrigAlpha.ToString("0.00") + "）");
+					}
+					else
+					{
+						MiniMapGUI.MiniMapOpened = false;
+						if (smMapCaptured)
+						{
+							rt.localScale = smMapOrigScale;
+							rt.anchoredPosition = smMapOrigPos;
+							if (cg != null && smMapOrigAlpha >= 0f) cg.alpha = smMapOrigAlpha;
+						}
+						SquadCmdLogic.LogAlways("[SquadCmd] M 地图 关闭（已还原原态）");
+					}
 				}
-				SquadCmdLogic.LogAlways("[SquadCmd] M 翻转 → open=" + MiniMapGUI.MiniMapOpened + " | " + d);
 			}
 		}
 		catch (Exception ex) { SquadCmdLogic.LogAlways("[SquadCmd] M 切换失败: " + ex.Message); }
@@ -2330,6 +2350,12 @@ internal static class GodViewController
 	// 把全部让位守卫锁死（鼠标失灵/设置地图打不开的根因）——改为只信自己开的菜单。
 	private static bool escMenuOpen;
 	private static Pause pauseInstance;
+
+	// 0.9.8：M 地图强制显示的原态备份（关闭时还原，不污染原版状态）
+	private static bool smMapCaptured;
+	private static Vector3 smMapOrigScale = Vector3.one;
+	private static Vector2 smMapOrigPos;
+	private static float smMapOrigAlpha = -1f;
 
 	private static void HandleClickCore()
 	{
