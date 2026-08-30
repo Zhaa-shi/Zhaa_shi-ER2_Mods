@@ -133,15 +133,13 @@ internal static class GodViewController
 	private static Vehicle wheelTargetVehicle;      // 目标载具（上车/开车）
 	private static Squad wheelTargetVehicleCrew;    // 目标载具车组（下车）
 	private static Soldier wheelTargetSoldier;      // 目标友军士兵（上车/物品）
-	// 布局常量：三项 120° 均布在半径 WheelItemDist 圆周上（正上/右下/左下）。
-	// 相邻按钮中心距 = 2*72*sin60° ≈ 125px > 按钮宽 84px，保证互不重叠。
+	// 布局常量：槽位在半径 WheelRadius() 的圆周上均布（正上起始）。
+	// 三项时相邻按钮中心距 = 2*72*sin60° ≈ 125px > 按钮宽 84px；七项时半径翻倍（144px）保持间距。
 	private const float WheelBtnW = 84f;
 	private const float WheelBtnH = 32f;
-	private const float WheelItemDist = 72f;      // 按钮中心到环心距离
-	private const float WheelEdgeMarginX = 110f;  // 环心离屏幕左右边最小值（按钮横向最远伸出约 105px，防出屏）
-	private const float WheelEdgeMarginY = 96f;   // 环心离屏幕上下边最小值（上方按钮纵向最远伸出约 88px）
-	// 动态条目：kind0=交互环(上车/下车/修理/合并)，kind2=单位环(站/蹲/趴/停止)；槽位按数量均布
-	private const int WheelSlotMax = 4;
+	private const float WheelItemDist = 72f;      // 基准按钮中心到环心距离（>5 槽时自动翻倍）
+	// 动态条目：kind0=交互环(上车/下车/修理)，kind2=命令环(站/蹲/趴/停止/掩体/集合/停火)；槽位按数量均布
+	private const int WheelSlotMax = 8;
 	private static readonly string[] WheelItemLabels = new string[WheelSlotMax];
 	private static readonly bool[] WheelItemEnabled = new bool[WheelSlotMax];
 	private static int wheelItemCount;
@@ -600,12 +598,14 @@ internal static class GodViewController
 			{
 				SquadCmdLogic.LogAlways("[VehicleMove] vehicle=" + vehRef.name + " squadInside=0x" + ((long)tgt.Pointer).ToString("X")
 					+ " target=" + point.ToString("0.0") + " via=LuaSquad");
+				RegisterVehicleObservation(vehRef, point);
 				return 1;
 			}
 			// 仅限 RTS 且原生调用失败时保留旧 Lua_Squad 兜底，避免车辆完全失去指令能力。
 			new Lua_Squad(tgt).moveTo(point, Plugin.radius.Value);
 			SquadCmdLogic.LogAlways("[VehicleMove] vehicle=" + vehRef.name + " squadInside=0x" + ((long)tgt.Pointer).ToString("X")
 				+ " target=" + point.ToString("0.0") + " via=Fallback");
+			RegisterVehicleObservation(vehRef, point);
 			return 1;
 		}
 		catch (Exception ex) { SquadCmdLogic.Log("[VehicleMove] 载具移动失败: " + ex.Message); return 0; }
@@ -734,12 +734,19 @@ internal static class GodViewController
 	private static float pendingBoardNext;
 
 	// ===== 0.7.99：移动完成度观测（纯观察——只统计到位数，不发任何修正命令） =====
+	// 0.8.00：补齐载具——DriveVehicleTo 成功发单后登记，到位半径放宽为 2×moveRadius
 	private static Vector3 obsTarget;
 	private static readonly List<Soldier> obsUnits = new List<Soldier>();
+	private static readonly List<Vehicle> obsVehicles = new List<Vehicle>();
 	private static float obsUntil = -10f;
 	private static float obsNext = -10f;
 	internal static int ObsArrived; // HUD 进度行用
 	internal static int ObsTotal;
+
+	// ===== 0.8.00：编组热键——Ctrl+1~9 保存当前选择，1~9 召回（RTS 内） =====
+	private static readonly Dictionary<int, List<Soldier>> groupUnits = new Dictionary<int, List<Soldier>>();
+	private static readonly Dictionary<int, List<Squad>> groupCrews = new Dictionary<int, List<Squad>>();
+	private static readonly Dictionary<int, List<Vehicle>> groupVehRefs = new Dictionary<int, List<Vehicle>>();
 
 	/// <summary>标记后：选中单位按所属原生小队编组冲锋（Squad.Charge）向目标推进接战，全原生无修正状态机。</summary>
 	private static void BeginMarkAdvance()
@@ -808,6 +815,7 @@ internal static class GodViewController
 			{
 				long vp = (long)parentVehicle.Pointer;
 				persistentMarkVehicles.RemoveAll(v => v == null || (long)v.Pointer == vp);
+				obsVehicles.RemoveAll(v => v == null || (long)v.Pointer == vp); // 不再计入移动完成度
 			}
 		}
 		catch { }
@@ -888,10 +896,9 @@ internal static class GodViewController
 	{
 		// 0.7.61：合并目标不再用隐藏的 rtsSquad 指针（0.7.57 事故：已"取消选择"的队被 rtsSquad 拖入合并）。
 		// 新语义：目标 = 选中单位中人数最多的原生小队——合并永远只影响被选中的单位。
+		// 0.8.00：合并只在步兵与步兵之间——载具车组不参与统计也不被合并。
 		List<Soldier> units = GetSelectedInfantry();
-		foreach (Soldier occ in SelectedVehicleOccupants())
-			if (occ != null && occ.IsAlive && !units.Contains(occ)) units.Add(occ);
-		if (units.Count == 0) { cmdFlash = "无选中单位"; cmdFlashUntil = Time.unscaledTime + 2f; return; }
+		if (units.Count == 0) { cmdFlash = "先选中要合并的步兵"; cmdFlashUntil = Time.unscaledTime + 2f; return; }
 		Dictionary<long, Squad> tally = new Dictionary<long, Squad>();
 		Dictionary<long, int> cnt = new Dictionary<long, int>();
 		foreach (Soldier u in units)
@@ -914,8 +921,10 @@ internal static class GodViewController
 		// 0.7.99：只选了一个小队时，并入"当前激活 RTS 组"（0.7.57 语义）——
 		// 旧多数语义下目标=选中队自己，合并 0 人（用户视角=按钮失效）。
 		// 多数语义仅用于跨队选择（0.7.61：避免取消选择后的残留 rtsSquad 劫持合并）。
+		// 0.8.00：激活组若是载具车组则不作为合并目标（合并只在步兵与步兵之间）。
 		if (cnt.Count == 1 && rtsSquad != null && target != null
-			&& (long)rtsSquad.Pointer != (long)target.Pointer && AliveCount(rtsSquad) > 0)
+			&& (long)rtsSquad.Pointer != (long)target.Pointer && AliveCount(rtsSquad) > 0
+			&& VehicleOfCrew(rtsSquad) == null)
 		{
 			target = rtsSquad;
 			best = AliveCount(target);
@@ -1002,20 +1011,41 @@ internal static class GodViewController
 	private static void ClearMoveObservation()
 	{
 		obsUnits.Clear();
+		obsVehicles.Clear();
 		obsUntil = -10f;
 		ObsTotal = 0;
 		ObsArrived = 0;
 	}
 
+	/// <summary>0.8.00：载具移动成功发单后登记（去重；到位半径=2×moveRadius，车体大停得远）。</summary>
+	private static void RegisterVehicleObservation(Vehicle v, Vector3 point)
+	{
+		if (v == null || v.transform == null) return;
+		try
+		{
+			long p = (long)v.Pointer;
+			foreach (Vehicle o in obsVehicles)
+				if (o != null && (long)o.Pointer == p) return;
+		}
+		catch { return; }
+		obsVehicles.Add(v);
+		obsTarget = point;
+		obsUntil = Time.unscaledTime + 45f;
+		if (obsNext < Time.unscaledTime) obsNext = Time.unscaledTime + 1f;
+		ObsTotal = obsUnits.Count + obsVehicles.Count;
+	}
+
 	/// <summary>每 1s 统计到位数；全员到位输出完成日志并清空，45s 超时静默放弃。不发任何修正命令。</summary>
 	private static void ObsMoveTick()
 	{
-		if (obsUnits.Count == 0) return;
+		if (obsUnits.Count == 0 && obsVehicles.Count == 0) return;
 		if (Time.unscaledTime > obsUntil) { ClearMoveObservation(); return; }
 		if (Time.unscaledTime < obsNext) return;
 		obsNext = Time.unscaledTime + 1f;
 		int alive = 0, arrived = 0;
 		float r2 = Plugin.radius.Value * Plugin.radius.Value;
+		float vR = Plugin.radius.Value * 2f;
+		float vr2 = vR * vR;
 		for (int i = obsUnits.Count - 1; i >= 0; i--)
 		{
 			Soldier s = obsUnits[i];
@@ -1026,6 +1056,17 @@ internal static class GodViewController
 				if ((s.transform.position - obsTarget).sqrMagnitude <= r2) arrived++;
 			}
 			catch { obsUnits.RemoveAt(i); }
+		}
+		for (int i = obsVehicles.Count - 1; i >= 0; i--)
+		{
+			Vehicle v = obsVehicles[i];
+			try
+			{
+				if (v == null || v.transform == null) { obsVehicles.RemoveAt(i); continue; }
+				alive++;
+				if ((v.transform.position - obsTarget).sqrMagnitude <= vr2) arrived++;
+			}
+			catch { obsVehicles.RemoveAt(i); }
 		}
 		ObsArrived = arrived;
 		ObsTotal = alive;
@@ -1090,15 +1131,19 @@ internal static class GodViewController
 			// 0.7.85：转队已在发起时同帧完成——这里只补登记兜底 + 收尾
 			rtsSquad = sq;
 			rtsSquadSet.Add((long)sq.Pointer);
-			if (veh != null)
+			// 0.8.00：仅当登车上下文仍是当前选择（用户中途未取消/换选）时才转选车组。
+			// 判据：发起时 selVehicles 加入了 sq，用户 ClearSelection 会把它带走。
+			bool stillSelected = false;
+			try { stillSelected = sq != null && selVehicles.Contains(sq); } catch { }
+			if (veh != null && stillSelected)
 			{
 				selVehicleRefs.Clear();
 				selVehicles.Add(sq);
 				AddVehicleRef(veh);
 			}
-			SquadCmdLogic.LogAlways("[BoardPending] 完成（" + reason + "） vehicle=" + (veh != null ? veh.name : "?"));
-			cmdFlash = "登车完成 → 可直接驾驶"; cmdFlashUntil = Time.unscaledTime + 2.5f;
-			selFlash = Time.unscaledTime + 3f;
+			SquadCmdLogic.LogAlways("[BoardPending] 完成（" + reason + "） vehicle=" + (veh != null ? veh.name : "?") + " 转选=" + (stillSelected ? "Y" : "N"));
+			cmdFlash = stillSelected ? "登车完成 → 可直接驾驶" : "登车完成"; cmdFlashUntil = Time.unscaledTime + 2.5f;
+			if (stillSelected) selFlash = Time.unscaledTime + 3f;
 		}
 		catch { }
 		pendingBoardVeh = null; pendingBoardSq = null; pendingBoardUnits = null;
@@ -1793,6 +1838,48 @@ internal static class GodViewController
 
 	// ===== 帧循环 =====
 
+	/// <summary>0.8.00：编组热键。Ctrl+数字=保存当前选择快照；数字=召回（死亡单位自动剔除，替换当前选择）。</summary>
+	private static void HandleGroupHotkeys()
+	{
+		bool ctrl = Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.RightControl);
+		for (int k = 1; k <= 9; k++)
+		{
+			if (!Input.GetKeyDown(KeyCode.Alpha1 + (k - 1))) continue;
+			if (ctrl)
+			{
+				groupUnits[k] = new List<Soldier>(GetSelectedInfantry());
+				groupCrews[k] = new List<Squad>(selVehicles);
+				groupVehRefs[k] = new List<Vehicle>(selVehicleRefs);
+				cmdFlash = "编组 " + k + " 已保存（步兵 " + groupUnits[k].Count + " + 车组 " + groupCrews[k].Count + "）";
+				cmdFlashUntil = Time.unscaledTime + 2f;
+				SquadCmdLogic.LogAlways("[SquadCmd] 编组 " + k + " 保存 步兵=" + groupUnits[k].Count + " 车组=" + groupCrews[k].Count);
+			}
+			else if (groupUnits.ContainsKey(k) || groupCrews.ContainsKey(k))
+			{
+				List<Soldier> units = new List<Soldier>();
+				if (groupUnits.TryGetValue(k, out List<Soldier> gu) && gu != null)
+					foreach (Soldier s in gu) { try { if (s != null && s.IsAlive) units.Add(s); } catch { } }
+				List<Squad> crews = new List<Squad>();
+				if (groupCrews.TryGetValue(k, out List<Squad> gc) && gc != null)
+					foreach (Squad c in gc) { try { if (c != null && AliveCount(c) > 0) crews.Add(c); } catch { } }
+				if (units.Count == 0 && crews.Count == 0)
+				{
+					cmdFlash = "编组 " + k + " 已无存活单位"; cmdFlashUntil = Time.unscaledTime + 2f;
+					return;
+				}
+				ClearSelection();
+				foreach (Soldier s in units) { try { if (!virtualUnits.Contains(s)) virtualUnits.Add(s); } catch { } }
+				foreach (Squad c in crews) { try { if (!selVehicles.Contains(c)) selVehicles.Add(c); } catch { } }
+				if (groupVehRefs.TryGetValue(k, out List<Vehicle> gv) && gv != null)
+					foreach (Vehicle v in gv) { try { if (v != null && v.transform != null) AddVehicleRef(v); } catch { } }
+				cmdFlash = "编组 " + k + "（步兵 " + units.Count + " + 车组 " + crews.Count + "）";
+				cmdFlashUntil = Time.unscaledTime + 2f;
+				selFlash = Time.unscaledTime + 2.5f;
+			}
+			return; // 每帧至多处理一个数字键
+		}
+	}
+
 	internal static void Tick()
 	{
 		// 持久任务段：无论当前是 RTS 还是 FPS，都继续维护已经下达的任务。
@@ -1836,6 +1923,7 @@ internal static class GodViewController
 		}
 
 		// 输入先处理，避免相机/原生对象访问异常阻断鼠标手势收尾。
+		try { HandleGroupHotkeys(); } catch { }
 		try { HandleClick(); }
 		catch (Exception ex)
 		{
@@ -2560,7 +2648,7 @@ internal static class GodViewController
 			string info = cam != null ? "  高度 " + cam.transform.position.y.ToString("0") + "m" : "";
 
 			// 底部指令提示
-			string hint = "WASD移动 滚轮缩放 中键旋转 左键=选/框选(临时选择) 右键=指令 / 长按空地=单位环(站蹲趴停止) 空格=暂停" + info;
+			string hint = "WASD移动 滚轮缩放 中键旋转 左键=选/框选(临时选择) 右键=指令 / 长按空地=命令环(站蹲趴停止/掩体/集合/停火) 空格=暂停" + info;
 			GUIStyle hs = SquadCmdLogic.HudStyleSmall();
 			GUI.color = new Color(0.05f, 0.05f, 0.05f, 0.55f);
 			GUI.DrawTexture(new Rect((Screen.width - 900f) * 0.5f, Screen.height - 30f, 900f, 22f), Texture2D.whiteTexture);
@@ -3192,13 +3280,17 @@ internal static class GodViewController
 			try { Ray rr = cc.ScreenPointToRay(Input.mousePosition); if (Physics.Raycast(rr, out RaycastHit hh, 3000f)) { wheelAnchorWorld = hh.point + Vector3.up * 1.0f; hasWheelAnchor = true; } } catch { }
 		}
 		wheelKind = 2;
-		wheelItemCount = 4;
+		wheelItemCount = 7;
 		WheelItemLabels[0] = "站起"; WheelItemLabels[1] = "蹲下"; WheelItemLabels[2] = "趴下"; WheelItemLabels[3] = "停止";
+		WheelItemLabels[4] = "掩体"; WheelItemLabels[5] = "集合"; WheelItemLabels[6] = "停火";
 		bool hasInf = GetSelectedInfantry().Count > 0;
 		WheelItemEnabled[0] = hasInf; WheelItemEnabled[1] = hasInf; WheelItemEnabled[2] = hasInf;
 		WheelItemEnabled[3] = true; // 停止对步兵+载具都有效
+		WheelItemEnabled[4] = hasInf; // 进入掩体：步兵小队原生 SendUnitsToCovers
+		WheelItemEnabled[5] = true;   // 集合：各小队向队长集结（原生 FollowLeader）
+		WheelItemEnabled[6] = true;   // 停火/开火切换（原生 holdFire）
 		FinishWheelOpen("单位", "步兵=" + GetSelectedInfantry().Count + " 载具=" + selVehicles.Count
-			+ " 可用项=[站起" + YN(hasInf) + " 蹲下" + YN(hasInf) + " 趴下" + YN(hasInf) + " 停止Y]");
+			+ " 可用项=[站起" + YN(hasInf) + " 蹲下" + YN(hasInf) + " 趴下" + YN(hasInf) + " 停止Y 掩体" + YN(hasInf) + " 集合Y 停火Y]");
 	}
 
 	/// <summary>对选中步兵应用姿态：站起=resetPose 归还 AI；蹲/趴=setPose 持久设置并记入还原名单。</summary>
@@ -3338,7 +3430,7 @@ internal static class GodViewController
 		if (swallowLeft) swallowLeftGesture = true;
 	}
 
-	/// <summary>执行轮盘选中的动作（按 wheelKind 映射：交互环 0/1/2=上车/下车/修理；单位环 4..7=站/蹲/趴/停止）。</summary>
+	/// <summary>执行轮盘选中的动作（按 wheelKind 映射：交互环 0/1/2=上车/下车/修理；命令环 4..10=站/蹲/趴/停止/掩体/集合/停火）。</summary>
 	private static void ExecuteWheelAction(int index)
 	{
 		string actionName = index >= 0 && index < wheelItemCount ? WheelItemLabels[index] : "?";
@@ -3394,6 +3486,86 @@ internal static class GodViewController
 				ClearMark();
 				StopSelected();
 				break;
+			// 0.8.00：进阶原生命令（命令环槽 4/5/6 → actionId 8/9/10）
+			case 8: // 进入掩体：原生 SendUnitsToCovers，按所属原生小队编组，以开环落点为中心
+				{
+					Vector3 p = hasWheelAnchor ? wheelAnchorWorld : SelCenter();
+					HashSet<long> doneC = new HashSet<long>();
+					int nC = 0;
+					foreach (Soldier s in GetSelectedInfantry())
+					{
+						try
+						{
+							if (s == null || !s.IsAlive) continue;
+							Squad sq = s.joinedSquad;
+							if (sq == null || !doneC.Add((long)sq.Pointer)) continue;
+							SquadCmdLogic.RegisterControlledSquad(sq);
+							sq.SendUnitsToCovers(p, Plugin.radius.Value);
+							nC++;
+						}
+						catch { }
+					}
+					if (nC > 0)
+					{
+						ClearFollow("进入掩体", false);
+						SquadCmdLogic.LogAlways("[SquadCmd] 进入掩体 squads=" + nC + " center=" + p.ToString("0.0"));
+					}
+					else { cmdFlash = "无可用步兵小队"; cmdFlashUntil = Time.unscaledTime + 2f; }
+				}
+				break;
+			case 9: // 集合：原生 FollowLeader，各小队向自己的队长集结
+				{
+					HashSet<long> doneF = new HashSet<long>();
+					int nF = 0;
+					foreach (Soldier s in GetSelectedInfantry())
+					{
+						try
+						{
+							if (s == null || !s.IsAlive) continue;
+							Squad sq = s.joinedSquad;
+							if (sq == null || !doneF.Add((long)sq.Pointer)) continue;
+							sq.FollowLeader();
+							nF++;
+						}
+						catch { }
+					}
+					foreach (Squad csq in GetSelectedVehicleCrews())
+					{
+						try { if (csq != null && doneF.Add((long)csq.Pointer)) { csq.FollowLeader(); nF++; } } catch { }
+					}
+					if (nF > 0) SquadCmdLogic.LogAlways("[SquadCmd] 集合（跟随队长） squads=" + nF);
+					else { cmdFlash = "无可用小队"; cmdFlashUntil = Time.unscaledTime + 2f; }
+				}
+				break;
+			case 10: // 停火/开火切换：有停火的小队→全部恢复开火；全部开火中→全部停火
+				{
+					HashSet<long> doneH = new HashSet<long>();
+					List<Squad> squads = new List<Squad>();
+					foreach (Soldier s in GetSelectedInfantry())
+					{
+						try
+						{
+							if (s == null || !s.IsAlive) continue;
+							Squad sq = s.joinedSquad;
+							if (sq == null || !doneH.Add((long)sq.Pointer)) continue;
+							squads.Add(sq);
+						}
+						catch { }
+					}
+					foreach (Squad csq in GetSelectedVehicleCrews())
+					{
+						try { if (csq != null && doneH.Add((long)csq.Pointer)) squads.Add(csq); } catch { }
+					}
+					if (squads.Count == 0) { cmdFlash = "无可用小队"; cmdFlashUntil = Time.unscaledTime + 2f; break; }
+					bool anyHolding = false;
+					foreach (Squad sq in squads) { try { if (sq.holdFire) { anyHolding = true; break; } } catch { } }
+					bool hold = !anyHolding;
+					int nH = 0;
+					foreach (Squad sq in squads) { try { sq.holdFire = hold; nH++; } catch { } }
+					cmdFlash = (hold ? "停火 → " : "开火 → ") + nH + " 队"; cmdFlashUntil = Time.unscaledTime + 2f;
+					SquadCmdLogic.LogAlways("[SquadCmd] " + (hold ? "停火" : "开火") + " squads=" + nH);
+				}
+				break;
 		}
 		CloseInteractionWheel("执行动作:" + actionName);
 	}
@@ -3419,16 +3591,24 @@ internal static class GodViewController
 			}
 		}
 		catch { }
-		c.x = Mathf.Clamp(c.x, WheelEdgeMarginX, Screen.width - WheelEdgeMarginX);
-		c.y = Mathf.Clamp(c.y, WheelEdgeMarginY, Screen.height - WheelEdgeMarginY);
+		float mX = WheelRadius() + WheelBtnW * 0.5f + 6f;
+		float mY = WheelRadius() + WheelBtnH * 0.5f + 6f;
+		c.x = Mathf.Clamp(c.x, mX, Screen.width - mX);
+		c.y = Mathf.Clamp(c.y, mY, Screen.height - mY);
 		return c;
+	}
+
+	/// <summary>当前环半径：>5 槽（命令环 7 项）时翻倍，保证相邻按钮中心距 ≥ 按钮宽。</summary>
+	private static float WheelRadius()
+	{
+		return wheelItemCount > 5 ? WheelItemDist * 2f : WheelItemDist;
 	}
 
 	private static Rect WheelButtonRect(int index, Vector2 center)
 	{
 		float angle = -90f + index * (360f / Mathf.Max(1, wheelItemCount));
 		float rad = angle * Mathf.Deg2Rad;
-		Vector2 pos = center + new Vector2(Mathf.Cos(rad), Mathf.Sin(rad)) * WheelItemDist;
+		Vector2 pos = center + new Vector2(Mathf.Cos(rad), Mathf.Sin(rad)) * WheelRadius();
 		return new Rect(pos.x - WheelBtnW * 0.5f, pos.y - WheelBtnH * 0.5f, WheelBtnW, WheelBtnH);
 	}
 
