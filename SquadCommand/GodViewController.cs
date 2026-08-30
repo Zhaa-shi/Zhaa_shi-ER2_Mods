@@ -2053,22 +2053,31 @@ internal static class GodViewController
 
 		// 输入先处理，避免相机/原生对象访问异常阻断鼠标手势收尾。
 		try { if (!escMenuOpen) HandleGroupHotkeys(); } catch { }
-		// 0.9.4：RTS 内 M 键开关原生大地图——直接调 MapGUI.OpenMap/CloseMap
-		//（0.9.3 已确认 MiniMapOpened 是死 API：全程序集无人调用，显隐由 MapGUI 管理）
+		// 0.9.7：M 键——翻转 MiniMapOpened（HVT 以它为"地图已打开"判据，原版 M 流程确实写它），
+		// 并输出 miniMap 容器完整可视状态诊断，一次测试即可定位原生的隐藏手段
 		try
 		{
 			if (Input.GetKeyDown(KeyCode.M) && !escMenuOpen)
 			{
-				if (mapGuiCached == null) { try { mapGuiCached = UnityEngine.Object.FindObjectOfType(Il2CppInterop.Runtime.Il2CppType.Of<MapGUI>()) as MapGUI; } catch { } }
-				if (mapGuiCached != null)
+				MiniMapGUI.MiniMapOpened = !MiniMapGUI.MiniMapOpened;
+				var inst = MiniMapGUI.Instance;
+				string d = "Instance=null";
+				if (inst != null && inst.miniMap != null)
 				{
-					if (MiniMapGUI.MiniMapOpened) { mapGuiCached.CloseMap(); SquadCmdLogic.LogAlways("[SquadCmd] M 地图 关"); }
-					else { mapGuiCached.OpenMap(); SquadCmdLogic.LogAlways("[SquadCmd] M 地图 开"); }
+					var rt = inst.miniMap;
+					GameObject go = rt.gameObject;
+					CanvasGroup cg = rt.GetComponent<CanvasGroup>();
+					if (cg == null) cg = rt.GetComponentInParent<CanvasGroup>();
+					d = "activeSelf=" + go.activeSelf + " activeInHier=" + go.activeInHierarchy
+						+ " scale=" + rt.localScale.ToString("0.00") + " size=" + rt.sizeDelta.ToString("0.0")
+						+ " pos=" + rt.anchoredPosition.ToString("0.0")
+						+ " cg=" + (cg != null ? cg.alpha.ToString("0.00") + (cg.blocksRaycasts ? "+ray" : "-ray") : "无")
+						+ " mode=" + inst.mode;
 				}
-				else SquadCmdLogic.LogAlways("[SquadCmd] M 地图：场景中未找到 MapGUI");
+				SquadCmdLogic.LogAlways("[SquadCmd] M 翻转 → open=" + MiniMapGUI.MiniMapOpened + " | " + d);
 			}
 		}
-		catch (Exception ex) { SquadCmdLogic.LogAlways("[SquadCmd] M 地图切换失败: " + ex.Message); }
+		catch (Exception ex) { SquadCmdLogic.LogAlways("[SquadCmd] M 切换失败: " + ex.Message); }
 		try { HandleClick(); }
 		catch (Exception ex)
 		{
@@ -2090,10 +2099,10 @@ internal static class GodViewController
 				}
 				else
 				{
-					if (pauseInstance == null) { try { pauseInstance = UnityEngine.Object.FindObjectOfType(Il2CppInterop.Runtime.Il2CppType.Of<Pause>()) as Pause; } catch { } }
-					if (pauseInstance != null) { pauseInstance.Resume(); SquadCmdLogic.LogAlways("[SquadCmd] ESC 关闭原生菜单"); }
-					else { SquadCmdLogic.LogAlways("[SquadCmd] ESC 关闭失败：场景中未找到 Pause"); }
+					// 0.9.7：对称关闭——SetPause(false)（Resume 实例方法不确定是否收起菜单）
+					Pause.SetPause(false);
 					escMenuOpen = false;
+					SquadCmdLogic.LogAlways("[SquadCmd] ESC 关闭原生菜单");
 				}
 			}
 			else if (escMenuOpen && !Pause.IsTimePaused() && !Pause.IsPaused())
@@ -3039,6 +3048,7 @@ internal static class GodViewController
 	internal static void DrawHud()
 	{
 		if (!Active) return;
+		if (escMenuOpen) return; // 0.9.7：ESC 菜单打开期间隐藏全部我方 IMGUI，不遮挡原生设置界面
 		try
 		{
 			GUIStyle st = SquadCmdLogic.HudStyle();
