@@ -461,20 +461,10 @@ internal static class GodViewController
 
 	private static int SelTotal => SelInfantryCount() + selVehicles.Count;
 
-	private static void ClearSelection(bool stopUnits = false)
+	private static void ClearSelection()
 	{
-		// 0.7.81：换选（stopUnits=false）旧队继续走完原命令（RTS 标准）；
-		// 左键点空白（stopUnits=true）= 明确的取消手势，全部停止。
-		if (stopUnits)
-		{
-			CancelBoardPending("左键空白取消"); // 0.7.82：明确取消手势——登车引导同步停止（否则 stop 后又被引导拉走）
-			try { foreach (Soldier s in GetSelectedInfantry()) { try { new Lua_Soldier(s).stop(); } catch { } } } catch { }
-			foreach (Vehicle rv in selVehicleRefs)
-			{
-				try { AIVehicle ai = rv.GetComponent<AIVehicle>(); if (ai == null) ai = rv.GetComponentInChildren<AIVehicle>(); if (ai != null) ai.StopAndClearPath(); } catch { }
-			}
-		}
-		mvActive = false; mvUnits.Clear(); mvLastDist.Clear(); mvLastPos.Clear(); mvPathAcc.Clear();
+		// 0.7.83 任务生命周期定案：指令下达后持续执行直到 完成/单位死亡/新指令覆盖。
+		// 清空/更换选择【不】影响进行中的任务（M7 修正与登车流程照常）；显式停止只用【停止】按钮。
 		mainSquad = null;
 		selVehicles.Clear();
 		selVehicleRefs.Clear();
@@ -2295,8 +2285,8 @@ internal static class GodViewController
 					return;
 				}
 			}
-			// 敌军/中立/空白 → 取消选择（主动取消手势：同时停止旧队移动）
-			ClearSelection(true);
+			// 敌军/中立/空白 → 取消选择（不影响进行中的任务；停止用【停止】按钮）
+			ClearSelection();
 			cmdFlash = "已清空选择"; cmdFlashUntil = Time.unscaledTime + 1.5f;
 		}
 		catch { }
