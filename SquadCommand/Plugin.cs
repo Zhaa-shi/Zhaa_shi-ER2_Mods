@@ -9,7 +9,7 @@ using UnityEngine;
 
 namespace ER2SquadCommand;
 
-[BepInPlugin("er2.squadcommand", "ER2 Squad Command", "0.8.2")]
+[BepInPlugin("er2.squadcommand", "ER2 Squad Command", "0.9.0")]
 public class Plugin : BasePlugin
 {
 	internal static ManualLogSource ModLog;
@@ -18,6 +18,10 @@ public class Plugin : BasePlugin
 	internal static ConfigEntry<float> radius;
 	internal static ConfigEntry<bool> debugLog;
 	internal static ConfigEntry<KeyCode> godKey;
+	internal static ConfigEntry<string> uiColorBase;
+	internal static ConfigEntry<string> uiColorHover;
+	internal static ConfigEntry<string> uiColorDisabled;
+	internal static ConfigEntry<string> uiColorText;
 
 	public override void Load()
 	{
@@ -28,9 +32,19 @@ public class Plugin : BasePlugin
 		debugLog = Config.Bind("Debug", "debugLog", false, new ConfigDescription("调试日志开关（发布版保持关闭）。开启后输出全部指挥/登车/标记诊断日志，用于问题排查。"));
 		godKey = Config.Bind("General", "godKey", KeyCode.F9, "上帝视角开关（仅进入）。退出＝选中小队后点顶部[控制该小队]随机接管一人；全军覆没时按键紧急退出。空格＝暂停/继续世界。");
 
+		uiColorBase = Config.Bind("UI", "colorBase", "#9A9A9A", new ConfigDescription("UI 主色（#RRGGBB 或 #RRGGBBAA）：按钮底板、友军脚环。默认灰。"));
+		uiColorHover = Config.Bind("UI", "colorHover", "#C8C8C8", "UI 悬停/选中环颜色。");
+		uiColorDisabled = Config.Bind("UI", "colorDisabled", "#3F3F3F", "UI 禁用态颜色。");
+		uiColorText = Config.Bind("UI", "colorText", "#F0F0F0", "UI 文字/描边/移动目标环颜色。");
+		uiColorBase.SettingChanged += (s, e) => GodViewController.ApplyUiTheme();
+		uiColorHover.SettingChanged += (s, e) => GodViewController.ApplyUiTheme();
+		uiColorDisabled.SettingChanged += (s, e) => GodViewController.ApplyUiTheme();
+		uiColorText.SettingChanged += (s, e) => GodViewController.ApplyUiTheme();
+		GodViewController.ApplyUiTheme();
+
 		new Harmony("er2.squadcommand").PatchAll(typeof(Plugin).Assembly);
 		FrameEndRunner.Ensure();
-		ModLog.LogInfo("ER2 Squad Command 0.8.2 loaded. godKey=" + godKey.Value);
+		ModLog.LogInfo("ER2 Squad Command 0.9.0 loaded. godKey=" + godKey.Value);
 	}
 }
 

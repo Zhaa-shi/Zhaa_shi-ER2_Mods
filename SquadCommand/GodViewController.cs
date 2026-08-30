@@ -2013,6 +2013,7 @@ internal static class GodViewController
 		try
 		{
 			PruneMark();
+			SceneMarkersFrame(); // 0.9.0：3D 场景标记每帧跟随（RTS/FPS 均显示集火/目标环）
 			ObsMoveTick();
 			BoardPendingTick();
 			VehiclePendingTick();
@@ -2051,6 +2052,8 @@ internal static class GodViewController
 
 		// 输入先处理，避免相机/原生对象访问异常阻断鼠标手势收尾。
 		try { HandleGroupHotkeys(); } catch { }
+		// 0.9.0：RTS 内 M 键开关原生大地图（原生输入链被跳过，这里代触发）
+		try { if (Input.GetKeyDown(KeyCode.M)) MiniMapGUI.MiniMapOpened = !MiniMapGUI.MiniMapOpened; } catch { }
 		try { HandleClick(); }
 		catch (Exception ex)
 		{
@@ -2267,6 +2270,11 @@ internal static class GodViewController
 		}
 	}
 
+	private static bool MiniMapGuiBlocking()
+	{
+		try { return Active && MiniMapGUI.MiniMapOpened; } catch { return false; }
+	}
+
 	private static void HandleClickCore()
 	{
 		bool leftDown = Input.GetMouseButtonDown(0);
@@ -2275,7 +2283,7 @@ internal static class GodViewController
 		bool rightDown = Input.GetMouseButtonDown(1);
 		bool rightHeld = Input.GetMouseButton(1);
 		bool rightUp = Input.GetMouseButtonUp(1);
-		bool guiNow = IsMouseOverGui();
+		bool guiNow = IsMouseOverGui() || MiniMapGuiBlocking(); // 0.9.0：RTS 内大地图打开时点击归地图
 
 		// 轮盘打开期间，Update 只负责收尾手势；按钮点击和右键关闭由 OnGUI 处理。
 		// 不能让旧的 rightHoldActive 卡在轮盘状态里。
@@ -2413,7 +2421,6 @@ internal static class GodViewController
 				if (btn.Contains(m)) return true;
 				if (SplitButtonRect().Contains(m)) return true;
 				if (MergeButtonRect().Contains(m)) return true;
-				if (ScatterRect().Contains(m)) return true;
 			}
 			if (squadPanelHit.height > 0f && squadPanelHit.Contains(m)) return true;
 		}
@@ -2439,13 +2446,7 @@ internal static class GodViewController
 		Rect b = ControlButtonRect();
 		return new Rect(b.x - 8f - 120f, 12f, 120f, 36f);
 	}
-
-	/// <summary>0.8.2：【分散】按钮（分队按钮右侧）——选中步兵就地散开找掩护（原生 SendUnitsToCovers）。</summary>
-	private static Rect ScatterRect()
-	{
-		Rect b = SplitButtonRect();
-		return new Rect(b.xMax + 8f, 12f, 120f, 36f);
-	}
+	// 0.9.0：【分散】已移入命令环（槽 7），顶栏不再单独设按钮
 
 	/// <summary>左键单击：只负责选择/取消选择（友军=选中，其余=清空选择）。</summary>
 	private static void ClickActOrCancel()
@@ -2772,6 +2773,186 @@ internal static class GodViewController
 
 	// ===== HUD =====
 
+	// ===== 0.9.0：统一 UI 主题（cfg "UI" 节可自定义，默认灰） =====
+	private static Color uiBase = new Color(0.55f, 0.55f, 0.55f, 0.92f);      // 按钮底板/友军脚环
+	private static Color uiHover = new Color(0.78f, 0.78f, 0.78f, 0.97f);     // 悬停/选中环
+	private static Color uiDisabled = new Color(0.28f, 0.28f, 0.28f, 0.80f);  // 禁用
+	private static Color uiText = new Color(0.94f, 0.94f, 0.94f, 1f);         // 文字/描边/移动目标环
+
+	internal static void ApplyUiTheme()
+	{
+		uiBase = ParseThemeColor(Plugin.uiColorBase.Value, uiBase);
+		uiHover = ParseThemeColor(Plugin.uiColorHover.Value, uiHover);
+		uiDisabled = ParseThemeColor(Plugin.uiColorDisabled.Value, uiDisabled);
+		uiText = ParseThemeColor(Plugin.uiColorText.Value, uiText);
+	}
+
+	private static Color ParseThemeColor(string hex, Color fallback)
+	{
+		try
+		{
+			string s = (hex ?? "").Trim();
+			if (s.Length == 0) return fallback;
+			if (!s.StartsWith("#")) s = "#" + s;
+			if (ColorUtility.TryParseHtmlString(s, out Color c)) return c;
+		}
+		catch { }
+		return fallback;
+	}
+
+	/// <summary>0.9.0：统一按钮绘制——主题色底板+描边+居中文字；enabled=false 用禁用色。</summary>
+	private static void DrawUiButton(Rect r, string label, bool enabled, bool hover)
+	{
+		Color fill = !enabled ? uiDisabled : (hover ? uiHover : uiBase);
+		GUI.color = fill;
+		GUI.DrawTexture(r, Texture2D.whiteTexture);
+		GUI.color = uiText;
+		GUI.DrawTexture(new Rect(r.x, r.y, r.width, 1.5f), Texture2D.whiteTexture);
+		GUI.DrawTexture(new Rect(r.x, r.yMax - 1.5f, r.width, 1.5f), Texture2D.whiteTexture);
+		GUI.DrawTexture(new Rect(r.x, r.y, 1.5f, r.height), Texture2D.whiteTexture);
+		GUI.DrawTexture(new Rect(r.xMax - 1.5f, r.y, 1.5f, r.height), Texture2D.whiteTexture);
+		GUI.Label(r, label, SquadCmdLogic.ButtonStyle());
+		GUI.color = Color.white;
+	}
+
+	// ===== 0.9.0：3D 场景标记驱动（友军脚环/选中环/集火环/移动目标环/名签） =====
+	private static readonly List<Soldier> smFriendly = new List<Soldier>();
+	private static readonly List<Vehicle> smFriendlyVeh = new List<Vehicle>();
+	private static float smFriendlyNext = -10f;
+	private static readonly HashSet<long> smSelected = new HashSet<long>();
+	private const int SceneMarkerCap = 200;
+
+	private static void SceneMarkersFrame()
+	{
+		float t = Time.unscaledTime;
+		// 选中集（0.2s 缓存，含车内乘员——车组成员由载具环覆盖，不单独画）
+		if (t > markerCacheUntil) { markerCacheUntil = t + 0.2f; markerCache = GetCommandUnits(); }
+		smSelected.Clear();
+		foreach (Soldier s in markerCache) { try { if (s != null) smSelected.Add((long)s.Pointer); } catch { } }
+
+		// 友军脚环 + 选中环：仅 RTS 显示（FPS 第一人称满屏脚环会干扰视野）
+		if (Active)
+		{
+			if (t > smFriendlyNext)
+			{
+				smFriendlyNext = t + 1f;
+				RebuildFriendlyCache();
+			}
+			Color dim = new Color(uiBase.r, uiBase.g, uiBase.b, 0.5f);
+			int drawn = 0;
+			foreach (Soldier s in smFriendly)
+			{
+				if (drawn >= SceneMarkerCap) break;
+				try
+				{
+					if (s == null || !s.IsAlive || s.transform == null) continue;
+					long k = (long)s.Pointer;
+					if (smSelected.Contains(k)) continue; // 选中环更亮，不叠画
+					SceneMarkers.Ring("F" + k, s.transform.position + Vector3.up * 0.05f, 0.55f, dim, 0.05f, true);
+					drawn++;
+				}
+				catch { }
+			}
+			foreach (Vehicle v in smFriendlyVeh)
+			{
+				if (drawn >= SceneMarkerCap) break;
+				try
+				{
+					if (v == null || v.transform == null) continue;
+					long k = (long)v.Pointer;
+					Color c = smSelected.Contains(k) ? uiHover : dim;
+					SceneMarkers.Ring("FV" + k, v.transform.position + Vector3.up * 0.08f, VehicleRingRadius(v), c, 0.08f, true);
+					drawn++;
+				}
+				catch { }
+			}
+			// 选中步兵亮环（载具上面已画）
+			foreach (Soldier s in markerCache)
+			{
+				try
+				{
+					if (s == null || !s.IsAlive || s.transform == null) continue;
+					if (s.GetComponentInParent<Vehicle>() != null) continue;
+					SceneMarkers.Ring("S" + (long)s.Pointer, s.transform.position + Vector3.up * 0.06f, 0.8f, uiHover, 0.09f, true);
+				}
+				catch { }
+			}
+			foreach (Vehicle v in new List<Vehicle>(selVehicleRefs))
+			{
+				try
+				{
+					if (v == null || v.transform == null) continue;
+					SceneMarkers.Ring("SV" + (long)v.Pointer, v.transform.position + Vector3.up * 0.08f, VehicleRingRadius(v), uiHover, 0.1f, true);
+				}
+				catch { }
+			}
+		}
+
+		// 集火环 + 名签：RTS/FPS 都显示（任务跨视角持续）
+		try
+		{
+			var m = mark;
+			if (m != null && m.Active)
+			{
+				Color mc = m.Downgraded ? new Color(0.8f, 0.45f, 0.25f, 0.8f) : new Color(0.95f, 0.28f, 0.22f, 0.95f);
+				SceneMarkers.Ring("MK", m.Position + Vector3.up * 0.08f, 1.5f, mc, 0.12f, true);
+				SceneMarkers.Label("MKN", m.Position + Vector3.up * 2.6f, "⚔ " + (m.Downgraded ? "[降级] " : "") + m.Name, mc, true);
+			}
+		}
+		catch { }
+
+		// 移动目标环：RTS/FPS 都显示
+		try
+		{
+			bool show = hasCmdTarget && t < cmdTargetUntil;
+			if (show) SceneMarkers.Ring("MT", cmdTarget + Vector3.up * 0.06f, 1.1f, uiText, 0.1f, true);
+		}
+		catch { }
+
+		SceneMarkers.EndFrame();
+	}
+
+	private static float VehicleRingRadius(Vehicle v)
+	{
+		try
+		{
+			Collider col = v.GetComponent<Collider>();
+			if (col == null) col = v.GetComponentInChildren<Collider>();
+			if (col != null)
+			{
+				Vector3 e = col.bounds.extents;
+				return Mathf.Clamp(Mathf.Max(e.x, e.z) + 0.6f, 2.2f, 7f);
+			}
+		}
+		catch { }
+		return 3.5f;
+	}
+
+	private static void RebuildFriendlyCache()
+	{
+		smFriendly.Clear();
+		smFriendlyVeh.Clear();
+		try
+		{
+			foreach (Squad sq in SquadCmdLogic.GetAllFriendlySquads())
+			{
+				if (sq == null) continue;
+				Vehicle vc = null;
+				try { vc = VehicleOfCrew(sq); } catch { }
+				if (vc != null && vc.transform != null) { smFriendlyVeh.Add(vc); continue; }
+				int c = 0;
+				try { c = sq.CountMembers; } catch { }
+				for (int i = 0; i < c && smFriendly.Count < SceneMarkerCap; i++)
+				{
+					Soldier m = null;
+					try { m = sq.GetMemberClamped(i); } catch { }
+					if (m != null && m.IsAlive) smFriendly.Add(m);
+				}
+			}
+		}
+		catch { }
+	}
+
 	internal static void DrawHud()
 	{
 		if (!Active) return;
@@ -2783,7 +2964,7 @@ internal static class GodViewController
 			string info = cam != null ? "  高度 " + cam.transform.position.y.ToString("0") + "m" : "";
 
 			// 底部指令提示
-			string hint = "WASD移动 滚轮缩放 中键旋转 左键=选/框选(临时选择) 右键=指令 / 长按空地=命令环(站蹲趴停止/掩体/集合/停火) 空格=暂停" + info;
+			string hint = "WASD移动 滚轮缩放 中键旋转 左键=选/框选(临时选择) 右键=指令 / 长按空地=命令环(站蹲趴停止/掩体/集合/停火/分散) 空格=暂停 M=地图" + info;
 			GUIStyle hs = SquadCmdLogic.HudStyleSmall();
 			GUI.color = new Color(0.05f, 0.05f, 0.05f, 0.55f);
 			GUI.DrawTexture(new Rect((Screen.width - 900f) * 0.5f, Screen.height - 30f, 900f, 22f), Texture2D.whiteTexture);
@@ -2803,7 +2984,7 @@ internal static class GodViewController
 			{
 				GUI.color = new Color(0.05f, 0.05f, 0.05f, 0.55f);
 				GUI.DrawTexture(new Rect(8f, 10f, 400f, 22f), Texture2D.whiteTexture);
-				GUI.color = Paused ? new Color(1f, 0.85f, 0.2f, 0.95f) : selColor;
+				GUI.color = Paused ? new Color(1f, 0.85f, 0.2f, 0.95f) : uiText;
 				GUI.Label(new Rect(14f, 9f, 400f, 22f), status, st);
 				GUI.color = Color.white;
 			}
@@ -2813,7 +2994,7 @@ internal static class GodViewController
 			{
 				GUI.color = new Color(0.05f, 0.05f, 0.05f, 0.55f);
 				GUI.DrawTexture(new Rect(8f, 38f, 700f, 22f), Texture2D.whiteTexture);
-				GUI.color = selColor;
+				GUI.color = uiText;
 				GUI.Label(new Rect(14f, 37f, 700f, 22f), cmdFlash, st);
 				GUI.color = Color.white;
 			}
@@ -2828,124 +3009,48 @@ internal static class GodViewController
 				GUI.color = Color.white;
 			}
 
-			// 顶部控制按钮
+			// 顶部控制按钮（0.9.0：统一主题色，文字居中；分散已移入命令环）
 			if (HasSelection)
 			{
 				Rect btn = ControlButtonRect();
 				bool hover = btn.Contains(Event.current.mousePosition);
-				GUI.color = hover ? new Color(0.10f, 0.30f, 0.12f, 0.9f) : new Color(0.08f, 0.15f, 0.09f, 0.82f);
-				GUI.DrawTexture(btn, Texture2D.whiteTexture);
-				GUI.color = new Color(0.35f, 1f, 0.5f, 0.85f);
-				GUI.DrawTexture(new Rect(btn.x, btn.y, btn.width, 1.5f), Texture2D.whiteTexture);
-				GUI.DrawTexture(new Rect(btn.x, btn.yMax - 1.5f, btn.width, 1.5f), Texture2D.whiteTexture);
-				GUI.DrawTexture(new Rect(btn.x, btn.y, 1.5f, btn.height), Texture2D.whiteTexture);
-				GUI.DrawTexture(new Rect(btn.xMax - 1.5f, btn.y, 1.5f, btn.height), Texture2D.whiteTexture);
-				GUI.color = Color.white;
-				GUI.Label(btn, "控制该小队（随机接管一名存活成员）", st);
+				DrawUiButton(btn, "控制该小队", true, hover);
 				if (Event.current.type == EventType.MouseDown && Event.current.button == 0 && hover)
 				{
 					Event.current.Use();
 					TakeControlSelected();
 					return;
 				}
-				// 0.7.46：【分队】按钮——把当前选中 Soldier[] 拆进真正的新 Squad
 				Rect sbtn = SplitButtonRect();
 				bool shover = sbtn.Contains(Event.current.mousePosition);
-				GUI.color = shover ? new Color(0.18f, 0.28f, 0.12f, 0.9f) : new Color(0.13f, 0.20f, 0.09f, 0.82f);
-				GUI.DrawTexture(sbtn, Texture2D.whiteTexture);
-				GUI.color = new Color(0.7f, 1f, 0.5f, 0.85f);
-				GUI.DrawTexture(new Rect(sbtn.x, sbtn.y, sbtn.width, 1.5f), Texture2D.whiteTexture);
-				GUI.DrawTexture(new Rect(sbtn.x, sbtn.yMax - 1.5f, sbtn.width, 1.5f), Texture2D.whiteTexture);
-				GUI.DrawTexture(new Rect(sbtn.x, sbtn.y, 1.5f, sbtn.height), Texture2D.whiteTexture);
-				GUI.DrawTexture(new Rect(sbtn.xMax - 1.5f, sbtn.y, 1.5f, sbtn.height), Texture2D.whiteTexture);
-				GUI.color = Color.white;
-				GUI.Label(sbtn, "分队", st);
+				DrawUiButton(sbtn, "分队", true, shover);
 				if (Event.current.type == EventType.MouseDown && Event.current.button == 0 && shover)
 				{
 					Event.current.Use();
 					SplitSelected();
 					return;
 				}
-				// 0.7.57：【合并】按钮——选中单位并入当前激活 RTS 组
 				Rect mbtn = MergeButtonRect();
 				bool mhover = mbtn.Contains(Event.current.mousePosition);
-				GUI.color = mhover ? new Color(0.15f, 0.25f, 0.20f, 0.9f) : new Color(0.10f, 0.17f, 0.13f, 0.82f);
-				GUI.DrawTexture(mbtn, Texture2D.whiteTexture);
-				GUI.color = new Color(0.5f, 1f, 0.8f, 0.85f);
-				GUI.DrawTexture(new Rect(mbtn.x, mbtn.y, mbtn.width, 1.5f), Texture2D.whiteTexture);
-				GUI.DrawTexture(new Rect(mbtn.x, mbtn.yMax - 1.5f, mbtn.width, 1.5f), Texture2D.whiteTexture);
-				GUI.DrawTexture(new Rect(mbtn.x, mbtn.y, 1.5f, mbtn.height), Texture2D.whiteTexture);
-				GUI.DrawTexture(new Rect(mbtn.xMax - 1.5f, mbtn.y, 1.5f, mbtn.height), Texture2D.whiteTexture);
-				GUI.color = Color.white;
-				GUI.Label(mbtn, "合并", st);
+				DrawUiButton(mbtn, "合并", true, mhover);
 				if (Event.current.type == EventType.MouseDown && Event.current.button == 0 && mhover)
 				{
 					Event.current.Use();
 					MergeSelectedToRts();
 					return;
 				}
-				// 0.8.2：【分散】按钮——选中步兵就地散开找掩护
-				Rect scbtn = ScatterRect();
-				bool scover = scbtn.Contains(Event.current.mousePosition);
-				GUI.color = scover ? new Color(0.13f, 0.27f, 0.30f, 0.9f) : new Color(0.09f, 0.18f, 0.20f, 0.82f);
-				GUI.DrawTexture(scbtn, Texture2D.whiteTexture);
-				GUI.color = new Color(0.5f, 0.95f, 1f, 0.85f);
-				GUI.DrawTexture(new Rect(scbtn.x, scbtn.y, scbtn.width, 1.5f), Texture2D.whiteTexture);
-				GUI.DrawTexture(new Rect(scbtn.x, scbtn.yMax - 1.5f, scbtn.width, 1.5f), Texture2D.whiteTexture);
-				GUI.DrawTexture(new Rect(scbtn.x, scbtn.y, 1.5f, scbtn.height), Texture2D.whiteTexture);
-				GUI.DrawTexture(new Rect(scbtn.xMax - 1.5f, scbtn.y, 1.5f, scbtn.height), Texture2D.whiteTexture);
-				GUI.color = Color.white;
-				GUI.Label(scbtn, "分散", st);
-				if (Event.current.type == EventType.MouseDown && Event.current.button == 0 && scover)
-				{
-					Event.current.Use();
-					ScatterSelected();
-					return;
-				}
 			}
 
-			// 目标标记
-			if (hasCmdTarget && Time.unscaledTime < cmdTargetUntil && cam != null)
-			{
-				Vector3 sp = cam.WorldToScreenPoint(cmdTarget);
-				if (sp.z > 0f)
-				{
-					float x = sp.x, y = Screen.height - sp.y;
-					GUI.color = new Color(1f, 0.5f, 0.2f, 0.95f);
-					GUI.Label(new Rect(x - 7f, y - 7f, 14f, 14f), "◎", st);
-					if (squadCenterDraw != Vector3.zero)
-					{
-						Vector3 cs = cam.WorldToScreenPoint(squadCenterDraw);
-						if (cs.z > 0f) DrawLine(new Vector2(cs.x, Screen.height - cs.y), new Vector2(x, y), st);
-					}
-				}
-			}
+			// 0.9.0：集火标记/移动目标/选中标记/友军脚环已全部改为 3D 场景标记（SceneMarkers，
+			// 由 Tick 持久段每帧驱动，RTS/FPS 均显示），这里不再做屏幕投影绘制。
 
-			// 标记敌军集火标记（红色菱形 + 目标名，存活期间常显）
-			PruneMark();
-			var markDraw = mark;
-			if (markDraw != null && markDraw.Active && cam != null)
-			{
-				Vector3 msp = cam.WorldToScreenPoint(markDraw.Position + Vector3.up * 2.2f);
-				if (msp.z > 0f)
-				{
-					float mx = msp.x, my = Screen.height - msp.y;
-					GUI.color = new Color(1f, 0.25f, 0.2f, 0.98f);
-					GUI.Label(new Rect(mx - 12f, my - 12f, 24f, 24f), "◆", st);
-					// 目标名标签（更亮红）
-					GUI.color = new Color(1f, 0.45f, 0.4f, 0.95f);
-					GUI.Label(new Rect(mx + 10f, my - 10f, 220f, 20f), "⚔ " + (markDraw.Downgraded ? "[降级] " : "") + markDraw.Name, st);
-					GUI.color = Color.white;
-				}
-			}
-
-			// 框选矩形
+			// 框选矩形（0.9.0：主题色）
 			if (isDragging)
 			{
 				Rect sel = GetScreenRect(pressStart, MouseGui());
-				GUI.color = new Color(0.2f, 1f, 0.35f, 0.2f);
+				GUI.color = new Color(uiBase.r, uiBase.g, uiBase.b, 0.22f);
 				GUI.DrawTexture(sel, Texture2D.whiteTexture);
-				GUI.color = new Color(0.2f, 1f, 0.35f, 0.8f);
+				GUI.color = new Color(uiHover.r, uiHover.g, uiHover.b, 0.9f);
 				GUI.DrawTexture(new Rect(sel.x, sel.y, sel.width, 1.5f), Texture2D.whiteTexture);
 				GUI.DrawTexture(new Rect(sel.x, sel.yMax, sel.width, 1.5f), Texture2D.whiteTexture);
 				GUI.DrawTexture(new Rect(sel.x, sel.y, 1.5f, sel.height), Texture2D.whiteTexture);
@@ -2956,34 +3061,10 @@ internal static class GodViewController
 			// 右下角小队列表（编号 + 装甲□/步兵○ 符号）
 			DrawSquadPanel(st);
 
-			// 选中单位标记（◆，身上光标）——0.2s 缓存，OnGUI 多 pass 复用
-			PruneSelection();
-			if (Time.unscaledTime > markerCacheUntil) { markerCacheUntil = Time.unscaledTime + 0.2f; markerCache = GetCommandUnits(); }
-			List<Soldier> markers = markerCache;
-			for (int i = 0; i < markers.Count; i++)
-			{
-				Soldier m = markers[i];
-				if (m == null || m.transform == null) continue;
-				Vector3 sp = cam.WorldToScreenPoint(m.transform.position);
-				if (sp.z < 0f) continue;
-				GUI.color = selColor;
-				GUI.Label(new Rect(sp.x - 5f, Screen.height - sp.y - 5f, 10f, 10f), "◆", st);
-				GUI.color = Color.white;
-			}
-
 			// 交互命令环（仅上车/下车/物品）
 			DrawInteractionWheel(st);
 		}
 		catch { }
-	}
-
-	private static void DrawLine(Vector2 a, Vector2 b, GUIStyle st)
-	{
-		float dx = b.x - a.x, dy = b.y - a.y, len = Mathf.Sqrt(dx * dx + dy * dy);
-		if (len < 1f) return;
-		GUI.color = new Color(0.2f, 1f, 0.35f, 0.4f);
-		GUI.Label(new Rect(a.x, a.y - 1f, len, 2f), "", st);
-		GUI.color = Color.white;
 	}
 
 	// ===== 小队列表（右下角，编号 + 符号） =====
@@ -3433,17 +3514,18 @@ internal static class GodViewController
 			try { Ray rr = cc.ScreenPointToRay(Input.mousePosition); if (Physics.Raycast(rr, out RaycastHit hh, 3000f)) { wheelAnchorWorld = hh.point + Vector3.up * 1.0f; hasWheelAnchor = true; } } catch { }
 		}
 		wheelKind = 2;
-		wheelItemCount = 7;
+		wheelItemCount = 8;
 		WheelItemLabels[0] = "站起"; WheelItemLabels[1] = "蹲下"; WheelItemLabels[2] = "趴下"; WheelItemLabels[3] = "停止";
-		WheelItemLabels[4] = "掩体"; WheelItemLabels[5] = "集合"; WheelItemLabels[6] = "停火";
+		WheelItemLabels[4] = "掩体"; WheelItemLabels[5] = "集合"; WheelItemLabels[6] = "停火"; WheelItemLabels[7] = "分散";
 		bool hasInf = GetSelectedInfantry().Count > 0;
 		WheelItemEnabled[0] = hasInf; WheelItemEnabled[1] = hasInf; WheelItemEnabled[2] = hasInf;
 		WheelItemEnabled[3] = true; // 停止对步兵+载具都有效
 		WheelItemEnabled[4] = hasInf; // 进入掩体：步兵小队原生 SendUnitsToCovers
-		WheelItemEnabled[5] = true;   // 集合：各小队向队长集结（原生 FollowLeader）
+		WheelItemEnabled[5] = true;   // 集合：各小队向班长集结
 		WheelItemEnabled[6] = true;   // 停火/开火切换（原生 holdFire）
+		WheelItemEnabled[7] = hasInf; // 分散：各小队以自身中心就地散开找掩护
 		FinishWheelOpen("单位", "步兵=" + GetSelectedInfantry().Count + " 载具=" + selVehicles.Count
-			+ " 可用项=[站起" + YN(hasInf) + " 蹲下" + YN(hasInf) + " 趴下" + YN(hasInf) + " 停止Y 掩体" + YN(hasInf) + " 集合Y 停火Y]");
+			+ " 可用项=[站起" + YN(hasInf) + " 蹲下" + YN(hasInf) + " 趴下" + YN(hasInf) + " 停止Y 掩体" + YN(hasInf) + " 集合Y 停火Y 分散" + YN(hasInf) + "]");
 	}
 
 	/// <summary>对选中步兵应用姿态：站起=resetPose 归还 AI；蹲/趴=setPose 持久设置并记入还原名单。</summary>
@@ -3719,6 +3801,9 @@ internal static class GodViewController
 					SquadCmdLogic.LogAlways("[SquadCmd] " + (hold ? "停火" : "开火") + " squads=" + nH);
 				}
 				break;
+			case 11: // 分散：各步兵小队以自身中心就地散开找掩护（原生 SendUnitsToCovers）
+				ScatterSelected();
+				break;
 		}
 		CloseInteractionWheel("执行动作:" + actionName);
 	}
@@ -3786,18 +3871,7 @@ internal static class GodViewController
 		{
 			Rect btn = WheelButtonRect(i, center);
 			bool hover = btn.Contains(mouse) && WheelItemEnabled[i];
-			// 按钮底板
-			GUI.color = WheelItemEnabled[i] ? new Color(0.06f, 0.13f, 0.08f, 0.92f) : new Color(0.10f, 0.10f, 0.10f, 0.75f);
-			GUI.DrawTexture(btn, Texture2D.whiteTexture);
-			// 描边（悬停亮绿），与顶部控制按钮同风格
-			GUI.color = hover ? new Color(0.45f, 1f, 0.55f, 0.95f) : new Color(0.25f, 0.55f, 0.3f, 0.9f);
-			GUI.DrawTexture(new Rect(btn.x, btn.y, btn.width, 1.5f), Texture2D.whiteTexture);
-			GUI.DrawTexture(new Rect(btn.x, btn.yMax - 1.5f, btn.width, 1.5f), Texture2D.whiteTexture);
-			GUI.DrawTexture(new Rect(btn.x, btn.y, 1.5f, btn.height), Texture2D.whiteTexture);
-			GUI.DrawTexture(new Rect(btn.xMax - 1.5f, btn.y, 1.5f, btn.height), Texture2D.whiteTexture);
-			// 文字
-			GUI.color = WheelItemEnabled[i] ? (hover ? Color.white : new Color(0.85f, 0.95f, 0.87f, 0.95f)) : new Color(0.55f, 0.55f, 0.55f, 0.8f);
-			GUI.Label(btn, WheelItemLabels[i], st);
+			DrawUiButton(btn, WheelItemLabels[i], WheelItemEnabled[i], hover);
 			if (hover && e.type == EventType.MouseDown && e.button == 0)
 			{
 				e.Use();
@@ -3821,5 +3895,4 @@ internal static class GodViewController
 		GUI.color = Color.white;
 	}
 
-	private static readonly Color selColor = new Color(0.2f, 1f, 0.35f, 0.95f);
 }

@@ -425,6 +425,31 @@ internal static class SquadCmdLogic
 		return smallStyle;
 	}
 
+	private static GUIStyle btnStyle;
+	private static int btnFontSize;
+
+	/// <summary>0.9.0：统一按钮样式——文字居中（顶栏/轮盘共用，颜色由 DrawUiButton 用 GUI.color 叠加）。</summary>
+	internal static GUIStyle ButtonStyle()
+	{
+		int fs = Mathf.Max(11, Mathf.RoundToInt(13f * ResMult()));
+		if (btnStyle != null && btnFontSize == fs)
+		{
+			return btnStyle;
+		}
+		btnFontSize = fs;
+		btnStyle = new GUIStyle();
+		Font f = GetFont();
+		if (f != null)
+		{
+			btnStyle.font = f;
+		}
+		btnStyle.fontSize = fs;
+		btnStyle.fontStyle = FontStyle.Bold;
+		btnStyle.alignment = TextAnchor.MiddleCenter;
+		btnStyle.normal.textColor = Color.white;
+		return btnStyle;
+	}
+
 	private static float ResMult()
 	{
 		try
