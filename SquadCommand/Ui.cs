@@ -89,6 +89,7 @@ internal static class Ui
 		["步兵队"] = "infantry squad",
 		["，已在队 "] = ", already in squad ",
 		["，超员留下 "] = ", overflow left ",
+		["，{0} 辆车同队"] = ", {0} vehicles in one squad",
 		["无可合并（选中单位已在同一小队）"] = "Nothing to merge (already one squad)",
 		["选中单位没有所属小队"] = "Selected units have no squad",
 		["先选中要合并的步兵"] = "Select infantry to merge first",

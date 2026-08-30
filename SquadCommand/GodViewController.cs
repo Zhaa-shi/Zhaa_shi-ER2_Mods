@@ -965,54 +965,78 @@ internal static class GodViewController
 	/// <summary>0.7.57：把当前选中 Soldier[] 并入按选中成员多数决定的目标小队。</summary>
 	private static void MergeSelectedToRts()
 	{
-		// 0.8.1 合并语义：
+		// 0.9.14 合并语义：
 		//  - 只选步兵：单队 → 并入当前激活 RTS 组（须为步兵队）；跨队 → 多数队吸收少数队
-		//  - 选了载具车组：车组即合并目标——选中步兵并入该车组（上限 12，超员留下）。
-		//    车组成员绝不会被移出车组（破坏 squadInside 结构），所以"并方向"永远是步兵→车组。
+		//  - 选了载具：第一辆车的车组为合并目标——选中步兵与其余车组成员全部并入目标车组
+		//    （上限 12，超员留下）；被吸收车组的车辆 squadInside 同步改写，合并后照常驾驶。
 		List<Soldier> units = GetSelectedInfantry();
 		List<Squad> crews = GetSelectedVehicleCrews();
-		if (units.Count == 0)
+		if (units.Count == 0 && crews.Count == 0)
 		{
-			cmdFlash = crews.Count > 0 ? Ui.Tr("没有可并入车组的步兵") : Ui.Tr("先选中要合并的步兵");
-			cmdFlashUntil = Time.unscaledTime + 2f;
+			cmdFlash = Ui.Tr("先选中要合并的步兵"); cmdFlashUntil = Time.unscaledTime + 2f;
 			return;
 		}
-		Dictionary<long, Squad> tally = new Dictionary<long, Squad>();
-		Dictionary<long, int> cnt = new Dictionary<long, int>();
-		foreach (Soldier u in units)
-		{
-			try
-			{
-				Squad q = u.joinedSquad;
-				if (q == null) continue;
-				long k = (long)q.Pointer;
-				if (!tally.ContainsKey(k)) { tally[k] = q; cnt[k] = 0; }
-				cnt[k]++;
-			}
-			catch { }
-		}
+		int moved = 0, skip = 0, overflow = 0;
 		Squad target = null; int best = 0;
-		foreach (var kv in cnt)
-		{
-			if (kv.Value > best) { best = kv.Value; target = tally[kv.Key]; }
-		}
+		List<Vehicle> repointVehicles = new List<Vehicle>();
 		if (crews.Count > 0)
 		{
-			// 选了载具：车组即目标（用户场景：步兵+坦克 → 合成一队）
+			// 车组合并：目标=第一辆车的车组；其余车组成员全部并入（坦克+坦克场景）
 			target = crews[0];
 			best = AliveCount(target);
+			int cap = 12 - best;
+			for (int ci = 1; ci < crews.Count; ci++)
+			{
+				Squad csq = crews[ci];
+				if (csq == null) continue;
+				int c = 0; try { c = csq.CountMembers; } catch { }
+				for (int i = 0; i < c; i++)
+				{
+					Soldier m = null;
+					try { m = csq.GetMemberClamped(i); } catch { }
+					if (m == null || !m.IsAlive) continue;
+					if (cap <= 0) { overflow++; continue; }
+					Vehicle vIn = null;
+					try { vIn = m.GetComponentInParent<Vehicle>(); } catch { }
+					if (AddInfantryToSquadTo(m, target))
+					{
+						moved++; cap--;
+						try { if (vIn != null && vIn.transform != null && !repointVehicles.Contains(vIn)) repointVehicles.Add(vIn); } catch { }
+					}
+				}
+			}
 		}
-		else if (cnt.Count == 1 && rtsSquad != null && target != null
-			&& (long)rtsSquad.Pointer != (long)target.Pointer && AliveCount(rtsSquad) > 0
-			&& VehicleOfCrew(rtsSquad) == null)
+		else
 		{
-			// 0.7.99：单队选择并入当前激活 RTS 组（多数语义下目标=自己=0 人合并）
-			target = rtsSquad;
-			best = AliveCount(target);
+			Dictionary<long, Squad> tally = new Dictionary<long, Squad>();
+			Dictionary<long, int> cnt = new Dictionary<long, int>();
+			foreach (Soldier u in units)
+			{
+				try
+				{
+					Squad q = u.joinedSquad;
+					if (q == null) continue;
+					long k = (long)q.Pointer;
+					if (!tally.ContainsKey(k)) { tally[k] = q; cnt[k] = 0; }
+					cnt[k]++;
+				}
+				catch { }
+			}
+			foreach (var kv in cnt)
+			{
+				if (kv.Value > best) { best = kv.Value; target = tally[kv.Key]; }
+			}
+			if (cnt.Count == 1 && rtsSquad != null && target != null
+				&& (long)rtsSquad.Pointer != (long)target.Pointer && AliveCount(rtsSquad) > 0
+				&& VehicleOfCrew(rtsSquad) == null)
+			{
+				// 0.7.99：单队选择并入当前激活 RTS 组（多数语义下目标=自己=0 人合并）
+				target = rtsSquad;
+				best = AliveCount(target);
+			}
 		}
 		if (target == null) { cmdFlash = Ui.Tr("选中单位没有所属小队"); cmdFlashUntil = Time.unscaledTime + 2f; return; }
-		int cap = 12 - AliveCount(target);
-		int moved = 0, skip = 0, overflow = 0;
+		int cap2 = 12 - AliveCount(target);
 		foreach (Soldier u in units)
 		{
 			if (u == null || !u.IsAlive || !IsInfantry(u)) continue;
@@ -1020,8 +1044,8 @@ internal static class GodViewController
 			{
 				Squad cur = u.joinedSquad;
 				if (cur != null && (long)cur.Pointer == (long)target.Pointer) { skip++; continue; }
-				if (cap <= 0) { overflow++; continue; }
-				if (AddInfantryToSquadTo(u, target)) { moved++; cap--; }
+				if (cap2 <= 0) { overflow++; continue; }
+				if (AddInfantryToSquadTo(u, target)) { moved++; cap2--; }
 			}
 			catch { }
 		}
@@ -1029,17 +1053,32 @@ internal static class GodViewController
 		{
 			rtsSquad = target;
 			rtsSquadSet.Add((long)target.Pointer);
+			// 被吸收车组的车辆 squadInside 同步改写（合并后照常驾驶）
+			foreach (Vehicle v in repointVehicles)
+			{
+				try
+				{
+					AIVehicle ai = v.GetComponent<AIVehicle>();
+					if (ai == null) ai = v.GetComponentInChildren<AIVehicle>();
+					if (ai != null) ai.squadInside = target;
+				}
+				catch { }
+			}
 		}
-		string tgtDesc = VehicleOfCrew(target) != null ? "车组" : "步兵队";
+		string tgtDesc = VehicleOfCrew(target) != null ? Ui.Tr("车组") : Ui.Tr("步兵队");
 		if (moved == 0)
 		{
 			cmdFlash = Ui.Tr("无可合并（选中单位已在同一小队）"); cmdFlashUntil = Time.unscaledTime + 2f;
 			SquadCmdLogic.Log("[Merge] 收编 入队=0 已在队=" + skip + " 目标=0x" + ((long)target.Pointer).ToString("X"));
 			return;
 		}
-		cmdFlash = string.Format(Ui.Tr("合并 → {0} 人入{1}"), moved, tgtDesc) + (skip > 0 ? Ui.Tr("，已在队 ") + skip : "") + (overflow > 0 ? Ui.Tr("，超员留下 ") + overflow : "");
+		try { if (!selVehicles.Contains(target)) selVehicles.Add(target); } catch { }
+		cmdFlash = string.Format(Ui.Tr("合并 → {0} 人入{1}"), moved, tgtDesc)
+			+ (repointVehicles.Count > 0 ? string.Format(Ui.Tr("，{0} 辆车同队"), repointVehicles.Count) : "")
+			+ (skip > 0 ? Ui.Tr("，已在队 ") + skip : "")
+			+ (overflow > 0 ? Ui.Tr("，超员留下 ") + overflow : "");
 		cmdFlashUntil = Time.unscaledTime + 2.5f;
-		SquadCmdLogic.LogAlways("[Merge] 收编 入队=" + moved + " 已在队=" + skip + " 超员=" + overflow + " 目标=" + tgtDesc + "=0x" + ((long)target.Pointer).ToString("X") + " 目标人数=" + best);
+		SquadCmdLogic.LogAlways("[Merge] 收编 入队=" + moved + " 已在队=" + skip + " 超员=" + overflow + " 目标=" + tgtDesc + "=0x" + ((long)target.Pointer).ToString("X") + " 同队车辆=" + repointVehicles.Count);
 	}
 
 	/// <summary>
@@ -1216,7 +1255,6 @@ internal static class GodViewController
 		if (Time.unscaledTime < obsNext) return;
 		obsNext = Time.unscaledTime + 1f;
 		// 0.9.11：每周期重申行军压制（防原生任务系统回写恢复索敌/找掩护）
-		HashSet<long> doneSq = new HashSet<long>();
 		foreach (Soldier s in obsNoEngage)
 		{
 			try
@@ -1225,9 +1263,6 @@ internal static class GodViewController
 				AiParams ap = new Lua_Soldier(s).getAiParams();
 				ap.allowCheckForEnemies(false);
 				ap.allowFindCoverWhenSuppressed(false);
-				// 0.9.12：控制点 2——受控小队任务置空（防班长例程/战役任务覆盖行军）
-				Squad sq = s.joinedSquad;
-				if (sq != null && doneSq.Add((long)sq.Pointer)) sq.currentTask = null;
 			}
 			catch { }
 		}
@@ -1490,6 +1525,7 @@ internal static class GodViewController
 	private static int BoardVehicle(Vehicle veh)
 	{
 		if (veh == null) return 0;
+		ClearMoveObservation(); // 0.9.14：上车是新命令——清掉行军压制/任务置空的残留（否则登车后无法驾驶）
 		List<Soldier> units = GetSelectedInfantry();
 		if (units.Count == 0)
 		{
