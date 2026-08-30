@@ -1,4 +1,4 @@
-ER2 Squad Command v0.7.98
+ER2 Squad Command v0.7.99
 ========================
 
 一款给 Easy Red 2 增加「RTS 上帝视角小队指挥」的 BepInEx 插件，鼠标操作逻辑参照《地狱之门：东部前线》。
@@ -35,7 +35,7 @@ ER2 Squad Command v0.7.98
 【安装】
 1. 确保已安装 BepInEx（IL2CPP 版）到游戏根目录。
 2. 把 ER2_SquadCommand.dll 放进 游戏根目录\BepInEx\plugins\。
-3. 启动游戏，日志出现 "Loading [ER2 Squad Command 0.7.98]" 即成功。
+3. 启动游戏，日志出现 "Loading [ER2 Squad Command 0.7.99]" 即成功。
 
 【已知说明】
 · 上帝视角进入时会解除本阵营全部小队的原生任务拉取；接管时会自动关闭原生"选择队友"残留面板，避免提示/背景反复弹出。

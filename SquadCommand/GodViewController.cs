@@ -713,7 +713,8 @@ internal static class GodViewController
 	private static void ClearFollow(string reason, bool logIt)
 	{
 		// 这里只清理本 Mod 的 RTS 状态；不向原生 Squad 发送取消/替换订单，
-		// 也不触碰 FPS 模式下的原生 AI。
+		// 也不触碰 FPS 模式下的原生 AI。新命令经此处覆盖旧的完成度观测。
+		ClearMoveObservation();
 		pendVeh = null;
 		pendUntil = -10f;
 		pendNextRetry = -10f;
@@ -732,9 +733,18 @@ internal static class GodViewController
 	private static float pendingBoardUntil;
 	private static float pendingBoardNext;
 
+	// ===== 0.7.99：移动完成度观测（纯观察——只统计到位数，不发任何修正命令） =====
+	private static Vector3 obsTarget;
+	private static readonly List<Soldier> obsUnits = new List<Soldier>();
+	private static float obsUntil = -10f;
+	private static float obsNext = -10f;
+	internal static int ObsArrived; // HUD 进度行用
+	internal static int ObsTotal;
+
 	/// <summary>标记后：选中单位按所属原生小队编组冲锋（Squad.Charge）向目标推进接战，全原生无修正状态机。</summary>
 	private static void BeginMarkAdvance()
 	{
+		ClearMoveObservation(); // 标记覆盖旧的移动观测
 		persistentMarkUnits.Clear();
 		persistentMarkVehicles.Clear();
 		foreach (Soldier s in GetSelectedInfantry())
@@ -788,6 +798,7 @@ internal static class GodViewController
 	{
 		if (unit == null) return;
 		try { persistentMarkUnits.RemoveAll(s => s == null || s.Pointer == unit.Pointer); } catch { }
+		try { obsUnits.RemoveAll(s => s == null || s.Pointer == unit.Pointer); } catch { } // 接管单位不再计入移动完成度
 		// 接管车内单位时，连同该单位所在的持久载具标记一起摘除，
 		// 避免 FPS 接管后仍由本 Mod 改写玩家载具的目标。
 		try
@@ -900,6 +911,15 @@ internal static class GodViewController
 		{
 			if (kv.Value > best) { best = kv.Value; target = tally[kv.Key]; }
 		}
+		// 0.7.99：只选了一个小队时，并入"当前激活 RTS 组"（0.7.57 语义）——
+		// 旧多数语义下目标=选中队自己，合并 0 人（用户视角=按钮失效）。
+		// 多数语义仅用于跨队选择（0.7.61：避免取消选择后的残留 rtsSquad 劫持合并）。
+		if (cnt.Count == 1 && rtsSquad != null && target != null
+			&& (long)rtsSquad.Pointer != (long)target.Pointer && AliveCount(rtsSquad) > 0)
+		{
+			target = rtsSquad;
+			best = AliveCount(target);
+		}
 		if (target == null) { cmdFlash = "选中单位没有所属小队"; cmdFlashUntil = Time.unscaledTime + 2f; return; }
 		int moved = 0, skip = 0;
 		foreach (Soldier u in units)
@@ -915,9 +935,15 @@ internal static class GodViewController
 			catch { }
 		}
 		if (rtsSquad != null && (long)target.Pointer == (long)rtsSquad.Pointer) { /* 目标=激活组，无需变更 */ }
-		cmdFlash = "合并 → " + moved + " 人入目标队（" + best + " 人队）" + (skip > 0 ? "（已在队 " + skip + "）" : "");
+		if (moved == 0)
+		{
+			cmdFlash = "无可合并（选中单位已在同一小队）"; cmdFlashUntil = Time.unscaledTime + 2f;
+			SquadCmdLogic.Log("[Merge] 收编 入队=0 已在队=" + skip + " 目标=0x" + ((long)target.Pointer).ToString("X"));
+			return;
+		}
+		cmdFlash = "合并 → " + moved + " 人入目标队（" + best + " 人队）" + (skip > 0 ? "，已在队 " + skip : "");
 		cmdFlashUntil = Time.unscaledTime + 2.5f;
-		SquadCmdLogic.Log("[Merge] 收编 入队=" + moved + " 已在队=" + skip + " 目标=0x" + ((long)target.Pointer).ToString("X") + " 目标人数=" + best);
+		SquadCmdLogic.LogAlways("[Merge] 收编 入队=" + moved + " 已在队=" + skip + " 目标=0x" + ((long)target.Pointer).ToString("X") + " 目标人数=" + best);
 	}
 
 	/// <summary>0.7.46：分队后立即读取载具 AIVehicle.squadInside，验证原生是否跟随新 Squad。</summary>
@@ -959,6 +985,57 @@ internal static class GodViewController
 		}
 		// 无载具选中时也留一条（纯步兵分队场景）
 		if (selVehicleRefs.Count == 0) SquadCmdLogic.Log("[SplitCheck] 无选中载具（纯步兵分队）");
+	}
+
+	/// <summary>0.7.99：下达移动后登记完成度观测（纯观察，不动 AI）。</summary>
+	private static void RegisterMoveObservation(Vector3 point, List<Soldier> units)
+	{
+		obsTarget = point;
+		obsUnits.Clear();
+		if (units != null) foreach (Soldier s in units) if (s != null && s.IsAlive) obsUnits.Add(s);
+		obsUntil = Time.unscaledTime + 45f;
+		obsNext = Time.unscaledTime + 1f;
+		ObsTotal = obsUnits.Count;
+		ObsArrived = 0;
+	}
+
+	private static void ClearMoveObservation()
+	{
+		obsUnits.Clear();
+		obsUntil = -10f;
+		ObsTotal = 0;
+		ObsArrived = 0;
+	}
+
+	/// <summary>每 1s 统计到位数；全员到位输出完成日志并清空，45s 超时静默放弃。不发任何修正命令。</summary>
+	private static void ObsMoveTick()
+	{
+		if (obsUnits.Count == 0) return;
+		if (Time.unscaledTime > obsUntil) { ClearMoveObservation(); return; }
+		if (Time.unscaledTime < obsNext) return;
+		obsNext = Time.unscaledTime + 1f;
+		int alive = 0, arrived = 0;
+		float r2 = Plugin.radius.Value * Plugin.radius.Value;
+		for (int i = obsUnits.Count - 1; i >= 0; i--)
+		{
+			Soldier s = obsUnits[i];
+			try
+			{
+				if (s == null || !s.IsAlive || s.transform == null) { obsUnits.RemoveAt(i); continue; }
+				alive++;
+				if ((s.transform.position - obsTarget).sqrMagnitude <= r2) arrived++;
+			}
+			catch { obsUnits.RemoveAt(i); }
+		}
+		ObsArrived = arrived;
+		ObsTotal = alive;
+		if (alive == 0) { ClearMoveObservation(); return; }
+		if (arrived >= alive)
+		{
+			SquadCmdLogic.LogAlways("[SquadCmd] MOVE 完成 " + arrived + " 单位");
+			cmdFlash = "到达 → " + arrived + " 单位"; cmdFlashUntil = Time.unscaledTime + 2.5f;
+			ClearMoveObservation();
+		}
 	}
 
 	private static void BoardPendingTick()
@@ -1722,6 +1799,7 @@ internal static class GodViewController
 		try
 		{
 			PruneMark();
+			ObsMoveTick();
 			BoardPendingTick();
 			VehiclePendingTick();
 		}
@@ -2517,6 +2595,16 @@ internal static class GodViewController
 				GUI.color = Color.white;
 			}
 
+			// 0.7.99：移动完成度进度行（纯观察统计，ObsMoveTick 维护）
+			if (ObsTotal > 0)
+			{
+				GUI.color = new Color(0.05f, 0.05f, 0.05f, 0.55f);
+				GUI.DrawTexture(new Rect(8f, 66f, 320f, 22f), Texture2D.whiteTexture);
+				GUI.color = Color.white;
+				GUI.Label(new Rect(14f, 65f, 320f, 22f), "移动 → " + ObsArrived + "/" + ObsTotal + " 已到位", st);
+				GUI.color = Color.white;
+			}
+
 			// 顶部控制按钮
 			if (HasSelection)
 			{
@@ -3014,6 +3102,7 @@ internal static class GodViewController
 		{
 			driven += DriveVehicleTo(vv, point);
 		}
+		if (movedInf > 0) RegisterMoveObservation(point, infantry);
 		lastMovePoint = point;
 		RecordCmdTarget(point);
 		cmdFlash = "移动 → 步兵 " + movedInf + " + 载具 " + driven; cmdFlashUntil = Time.unscaledTime + 3f;
@@ -3221,7 +3310,12 @@ internal static class GodViewController
 		bool hasSelVeh = selVehicles.Count > 0;
 		PruneVehicleRefs();
 		bool occupiedSel = AnySelRefOccupied(); // 0.7.43：实时占用判定（无缓存无滞后）
-		WheelItemEnabled[0] = ((veh != null || sol != null) && hasSelInf) || (veh != null && !occupiedSel); // 上车：有步兵可选，或选中车已全空
+		// 0.7.99：上车可用还需目标车有空位——满员车不再显示可用
+		Vehicle seatVeh = veh;
+		if (seatVeh == null && sol != null) { try { seatVeh = sol.GetComponentInParent<Vehicle>(); } catch { } }
+		int emptySeats = 99;
+		if (seatVeh != null) { try { emptySeats = new Lua_Vehicle(seatVeh).countEmptySeats(); } catch { } }
+		WheelItemEnabled[0] = emptySeats > 0 && (((veh != null || sol != null) && hasSelInf) || (veh != null && !occupiedSel)); // 上车：有空位，且有步兵可选或选中车已全空
 		WheelItemEnabled[1] = occupiedSel; // 下车：选中的车里确有乘员
 		// 修理：目标载具可修（原生 CanBeRepaired=部件损坏）且有 RTS 建队步兵接单
 		// （单击虚拟选择没有受控小队——原生 Squad 修理订单会牵动未选中队友，故不启用）
