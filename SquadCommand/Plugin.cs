@@ -20,23 +20,20 @@ public class Plugin : BasePlugin
 	internal static ConfigEntry<bool> debugLog;
 	internal static ConfigEntry<float> m7Interval;
 	internal static ConfigEntry<KeyCode> godKey;
-	internal static ConfigEntry<float> markDuration;
 
 	public override void Load()
 	{
 		ModLog = Log;
 
 		enabled = Config.Bind("General", "enabled", true, "主开关。");
-		radius = Config.Bind("General", "radius", 8f, new ConfigDescription("moveTo 半径（米）。", new AcceptableValueRange<float>(1f, 60f)));
-		trackSeconds = Config.Bind("General", "trackSeconds", 14f, new ConfigDescription("移动后追踪小队中心点的秒数（被动监控，不重发移动命令）。", new AcceptableValueRange<float>(2f, 45f)));
-		debugLog = Config.Bind("General", "debugLog", false, new ConfigDescription("诊断日志开关。关闭后 [SquadCmd]/[BoardPending] 等诊断日志静默。"));
-		m7Interval = Config.Bind("General", "m7Interval", 2f, new ConfigDescription("M7 移动修正检查间隔（秒）。越小越及时，过大则被打断后恢复慢。", new AcceptableValueRange<float>(0.5f, 10f)));
+		radius = Config.Bind("Control", "moveRadius", 8f, new ConfigDescription("移动到达判定半径（米）。快速移动(双击右键)时为 30 米。", new AcceptableValueRange<float>(1f, 60f)));
+		trackSeconds = Config.Bind("Control", "moveTimeout", 14f, new ConfigDescription("移动任务超时（秒）：超时后停止修正并输出路径质量报告。", new AcceptableValueRange<float>(2f, 45f)));
+		debugLog = Config.Bind("Debug", "debugLog", false, new ConfigDescription("调试日志开关（发布版保持关闭）。开启后输出全部指挥/登车/标记诊断日志，用于问题排查。"));
 		godKey = Config.Bind("General", "godKey", KeyCode.F9, "上帝视角开关（仅进入）。退出＝选中小队后点顶部[控制该小队]随机接管一人；全军覆没时按键紧急退出。空格＝暂停/继续世界。");
-		markDuration = Config.Bind("General", "markDuration", 20f, new ConfigDescription("标记敌军集火的持续秒数：期间选中的本阵营单位会把被标记目标当作最佳可见敌人优先攻击（走原生目标选择，替代从未生效的 forceTarget）。", new AcceptableValueRange<float>(5f, 60f)));
 
 		new Harmony("er2.squadcommand").PatchAll(typeof(Plugin).Assembly);
 		FrameEndRunner.Ensure();
-		ModLog.LogInfo("ER2 Squad Command 0.7.86 loaded. godKey=" + godKey.Value + " markDuration=" + markDuration.Value);
+		ModLog.LogInfo("ER2 Squad Command 0.7.87 loaded. godKey=" + godKey.Value);
 	}
 }
 
