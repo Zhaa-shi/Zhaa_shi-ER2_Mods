@@ -9,7 +9,7 @@ using UnityEngine;
 
 namespace ER2SquadCommand;
 
-[BepInPlugin("er2.squadcommand", "ER2 Squad Command", "0.7.96")]
+[BepInPlugin("er2.squadcommand", "ER2 Squad Command", "0.7.97")]
 public class Plugin : BasePlugin
 {
 	internal static ManualLogSource ModLog;
@@ -26,7 +26,7 @@ public class Plugin : BasePlugin
 		ModLog = Log;
 
 		enabled = Config.Bind("General", "enabled", true, "主开关。");
-		radius = Config.Bind("Control", "moveRadius", 8f, new ConfigDescription("移动到达判定半径（米）。快速移动(双击右键)时为 30 米。", new AcceptableValueRange<float>(1f, 60f)));
+		radius = Config.Bind("Control", "moveRadius", 8f, new ConfigDescription("移动到达判定半径（米）；双击右键「前往并防守」的防守半径同用此值。", new AcceptableValueRange<float>(1f, 60f)));
 		trackSeconds = Config.Bind("Control", "moveTimeout", 14f, new ConfigDescription("移动任务超时（秒）：超时后停止修正并输出路径质量报告。", new AcceptableValueRange<float>(2f, 45f)));
 		m7Interval = Config.Bind("Control", "moveCheckInterval", 2f, new ConfigDescription("移动任务检查间隔（秒）。只在单位停滞时修正，不会每帧重发命令。", new AcceptableValueRange<float>(0.25f, 5f)));
 		debugLog = Config.Bind("Debug", "debugLog", false, new ConfigDescription("调试日志开关（发布版保持关闭）。开启后输出全部指挥/登车/标记诊断日志，用于问题排查。"));
@@ -34,7 +34,7 @@ public class Plugin : BasePlugin
 
 		new Harmony("er2.squadcommand").PatchAll(typeof(Plugin).Assembly);
 		FrameEndRunner.Ensure();
-		ModLog.LogInfo("ER2 Squad Command 0.7.96 loaded. godKey=" + godKey.Value);
+		ModLog.LogInfo("ER2 Squad Command 0.7.97 loaded. godKey=" + godKey.Value);
 	}
 }
 

@@ -7,7 +7,7 @@ namespace ER2SquadCommand;
 /// <summary>
 /// 上帝视角 v0.7.93（RTS 指挥，RTS/FPS 共存版）。
 ///   左键：单击选友军（临时指挥，不建队）/拖框/双击选队/空白清选/Shift 追加
-///   右键短按：空白=移动(M7)｜敌军=叛徒标记+推进｜友军载具/车内兵=交互环｜徒步友军=视为地面移动（合并已上移顶栏）
+///   右键短按：空白=移动(M7)｜敌军=集火标记+推进｜友军载具/车内兵=交互环｜徒步友军=视为地面移动（合并已上移顶栏）；双击=原生前往并防守(HoldArea)
 ///   右键长按 0.35s（仅按在空地/无效目标时）：单位环（站起[resetPose]/蹲下/趴下[setPose+还原名单]/停止）；按在单位上=短按指令，不弹环
 ///   交互环：上车（成功后转选车组）/下车/修理（原生 OrderRepairVehicle）；合并只保留顶栏入口（0.7.96 移出轮盘）
 ///   顶栏按钮：控制该小队 / 分队（显式新建组）/ 合并（并入当前激活 RTS 组）
@@ -785,8 +785,8 @@ internal static class GodViewController
 		};
 		RecordCmdTarget(target.transform.position);
 		BeginMarkAdvance();
-		cmdFlash = "叛徒标记 → " + mark.Name + "（持续到死亡/失控）"; cmdFlashUntil = Time.unscaledTime + 3f;
-		SquadCmdLogic.LogAlways("[SquadCmd] 叛徒标记(持久) " + mark.Name + " 阵营=" + fac);
+		cmdFlash = "集火标记 → " + mark.Name + "（持续到死亡/失控）"; cmdFlashUntil = Time.unscaledTime + 3f;
+		SquadCmdLogic.LogAlways("[SquadCmd] 集火标记(持久) " + mark.Name + " 阵营=" + fac);
 	}
 
 	private static void MarkEnemyVehicle(Vehicle veh)
@@ -815,8 +815,8 @@ internal static class GodViewController
 		};
 		RecordCmdTarget(veh.transform.position);
 		BeginMarkAdvance();
-		cmdFlash = "叛徒标记 → " + mark.Name + "（持续到死亡/失控）"; cmdFlashUntil = Time.unscaledTime + 3f;
-		SquadCmdLogic.LogAlways("[SquadCmd] 叛徒标记(持久) 载具 " + veh.name);
+		cmdFlash = "集火标记 → " + mark.Name + "（持续到死亡/失控）"; cmdFlashUntil = Time.unscaledTime + 3f;
+		SquadCmdLogic.LogAlways("[SquadCmd] 集火标记(持久) 载具 " + veh.name);
 	}
 
 	/// <summary>标记任意 Spottable（中立物品/设施）：标谁打谁。</summary>
@@ -924,10 +924,6 @@ internal static class GodViewController
 	private static List<Soldier> pendingBoardUnits;
 	private static float pendingBoardUntil;
 	private static float pendingBoardNext;
-	private static HashSet<long> pendingBoardIssued = new HashSet<long>();
-	private static readonly Dictionary<long, float> issuedAt = new Dictionary<long, float>();
-	private static readonly Dictionary<long, float> guideAt = new Dictionary<long, float>();
-	private static Vector3? lastGuideVehPos;
 
 	/// <summary>标记后：选中单位向目标推进（借 M7 修正循环），到达交战距离即停由原生接战。</summary>
 	private static void BeginMarkAdvance()
@@ -1181,29 +1177,10 @@ internal static class GodViewController
 		try
 		{
 			if (veh.transform == null) { CancelBoardPending("载具销毁"); return; }
-			if (Time.unscaledTime > pendingBoardUntil)
-			{
-				foreach (Soldier bs in pendingBoardUnits)
-				{
-					try
-					{
-						if (bs == null || !bs.IsAlive) continue;
-						// 0.7.96：超时强制=对未在车成员一律重发 boardVehicle（旧逻辑跳过已发者，
-						// 卡在引导循环里的单位拿不到最后一发强制令）
-						new Lua_Soldier(bs).boardVehicle(new Lua_Vehicle(veh));
-					}
-					catch { }
-				}
-				FinishBoardPending("超时强制登车");
-				return;
-			}
 			if (Time.unscaledTime < pendingBoardNext) return;
 			pendingBoardNext = Time.unscaledTime + 0.5f;
-			// 0.7.69：引导点只在车辆位移>2m 时刷新（固定目标不重发=不卡顿）
-			bool refresh = !lastGuideVehPos.HasValue
-				|| (veh.transform.position - lastGuideVehPos.Value).sqrMagnitude > 4f;
-			if (refresh) lastGuideVehPos = veh.transform.position;
-			// 0.7.74：车内成员实时集合（完成判据=全员真实在车，而非"已发命令"）
+			// 0.7.97：纯观察。登车令已在下令瞬间全量发出（全原生），这里只做完成判定与超时补发，
+			// 不再发任何接近引导/分段命令（Mod 自建移动编排已整体移除）。
 			HashSet<long> inCar = new HashSet<long>();
 			try
 			{
@@ -1211,53 +1188,6 @@ internal static class GodViewController
 				if (occ != null) for (int i = 0; i < occ.Length; i++) if (occ[i] != null && occ[i].IsAlive) inCar.Add((long)occ[i].Pointer);
 			}
 			catch { }
-			foreach (Soldier bs in pendingBoardUnits)
-			{
-				try
-				{
-					if (bs == null || !bs.IsAlive) continue;
-					long k = (long)bs.Pointer;
-					if (inCar.Contains(k)) continue; // 已真实在车
-					// 0.7.82：0.7.80 的选择门已删——登车途中乘员必然"不在选择中"（换选/清选是常态），
-					// 玩家改令由 MoveCommandTo 摘除机制处理。
-					float d = (bs.transform.position - veh.transform.position).magnitude;
-					// 0.7.96 核心修复：boardVehicle 一经发出，移动指挥权完全交给原生登车链
-					// （分散→绕车门→进车）。原生登车路线会让欧氏距离暂时拉回 10m 外，
-					// 旧逻辑此时重发接近引导，把原生登车反复打断——"走到车边不上车"根因。
-					if (pendingBoardIssued.Contains(k))
-					{
-						// 已发登车令：只做 8s 无进展重发（原生登车被打断/静默失败），任何距离都允许
-						if (issuedAt.TryGetValue(k, out float t0) && Time.unscaledTime - t0 >= 8f)
-						{
-							issuedAt[k] = Time.unscaledTime;
-							new Lua_Soldier(bs).boardVehicle(new Lua_Vehicle(veh));
-							SquadCmdLogic.LogAlways("[BoardPending] boardVehicle 重发 " + SafeName(bs));
-						}
-						continue;
-					}
-					if (d < 10f)
-					{
-						// 阶段2：首次近距离登车
-						issuedAt[k] = Time.unscaledTime;
-						pendingBoardIssued.Add(k);
-						new Lua_Soldier(bs).boardVehicle(new Lua_Vehicle(veh));
-						SquadCmdLogic.LogAlways("[BoardPending] boardVehicle " + SafeName(bs));
-					}
-					else
-					{
-						// 阶段1：接近引导（仅限从未发过登车令的单位）。0.7.76：只在 车移动>2m
-						// 或 距上次引导>3s 时发——moveTo 是持久命令，高频重发会打断原生移动
-						guideAt.TryGetValue(k, out float g0);
-						if (refresh || Time.unscaledTime - g0 > 3f)
-						{
-							guideAt[k] = Time.unscaledTime;
-							Vector3 p = NearSideApproachPoint(bs, veh);
-							new Lua_Soldier(bs).moveTo(p);
-						}
-					}
-				}
-				catch { } // 单兵异常跳过，不取消整批登车
-			}
 			// 完成判据：全部存活乘员真实在车
 			bool allIn = true;
 			foreach (Soldier bs in pendingBoardUnits)
@@ -1265,6 +1195,19 @@ internal static class GodViewController
 				try { if (bs != null && bs.IsAlive && !inCar.Contains((long)bs.Pointer)) { allIn = false; break; } } catch { }
 			}
 			if (allIn) { FinishBoardPending("全员在车"); return; }
+			if (Time.unscaledTime > pendingBoardUntil)
+			{
+				foreach (Soldier bs in pendingBoardUnits)
+				{
+					try
+					{
+						if (bs == null || !bs.IsAlive || inCar.Contains((long)bs.Pointer)) continue;
+						new Lua_Soldier(bs).boardVehicle(new Lua_Vehicle(veh));
+					}
+					catch { }
+				}
+				FinishBoardPending("超时补发登车令");
+			}
 		}
 		catch { } // 0.7.69：单轮异常跳过本轮，不取消整批登车
 	}
@@ -1290,18 +1233,6 @@ internal static class GodViewController
 		}
 		catch { }
 		pendingBoardVeh = null; pendingBoardSq = null; pendingBoardUnits = null;
-		try { pendingBoardIssued.Clear(); } catch { }
-	}
-
-	/// <summary>0.7.72：登车接近点=士兵当前方位一侧距车 4m 处（就近接近；太近会落在车体碰撞内引发寻路抖动）。</summary>
-	private static Vector3 NearSideApproachPoint(Soldier s, Vehicle veh)
-	{
-		Vector3 vp = veh.transform.position;
-		Vector3 sp = s.transform.position;
-		Vector3 dir = sp - vp; dir.y = 0f;
-		if (dir.sqrMagnitude < 0.01f) dir = veh.transform.forward; // 士兵恰在车上：用车头方向
-		dir.Normalize();
-		return vp + dir * 4f;
 	}
 
 	private static void CancelBoardPending(string reason)
@@ -1312,7 +1243,6 @@ internal static class GodViewController
 		}
 		catch { }
 		pendingBoardVeh = null; pendingBoardSq = null; pendingBoardUnits = null;
-		try { pendingBoardIssued.Clear(); } catch { }
 	}
 
 	/// <summary>0.7.48：分队同步窗口的自动重试（最多 3s；收敛后把同一目标补发给新 Squad 原生命令）。</summary>
@@ -1449,10 +1379,11 @@ internal static class GodViewController
 		return false;
 	}
 
-	/// <summary>上车：优先小队级 boardVehicle，失败逐员兜底。返回成功数。</summary>
 	/// <summary>
-	/// 上车：逐员 boardVehicle，按空位数限流（解决"选择人数超过载具上限无法上车"）。
-	/// 先解锁载具；小队级上车在自建小队上不稳定（用户实测进不去），改为逐员为主。
+	/// 上车（0.7.97 全原生）：下令瞬间对空位内的步兵逐员发出 boardVehicle，
+	/// 走位/绕车门/入座全部由原生登车任务完成——Mod 不再发任何接近引导或分段命令
+	/// （自建两段式与原生登车双源竞争，是"走到车边不上车、要再框选一次"的根因）。
+	/// 超员者不下令，保持原生行为。同帧转队/登记（0.7.85 语义）只负责归属与驾驶资格。
 	/// </summary>
 	private static int BoardVehicle(Vehicle veh)
 	{
@@ -1466,7 +1397,6 @@ internal static class GodViewController
 		Lua_Vehicle lv = new Lua_Vehicle(veh);
 		// 解锁（防止 locked 导致上车静默失败）
 		try { if (veh.IsLocked()) veh.SetLocked(false); } catch { }
-		// 空位数
 		int seats = 99;
 		try { seats = lv.countEmptySeats(); } catch { }
 		if (seats <= 0)
@@ -1474,98 +1404,39 @@ internal static class GodViewController
 			cmdFlash = "载具已满"; cmdFlashUntil = Time.unscaledTime + 2f;
 			return 0;
 		}
-		// 0.7.70 关键修复：此处【不发】boardVehicle——0.7.67 重构遗漏了删除本调用，
-		// 导致原生登车路线（分散→走登车点）与我们的环形接近引导双源竞争（先分散/乱走/到车旁不上车）。
-		// boardVehicle 统一在 BoardPendingTick 阶段2（距车 8m 内）才发出。
-		string extra = "";
-		int n = 0;
-		List<Soldier> overflow = new List<Soldier>(); // 0.7.72：超员落选者——原地停止待命，消除乱走
+		List<Soldier> wait = new List<Soldier>();
 		foreach (Soldier s in units)
 		{
-			if (n >= seats) { overflow.Add(s); continue; }
-			n++;
+			if (wait.Count >= seats) break;
+			if (s != null && s.IsAlive) wait.Add(s);
 		}
-		if (overflow.Count > 0)
+		if (wait.Count == 0) return 0;
+		pendingBoardVeh = veh;
+		pendingBoardSq = CreateNewSquad();
+		pendingBoardUnits = wait;
+		pendingBoardUntil = Time.unscaledTime + 60f; // 全原生走位，距离可能很远
+		// 同帧转队/登记（0.7.85）：乘员此刻已是新队成员、组已获驾驶资格
+		int moved = 0;
+		foreach (Soldier bs in wait)
 		{
-			// 0.7.73：落选者自动编入"待命分队"——脱离原队 S 的跟随/任务链（乱走根因），
-			// 原地待命；玩家之后可正常选中他们（已在 rtsSquadSet，走原生链移动/合并）
-			Squad waitSq = CreateNewSquad();
-			if (waitSq != null)
-			{
-				int moved = 0;
-				foreach (Soldier s in overflow)
-				{
-					try { if (AddInfantryToSquadTo(s, waitSq)) moved++; } catch { }
-				}
-				rtsSquadSet.Add((long)waitSq.Pointer);
-				try { new Lua_Soldier(overflow[0]).stop(); } catch { }
-				SquadCmdLogic.LogAlways("[BoardPending] 待命分队建立 人数=" + moved + " 队=0x" + ((long)waitSq.Pointer).ToString("X") + "（脱离原队跟随链，原地待命）");
-				extra = "，余 " + moved + " 人入待命组";
-			}
-			foreach (Soldier s in overflow)
-			{
-				try { new Lua_Soldier(s).stop(); } catch { }
-			}
+			try { if (AddInfantryToSquadTo(bs, pendingBoardSq)) moved++; } catch { }
 		}
-		// 0.7.67：两段式登车——阶段1 纯步兵直线接近（不与原生登车移动源打架，杜绝"先分散"）；
-		// 阶段2 距车 6m 内才发 boardVehicle（原生立即塞入）。转队/登记在完成后执行。
-		if (n > 0)
+		rtsSquad = pendingBoardSq;
+		rtsSquadSet.Add((long)pendingBoardSq.Pointer);
+		selVehicleRefs.Clear();
+		selVehicles.Add(pendingBoardSq);
+		AddVehicleRef(veh);
+		// 0.7.97：登车令在下令瞬间全量发出，此后移动指挥权完全归原生
+		foreach (Soldier bs in wait)
 		{
-			List<Soldier> wait = new List<Soldier>();
-			int taken2 = 0;
-			foreach (Soldier bs in units)
-			{
-				if (taken2 >= n) break;
-				try { if (bs != null && bs.IsAlive) { wait.Add(bs); taken2++; } } catch { }
-			}
-			pendingBoardVeh = veh;
-			pendingBoardSq = CreateNewSquad();
-			pendingBoardUnits = wait;
-			pendingBoardUntil = Time.unscaledTime + 25f;
-			pendingBoardNext = Time.unscaledTime; // 立即引导一轮
-			// 0.7.85 核心修正：转队/登记与下令【同帧】完成（成员关系与位置无关）——
-			// 乘员此刻已是新队成员、组已获驾驶资格。此前"登车完成后才转队"导致：
-			// 剩人→资格永不生效→驾驶锁死；超员者留在原队→跟随链持续驱动乱走。
-			{
-				int moved = 0;
-				foreach (Soldier bs in wait)
-				{
-					try { if (AddInfantryToSquadTo(bs, pendingBoardSq)) moved++; } catch { }
-				}
-				rtsSquad = pendingBoardSq;
-				rtsSquadSet.Add((long)pendingBoardSq.Pointer);
-				selVehicleRefs.Clear();
-				selVehicles.Add(pendingBoardSq);
-				AddVehicleRef(veh);
-				SquadCmdLogic.LogAlways("[BoardPending] 转队同帧完成 moved=" + moved + " rtsSquad=0x" + ((long)pendingBoardSq.Pointer).ToString("X"));
-			}
-			foreach (Soldier s in wait)
-			{
-				// 0.7.71：接近点=士兵当前方位一侧（就近接近）——不再环形分布，
-				// 远距离不再"向四周扩散"，也不会有人绕到坦克对侧（乱走根因）
-				Vector3 p = NearSideApproachPoint(s, veh);
-				try
-				{
-					SquadCmdLogic.RegisterControlledUnit(s);
-					AiParams ap = new Lua_Soldier(s).getAiParams();
-					try { ap.followCustomSquadOrders(); } catch { }
-					try { ap.followCustomDirectCommands(); } catch { }
-					try { ap.allowMovements(true); } catch { }
-					new Lua_Soldier(s).moveTo(p);
-				}
-				catch { }
-			}
-			extra = "（登车接近中…）";
-			selFlash = Time.unscaledTime + 3f;
-			SquadCmdLogic.Log("[BoardPending] two-stage queued vehicle=" + veh.name + " units=" + wait.Count);
+			try { new Lua_Soldier(bs).boardVehicle(lv); } catch { }
 		}
+		SquadCmdLogic.LogAlways("[BoardPending] 全原生登车令 vehicle=" + veh.name + " 人数=" + wait.Count + " 转队=" + moved);
 		RecordCmdTarget(veh.transform.position);
-		// 保持选择连续性：上车的士兵会被原生移出原小队编入车组，步兵选择会凭空消失——
-		// 这里把选择转换为该车组的载具选择（座位不够时只保留实际上车者）
-		cmdFlash = "上车 → " + n + " 人（登车中…）" + (overflow.Count > 0 ? "，余 " + overflow.Count + " 人原地待命" : "") + extra; cmdFlashUntil = Time.unscaledTime + 3f;
-		SquadCmdLogic.Log("[SquadCmd] 上车发起 " + veh.name + " 人数=" + n + " 空位=" + seats + "（boardVehicle 延迟至阶段2）");
-		RTSTrace("BoardVehicleExit", "vehicle=" + veh.name + " boarded=" + n);
-		return n;
+		// 保持选择连续性：上车的士兵会被原生编入车组，步兵选择会凭空消失——
+		// 这里把选择转换为该车组的载具选择
+		cmdFlash = "上车 → " + wait.Count + " 人（原生登车中…）" + (units.Count > wait.Count ? "，余 " + (units.Count - wait.Count) + " 人未下令" : ""); cmdFlashUntil = Time.unscaledTime + 3f;
+		return wait.Count;
 	}
 
 	/// <summary>
@@ -2398,9 +2269,10 @@ internal static class GodViewController
 				lastRightBlankClickPos = MouseGui();
 				if (dbl && lastMovePoint.HasValue)
 				{
-					// 0.7.77：双击第二击复用第一击目标点，切快速模式。
-					MoveCommandTo(lastMovePoint.Value, true);
-					cmdFlash = "快速移动（同一目标）"; cmdFlashUntil = Time.unscaledTime + 1.5f;
+					// 0.7.97：双击右键=原生「前往并防守」（Squad.HoldArea，同一点第二击升级）——
+					// 每个涉入原生小队一条原生命令，Mod 不再做快速移动/停滞修正编排。
+					IssueNativeHoldArea(lastMovePoint.Value);
+					cmdFlash = "前往并防守（同一目标）"; cmdFlashUntil = Time.unscaledTime + 1.5f;
 				}
 				else
 				{
@@ -3295,6 +3167,35 @@ internal static class GodViewController
 		new Lua_Squad(sq).moveTo(p, Plugin.radius.Value);
 	}
 
+	/// <summary>
+	/// 0.7.97：双击右键=原生「前往并防守」（Squad.HoldArea）。按选中成员所属原生小队分组，
+	/// 每个小队单条原生命令；不建 Mod 侧跟踪/修正状态。载具仍走原生车组订单链。
+	/// </summary>
+	private static void IssueNativeHoldArea(Vector3 point)
+	{
+		if (!Active) return;
+		ClearFollow("前往并防守", false);
+		ClearMark(); // 新命令覆盖旧集火
+		int squads = 0;
+		HashSet<long> done = new HashSet<long>();
+		foreach (Soldier s in GetSelectedInfantry())
+		{
+			try
+			{
+				if (s == null || !s.IsAlive) continue;
+				Squad sq = s.joinedSquad;
+				if (sq == null || !done.Add((long)sq.Pointer)) continue;
+				SquadCmdLogic.RegisterControlledSquad(sq);
+				sq.HoldArea(point, Plugin.radius.Value);
+				squads++;
+			}
+			catch { }
+		}
+		int driven = 0;
+		foreach (Vehicle vv in new List<Vehicle>(selVehicleRefs)) driven += DriveVehicleTo(vv, point);
+		if (squads > 0 || driven > 0) SquadCmdLogic.LogAlways("[SquadCmd] 前往并防守 squads=" + squads + " vehicles=" + driven + " target=" + point.ToString("0.0"));
+	}
+
 	/// <summary>移动指令：选中步兵走 + 选中载具开过去（到点击点，标点就在点击处）。移动会解除跟随。</summary>
 	private static void MoveCommandTo(Vector3 point, bool fast = false)
 	{
@@ -3310,8 +3211,8 @@ internal static class GodViewController
 			}
 		}
 		ClearFollow("下达移动", false);
-		// 0.7.78：玩家新命令优先——把选中的、尚未发出 boardVehicle 的乘员从登车 pending 摘除，
-		// 否则登车引导（阶段1）会持续拉他们回车边，与本次移动命令竞争（原地踏步根因）。
+		// 0.7.78：玩家新命令优先——把选中的乘员从登车 pending 摘除，否则完成判定会一直等待
+		// 他们（本次移动命令已覆盖原生 boardVehicle，他们不会再上车）。
 		if (pendingBoardVeh != null && pendingBoardUnits != null)
 		{
 			List<Soldier> sel = GetSelectedInfantry();
