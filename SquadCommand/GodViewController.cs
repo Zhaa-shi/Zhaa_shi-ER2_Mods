@@ -2052,12 +2052,12 @@ internal static class GodViewController
 		}
 
 		// 输入先处理，避免相机/原生对象访问异常阻断鼠标手势收尾。
-		try { if (!NativePanelBlocking()) HandleGroupHotkeys(); } catch { }
+		try { if (!escMenuOpen) HandleGroupHotkeys(); } catch { }
 		// 0.9.4：RTS 内 M 键开关原生大地图——直接调 MapGUI.OpenMap/CloseMap
 		//（0.9.3 已确认 MiniMapOpened 是死 API：全程序集无人调用，显隐由 MapGUI 管理）
 		try
 		{
-			if (Input.GetKeyDown(KeyCode.M) && !NativePanelBlocking())
+			if (Input.GetKeyDown(KeyCode.M) && !escMenuOpen)
 			{
 				if (mapGuiCached == null) { try { mapGuiCached = UnityEngine.Object.FindObjectOfType(Il2CppInterop.Runtime.Il2CppType.Of<MapGUI>()) as MapGUI; } catch { } }
 				if (mapGuiCached != null)
@@ -2076,21 +2076,37 @@ internal static class GodViewController
 			SquadCmdLogic.LogAlways("[SquadCmd] 输入处理失败，已复位 RTS 手势: " + ex.Message);
 		}
 
-		// 0.9.5：RTS 内 ESC 打开原生暂停/设置菜单（无面板时才响应；关闭菜单由原生恢复时间流速）
+		// 0.9.6：RTS 内 ESC 开关原生暂停/设置菜单（自持状态；菜单内"继续"按钮触发的原生
+		// Resume 会经 IsTimePaused 检测自动解除让位）
 		try
 		{
-			if (Input.GetKeyDown(KeyCode.Escape) && !Pause.HavePanel())
+			if (Input.GetKeyDown(KeyCode.Escape))
 			{
-				Pause.SetPause(true);
-				SquadCmdLogic.LogAlways("[SquadCmd] ESC 打开原生菜单");
+				if (!escMenuOpen)
+				{
+					Pause.SetPause(true);
+					escMenuOpen = true;
+					SquadCmdLogic.LogAlways("[SquadCmd] ESC 打开原生菜单");
+				}
+				else
+				{
+					if (pauseInstance == null) { try { pauseInstance = UnityEngine.Object.FindObjectOfType(Il2CppInterop.Runtime.Il2CppType.Of<Pause>()) as Pause; } catch { } }
+					if (pauseInstance != null) { pauseInstance.Resume(); SquadCmdLogic.LogAlways("[SquadCmd] ESC 关闭原生菜单"); }
+					else { SquadCmdLogic.LogAlways("[SquadCmd] ESC 关闭失败：场景中未找到 Pause"); }
+					escMenuOpen = false;
+				}
+			}
+			else if (escMenuOpen && !Pause.IsTimePaused() && !Pause.IsPaused())
+			{
+				escMenuOpen = false; // 用户在菜单里点了"继续"（原生 Resume），自动解除让位
 			}
 		}
-		catch (Exception ex) { SquadCmdLogic.LogAlways("[SquadCmd] ESC 菜单打开失败: " + ex.Message); }
+		catch (Exception ex) { SquadCmdLogic.LogAlways("[SquadCmd] ESC 菜单切换失败: " + ex.Message); }
 
 		try
 		{
-			// 空格暂停（0.9.5：原生面板打开期间让位）
-			if (!NativePanelBlocking() && Input.GetKeyDown(KeyCode.Space)) TogglePause();
+			// 空格暂停（0.9.6：ESC 菜单打开期间让位）
+			if (!escMenuOpen && Input.GetKeyDown(KeyCode.Space)) TogglePause();
 			// 用 unscaledDeltaTime：空格暂停（timeScale=0）时镜头仍可移动
 			float dt = Mathf.Min(Time.unscaledDeltaTime, 0.05f);
 			HandleMove(dt);
@@ -2301,11 +2317,10 @@ internal static class GodViewController
 		try { return Active && MiniMapGUI.MiniMapOpened; } catch { return false; }
 	}
 
-	/// <summary>0.9.5：原生暂停/设置面板打开期间，本 mod 的按键与战场点击全部让位。</summary>
-	private static bool NativePanelBlocking()
-	{
-		try { return Pause.HavePanel(); } catch { return false; }
-	}
+	// 0.9.6：ESC 菜单自持状态。0.9.5 的 Pause.HavePanel() 在 RTS 下恒为 true（常驻面板被计入），
+	// 把全部让位守卫锁死（鼠标失灵/设置地图打不开的根因）——改为只信自己开的菜单。
+	private static bool escMenuOpen;
+	private static Pause pauseInstance;
 
 	private static void HandleClickCore()
 	{
@@ -2315,7 +2330,7 @@ internal static class GodViewController
 		bool rightDown = Input.GetMouseButtonDown(1);
 		bool rightHeld = Input.GetMouseButton(1);
 		bool rightUp = Input.GetMouseButtonUp(1);
-		bool guiNow = IsMouseOverGui() || MiniMapGuiBlocking() || NativePanelBlocking(); // 0.9.5：地图/原生面板打开时点击让位
+		bool guiNow = IsMouseOverGui() || MiniMapGuiBlocking() || escMenuOpen; // 0.9.6：地图/ESC 菜单打开时点击让位
 
 		// 轮盘打开期间，Update 只负责收尾手势；按钮点击和右键关闭由 OnGUI 处理。
 		// 不能让旧的 rightHoldActive 卡在轮盘状态里。
