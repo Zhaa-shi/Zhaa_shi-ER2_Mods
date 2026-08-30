@@ -1122,19 +1122,17 @@ internal static class GodViewController
 		{
 			Vehicle veh = pendingBoardVeh;
 			Squad sq = pendingBoardSq;
-			int moved = 0;
-			foreach (Soldier bs in pendingBoardUnits)
-			{
-				try { if (bs != null && bs.IsAlive && AddInfantryToSquadTo(bs, sq)) moved++; } catch { }
-			}
+			// 0.7.85：转队已在发起时同帧完成——这里只补登记兜底 + 收尾
 			rtsSquad = sq;
 			rtsSquadSet.Add((long)sq.Pointer);
-			selVehicleRefs.Clear();
-			selVehicles.Add(sq);
-			if (veh != null) AddVehicleRef(veh);
-			SquadCmdLogic.Log("[BoardPending] 完成（" + reason + "） vehicle=" + (veh != null ? veh.name : "?")
-				+ " 转队=" + moved + " rtsSquad=0x" + ((long)sq.Pointer).ToString("X"));
-			cmdFlash = "登车完成 → 已转选车组"; cmdFlashUntil = Time.unscaledTime + 2.5f;
+			if (veh != null)
+			{
+				selVehicleRefs.Clear();
+				selVehicles.Add(sq);
+				AddVehicleRef(veh);
+			}
+			SquadCmdLogic.Log("[BoardPending] 完成（" + reason + "） vehicle=" + (veh != null ? veh.name : "?"));
+			cmdFlash = "登车完成 → 可直接驾驶"; cmdFlashUntil = Time.unscaledTime + 2.5f;
 			selFlash = Time.unscaledTime + 3f;
 		}
 		catch { }
@@ -1316,10 +1314,26 @@ internal static class GodViewController
 				try { if (bs != null && bs.IsAlive) { wait.Add(bs); taken2++; } } catch { }
 			}
 			pendingBoardVeh = veh;
-			pendingBoardSq = CreateNewSquad(); // 完成时转队用
+			pendingBoardSq = CreateNewSquad();
 			pendingBoardUnits = wait;
 			pendingBoardUntil = Time.unscaledTime + 25f;
 			pendingBoardNext = Time.unscaledTime; // 立即引导一轮
+			// 0.7.85 核心修正：转队/登记与下令【同帧】完成（成员关系与位置无关）——
+			// 乘员此刻已是新队成员、组已获驾驶资格。此前"登车完成后才转队"导致：
+			// 剩人→资格永不生效→驾驶锁死；超员者留在原队→跟随链持续驱动乱走。
+			{
+				int moved = 0;
+				foreach (Soldier bs in wait)
+				{
+					try { if (AddInfantryToSquadTo(bs, pendingBoardSq)) moved++; } catch { }
+				}
+				rtsSquad = pendingBoardSq;
+				rtsSquadSet.Add((long)pendingBoardSq.Pointer);
+				selVehicleRefs.Clear();
+				selVehicles.Add(pendingBoardSq);
+				AddVehicleRef(veh);
+				SquadCmdLogic.Log("[BoardPending] 转队同帧完成 moved=" + moved + " rtsSquad=0x" + ((long)pendingBoardSq.Pointer).ToString("X"));
+			}
 			foreach (Soldier s in wait)
 			{
 				// 0.7.71：接近点=士兵当前方位一侧（就近接近）——不再环形分布，
