@@ -5,7 +5,7 @@
     <LangVersion>latest</LangVersion>
     <Nullable>disable</Nullable>
     <ImplicitUsings>disable</ImplicitUsings>
-    <AssemblyName>ER2_SquadCommand</AssemblyName>
+    <AssemblyName>ER2_BattlefieldCommander</AssemblyName>
     <RootNamespace>ER2SquadCommand</RootNamespace>
     <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
     <NoWarn>CS0618</NoWarn>
