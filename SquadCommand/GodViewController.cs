@@ -3061,7 +3061,14 @@ internal static class GodViewController
 			List<Soldier> sel = GetSelectedInfantry();
 			int removed = pendingBoardUnits.RemoveAll(s =>
 			{
-				try { if (s == null) return true; return sel.Any(x => x != null && (long)x.Pointer == (long)s.Pointer); } catch { return false; }
+				try
+				{
+					if (s == null) return true;
+					long k = (long)s.Pointer;
+					foreach (Soldier x in sel) { try { if (x != null && (long)x.Pointer == k) return true; } catch { } }
+					return false;
+				}
+				catch { return false; }
 			});
 			if (pendingBoardUnits.Count == 0) CancelBoardPending("玩家下达了新命令");
 			else if (removed > 0) SquadCmdLogic.Log("[BoardPending] 摘除 " + removed + " 名改令乘员（余 " + pendingBoardUnits.Count + " 人继续登车）");
