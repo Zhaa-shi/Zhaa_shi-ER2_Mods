@@ -9,7 +9,7 @@ using UnityEngine;
 
 namespace ER2SquadCommand;
 
-[BepInPlugin("er2.squadcommand", "ER2 Squad Command", "0.7.86")]
+[BepInPlugin("er2.squadcommand", "ER2 Squad Command", "0.7.95")]
 public class Plugin : BasePlugin
 {
 	internal static ManualLogSource ModLog;
@@ -28,12 +28,13 @@ public class Plugin : BasePlugin
 		enabled = Config.Bind("General", "enabled", true, "主开关。");
 		radius = Config.Bind("Control", "moveRadius", 8f, new ConfigDescription("移动到达判定半径（米）。快速移动(双击右键)时为 30 米。", new AcceptableValueRange<float>(1f, 60f)));
 		trackSeconds = Config.Bind("Control", "moveTimeout", 14f, new ConfigDescription("移动任务超时（秒）：超时后停止修正并输出路径质量报告。", new AcceptableValueRange<float>(2f, 45f)));
+		m7Interval = Config.Bind("Control", "moveCheckInterval", 2f, new ConfigDescription("移动任务检查间隔（秒）。只在单位停滞时修正，不会每帧重发命令。", new AcceptableValueRange<float>(0.25f, 5f)));
 		debugLog = Config.Bind("Debug", "debugLog", false, new ConfigDescription("调试日志开关（发布版保持关闭）。开启后输出全部指挥/登车/标记诊断日志，用于问题排查。"));
 		godKey = Config.Bind("General", "godKey", KeyCode.F9, "上帝视角开关（仅进入）。退出＝选中小队后点顶部[控制该小队]随机接管一人；全军覆没时按键紧急退出。空格＝暂停/继续世界。");
 
 		new Harmony("er2.squadcommand").PatchAll(typeof(Plugin).Assembly);
 		FrameEndRunner.Ensure();
-		ModLog.LogInfo("ER2 Squad Command 0.7.87 loaded. godKey=" + godKey.Value);
+		ModLog.LogInfo("ER2 Squad Command 0.7.95 loaded. godKey=" + godKey.Value);
 	}
 }
 
@@ -72,123 +73,6 @@ internal class FrameEndRunner : MonoBehaviour
 			yield return new WaitForEndOfFrame();
 			try { GodViewController.FrameEndGuard(); } catch { }
 		}
-	}
-}
-
-/// <summary>0.7.86：Squad 引用三方对比工具（纯读）。</summary>
-internal static class SquadTrace
-{
-	private static string Ref(string name, Squad sq)
-	{
-		try
-		{
-			if (sq == null) return name + "=null";
-			int alive = 0, total = 0;
-			try { total = sq.CountMembers; } catch { }
-			try { int n = sq.CountMembers; for (int i = 0; i < n; i++) { Soldier m = sq.GetMemberClamped(i); if (m != null && m.IsAlive) alive++; } } catch { }
-			return name + "=0x" + ((long)sq.Pointer).ToString("X") + " members=" + total + " alive=" + alive;
-		}
-		catch (Exception e) { return name + "=<err " + e.Message + ">"; }
-	}
-
-	internal static void Dump(string tag, Squad direct)
-	{
-		try
-		{
-			Squad g = null, gs = null; try { g = PlayerGUI.squad; gs = PlayerGUI.GUISquad; } catch { }
-			SquadCmdLogic.Log("[SquadTrace] " + tag + " | " + Ref("squad", direct) + " | " + Ref("gui", g) + " | " + Ref("guiSquad", gs));
-		}
-		catch (Exception e) { SquadCmdLogic.Log("[SquadTrace] " + tag + " 异常: " + e.Message); }
-	}
-
-	internal static void Dump(string tag, Soldier creature)
-	{
-		try
-		{
-			Squad j = null; try { j = creature != null ? creature.joinedSquad : null; } catch { }
-			Squad g = null, gs = null; try { g = PlayerGUI.squad; gs = PlayerGUI.GUISquad; } catch { }
-			SquadCmdLogic.Log("[SquadTrace] " + tag + " | " + Ref("joined", j) + " | " + Ref("gui", g) + " | " + Ref("guiSquad", gs));
-		}
-		catch (Exception e) { SquadCmdLogic.Log("[SquadTrace] " + tag + " 异常: " + e.Message); }
-	}
-}
-
-/// <summary>0.7.86：DeathPanel.ShowDeath 纯观察 Postfix（不改行为、不调重生）。</summary>
-[HarmonyPatch(typeof(DeathPanel), "ShowDeath")]
-public static class DeathTracePatch
-{
-	private static void Postfix(Soldier creature)
-	{
-		try
-		{
-			PlayerController pc = PlayerController.currentController;
-			Soldier cc = pc != null ? pc.ControlledCharacter : null;
-			Soldier lk = GodViewController.LastKnownSoldier;
-			string sq = "?"; int others = -1;
-			try { Squad jsq = creature != null ? creature.joinedSquad : null; sq = jsq != null ? "0x" + ((long)jsq.Pointer).ToString("X") : "null"; if (jsq != null) others = GodViewController.AliveOthers(jsq); } catch { }
-			int quota = -1; try { quota = BattleManager.instance.playerRespawns; } catch { }
-			string lkn = "null";
-			if (lk != null) { try { lkn = lk.name_surname + "/" + (lk.IsAlive ? "alive" : "dead"); } catch { lkn = "?"; } }
-			string ccn = "null";
-			if (cc != null) { try { ccn = cc.IsAlive ? "alive" : "dead"; } catch { ccn = "?"; } }
-			SquadTrace.Dump("ShowDeath", creature);
-			SquadCmdLogic.Log("[DeathTrace] ShowDeath creature=" + (creature != null ? "有" : "null")
-				+ " | CC=" + ccn + " | lastKnown=" + lkn
-				+ " | joinedSquad=" + sq + " AliveOthers=" + others + " | 配额=" + quota);
-		}
-		catch (Exception ex) { SquadCmdLogic.Log("[DeathTrace] 异常: " + ex.Message); }
-	}
-}
-
-/// <summary>0.7.86：监控 ClearSquadList 是否仍被执行（本版本应永为 0）。</summary>
-[HarmonyPatch(typeof(PlayerGUI), "ClearSquadList")]
-public static class ClearSquadListWatchPatch
-{
-	private static void Prefix()
-	{
-		try { SquadCmdLogic.Log("[SquadTrace] ClearSquadList EXECUTED (谁在调？)"); } catch { }
-	}
-}
-
-/// <summary>0.7.86：ShowSquadList 纯观察（进/出各一条，含调用栈快照；不改行为）。</summary>
-[HarmonyPatch(typeof(PlayerGUI), "ShowSquadList")]
-public static class ShowSquadListTracePatch
-{
-	private static void Prefix(Squad squad, float duration)
-	{
-		try
-		{
-			SquadCmdLogic.Log("[SquadTrace] ShowSquadList duration=" + duration.ToString("0.00"));
-			SquadTrace.Dump("ShowSquadList-IN", squad);
-			var st = new System.Diagnostics.StackTrace(2, false);
-			var frames = st.GetFrames();
-			int n = frames != null ? System.Math.Min(6, frames.Length) : 0;
-			var sb = new System.Text.StringBuilder("[SquadTrace] ShowSquadList-CALLERS:");
-			for (int i = 0; i < n; i++) sb.Append(' ').Append(frames[i].GetMethod().DeclaringType?.Name ?? "?").Append("::").Append(frames[i].GetMethod().Name);
-			SquadCmdLogic.Log(sb.ToString());
-		}
-		catch { }
-	}
-
-	private static void Postfix(Squad squad, float duration)
-	{
-		try { SquadTrace.Dump("ShowSquadList-OUT", squad); } catch { }
-	}
-}
-
-/// <summary>0.7.86：ShowSwitchMemberSelection 纯日志 Prefix（不改返回值、不拦截）。</summary>
-[HarmonyPatch(typeof(PlayerController), "ShowSwitchMemberSelection")]
-public static class SwitchMemberTracePatch
-{
-	private static void Prefix()
-	{
-		try
-		{
-			PlayerController pc = PlayerController.currentController;
-			Soldier c = pc != null ? pc.ControlledCharacter : null;
-			SquadTrace.Dump("SwitchMember", c);
-		}
-		catch { }
 	}
 }
 
@@ -493,7 +377,7 @@ public static class CursorVisiblePatch
 
 /// <summary>
 /// 标记集火：覆盖 Soldier.GetBestVisibleEnemy（Postfix）。
-/// 只对【当前选中的单位】生效（步兵选择 + 选中载具车组），走原生目标选择让 AI 自然集火，
+/// 只对【下达标记时的单位快照】生效（步兵选择 + 选中载具车组），走原生目标选择让 AI 自然集火，
 /// 零强制态 —— HVT 老兵团已实证此路径有效。攻击/标记指令原用 forceTarget（从未生效），
 /// 改为记录 Spottable 让 AI 自行选择。
 /// </summary>
@@ -509,8 +393,8 @@ internal static class MarkedTargetSelectionPatch
 			{
 				return;
 			}
-			// 只引导选中的单位（未被选择的友军不受影响）
-			if (!GodViewController.IsSelectedUnit(__instance)) return;
+			// 只引导下达标记时的单位（切回 FPS 后仍生效；后来接管的单位不受影响）
+			if (!GodViewController.IsMarkUnit(__instance)) return;
 			// 玩家自己瞄准/控制的单位不受强制
 			try
 			{
@@ -556,7 +440,16 @@ internal static class MarkedVehicleTargetPatch
 		{
 			var mark = GodViewController.CurrentMark;
 			if (mark == null || mark.Spottable == null || __instance == null) return;
-			if (!GodViewController.IsSelectedVehicle(__instance)) return;
+			if (!GodViewController.IsMarkVehicle(__instance)) return;
+			// 当前玩家若已接管该载具，交还给 FPS 原生目标链。
+			try
+			{
+				PlayerController pc = PlayerController.currentController;
+				Soldier ctrl = pc != null ? pc.ControlledCharacter : null;
+				Vehicle playerVehicle = ctrl != null ? ctrl.GetComponentInParent<Vehicle>() : null;
+				if (playerVehicle != null && playerVehicle.Pointer == __instance.Pointer) return;
+			}
+			catch { }
 			__result = mark.Spottable;
 		}
 		catch

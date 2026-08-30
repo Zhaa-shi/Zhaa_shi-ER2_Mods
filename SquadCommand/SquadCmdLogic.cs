@@ -123,7 +123,17 @@ internal static class SquadCmdLogic
 	{
 		try
 		{
+			if (!GodViewController.Active)
+			{
+				return 0;
+			}
 			List<Soldier> units = GodViewController.GetSelectedInfantry();
+			if (TryIssueNativeMove(units, aim, Plugin.radius.Value))
+			{
+				StartTrackingUnits(units, aim);
+				LogAlways("[SquadCmd] 本次移动 via=LuaSquad 选中=" + units.Count);
+				return units.Count;
+			}
 			int moved = 0;
 			for (int i = 0; i < units.Count; i++)
 			{
@@ -147,6 +157,137 @@ internal static class SquadCmdLogic
 			Log("[SquadCmd] IssueMoveTo error: " + ex.Message);
 			return 0;
 		}
+	}
+
+	/// <summary>
+	/// RTS-only 原生移动桥接：只有当选择恰好覆盖一个完整原生 Squad 的全部存活成员时才接管。
+	/// 部分选中、跨 Squad 选择或缺少 joinedSquad 时返回 false，由调用方走逐兵兜底。
+	/// </summary>
+	internal static bool TryIssueNativeMove(List<Soldier> units, Vector3 aim, float radius)
+	{
+		if (!GodViewController.Active || units == null || units.Count == 0)
+		{
+			return false;
+		}
+		try
+		{
+			HashSet<IntPtr> selected = new HashSet<IntPtr>();
+			Squad common = null;
+			for (int i = 0; i < units.Count; i++)
+			{
+				Soldier s = units[i];
+				if (s == null || !s.IsAlive || !selected.Add(s.Pointer))
+				{
+					return false;
+				}
+				Squad joined = s.joinedSquad;
+				if (joined == null)
+				{
+					return false;
+				}
+				if (common == null)
+				{
+					common = joined;
+				}
+				else if (common.Pointer != joined.Pointer)
+				{
+					return false;
+				}
+			}
+
+			if (!IsCompleteAliveSquadSelection(common, selected))
+			{
+				return false;
+			}
+			return TryIssueNativeMove(common, aim, radius);
+		}
+		catch (Exception ex)
+		{
+			Log("[SquadCmd] 原生 Squad 移动映射失败: " + ex.Message);
+			return false;
+		}
+	}
+
+	/// <summary>对已经确认属于 RTS 控制范围的完整 Squad 下发原生 follow/move 订单。</summary>
+	internal static bool TryIssueNativeMove(Squad sq, Vector3 aim, float radius)
+	{
+		// 该重载也供 RTS 退出后的车辆同步窗口重试使用；是否允许新指令
+		// 由调用方保证，这里只负责把订单送进游戏真正的 Squad AI 链。
+		if (sq == null)
+		{
+			return false;
+		}
+		try
+		{
+			if (!HasAliveMembers(sq))
+			{
+				return false;
+			}
+			RegisterControlledSquad(sq);
+			DisableNativeOrders(sq);
+			// SynchOrder 只同步订单字段，不能可靠启动完整移动 AI。
+			// Lua_Squad.moveTo 才是游戏原生指挥链实际使用的入口。
+			new Lua_Squad(sq).moveTo(aim, radius);
+			return true;
+		}
+		catch (Exception ex)
+		{
+			Log("[SquadCmd] 原生 Lua_Squad.moveTo 失败: " + ex.Message);
+			return false;
+		}
+	}
+
+	private static bool IsCompleteAliveSquadSelection(Squad sq, HashSet<IntPtr> selected)
+	{
+		if (sq == null || selected == null || selected.Count == 0)
+		{
+			return false;
+		}
+		HashSet<IntPtr> aliveMembers = new HashSet<IntPtr>();
+		int alive = 0;
+		int count = sq.CountMembers;
+		for (int i = 0; i < count; i++)
+		{
+			Soldier member = sq.GetMemberClamped(i);
+			if (member == null || !member.IsAlive)
+			{
+				continue;
+			}
+			alive++;
+			aliveMembers.Add(member.Pointer);
+		}
+		if (alive != selected.Count || aliveMembers.Count != selected.Count)
+		{
+			return false;
+		}
+		foreach (IntPtr ptr in selected)
+		{
+			if (!aliveMembers.Contains(ptr))
+			{
+				return false;
+			}
+		}
+		return true;
+	}
+
+	private static bool HasAliveMembers(Squad sq)
+	{
+		try
+		{
+			int count = sq.CountMembers;
+			for (int i = 0; i < count; i++)
+			{
+				Soldier member = sq.GetMemberClamped(i);
+				if (member != null && member.IsAlive)
+				{
+					return true;
+				}
+			}
+		}
+		catch
+		{
+		}
+		return false;
 	}
 
 	internal static void TickTracker()
@@ -597,7 +738,14 @@ internal static class SquadCmdLogic
 			{
 				Soldier m = sq.GetMemberClamped(i);
 				if (m == null || !IsControlledUnit(m) && controlledSquads.Contains(sq.Pointer) == false) continue;
-				try { new Lua_Soldier(m).getAiParams().followCustomSquadOrders(); } catch { }
+				try
+				{
+					AiParams ap = new Lua_Soldier(m).getAiParams();
+					try { ap.followCustomSquadOrders(); } catch { }
+					try { ap.followCustomDirectCommands(); } catch { }
+					try { ap.allowMovements(true); } catch { }
+				}
+				catch { }
 			}
 		}
 		catch { }
@@ -606,7 +754,14 @@ internal static class SquadCmdLogic
 	internal static void DisableNativeOrders(Soldier s)
 	{
 		if (!IsControlledUnit(s)) return;
-		try { new Lua_Soldier(s).getAiParams().followCustomSquadOrders(); } catch { }
+		try
+		{
+			AiParams ap = new Lua_Soldier(s).getAiParams();
+			try { ap.followCustomSquadOrders(); } catch { }
+			try { ap.followCustomDirectCommands(); } catch { }
+			try { ap.allowMovements(true); } catch { }
+		}
+		catch { }
 	}
 
 	internal static void StartTracking(Squad sq, Vector3 aim)

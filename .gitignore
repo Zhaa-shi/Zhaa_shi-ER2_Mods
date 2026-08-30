@@ -25,6 +25,11 @@ research_out/redump/
 research_out/sounds/
 research_out/squad_camera/
 research_out/thirdparty/
+research_out/il2cpp_native_20260830/
+research_out/native_20260830/
+research_out/real_ilspy_battleloader/
+research_out/real_ilspy_mos/
+research_out/real_ilspy_squad/
 
 # 临时文件
 *.tmp

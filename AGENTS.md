@@ -22,6 +22,7 @@ ER2_Mods/
 ├── ZoomAnywhere/        # mod 10：任意位置放大（er2.zoomanywhere）
 ├── HighValueTarget/     # mod 14：ER2 Veteran HVT（老兵高危目标：击杀追踪+集火+叛徒机制，er2.highvaluetarget）
 ├── InventoryPause/      # mod 15：背包暂停（打开自己/尸体背包时冻结世界，er2.inventorypause）
+├── SquadCommand/        # 战场指挥官（RTS 上帝视角小队指挥，er2.squadcommand）
 ├── UnitCollision/       # mod 11：MorePhysics 附属轻量版——单位/尸体碰撞（er2.morephysics.unitcollision）
 ├── UnitInfoOverlay/     # mod 12：单位状态悬浮显示（开发者调试工具，er2.unitinfooverlay）
 ├── Shared/              # 跨 mod 共享（NoHintsHudLink 等）
