@@ -23,7 +23,8 @@ internal static class SceneMarkers
 	private static Material LineMat()
 	{
 		if (lineMat != null) return lineMat;
-		foreach (string sn in new[] { "Sprites/Default", "Universal Render Pipeline/Unlit", "Particles/Standard Unlit", "Legacy Shaders/Particles/Alpha Blended" })
+		// 0.9.1：GUI/Text Shader 无视深度测试——脚环不会被地形/草丛埋住
+		foreach (string sn in new[] { "GUI/Text Shader", "Sprites/Default", "Universal Render Pipeline/Unlit", "Particles/Standard Unlit" })
 		{
 			Shader sh = null;
 			try { sh = Shader.Find(sn); } catch { }
@@ -120,5 +121,52 @@ internal static class SceneMarkers
 			if (!used.Contains(kv.Key) && kv.Value.activeSelf) kv.Value.SetActive(false);
 		}
 		used.Clear();
+	}
+
+	/// <summary>
+	/// 0.9.1：RTS 角括号选中指示——四角 45° 圆弧，角间留缺口（父对象 + 4 段弧线，缩放父对象）。
+	/// 比整圈圆环更有 RTS 辨识度，选中变化一目了然。
+	/// </summary>
+	public static void Bracket(string key, Vector3 groundPos, float radius, Color c, float width, bool visible)
+	{
+		if (!visible || radius <= 0f) return;
+		used.Add(key);
+		if (!pool.TryGetValue(key, out GameObject parent) || parent == null)
+		{
+			parent = new GameObject("SCMB_" + key);
+			UnityEngine.Object.DontDestroyOnLoad(parent);
+			for (int q = 0; q < 4; q++)
+			{
+				GameObject seg = new GameObject("c" + q);
+				seg.transform.SetParent(parent.transform, false);
+				LineRenderer lr = seg.AddComponent<LineRenderer>();
+				lr.useWorldSpace = false;
+				lr.loop = false;
+				lr.positionCount = 9;
+				lr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+				lr.receiveShadows = false;
+				lr.material = LineMat();
+				Il2CppStructArray<Vector3> pts = new Il2CppStructArray<Vector3>(9);
+				float start = q * 90f + 22.5f; // 每角 45° 弧，四角间各留 45° 缺口
+				for (int i = 0; i < 9; i++)
+				{
+					float a = (start + 45f * i / 8f) * Mathf.Deg2Rad;
+					pts[i] = new Vector3(Mathf.Cos(a), 0f, Mathf.Sin(a));
+				}
+				lr.SetPositions(pts);
+			}
+			pool[key] = parent;
+		}
+		parent.SetActive(true);
+		parent.transform.localScale = new Vector3(radius, 1f, radius);
+		parent.transform.position = groundPos;
+		foreach (Transform child in parent.transform)
+		{
+			LineRenderer lr = child.GetComponent<LineRenderer>();
+			if (lr == null) continue;
+			lr.startColor = c;
+			lr.endColor = c;
+			lr.widthMultiplier = width;
+		}
 	}
 }
