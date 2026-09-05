@@ -75,8 +75,16 @@ if (-not $SkipPackage) {
         Copy-Item "$root\$Mod\Assets" "$pkgDir\$assetsDir" -Recurse -Force
     }
     foreach ($doc in @("README.txt", "Nexus_description.md")) {
+        # 双语发布包：README/Nexus 描述按包语言取文件——默认包=英文，-Cn 包=中文
         $docSrc = "$root\$Mod\$doc"
-        if ($Cn -and $doc -eq "README.txt" -and (Test-Path "$root\$Mod\README_CN.txt")) { $docSrc = "$root\$Mod\README_CN.txt" }
+        if ($doc -eq "README.txt") {
+            $localized = if ($Cn) { "README_CN.txt" } else { "README.txt" }
+            if (Test-Path "$root\$Mod\$localized") { $docSrc = "$root\$Mod\$localized" }
+        }
+        if ($doc -eq "Nexus_description.md") {
+            $localized = if ($Cn) { "Nexus_description_CN.md" } else { "Nexus_description.md" }
+            if (Test-Path "$root\$Mod\$localized") { $docSrc = "$root\$Mod\$localized" }
+        }
         if (Test-Path $docSrc) { Copy-Item $docSrc "$pkgDir\$doc" -Force }
     }
     $zipName = "$pkg" + $tag + "_v" + ((Select-String -Path "$root\$Mod\Plugin.cs" -Pattern '"(\d+)\.(\d+)\.(\d+)"' | Select-Object -First 1).Matches.Value.Trim('"')) + ".zip"

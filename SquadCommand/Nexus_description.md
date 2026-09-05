@@ -1,32 +1,32 @@
-# ER2 Battlefield Commander — RTS 上帝视角小队指挥
+# ER2 Battlefield Commander — RTS God-View Squad Command
 
 ## Description
-为 Easy Red 2 增加一套「RTS 上帝视角」小队指挥系统，鼠标操作逻辑参照《地狱之门：东部前线》。按 F9 进入自由上帝视角俯瞰战场，长按左键框选友军进行临时选择，不会自动拆散原生小队；只有显式点击 [分队] 才会创建真实新小队。载具车组不拆散，整体作为 1 个单位纳入选择。右键下达移动、集火标记、上车、下车和车辆移动指令，空格暂停世界从容指挥。已经下达的移动、集火、登车和车辆同步任务会在切回 FPS 后继续执行；FPS 原生移动、视角和射击不受影响。接管时随机进入一名存活选中成员继续战斗。
+Adds an "RTS god-view squad command" layer to Easy Red 2, with mouse operations inspired by Gates of Hell: Ostfront. Press F9 to enter a free god view overlooking the battlefield, hold LMB to box-select friendly units as a temporary selection — native squads are never split automatically; only the explicit [Split] button creates a real new squad. Vehicle crews stay together as one selectable unit. Right-click issues move, focus-fire mark, boarding and vehicle movement orders; Space pauses the world for unhurried command. Orders already issued — movement, focus-fire, boarding and vehicle sync — keep executing after you switch back to first person; FPS movement, aiming and shooting are untouched. Takeover puts you into a random living selected member to keep fighting.
 
 ## Installation instructions
-1. 安装 BepInEx（IL2CPP 版）到游戏根目录。
-2. 将 `ER2_BattlefieldCommander.dll` 放入 `Easy Red 2\BepInEx\plugins\`。
-3. 启动游戏，BepInEx 日志出现 `Loading [ER2 Battlefield Commander 1.0.0]` 表示加载成功。
+1. Install BepInEx (IL2CPP build) into the game root folder.
+2. Put `ER2_BattlefieldCommander.dll` into `Easy Red 2\BepInEx\plugins\`.
+3. Launch the game — `Loading [ER2 Battlefield Commander 1.0.0]` in the BepInEx log means success.
 
 ## Main features
-- **上帝视角指挥**：F9 进入自由视角，WASD 移动、滚轮缩放、中键旋转、Q/E 升降，空格暂停/继续世界。
-- **临时框选与显式分队**：长按左键框选只改变当前选择，不自动拆队；点击顶部 [分队] 时才创建真实新小队；Shift+框选 = 追加。
-- **地狱之门式鼠标交互**：
-  - 左键点击友军士兵/载具 = 选中（载具整车组算 1 个单位），左键点击敌军/空白 = 清空选择
-  - 双击友军 = 选中该单位整个小队
-  - 右键短按 = 下指令（地面=移动、敌军=持久标记集火（只指定打击目标，单位原地开火不自动推进；要推进用移动或双击右键）、友军/中立载具=打开交互轮盘），右键双击 = 原生「前往并防守」；长按空地打开命令环（站/蹲/趴/停止/掩体/集合/停火切换），按在单位上不弹环
-  - Ctrl+1~9 保存当前选择为编组，1~9 一键召回（死亡单位自动剔除）
-  - 只有身上带 ◆ 光标（被选中）的单位响应移动，未选单位不动
-- **载具与火力点**：点载具/火力点直接选中整车组（不用点里面的乘员）；右键友军/中立载具打开交互轮盘，逐员上车；通过轮盘下车/修理。
-- **随机接管**：选中单位后点顶部 `[控制该小队]`，随机接管一名存活成员回到第一人称；全军覆没时可 F9 紧急退出。
-- **RTS/FPS 共存**：切回 FPS 后，FPS 的 WASD、鼠标视角、射击和原生操作继续运行；已经下达的移动、集火、登车和车辆同步任务不会因退出 RTS 而被清除。接管某个单位时，只停止该单位自己的 Mod 持久任务。
-- **原生指挥链**：移动/防守/登车全部走游戏自身命令入口（Squad.moveTo/HoldArea、boardVehicle），标记集火走原生目标选择（GetBestVisibleEnemy/CurrentVisibleTarget），Mod 不自建移动编排，只做下达与完成观测。
-- **根治光标闪烁**：上帝视角下 patch `Cursor.set_lockState`，原生无法锁/隐藏光标——右键不再闪烁或重置到屏幕中央。
-- **压制原生干扰**：进入时解除本阵营小队的原生任务拉取；接管时自动关闭原生"选择队友"残留面板。
+- **God-view command**: F9 to enter free camera, WASD move, wheel zoom, MMB rotate, Q/E height, Space to pause/resume the world.
+- **Temporary box-select & explicit split**: box-selecting only changes the current selection, never splits squads; the top [Split] button is the only way to create a real new squad; Shift+box = append.
+- **Gates of Hell style mouse interaction**:
+  - LMB on a friendly soldier/vehicle = select (a vehicle crew counts as one unit); LMB on enemy/empty = clear selection
+  - Double-click a friendly = select their whole squad
+  - RMB short press = order (ground = move; enemy = persistent focus-fire mark (fire priority only, no auto-advance — use move or double-right-click to advance); friendly/neutral vehicle = interaction ring); RMB double-click = native "Move & Defend"; long press on empty ground = command ring (Stand/Crouch/Prone/Halt/Cover/Rally/Hold Fire toggle/Scatter); pressed on a unit, the ring never opens
+  - Ctrl+1~9 save the current selection as a group; 1~9 recall (dead units auto-pruned)
+  - Only units with the ◆ cursor (selected) respond to orders — unselected units stay put
+- **Vehicles & emplacements**: click a vehicle/fire position to select the whole crew (no need to click the men inside); right-click a friendly/neutral vehicle for the interaction ring, per-man boarding; dismount/repair through the ring.
+- **Random takeover**: with units selected, click the top `[Take Command]` button to possess a random living member back into first person; F9 emergency exit when everyone is wiped.
+- **RTS/FPS coexistence**: after switching back, FPS WASD, mouse look, shooting and native controls keep working; movement, focus-fire, boarding and vehicle-sync tasks issued in RTS survive leaving the view. Taking over a unit stops only that unit's own persistent tasks.
+- **Native command chain**: move/defend/boarding go through the game's own command entries (Squad.moveTo/HoldArea, boardVehicle); focus-fire marking rides the native target selection (GetBestVisibleEnemy/CurrentVisibleTarget) — the mod builds no movement orchestration of its own, it only issues orders and observes completion.
+- **Cursor flicker fixed**: in god view the mod patches `Cursor.set_lockState`, so the game can no longer lock/hide the cursor — no more flicker or cursor snapping to screen center on right-click.
+- **Native interference suppressed**: native task pulls on your side's squads are released on entry; the native "choose teammate" leftover panel is closed automatically on takeover.
 
 ## Requirements
 - Easy Red 2
-- BepInEx（IL2CPP 版）
+- BepInEx (IL2CPP build)
 
 ## Shout outs
-感谢 Easy Red 2 社区与 BepInEx / Harmony 生态，以及所有为 IL2CPP modding 提供思路的作者。
+Thanks to the Easy Red 2 community and the BepInEx / Harmony ecosystem, and to all authors whose IL2CPP modding work paved the way.
