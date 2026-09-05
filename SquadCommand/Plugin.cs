@@ -9,7 +9,7 @@ using UnityEngine;
 
 namespace ER2SquadCommand;
 
-[BepInPlugin("er2.squadcommand", "ER2 Battlefield Commander", "0.9.15")]
+[BepInPlugin("er2.squadcommand", "ER2 Battlefield Commander", "0.9.16")]
 public class Plugin : BasePlugin
 {
 	internal static ManualLogSource ModLog;
@@ -41,7 +41,7 @@ public class Plugin : BasePlugin
 
 		new Harmony("er2.squadcommand").PatchAll(typeof(Plugin).Assembly);
 		FrameEndRunner.Ensure();
-		ModLog.LogInfo("ER2 Battlefield Commander 0.9.15 loaded. godKey=" + godKey.Value);
+		ModLog.LogInfo("ER2 Battlefield Commander 0.9.16 loaded. godKey=" + godKey.Value);
 	}
 }
 
@@ -385,7 +385,7 @@ public static class CursorVisiblePatch
 /// 只对【下达标记时的单位快照】生效（步兵选择 + 选中载具车组），走原生目标选择让 AI 自然集火，
 /// 零强制态 —— HVT 老兵团已实证此路径有效。攻击/标记指令原用 forceTarget（从未生效），
 /// 改为记录 Spottable 让 AI 自行选择。
-/// 0.9.15：行军停火改走原生 SetHoldFireOrder 通道，本方法不再做全盲切断
+/// 0.9.16：行军停火改走原生 SetHoldFireOrder 通道，本方法不再做全盲切断
 ///（实测会引发任务系统异常：单位罚站/大面积冻结，且拦不住任务级打断）。
 /// </summary>
 [HarmonyPatch(typeof(Soldier), "GetBestVisibleEnemy")]

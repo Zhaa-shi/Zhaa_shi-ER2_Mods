@@ -369,7 +369,7 @@ namespace ER2NoInteractionHints
 			}
 			try
 			{
-				var t = AccessTools.TypeByName("PhaseBarGUI");
+				var t = Plugin.PhaseBarType;
 				var pbObj = t.GetField("instance").GetValue(null);
 				if (pbObj != null)
 				{
@@ -393,7 +393,7 @@ namespace ER2NoInteractionHints
 		{
 			try
 			{
-				var t = AccessTools.TypeByName("PhaseBarGUI");
+				var t = Plugin.PhaseBarType;
 				if (t.GetField("instance").GetValue(null) != null)
 				{
 					AccessTools.Method(t, "SetVisible").Invoke(null, new object[] { false });
@@ -408,7 +408,7 @@ namespace ER2NoInteractionHints
 		{
 			try
 			{
-				var t = AccessTools.TypeByName("PhaseBarGUI");
+				var t = Plugin.PhaseBarType;
 				if (t.GetField("instance").GetValue(null) != null)
 				{
 					AccessTools.Method(t, "SetVisible").Invoke(null, new object[] { true });

@@ -8,7 +8,7 @@ using UnityEngine;
 
 namespace ER2NoInteractionHints;
 
-[BepInPlugin("com.ryan.er2.nointeractionhints", "ER2 Hide Anything", "4.5.3")]
+[BepInPlugin("com.ryan.er2.nointeractionhints", "ER2 Hide Anything", "4.5.4")]
 public class Plugin : BasePlugin
 {
 	[HarmonyPatch(typeof(InteractionGUI2), "SetInteraction")]
@@ -90,8 +90,23 @@ public class Plugin : BasePlugin
 
 	internal static ConfigEntry<bool> enabled;
 
-	/// <summary>0.9.15 兼容：游戏更新移除了 PhaseBarGUI 类型——不存在时跳过全部 PhaseBar 相关 patch。</summary>
-	internal static readonly bool PhaseBarPresent = AccessTools.TypeByName("PhaseBarGUI") != null;
+	/// <summary>0.9.16 兼容：精确查询游戏主程序集，避免 AccessTools.TypeByName 扫描新版 Unity 模块并刷 ReflectionTypeLoadException。</summary>
+	internal static readonly Type PhaseBarType = FindGameType("PhaseBarGUI");
+	internal static readonly bool PhaseBarPresent = PhaseBarType != null;
+
+	private static Type FindGameType(string name)
+	{
+		try
+		{
+			foreach (System.Reflection.Assembly assembly in AppDomain.CurrentDomain.GetAssemblies())
+			{
+				if (assembly == null || assembly.GetName().Name != "Assembly-CSharp") continue;
+				return assembly.GetType(name, false);
+			}
+		}
+		catch { }
+		return null;
+	}
 
 	public override void Load()
 	{
@@ -124,6 +139,6 @@ public class Plugin : BasePlugin
 		HudCompat.DiscoverFields();
 		// 应用勾选的隐藏状态（元素不存在的场景由巡检补藏）
 		UiGroups.ApplyAll();
-		ModLog.LogInfo((object)"ER2 Hide Anything 4.5.3 loaded. Check boxes in Mod Manager to hide UIs (checked = hidden & locked).");
+		ModLog.LogInfo((object)"ER2 Hide Anything 4.5.4 loaded. Check boxes in Mod Manager to hide UIs (checked = hidden & locked).");
 	}
 }

@@ -77,23 +77,7 @@ internal static class NativeUi
 			{
 			}
 		}
-		// 4) 游戏默认字体 API
-		if (cachedFont == null)
-		{
-			try
-			{
-				Font f = PhaseBarGUI.GetDefaultFont();
-				if (f != null)
-				{
-					cachedFont = f;
-					Plugin.ModLog.LogInfo((object)("NativeUi: font source=PhaseBarGUI.GetDefaultFont -> '" + f.name + "'."));
-				}
-			}
-			catch
-			{
-			}
-		}
-		// 5) 引擎默认（兜底）
+		// 4) 引擎默认（兜底；当前游戏已移除 PhaseBarGUI）
 		if (cachedFont == null)
 		{
 			try

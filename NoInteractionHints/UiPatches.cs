@@ -192,7 +192,7 @@ namespace ER2NoInteractionHints
 			if (!Plugin.PhaseBarPresent) return;
 			try
 			{
-				var t = AccessTools.TypeByName("PhaseBarGUI");
+				var t = Plugin.PhaseBarType;
 				var mSetVisible = AccessTools.Method(t, "SetVisible");
 				var post = new HarmonyMethod(typeof(UiPatches), nameof(BlockPhaseBarShowPostfix));
 				h.Patch(mSetVisible, postfix: post);
@@ -206,7 +206,7 @@ namespace ER2NoInteractionHints
 			{
 				if (UiGroups.IsHidden("phaseBar") && visible)
 				{
-					AccessTools.Method(AccessTools.TypeByName("PhaseBarGUI"), "SetVisible").Invoke(null, new object[] { false });
+					AccessTools.Method(Plugin.PhaseBarType, "SetVisible").Invoke(null, new object[] { false });
 				}
 			}
 			catch { }

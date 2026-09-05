@@ -12,7 +12,7 @@ using UnityEngine;
 
 namespace ER2LimbTweaks;
 
-[BepInPlugin("er2.limbtweaks", "ER2 Limb Tweaks", "2.13.100")]
+[BepInPlugin("er2.limbtweaks", "ER2 Limb Tweaks", "2.13.101")]
 public class Plugin : BasePlugin
 {
 	internal static ManualLogSource ModLog;
@@ -64,7 +64,7 @@ public class Plugin : BasePlugin
 		damageNeeded = Config.Bind("Limbs", "damageNeeded", 60f, "Accumulated damage on the same limb required to sever it (alive).");
 		corpseDamageThreshold = Config.Bind("Limbs", "corpseDamageThreshold", 80f, "Accumulated sever score (damage + muzzle velocity x0.08) on the same corpse limb required to sever it.");
 		new Harmony("er2.limbtweaks").PatchAll(Assembly.GetExecutingAssembly());
-		ModLog.LogInfo((object)"ER2 Limb Tweaks 2.13.100 loaded.");
+		ModLog.LogInfo((object)"ER2 Limb Tweaks 2.13.101 loaded.");
 	}
 }
 

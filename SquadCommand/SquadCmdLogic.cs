@@ -467,17 +467,6 @@ internal static class SquadCmdLogic
 	{
 		try
 		{
-			Font f = PhaseBarGUI.GetDefaultFont();
-			if (f != null)
-			{
-				return f;
-			}
-		}
-		catch
-		{
-		}
-		try
-		{
 			if (GUI.skin != null && GUI.skin.font != null)
 			{
 				return GUI.skin.font;
@@ -486,7 +475,14 @@ internal static class SquadCmdLogic
 		catch
 		{
 		}
-		return null;
+		try
+		{
+			return Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+		}
+		catch
+		{
+			return null;
+		}
 	}
 
 	#endregion

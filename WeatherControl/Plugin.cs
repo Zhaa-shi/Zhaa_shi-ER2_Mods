@@ -11,7 +11,7 @@ using UnityEngine;
 
 namespace ER2WeatherControl;
 
-[BepInPlugin("er2.weathercontrol", "ER2 Weather Control", "1.7.1")]
+[BepInPlugin("er2.weathercontrol", "ER2 Weather Control", "1.7.2")]
 public class Plugin : BasePlugin
 {
 	internal static ManualLogSource ModLog;
@@ -57,7 +57,7 @@ public class Plugin : BasePlugin
 		weatherMode = Config.Bind("Weather", "weatherMode", "Default", new ConfigDescription("Weather applied in battle: Default (map's own weather), Clear, Rain, Snow. Changes apply immediately.", new AcceptableValueList<string>("Default", "Clear", "Rain", "Snow")));
 		atmospherePreset = Config.Bind("Atmosphere", "atmospherePreset", "Default", new ConfigDescription("Time of day / atmosphere applied in battle. Changes apply immediately.", new AcceptableValueList<string>("Default", "Midday", "Sunset", "Dawn", "Night", "Cloudy", "Foggy")));
 		new Harmony("er2.weathercontrol").PatchAll(Assembly.GetExecutingAssembly());
-		ModLog.LogInfo((object)("ER2 Weather Control 1.7.1 loaded. Weather: " + weatherMode.Value + ", Atmosphere: " + atmospherePreset.Value));
+		ModLog.LogInfo((object)("ER2 Weather Control 1.7.2 loaded. Weather: " + weatherMode.Value + ", Atmosphere: " + atmospherePreset.Value));
 	}
 }
 

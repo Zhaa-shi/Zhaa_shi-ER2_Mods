@@ -8,7 +8,7 @@ using UnityEngine;
 
 namespace ER2UnitInfoOverlay;
 
-[BepInPlugin("er2.unitinfooverlay", "ER2 Unit Inspector", "1.0.4")]
+[BepInPlugin("er2.unitinfooverlay", "ER2 Unit Inspector", "1.0.5")]
 public class Plugin : BasePlugin
 {
 #if CN_BUILD
@@ -74,7 +74,7 @@ public class Plugin : BasePlugin
 		showId = Config.Bind("Info Lines", "showId", true, T("实例 ID 与指针行（开发者调试用）。", "Instance ID and pointer line (developer debugging)."));
 
 		new Harmony("er2.unitinfooverlay").PatchAll(typeof(Plugin).Assembly);
-		ModLog.LogInfo("ER2 Unit Inspector 1.0.4 loaded. Toggle: " + toggleKey.Value + " | mode: " + displayMode.Value + " | range: " + maxDistance.Value + "m");
+		ModLog.LogInfo("ER2 Unit Inspector 1.0.5 loaded. Toggle: " + toggleKey.Value + " | mode: " + displayMode.Value + " | range: " + maxDistance.Value + "m");
 	}
 }
 

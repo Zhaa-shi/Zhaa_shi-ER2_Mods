@@ -1003,17 +1003,6 @@ internal static class OverlayLogic
 	{
 		try
 		{
-			Font f = PhaseBarGUI.GetDefaultFont();
-			if (f != null)
-			{
-				return f;
-			}
-		}
-		catch
-		{
-		}
-		try
-		{
 			if (GUI.skin != null && GUI.skin.font != null)
 			{
 				return GUI.skin.font;
@@ -1022,7 +1011,14 @@ internal static class OverlayLogic
 		catch
 		{
 		}
-		return null;
+		try
+		{
+			return Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+		}
+		catch
+		{
+			return null;
+		}
 	}
 
 	private static Texture2D GetWhiteTex()

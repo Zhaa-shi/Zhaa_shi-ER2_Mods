@@ -42,7 +42,11 @@ internal static class SceneMarkers
 	private static Font LabelFont()
 	{
 		if (labelFont != null) return labelFont;
-		try { labelFont = PhaseBarGUI.GetDefaultFont(); } catch { }
+		try { if (GUI.skin != null) labelFont = GUI.skin.font; } catch { }
+		if (labelFont == null)
+		{
+			try { labelFont = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf"); } catch { }
+		}
 		return labelFont;
 	}
 

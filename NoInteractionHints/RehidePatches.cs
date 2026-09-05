@@ -69,7 +69,7 @@ namespace ER2NoInteractionHints
 			if (!Plugin.PhaseBarPresent) return;
 			try
 			{
-				var t = AccessTools.TypeByName("PhaseBarGUI");
+				var t = Plugin.PhaseBarType;
 				var mLate = AccessTools.Method(t, "LateUpdate");
 				var post = new HarmonyMethod(typeof(RehidePatches), nameof(RehidePhaseBarPostfix));
 				h.Patch(mLate, postfix: post);
