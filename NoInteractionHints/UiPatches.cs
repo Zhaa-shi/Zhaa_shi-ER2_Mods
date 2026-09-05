@@ -184,17 +184,32 @@ namespace ER2NoInteractionHints
 
 		// ===== 任务状态面板（MissionStatusGUI 由 Lua 驱动，补藏即可；阻断不了就靠巡检）=====
 
-		// ===== 阶段进度条（拦截 SetVisible 的"显示"调用，隐藏时强制不显示）=====
-		[HarmonyPatch(typeof(PhaseBarGUI), "SetVisible")]
-		private static class BlockPhaseBarShow
+		// ===== 阶段进度条 =====
+		// 0.9.15：PhaseBarGUI 在新版游戏中被移除——类型缺失时 typeof() 会抛 TypeLoadException，
+		// 改为条件 patch（类型存在才挂），不再使用 [HarmonyPatch] 特性。
+		internal static void PatchPhaseBar(Harmony h)
 		{
-			private static void Postfix(bool visible)
+			if (!Plugin.PhaseBarPresent) return;
+			try
+			{
+				var t = AccessTools.TypeByName("PhaseBarGUI");
+				var mSetVisible = AccessTools.Method(t, "SetVisible");
+				var post = new HarmonyMethod(typeof(UiPatches), nameof(BlockPhaseBarShowPostfix));
+				h.Patch(mSetVisible, postfix: post);
+			}
+			catch (System.Exception ex) { Plugin.ModLog.LogWarning("PhaseBar patch skipped: " + ex.Message); }
+		}
+
+		private static void BlockPhaseBarShowPostfix(bool visible)
+		{
+			try
 			{
 				if (UiGroups.IsHidden("phaseBar") && visible)
 				{
-					PhaseBarGUI.SetVisible(false);
+					AccessTools.Method(AccessTools.TypeByName("PhaseBarGUI"), "SetVisible").Invoke(null, new object[] { false });
 				}
 			}
+			catch { }
 		}
 
 		// ===== 地图与小地图（隐藏时禁止打开全屏地图 / 小地图）=====

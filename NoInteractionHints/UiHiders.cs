@@ -1,4 +1,5 @@
 using System;
+using HarmonyLib;
 using System.Collections.Generic;
 using Corvostudio.UI;
 using UnityEngine;
@@ -353,11 +354,13 @@ namespace ER2NoInteractionHints
 		// ===== 5. 阶段条 =====
 		// 优先走原生 PhaseBarGUI.SetVisible(false)（游戏自己维护 visibleFlag，LateUpdate 尊重它）；
 		// 同时把组件 GameObject 藏掉作为兜底。
+		// 0.9.15：PhaseBarGUI 在新版游戏中被移除——类型缺失时直接跳过（该类别无可隐藏对象）。
 		internal static readonly ElementHider PhaseBar = new ElementHider();
 		private static readonly MissLog PhaseBarLog = new MissLog("phase bar");
 
 		internal static void SetPhaseBar(bool visible)
 		{
+			if (!Plugin.PhaseBarPresent) return; // 新版游戏已无阶段条
 			if (visible)
 			{
 				PhaseBar.ShowAll();
@@ -366,11 +369,13 @@ namespace ER2NoInteractionHints
 			}
 			try
 			{
-				PhaseBarGUI pb = PhaseBarGUI.instance;
-				if (pb != null)
+				var t = AccessTools.TypeByName("PhaseBarGUI");
+				var pbObj = t.GetField("instance").GetValue(null);
+				if (pbObj != null)
 				{
-					PhaseBarGUI.SetVisible(false);
-					PhaseBar.Hide(pb);
+					AccessTools.Method(t, "SetVisible").Invoke(null, new object[] { false });
+					// 反射实例无法满足 ElementHider 的 Component 泛型——转 Component 兜底
+					PhaseBar.Hide(pbObj as UnityEngine.Component);
 					PhaseBarLog.Done();
 				}
 				else
@@ -386,9 +391,16 @@ namespace ER2NoInteractionHints
 		/// <summary>每帧补藏（PhaseBarGUI.LateUpdate Postfix 调用）。</summary>
 		internal static void RehidePhaseBar()
 		{
-			if (PhaseBarGUI.instance != null)
+			try
 			{
-				PhaseBarGUI.SetVisible(false);
+				var t = AccessTools.TypeByName("PhaseBarGUI");
+				if (t.GetField("instance").GetValue(null) != null)
+				{
+					AccessTools.Method(t, "SetVisible").Invoke(null, new object[] { false });
+				}
+			}
+			catch
+			{
 			}
 		}
 
@@ -396,9 +408,10 @@ namespace ER2NoInteractionHints
 		{
 			try
 			{
-				if (PhaseBarGUI.instance != null)
+				var t = AccessTools.TypeByName("PhaseBarGUI");
+				if (t.GetField("instance").GetValue(null) != null)
 				{
-					PhaseBarGUI.SetVisible(true);
+					AccessTools.Method(t, "SetVisible").Invoke(null, new object[] { true });
 				}
 			}
 			catch

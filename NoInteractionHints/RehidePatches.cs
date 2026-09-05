@@ -62,17 +62,31 @@ namespace ER2NoInteractionHints
 			}
 		}
 
-		// ===== 阶段进度条（原生 SetVisible(false)，游戏自己尊重该标志）=====
-		[HarmonyPatch(typeof(PhaseBarGUI), "LateUpdate")]
-		private static class RehidePhaseBarPatch
+		// ===== 阶段进度条 =====
+		// 0.9.15：PhaseBarGUI 在新版游戏中被移除——改为条件 patch（类型存在才挂）。
+		internal static void PatchPhaseBarRehide(Harmony h)
 		{
-			private static void Postfix()
+			if (!Plugin.PhaseBarPresent) return;
+			try
+			{
+				var t = AccessTools.TypeByName("PhaseBarGUI");
+				var mLate = AccessTools.Method(t, "LateUpdate");
+				var post = new HarmonyMethod(typeof(RehidePatches), nameof(RehidePhaseBarPostfix));
+				h.Patch(mLate, postfix: post);
+			}
+			catch (System.Exception ex) { Plugin.ModLog.LogWarning("PhaseBar rehide patch skipped: " + ex.Message); }
+		}
+
+		private static void RehidePhaseBarPostfix()
+		{
+			try
 			{
 				if (UiGroups.IsHidden("phaseBar"))
 				{
 					UiHiders.RehidePhaseBar();
 				}
 			}
+			catch { }
 		}
 
 		// ===== 载具 HUD =====

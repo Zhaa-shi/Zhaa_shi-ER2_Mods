@@ -1,4 +1,4 @@
-ER2 Hide Anything v4.5.2
+ER2 Hide Anything v4.5.3
 ========================
 
 Hide anything on your HUD - check boxes, done. No hotkeys to remember:
@@ -31,7 +31,7 @@ Mods are detected the moment they are installed (pre-registered); no
 waiting for the first battle. Uncheck = that mod's UI stays visible
 while everything else hides. Per-mod, independent control.
 
-v4.5.2
+v4.5.3
 ------
 - New mods (Veteran HVT, Unit Inspector) are pre-registered: their
   toggles appear in Mod Manager immediately after install, no need to

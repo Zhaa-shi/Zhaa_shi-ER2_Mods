@@ -8,7 +8,7 @@ using UnityEngine;
 
 namespace ER2NoInteractionHints;
 
-[BepInPlugin("com.ryan.er2.nointeractionhints", "ER2 Hide Anything", "4.5.2")]
+[BepInPlugin("com.ryan.er2.nointeractionhints", "ER2 Hide Anything", "4.5.3")]
 public class Plugin : BasePlugin
 {
 	[HarmonyPatch(typeof(InteractionGUI2), "SetInteraction")]
@@ -90,10 +90,14 @@ public class Plugin : BasePlugin
 
 	internal static ConfigEntry<bool> enabled;
 
+	/// <summary>0.9.15 兼容：游戏更新移除了 PhaseBarGUI 类型——不存在时跳过全部 PhaseBar 相关 patch。</summary>
+	internal static readonly bool PhaseBarPresent = AccessTools.TypeByName("PhaseBarGUI") != null;
+
 	public override void Load()
 	{
 		ModLog = this.Log;
 		enabled = Config.Bind("General", "enabled", true, "Master switch for UI hiding.");
+		if (!PhaseBarPresent) ModLog.LogWarning("PhaseBarGUI not found in this game version — phase bar hiding disabled (game removed the class).");
 		HudCompat.Cfg = Config;
 		UiGroups.Cfg = Config;
 		// UI 分类注册（每类：勾选 = 始终隐藏且严格生效；默认全部不勾选）
@@ -112,11 +116,14 @@ public class Plugin : BasePlugin
 		UiGroups.Register("scope", "scope overlay", UiHiders.SetScope);
 		UiGroups.Register("worldMarkers", "world markers (following markers)", UiHiders.SetWorldMarkers);
 		new Harmony("com.ryan.er2.nointeractionhints").PatchAll();
+		// 0.9.15：PhaseBar patch 条件注册（类型被游戏移除时不挂）
+		UiPatches.PatchPhaseBar(new Harmony("com.ryan.er2.nointeractionhints"));
+		RehidePatches.PatchPhaseBarRehide(new Harmony("com.ryan.er2.nointeractionhints"));
 		// 预注册已安装的生态 mod + 惯例字段扫描（Load 先跑一遍，设置界面/战斗帧补扫）
 		HudCompat.PreregisterKnownMods();
 		HudCompat.DiscoverFields();
 		// 应用勾选的隐藏状态（元素不存在的场景由巡检补藏）
 		UiGroups.ApplyAll();
-		ModLog.LogInfo((object)"ER2 Hide Anything 4.5.2 loaded. Check boxes in Mod Manager to hide UIs (checked = hidden & locked).");
+		ModLog.LogInfo((object)"ER2 Hide Anything 4.5.3 loaded. Check boxes in Mod Manager to hide UIs (checked = hidden & locked).");
 	}
 }
