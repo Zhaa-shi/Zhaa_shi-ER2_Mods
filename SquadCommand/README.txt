@@ -1,4 +1,4 @@
-ER2 Battlefield Commander v0.9.15
+ER2 Battlefield Commander v0.9.17
 =================================
 
 A BepInEx plugin for Easy Red 2 that adds an "RTS god-view squad command" layer — mouse operations inspired by Gates of Hell: Ostfront.
@@ -14,7 +14,7 @@ A BepInEx plugin for Easy Red 2 that adds an "RTS god-view squad command" layer 
 * Double-click a friendly soldier = select their entire squad.
 * Hold LMB to box-select = temporary selection of friendlies inside the box; native squads are never split automatically.
   Only the top [Split] button creates a real new squad; vehicle crews stay together as one unit; Shift+box = append.
-* RMB short press = order: ground = move (selected units only), enemy = persistent focus-fire mark, friendly/neutral vehicle = open interaction ring.
+* RMB short press = order: ground = move (selected units only), enemy = persistent focus-fire mark (fire priority only, no auto-advance), friendly/neutral vehicle = open interaction ring.
 * RMB double-click (same spot within 0.6s) = native "Move & Defend" (HoldArea): one native order per selected squad, no extra orchestration.
 * RMB long press (0.35s) = command ring: on empty ground → Stand / Crouch / Prone / Halt / Cover / Rally / Hold Fire (toggle) / Scatter;
   pressed on a unit the ring never opens — release issues the short-press order (friendly/neutral vehicle = Board / Dismount / Repair). Space pauses.
@@ -37,7 +37,7 @@ A BepInEx plugin for Easy Red 2 that adds an "RTS god-view squad command" layer 
 [Install]
 1. Install BepInEx (IL2CPP version) into the game root folder.
 2. Drop ER2_BattlefieldCommander.dll into <game root>\BepInEx\plugins\.
-3. Launch the game — "Loading [ER2 Battlefield Commander 0.9.15]" in the log means success.
+3. Launch the game — "Loading [ER2 Battlefield Commander 0.9.17]" in the log means success.
 
 [Notes]
 * Entering god view detaches every friendly squad from native task pulling; takeover auto-closes leftover native "select squad" panels.

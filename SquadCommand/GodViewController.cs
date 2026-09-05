@@ -7,13 +7,13 @@ namespace ER2SquadCommand;
 /// <summary>
 /// 上帝视角 v0.7.93（RTS 指挥，RTS/FPS 共存版）。
 ///   左键：单击选友军（临时指挥，不建队）/拖框/双击选队/空白清选/Shift 追加
-///   右键短按：空白=移动(M7)｜敌军=集火标记+推进｜友军载具/车内兵=交互环｜徒步友军=视为地面移动（合并已上移顶栏）；双击=原生前往并防守(HoldArea)
+///   右键短按：空白=移动(M7)｜敌军=集火标记（只改目标，不移动）｜友军载具/车内兵=交互环｜徒步友军=视为地面移动（合并已上移顶栏）；双击=原生前往并防守(HoldArea)
 ///   右键长按 0.35s（仅按在空地/无效目标时）：单位环（站起[resetPose]/蹲下/趴下[setPose+还原名单]/停止）；按在单位上=短按指令，不弹环
 ///   交互环：上车（成功后转选车组）/下车/修理（原生 OrderRepairVehicle）；合并只保留顶栏入口（0.7.96 移出轮盘）
 ///   顶栏按钮：控制该小队 / 分队（显式新建组）/ 合并（并入当前激活 RTS 组）
 ///   空格暂停；F9 进入/紧急退出；顶部按钮接管（保护窗+独苗转移）
 ///   退出 RTS 不清除已下达的移动、登车、车辆同步和集火任务；FPS 原生输入照常运行
-///   标记=持久集火（GetBestVisibleEnemy/CurrentVisibleTarget Postfix + LOS 缓存）+ 原生冲锋推进（Charge）
+///   标记=持久集火（GetBestVisibleEnemy/CurrentVisibleTarget Postfix + LOS 缓存）；0.9.17 起不再自动冲锋推进——想去哪用移动/前往并防守下令
 ///   死亡/换队链已冻结（0.7.40/41：停用 ClearSquadList 与 EnsurePlayerSquadHasCandidates）
 ///   光标防闪烁：Cursor set_lockState/visible patch + FrameEndRunner 兜底
 /// </summary>
@@ -640,8 +640,7 @@ internal static class GodViewController
 			Name = SafeName(target),
 			Until = float.MaxValue
 		};
-		RecordCmdTarget(target.transform.position);
-		BeginMarkAdvance();
+		BeginMarkFocus();
 		cmdFlash = string.Format(Ui.Tr("集火标记 → {0}（持续到死亡/失控）"), mark.Name); cmdFlashUntil = Time.unscaledTime + 3f;
 		SquadCmdLogic.LogAlways("[SquadCmd] 集火标记(持久) " + mark.Name + " 阵营=" + fac);
 	}
@@ -670,8 +669,7 @@ internal static class GodViewController
 			Name = "载具 " + SafeName(veh),
 			Until = float.MaxValue
 		};
-		RecordCmdTarget(veh.transform.position);
-		BeginMarkAdvance();
+		BeginMarkFocus();
 		cmdFlash = string.Format(Ui.Tr("集火标记 → {0}（持续到死亡/失控）"), mark.Name); cmdFlashUntil = Time.unscaledTime + 3f;
 		SquadCmdLogic.LogAlways("[SquadCmd] 集火标记(持久) 载具 " + veh.name);
 	}
@@ -689,8 +687,7 @@ internal static class GodViewController
 			Name = string.IsNullOrEmpty(objName) ? "目标物" : objName,
 			Until = float.MaxValue
 		};
-		RecordCmdTarget(pos);
-		BeginMarkAdvance();
+		BeginMarkFocus();
 		cmdFlash = string.Format(Ui.Tr("标记目标物 → {0}（持续到失效）"), mark.Name); cmdFlashUntil = Time.unscaledTime + 3f;
 		SquadCmdLogic.Log("[SquadCmd] 标记目标物 " + mark.Name);
 	}
@@ -754,10 +751,14 @@ internal static class GodViewController
 	private static readonly Dictionary<int, List<Squad>> groupCrews = new Dictionary<int, List<Squad>>();
 	private static readonly Dictionary<int, List<Vehicle>> groupVehRefs = new Dictionary<int, List<Vehicle>>();
 
-	/// <summary>标记后：选中单位按所属原生小队编组冲锋（Squad.Charge）向目标推进接战，全原生无修正状态机。</summary>
-	private static void BeginMarkAdvance()
+	/// <summary>
+	/// 0.9.17：标记=纯集火——只登记单位快照供 GetBestVisibleEnemy/CurrentVisibleTarget 覆盖引导射击，
+	/// 不再下发 Squad.Charge 推进（想去哪用移动/前往并防守下令，标记只管"打谁"）。
+	/// 保留 ClearMoveObservation：上一个移动令的行军停火必须立刻解除，否则被标记单位被停火锁住不打。
+	/// </summary>
+	private static void BeginMarkFocus()
 	{
-		ClearMoveObservation(); // 标记覆盖旧的移动观测
+		ClearMoveObservation(); // 标记解除行军停火（若上个移动令还在），标记单位恢复开火
 		persistentMarkUnits.Clear();
 		persistentMarkVehicles.Clear();
 		foreach (Soldier s in GetSelectedInfantry())
@@ -789,22 +790,7 @@ internal static class GodViewController
 			foreach (Vehicle old in persistentMarkVehicles) { try { if (old != null && old.Pointer == v.Pointer) { exists = true; break; } } catch { } }
 			if (!exists) persistentMarkVehicles.Add(v);
 		}
-		// 0.7.98：推进改用原生冲锋（Squad.Charge）——按所属原生小队分组单条命令，
-		// Mod 不再自建推进/停滞修正状态机。
-		if (mark == null) return;
-		HashSet<long> done = new HashSet<long>();
-		foreach (Soldier s in GetSelectedInfantry())
-		{
-			try
-			{
-				if (s == null || !s.IsAlive) continue;
-				Squad sq = s.joinedSquad;
-				if (sq == null || !done.Add((long)sq.Pointer)) continue;
-				SquadCmdLogic.RegisterControlledSquad(sq);
-				sq.Charge(mark.Position, Plugin.radius.Value);
-			}
-			catch { }
-		}
+		// 0.9.17：不再自动冲锋推进——标记只改目标选择（打谁），不动单位位置。
 	}
 
 	private static void RemovePersistentUnit(Soldier unit)
