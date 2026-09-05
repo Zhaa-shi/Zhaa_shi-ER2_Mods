@@ -738,8 +738,12 @@ internal static class GodViewController
 	private static Vector3 obsTarget;
 	private static readonly List<Soldier> obsUnits = new List<Soldier>();
 	private static readonly List<Vehicle> obsVehicles = new List<Vehicle>();
-	// 0.9.10：行军禁索敌名单——移动命令优先于自动交火（到位/超时/改令即恢复）
+	// 0.9.11：行军禁索敌名单——移动命令优先于自动交火（到位/超时/改令即恢复）
+	// 0.9.15：改用原生停火通道（Squad.SetHoldFireOrder + AiParams），并加 20s 有效期——
+	// 0.9.12 的"GetBestVisibleEnemy 全盲"会引发任务系统异常（单位罚站/冻结）且拦不住任务级打断
 	private static readonly List<Soldier> obsNoEngage = new List<Soldier>();
+	private static readonly HashSet<long> obsNoEngageSquads = new HashSet<long>();
+	private const float NoEngageMaxSeconds = 20f;
 	private static float obsUntil = -10f;
 	private static float obsNext = -10f;
 	internal static int ObsArrived; // HUD 进度行用
@@ -810,10 +814,16 @@ internal static class GodViewController
 		try { obsUnits.RemoveAll(s => s == null || s.Pointer == unit.Pointer); } catch { } // 接管单位不再计入移动完成度
 		try
 		{
-			// 0.9.10：被接管单位若在行军禁索敌名单中，恢复索敌再移除
+			// 0.9.15：被接管单位若在行军停火名单中，恢复感知再移除
 			if (obsNoEngage.RemoveAll(s => s == null || s.Pointer == unit.Pointer) > 0)
 			{
-				try { new Lua_Soldier(unit).getAiParams().allowCheckForEnemies(true); } catch { }
+				try
+				{
+					AiParams ap = new Lua_Soldier(unit).getAiParams();
+					ap.allowCheckForEnemies(true);
+					ap.allowFindCoverWhenSuppressed(true);
+				}
+				catch { }
 			}
 		}
 		catch { }
@@ -1173,41 +1183,82 @@ internal static class GodViewController
 		if (selVehicleRefs.Count == 0) SquadCmdLogic.Log("[SplitCheck] 无选中载具（纯步兵分队）");
 	}
 
-	/// <summary>0.7.99：下达移动后登记完成度观测（纯观察，不动 AI）。0.9.10：同时关闭行军单位索敌。</summary>
+	/// <summary>0.7.99：下达移动后登记完成度观测。0.9.15：改用原生停火通道 + 压制有效期。</summary>
 	private static void RegisterMoveObservation(Vector3 point, List<Soldier> units)
 	{
 		obsTarget = point;
 		obsUnits.Clear();
+		HashSet<long> squads = new HashSet<long>();
 		foreach (Soldier s in units)
 		{
 			if (s == null || !s.IsAlive) continue;
 			obsUnits.Add(s);
 			try
 			{
-				// 0.9.11：移动优先——行军期间禁索敌 + 禁被压制找掩护（后者会把队伍拽出队列）
 				SquadCmdLogic.RegisterControlledUnit(s);
-				AiParams ap = new Lua_Soldier(s).getAiParams();
-				ap.allowCheckForEnemies(false);
-				ap.allowFindCoverWhenSuppressed(false);
 				if (!obsNoEngage.Contains(s)) obsNoEngage.Add(s);
+				Squad sq = s.joinedSquad;
+				if (sq != null) squads.Add((long)sq.Pointer);
+			}
+			catch { }
+		}
+		// 0.9.15：原生停火（小队级 SetHoldFireOrder）+ 士兵级禁被压制找掩护。
+		// 不再切断 GetBestVisibleEnemy——全盲会引发任务系统异常（罚站/冻结）且拦不住任务级打断。
+		foreach (long k in squads)
+		{
+			try
+			{
+				Squad sq = ResolveSquadByPointer(k);
+				if (sq == null) continue;
+				SquadCmdLogic.RegisterControlledSquad(sq);
+				sq.SetHoldFireOrder(true, false, false, false);
+				obsNoEngageSquads.Add(k);
+			}
+			catch { }
+		}
+		foreach (Soldier s in obsNoEngage)
+		{
+			try
+			{
+				AiParams ap = new Lua_Soldier(s).getAiParams();
+				ap.allowFindCoverWhenSuppressed(false);
 			}
 			catch { }
 		}
 		obsUntil = Time.unscaledTime + 45f;
 		obsNext = Time.unscaledTime + 1f;
+		obsNoEngageExpire = Time.unscaledTime + NoEngageMaxSeconds; // 保险丝：20s 后自动恢复开火
 		ObsTotal = obsUnits.Count + obsVehicles.Count;
 		ObsArrived = 0;
 	}
 
-	/// <summary>0.9.12：该行军单位是否处于"移动优先"压制中（GetBestVisibleEnemy 前缀用）。</summary>
-	internal static bool MoveSuppressingTarget(Soldier s)
+	/// <summary>0.9.15：行军停火到期时间（保险丝，防长期罚站）。</summary>
+	private static float obsNoEngageExpire = -10f;
+
+	/// <summary>0.9.15：按指针在存活单位里找回 Squad（interop 对象可能已被 GC 重建）。</summary>
+	private static Squad ResolveSquadByPointer(long ptr)
 	{
-		try { return s != null && obsNoEngage.Contains(s); } catch { return false; }
+		try
+		{
+			Il2CppSystem.Collections.Generic.List<Creature> list = Creature.allCreatures;
+			if (list == null) return null;
+			for (int i = 0; i < list.Count; i++)
+			{
+				Creature c = list[i];
+				if (c == null) continue;
+				Soldier s = c.TryCast<Soldier>();
+				if (s == null || !s.IsAlive) continue;
+				Squad sq = s.joinedSquad;
+				if (sq != null && (long)sq.Pointer == ptr) return sq;
+			}
+		}
+		catch { }
+		return null;
 	}
 
 	private static void ClearMoveObservation()
 	{
-		// 0.9.11：观测结束（到位/超时/改令）恢复行军单位自动交火与被压制找掩护
+		// 0.9.15：观测结束（到位/超时/改令/到期）恢复开火与被压制找掩护
 		foreach (Soldier s in obsNoEngage)
 		{
 			try
@@ -1222,9 +1273,20 @@ internal static class GodViewController
 			catch { }
 		}
 		obsNoEngage.Clear();
+		foreach (long k in obsNoEngageSquads)
+		{
+			try
+			{
+				Squad sq = ResolveSquadByPointer(k);
+				if (sq != null) sq.SetHoldFireOrder(false, false, false, false);
+			}
+			catch { }
+		}
+		obsNoEngageSquads.Clear();
 		obsUnits.Clear();
 		obsVehicles.Clear();
 		obsUntil = -10f;
+		obsNoEngageExpire = -10f;
 		ObsTotal = 0;
 		ObsArrived = 0;
 	}
@@ -1254,17 +1316,27 @@ internal static class GodViewController
 		if (Time.unscaledTime > obsUntil) { ClearMoveObservation(); return; }
 		if (Time.unscaledTime < obsNext) return;
 		obsNext = Time.unscaledTime + 1f;
-		// 0.9.11：每周期重申行军压制（防原生任务系统回写恢复索敌/找掩护）
-		foreach (Soldier s in obsNoEngage)
+		// 0.9.15：行军停火保险丝到期 → 恢复全部开火/感知（防罚站冻结）
+		if (obsNoEngageExpire > 0f && Time.unscaledTime > obsNoEngageExpire)
 		{
-			try
+			obsNoEngageExpire = -10f;
+			foreach (Soldier s in obsNoEngage)
 			{
-				if (s == null || !s.IsAlive) continue;
-				AiParams ap = new Lua_Soldier(s).getAiParams();
-				ap.allowCheckForEnemies(false);
-				ap.allowFindCoverWhenSuppressed(false);
+				try
+				{
+					if (s == null || !s.IsAlive) continue;
+					AiParams ap = new Lua_Soldier(s).getAiParams();
+					ap.allowCheckForEnemies(true);
+					ap.allowFindCoverWhenSuppressed(true);
+				}
+				catch { }
 			}
-			catch { }
+			foreach (long k in obsNoEngageSquads)
+			{
+				try { Squad sq = ResolveSquadByPointer(k); if (sq != null) sq.SetHoldFireOrder(false, false, false, false); } catch { }
+			}
+			obsNoEngageSquads.Clear();
+			SquadCmdLogic.LogAlways("[SquadCmd] 行军停火到期，已恢复交战（单位仍未到位可再下移动令）");
 		}
 		int alive = 0, arrived = 0;
 		float r2 = Plugin.radius.Value * Plugin.radius.Value;
