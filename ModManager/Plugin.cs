@@ -15,7 +15,7 @@ using UnityEngine.UI;
 
 namespace ER2ModManager;
 
-[BepInPlugin("er2.modmanager", "ER2 Mod Manager", "1.1.1")]
+[BepInPlugin("er2.modmanager", "ER2 Mod Manager", "1.1.5")]
 public class Plugin : BasePlugin
 {
 	/// <summary>构建语言：CN_BUILD 编译符号 = 中文版（标签中文、页标题"模组"）；否则英文版。</summary>
@@ -45,7 +45,7 @@ public class Plugin : BasePlugin
 		nativeFull = Config.Bind("General", "NativeFull", false, "DEV: render the whole MODS page via native SettingSelectable rows.");
 		HarmonyInstance = new Harmony("er2.modmanager");
 		HarmonyInstance.PatchAll(GetType().Assembly);
-		ModLog.LogInfo((object)"ER2 Mod Manager 1.1.0 loaded.");
+		ModLog.LogInfo((object)"ER2 Mod Manager 1.1.5 loaded.");
 	}
 }
 
@@ -59,9 +59,6 @@ public class Plugin : BasePlugin
 public static class ModRegistry
 {
 	internal static int myIndex = -1;
-
-	/// <summary>上一次已知停留在 MODS 页（用于检测原生重置页码后自动恢复）。</summary>
-	internal static bool lastOnModsPage;
 
 	private const string MyPageId = "MODS";
 
@@ -174,6 +171,24 @@ public static class ModRegistry
 		}
 	}
 
+	/// <summary>v1.1.4：翻页进入 MODS 页的唯一入口（TabRight/TabLeft 调用）。
+	/// 补原生点击音效（拦截原生翻页后原生不再播音效）。**不做防抖吞掉**——连点时每次都必须
+	/// 执行 OpenMyPage（它开头就设 currentOpenedMenu=mods 页并停掉原生填充协程）；吞掉反而把
+	/// cur 留在旧页，后续点击错位、原生协程继续灌行 → "连点两页以上列表不显示"。
+	/// v1.1.5：进入时滚动回顶；页内展开/收起重建（ToggleMod 等直调 OpenMyPage）不回顶。</summary>
+	internal static void EnterMyPage(SettingsGUI_V2 s)
+	{
+		try
+		{
+			SoundManager.ClickSound();
+		}
+		catch
+		{
+		}
+		OpenMyPage(s);
+		ResetScrollTop(s.contentPage);
+	}
+
 	/// <summary>接管并填充我们的页面（用户翻到最后一页时由 TabRightPatch 调用）。</summary>
 	internal static void OpenMyPage(SettingsGUI_V2 s)
 	{
@@ -181,6 +196,19 @@ public static class ModRegistry
 		FlushAllStaged();
 		SettingsGUI_V2.currentOpenedMenu = myIndex;
 		ClearWatchesAndFlush();
+		// 停掉原生填充协程：新设置页的 FillSettingPage 是异步协程，晚到时会把原生控件
+		// 灌进我们的页面 → 与我们的每帧清理形成拉锯（页面反复重建/闪烁）
+		try
+		{
+			if (s.fillingRoutine != null)
+			{
+				s.StopCoroutine(s.fillingRoutine);
+				s.fillingRoutine = null;
+			}
+		}
+		catch
+		{
+		}
 		ClearContent(s.contentPage);
 		float y = FillContent(s.contentPage);
 		// 立即强制修复一次滚动高度，避免长列表打开瞬间只有第一行、要等 0.5s 巡检才恢复。
@@ -218,6 +246,9 @@ public static class ModRegistry
 		}
 		Plugin.ModLog.LogInfo((object)("ModManager: opened MODS page."));
 	}
+
+	/// <summary>v1.1.3：上一帧轮询时间（设置界面重开检测——Update 停跑期间时间跳变 &gt; 1.5s）。</summary>
+	internal static float lastPollTime;
 
 	/// <summary>重建页面前清空监视。落盘由各分区【保存】按钮显式触发（用户要求"按下后才保存"）。</summary>
 	private static void ClearWatchesAndFlush()
@@ -679,14 +710,16 @@ public static class ModRegistry
 			return y;
 		}
 		// 自动布局容器（锚定 Content 顶部，LayoutGroup 向下排列，Fitter 自动扩展高度）
+		// v1.1.5：容器右侧收窄（右边距 46px），行不再伸到滚动条下方 —— 修复滑条压列表 +
+		// 列表与滑条无间隔两个问题（模板行 LayoutGroup 控宽，收窄即整体让位）。
 		GameObject cont = new GameObject("MM_Container");
 		cont.transform.SetParent(contentPage, false);
 		RectTransform crt = cont.AddComponent<RectTransform>();
 		crt.anchorMin = new Vector2(0f, 1f);
 		crt.anchorMax = new Vector2(1f, 1f);
 		crt.pivot = new Vector2(0.5f, 1f);
-		crt.anchoredPosition = Vector2.zero;
-		crt.sizeDelta = new Vector2(0f, 100f);
+		crt.anchoredPosition = new Vector2(-23f, 0f);
+		crt.sizeDelta = new Vector2(-46f, 100f);
 		UnityEngine.UI.VerticalLayoutGroup lg = cont.AddComponent<UnityEngine.UI.VerticalLayoutGroup>();
 		lg.spacing = 6f;
 		lg.childAlignment = TextAnchor.UpperCenter;
@@ -703,54 +736,40 @@ public static class ModRegistry
 		{
 			AddWarningRow(container, warn);
 		}
-		// 分类：有总开关的 mod 与没有总开关的 mod 分开显示，便于快速管理。
-		List<PluginConfig> hasSwitch = new List<PluginConfig>();
-		List<PluginConfig> noSwitch = new List<PluginConfig>();
-		foreach (PluginConfig p in plugins)
+		// v1.1.4：按剥离前缀后的短名排序 + 字母分组（A/B/…/0-9/#），每组前插一个字母小标题行。
+		List<PluginConfig> visible = new List<PluginConfig>(plugins);
+		foreach (PluginConfig p in visible)
 		{
-			if (HasMasterSwitch(p))
-			{
-				hasSwitch.Add(p);
-			}
-			else
-			{
-				noSwitch.Add(p);
-			}
+			p.shortName = StripNamePrefix(p.name);
 		}
-
-		void RenderPlugins(List<PluginConfig> list)
+		visible.Sort((a, b) => string.Compare(a?.shortName, b?.shortName, StringComparison.OrdinalIgnoreCase));
+		string lastLetter = null;
+		foreach (PluginConfig p in visible)
 		{
-			foreach (PluginConfig p in list)
+			try
 			{
-				try
+				// 字母分组小标题：短名首字符 A-Z 归字母组；数字归 0-9；其余归 #
+				string letter = GroupLetter(p.shortName);
+				if (letter != null && letter != lastLetter)
 				{
-					// 可点击标题（mod 中文名）
-					string name = p.name;
-					bool expanded = expandedMods.Contains(name);
-					AddSectionButton(SettingsGUI_V2.instance, container, name, expanded, name);
-					if (expanded)
-					{
-						FillModEntries(p, container);
-						// 展开内容末尾：重置（恢复默认）+ 复制全部文本
-						AddFooterRow(container, p.name, p.cfg);
-					}
+					lastLetter = letter;
+					AddCategoryRow(container, letter);
 				}
-				catch (Exception ex)
+				// 可点击标题（剥离前缀的短名；展开行小字显示完整原名）
+				string name = p.name;
+				bool expanded = expandedMods.Contains(name);
+				AddSectionButton(SettingsGUI_V2.instance, container, p.shortName, expanded, name);
+				if (expanded)
 				{
-					Plugin.ModLog.LogError((object)("ModManager fill plugin error: " + ex.Message));
+					FillModEntries(p, container);
+					// 展开内容末尾：重置（恢复默认）+ 复制全部文本
+					AddFooterRow(container, p.name, p.cfg);
 				}
 			}
-		}
-
-		if (hasSwitch.Count > 0)
-		{
-			AddCategoryRow(container, Plugin.DefaultChinese ? "── 有开关 mod ──" : "── With master switch ──");
-			RenderPlugins(hasSwitch);
-		}
-		if (noSwitch.Count > 0)
-		{
-			AddCategoryRow(container, Plugin.DefaultChinese ? "── 无开关 mod ──" : "── Without master switch ──");
-			RenderPlugins(noSwitch);
+			catch (Exception ex)
+			{
+				Plugin.ModLog.LogError((object)("ModManager fill plugin error: " + ex.Message));
+			}
 		}
 		// 列表底部感谢行（双语）
 		AddThanksRow(container);
@@ -780,6 +799,39 @@ public static class ModRegistry
 		{
 		}
 		return y;
+	}
+
+	/// <summary>v1.1.3：滚动复位到顶部 + 清理 NaN（翻页/重进后列表不显示的常见根因）。</summary>
+	internal static void ResetScrollTop(Transform contentPage)
+	{
+		try
+		{
+			Transform cur = contentPage;
+			while (cur != null)
+			{
+				UnityEngine.UI.ScrollRect sr = cur.GetComponent<UnityEngine.UI.ScrollRect>();
+				if (sr != null)
+				{
+					float p = sr.verticalNormalizedPosition;
+					if (float.IsNaN(p) || p < 0.99f)
+					{
+						sr.verticalNormalizedPosition = 1f;
+					}
+					// handle 残缺（size<=0 或 NaN）时触发一次重算
+					UnityEngine.UI.Scrollbar sb = sr.verticalScrollbar;
+					if (sb != null && (float.IsNaN(sb.size) || sb.size <= 0.001f))
+					{
+						Canvas.ForceUpdateCanvases();
+						sr.verticalNormalizedPosition = 1f;
+					}
+					return;
+				}
+				cur = cur.parent;
+			}
+		}
+		catch
+		{
+		}
 	}
 
 	/// <summary>周期性重测容器高度并断言到滚动内容（防原生协程/转场把滚动范围写坏）。</summary>
@@ -907,6 +959,41 @@ public static class ModRegistry
 		}
 	}
 
+	/// <summary>v1.1.4：字母分组小标题行（"A"…"Z" / "0-9" / "#"）：小字号灰字，样式同旧分类行。</summary>
+	private static float AddCategoryRow(Transform container, string text)
+	{
+		try
+		{
+			Font font = GetNativeFont(SettingsGUI_V2.instance);
+			GameObject row = new GameObject("MM_CatRow");
+			row.transform.SetParent(container, false);
+			RectTransform rt = row.AddComponent<RectTransform>();
+			rt.sizeDelta = new Vector2(0f, 32f);
+			GameObject tgo = new GameObject("Label");
+			tgo.transform.SetParent(row.transform, false);
+			RectTransform trt = tgo.AddComponent<RectTransform>();
+			trt.anchorMin = new Vector2(0f, 0f);
+			trt.anchorMax = new Vector2(1f, 1f);
+			trt.offsetMin = new Vector2(4f, 2f);
+			trt.offsetMax = new Vector2(-4f, -2f);
+			Text txt = tgo.AddComponent<Text>();
+			if (font != null)
+			{
+				txt.font = font;
+			}
+			txt.fontSize = 16;
+			txt.fontStyle = FontStyle.Bold;
+			txt.color = new Color(0.75f, 0.75f, 0.75f, 1f);
+			txt.alignment = TextAnchor.MiddleLeft;
+			txt.text = text;
+			return 32f;
+		}
+		catch
+		{
+			return 0f;
+		}
+	}
+
 	/// <summary>列表底部的感谢行（双语）。</summary>
 	private static void AddThanksRow(Transform container)
 	{
@@ -978,7 +1065,11 @@ public static class ModRegistry
 			GameObject row = new GameObject("MM_ModTitle");
 			row.transform.SetParent(container, false);
 			RectTransform rt = row.AddComponent<RectTransform>();
-			bool longName = rawName != null && rawName.Length > 26;
+			// v1.1.4：按实测宽度判断是否截断。可用宽度 = viewport 实宽 - 标签两侧边距(24) - 滚动条余量(30)；
+			// 放不下才截断省略号，展开行仍显示完整原始名。
+			string prefix = expanded ? "v " : "> ";
+			float availWidth = TitleAvailWidth(s);
+			bool longName = MeasuresWiderThan(rawName, font, fontSize + 2, prefix, availWidth);
 			float rowH = (expanded && longName) ? 64f : 42f;
 			rt.sizeDelta = new Vector2(0f, rowH);
 			// label（锚点拉伸到行宽，左对齐）
@@ -1003,13 +1094,13 @@ public static class ModRegistry
 			txt.resizeTextForBestFit = true;
 			txt.resizeTextMinSize = 12;
 			txt.resizeTextMaxSize = fontSize + 2;
-			// 超长 mod 名截断为省略号（原生横向溢出会被滚动区裁切，显示不全）
+			// 超长 mod 名截断为省略号（仅当实测宽度放不下；二分收敛到可容纳的前缀长度）
 			string display = name;
-			if (display != null && display.Length > 26)
+			if (longName)
 			{
-				display = display.Substring(0, 25) + "…";
+				display = EllipsizeToFit(name, font, fontSize + 2, prefix, availWidth);
 			}
-			txt.text = (expanded ? "v " : "> ") + display;
+			txt.text = prefix + display;
 			// 展开时在标题下补一行完整原始名（小字、降透明度），长名字不再丢失
 			if (expanded && longName)
 			{
@@ -1058,6 +1149,110 @@ public static class ModRegistry
 		{
 			Plugin.ModLog.LogError((object)("ModManager header error: " + ex.Message));
 			return 0f;
+		}
+	}
+
+	/// <summary>v1.1.4：测宽探针设置（scaleFactor=1 时 GetPreferredWidth 返回 UI 单位像素）。</summary>
+	private static float MeasureTextWidth(string text, Font font, int fontSize)
+	{
+		try
+		{
+			if (string.IsNullOrEmpty(text))
+			{
+				return 0f;
+			}
+			TextGenerationSettings settings = new TextGenerationSettings();
+			if (font != null)
+			{
+				settings.font = font;
+			}
+			settings.fontSize = fontSize;
+			settings.fontStyle = FontStyle.Bold;
+			settings.scaleFactor = 1f;
+			settings.horizontalOverflow = HorizontalWrapMode.Overflow;
+			settings.verticalOverflow = VerticalWrapMode.Overflow;
+			settings.generateOutOfBounds = true;
+			TextGenerator gen = new TextGenerator();
+			float w = gen.GetPreferredWidth(text, settings);
+			return w;
+		}
+		catch
+		{
+			return -1f;
+		}
+	}
+
+	/// <summary>v1.1.4：标题行内可用像素宽。从 SettingsGUI_V2 所在 Canvas 实测（分辨率无关），
+	/// 探测失败退回 1920 宽的经验值。内容宽约为屏幕宽 45%（原生设置页布局），标签左右各留 12px + 滚动条 30px。</summary>
+	private static float TitleAvailWidth(SettingsGUI_V2 s)
+	{
+		try
+		{
+			Transform cp = (s != null) ? s.contentPage : null;
+			if (cp != null)
+			{
+				RectTransform rt = cp.GetComponent<RectTransform>();
+				if (rt != null && rt.rect.width > 10f)
+				{
+					return rt.rect.width - 24f - 30f;
+				}
+			}
+		}
+		catch
+		{
+		}
+		return 1920f * 0.45f - 54f;
+	}
+
+	/// <summary>v1.1.4：标题宽度实测。availWidth = 行内真实可用像素（viewport 宽 - 标签边距 - 滚动条余量）。</summary>
+	private static bool MeasuresWiderThan(string text, Font font, int fontSize, string prefix, float availWidth)
+	{
+		if (text == null || font == null)
+		{
+			return false;
+		}
+		float w = MeasureTextWidth(prefix + text, font, fontSize);
+		if (w < 0f)
+		{
+			return false;
+		}
+		return w > availWidth;
+	}
+
+	/// <summary>二分收敛：保留能放进可用宽度的最长前缀 + "…"（保底至少留 3 个字符 + 省略号）。</summary>
+	private static string EllipsizeToFit(string text, Font font, int fontSize, string prefix, float availWidth)
+	{
+		try
+		{
+			if (string.IsNullOrEmpty(text) || font == null)
+			{
+				return text;
+			}
+			if (MeasureTextWidth(prefix + text + "…", font, fontSize) <= availWidth)
+			{
+				return text + "…";
+			}
+			int lo = 3;
+			int hi = text.Length - 1;
+			int best = 3;
+			while (lo <= hi)
+			{
+				int mid = (lo + hi) / 2;
+				if (MeasureTextWidth(prefix + text.Substring(0, mid) + "…", font, fontSize) <= availWidth)
+				{
+					best = mid;
+					lo = mid + 1;
+				}
+				else
+				{
+					hi = mid - 1;
+				}
+			}
+			return text.Substring(0, best) + "…";
+		}
+		catch
+		{
+			return text;
 		}
 	}
 
@@ -1216,7 +1411,7 @@ public static class ModRegistry
 	/// <summary>数字安全字体（v1.0.74 重写）：游戏 2.1.0 更新后设置页改用简体中文字体
 	/// （无 ASCII 数字字形）→ 数字不显示。用**运行时渲染探测**找真正能画出数字的字体：
 	/// ① FontList.font_default（游戏默认拉丁字体）→ ② 全部已加载 Font → ③ 滑块模板
-	/// → ④ 活动设置页含数字的 Text → ⑤ PhaseBarGUI/GUI.skin（LegacyRuntime 必有数字）。
+	/// → ④ 活动设置页含数字的 Text → ⑤ GUI.skin/LegacyRuntime（不依赖已移除的 PhaseBarGUI）。
 	/// 探测：隐藏 uGUI Text 设 "0123456789" 量 preferredWidth（与输入框同一渲染路径，
 	/// 缺字形宽度≈0）。解析一次缓存；字体来自游戏资源，mod 只引用不创建。</summary>
 	private static Font cachedDigitFont;
@@ -1348,27 +1543,12 @@ public static class ModRegistry
 				Plugin.ModLog.LogError((object)("ModManager digit font live scan error: " + ex.Message));
 			}
 		}
-		// ⑤ 引擎默认字体（LegacyRuntime 必有数字；观感略差但保证可读）
+		// ⑤ GUI.skin 字体（游戏更新后 PhaseBarGUI 已移除；不再依赖旧 API）
 		if (found == null)
 		{
 			try
 			{
-				Font f = PhaseBarGUI.GetDefaultFont();
-				if (f != null && FontRendersDigits(f))
-				{
-					found = f;
-					src = "PhaseBarGUI";
-				}
-			}
-			catch
-			{
-			}
-		}
-		if (found == null)
-		{
-			try
-			{
-				Font f = GUI.skin.font;
+				Font f = GUI.skin != null ? GUI.skin.font : null;
 				if (f != null && FontRendersDigits(f))
 				{
 					found = f;
@@ -1458,7 +1638,7 @@ public static class ModRegistry
 		return false;
 	}
 
-	/// <summary>原生设置字体：SettingsGUI_V2.title 的字体（原生设置页标题字体），失败回退 PhaseBarGUI/引擎。</summary>
+	/// <summary>原生设置字体：SettingsGUI_V2.title 的字体（原生设置页标题字体），失败回退 GUI.skin/引擎。</summary>
 	private static Font GetNativeFont(SettingsGUI_V2 s)
 	{
 		try
@@ -1473,18 +1653,7 @@ public static class ModRegistry
 		}
 		try
 		{
-			Font f = PhaseBarGUI.GetDefaultFont();
-			if (f != null)
-			{
-				return f;
-			}
-		}
-		catch
-		{
-		}
-		try
-		{
-			return GUI.skin.font;
+			return GUI.skin != null ? GUI.skin.font : null;
 		}
 		catch
 		{
@@ -2941,7 +3110,68 @@ public static class ModRegistry
 	{
 		internal string name;
 
+		/// <summary>v1.1.4：剥离 "Easy Red 2 "/"ER2 " 前缀后的短名（排序/分组/标题显示用）。</summary>
+		internal string shortName;
+
 		internal ConfigFile cfg;
+	}
+
+	/// <summary>v1.1.4：剥离 mod 名的 "Easy Red 2" / "ER2" 前缀（含后续分隔符），
+	/// 便于按真实功能名排序分组；无前缀时原样返回。</summary>
+	internal static string StripNamePrefix(string name)
+	{
+		try
+		{
+			if (string.IsNullOrEmpty(name))
+			{
+				return name ?? "";
+			}
+			string[] prefixes = { "Easy Red 2", "ER2" };
+			foreach (string p in prefixes)
+			{
+				if (name.Length > p.Length &&
+					name.StartsWith(p, StringComparison.OrdinalIgnoreCase) &&
+					(name[p.Length] == ' ' || name[p.Length] == '-' || name[p.Length] == '_' || name[p.Length] == ':'))
+				{
+					string rest = name.Substring(p.Length + 1).TrimStart();
+					if (rest.Length > 0)
+					{
+						return rest;
+					}
+				}
+			}
+			return name;
+		}
+		catch
+		{
+			return name ?? "";
+		}
+	}
+
+	/// <summary>v1.1.4：短名 → 分组标题（"A"…"Z" / "0-9" / "#"）。</summary>
+	internal static string GroupLetter(string shortName)
+	{
+		try
+		{
+			if (string.IsNullOrEmpty(shortName))
+			{
+				return "#";
+			}
+			char c = char.ToUpperInvariant(shortName[0]);
+			if (c >= '0' && c <= '9')
+			{
+				return "0-9";
+			}
+			if (c >= 'A' && c <= 'Z')
+			{
+				return c.ToString();
+			}
+			return "#";
+		}
+		catch
+		{
+			return "#";
+		}
 	}
 
 	/// <summary>是否带总开关：配置里存在名为 Enabled/enabled 的 bool 配置项。</summary>
@@ -3076,45 +3306,6 @@ public static class ModRegistry
 		}
 	}
 
-	/// <summary>分类提示行（“有开关 / 无开关 mod”）：小字号 + 自动换行，保证英文版完整显示。</summary>
-	private static float AddCategoryRow(Transform container, string text)
-	{
-		try
-		{
-			Font font = GetNativeFont(SettingsGUI_V2.instance);
-			GameObject row = new GameObject("MM_CatRow");
-			row.transform.SetParent(container, false);
-			RectTransform rt = row.AddComponent<RectTransform>();
-			rt.sizeDelta = new Vector2(0f, 40f);
-			GameObject tgo = new GameObject("Label");
-			tgo.transform.SetParent(row.transform, false);
-			RectTransform trt = tgo.AddComponent<RectTransform>();
-			trt.anchorMin = new Vector2(0f, 0f);
-			trt.anchorMax = new Vector2(1f, 1f);
-			trt.offsetMin = new Vector2(4f, 4f);
-			trt.offsetMax = new Vector2(-4f, -4f);
-			Text txt = tgo.AddComponent<Text>();
-			if (font != null)
-			{
-				txt.font = font;
-			}
-			txt.fontSize = 16;
-			txt.color = new Color(0.75f, 0.75f, 0.75f, 1f);
-			txt.alignment = TextAnchor.MiddleLeft;
-			txt.horizontalOverflow = HorizontalWrapMode.Wrap;
-			txt.verticalOverflow = VerticalWrapMode.Overflow;
-			txt.resizeTextForBestFit = true;
-			txt.resizeTextMinSize = 10;
-			txt.resizeTextMaxSize = 16;
-			txt.text = text;
-			return 40f;
-		}
-		catch
-		{
-			return 0f;
-		}
-	}
-
 }
 
 /// <summary>轮询：注入 MODS 页 + 轮询活跃控件值变化 + 抓取原生控件模板。</summary>
@@ -3135,7 +3326,8 @@ public class InjectPollPatch
 				return;
 			}
 			ModRegistry.EnsureInjected(s);
-			// 原生可能在最后一页隐藏 R 翻页按钮（它不知道 MODS 页）→ 强制 R 按钮可用
+			// 原生可能在最后一页隐藏 R 翻页按钮（它不知道 MODS 页）→ 强制左右按钮常显。
+			// v1.1.3：l_button 也常显（首页左翻绕回 MODS 页，见 TabLeftPatch）。
 			try
 			{
 				if (s.r_button != null)
@@ -3149,9 +3341,37 @@ public class InjectPollPatch
 						s.r_button.interactable = true;
 					}
 				}
+				if (s.l_button != null)
+				{
+					if (!s.l_button.gameObject.activeSelf)
+					{
+						s.l_button.gameObject.SetActive(true);
+					}
+					if (!s.l_button.interactable)
+					{
+						s.l_button.interactable = true;
+					}
+				}
 			}
 			catch
 			{
+			}
+			// 会话检测：设置界面关闭期间 Update 不跑，unscaledTime 跳变 = 刚重开。
+			// 重开后强制重建一次（问题：重进后 slider 模板布局残留/滚动状态错乱导致滑条与标题行重叠、列表不显示）。
+			if (SettingsGUI_V2.currentOpenedMenu == ModRegistry.myIndex && ModRegistry.myIndex > 0)
+			{
+				if (Time.unscaledTime - ModRegistry.lastPollTime > 1.5f)
+				{
+					ModRegistry.lastPollTime = Time.unscaledTime;
+					ModRegistry.OpenMyPage(s);
+					ModRegistry.ResetScrollTop(s.contentPage);
+					return;
+				}
+				ModRegistry.lastPollTime = Time.unscaledTime;
+			}
+			else
+			{
+				ModRegistry.lastPollTime = Time.unscaledTime;
 			}
 			// 轮询活跃控件（开关/滑条/下拉）的值变化（绕开 UnityAction 委托桥接的 marshaling bug）
 			ModRegistry.PollControls();
@@ -3162,10 +3382,8 @@ public class InjectPollPatch
 				ModRegistry.CacheTemplatesFromNative(cp);
 			}
 			// 重开设置界面时原生可能重置页码/重新填充我们的页 → 检测并重新接管
-			bool lastOnMods = ModRegistry.lastOnModsPage;
 			if (SettingsGUI_V2.currentOpenedMenu == ModRegistry.myIndex)
 			{
-				ModRegistry.lastOnModsPage = true;
 				// 原生填充是异步协程：重开设置界面时协程可能晚到，把原生控件填进我们的页 → 每帧清理非我们容器的子物体
 				bool hasOurs = false;
 				bool nativeMode = (Plugin.nativePoc != null && Plugin.nativePoc.Value) ||
@@ -3214,13 +3432,12 @@ public class InjectPollPatch
 			}
 			else
 			{
-				// 不在 MODS 页：还原我们改过的 content 锚点（防影响原生页面）
+				// 不在 MODS 页：只还原我们改过的 content 锚点。
+				// 游戏更新后的 SettingsGUI_V2 会在转场/动画期间暂时改写 currentOpenedMenu；
+				// 旧逻辑看到 lastOnMods 就每帧 OpenMyPage，导致按钮刚创建便被 Destroy，
+				// 日志表现为 MODS page 反复打开、页面控件全部闪失。重新进入 MODS 页
+				// 由 TabRight/TabLeft 的明确翻页入口处理，这里绝不抢回页面。
 				ModRegistry.RestoreScrollAnchors();
-				if (lastOnMods && ModRegistry.myIndex > 0)
-				{
-					// 用户未翻页但页码离开了 MODS 页（原生重置）→ 恢复
-					ModRegistry.OpenMyPage(s);
-				}
 			}
 		}
 		catch (Exception ex)
@@ -3247,7 +3464,8 @@ public class WatchdogPatch
 	}
 }
 
-/// <summary>翻到最后一页（我们的 MODS 页）时接管填充；在 MODS 页再右翻则拦截（防止越界空白页）。</summary>
+/// <summary>翻到最后一页（我们的 MODS 页）时接管填充；v1.1.4 在 MODS 页再右翻绕回第一页
+///（与左翻绕回 MODS 页呼应，两个方向都能循环）。</summary>
 [HarmonyPatch(typeof(SettingsGUI_V2), "SettingsTabRight")]
 public class TabRightPatch
 {	private static bool Prefix()
@@ -3262,12 +3480,22 @@ public class TabRightPatch
 			int cur = SettingsGUI_V2.currentOpenedMenu;
 			if (cur == ModRegistry.myIndex)
 			{
-				// 已是最后一页（MODS），不允许再右翻
+				// 已是 MODS 页（末页）：右翻绕回第一页（走原生 UpdateOpenedMenu 恢复原生气/行为）
+				try
+				{
+					SoundManager.ClickSound();
+					SettingsGUI_V2.currentOpenedMenu = 0;
+					s.UpdateOpenedMenu(true);
+				}
+				catch
+				{
+					SettingsGUI_V2.currentOpenedMenu = 0;
+				}
 				return false;
 			}
 			if (cur + 1 == ModRegistry.myIndex)
 			{
-				ModRegistry.OpenMyPage(s);
+				ModRegistry.EnterMyPage(s);
 				return false;
 			}
 		}
@@ -3279,7 +3507,8 @@ public class TabRightPatch
 	}
 }
 
-/// <summary>从越界页（myIndex+1）左翻回 MODS 页时重新接管填充。</summary>
+/// <summary>左翻：从越界页（myIndex+1）回 MODS 页重新接管；v1.1.3 在第一页左翻绕回 MODS 页
+///（原生翻页循环走左边按钮，MODS 页在末尾，绕回 = 最快进入路径）。左翻离开 MODS 页正常放行。</summary>
 [HarmonyPatch(typeof(SettingsGUI_V2), "SettingsTabLeft")]
 public class TabLeftPatch
 {
@@ -3292,14 +3521,16 @@ public class TabLeftPatch
 			{
 				return true;
 			}
-			if (SettingsGUI_V2.currentOpenedMenu == ModRegistry.myIndex)
+			int cur = SettingsGUI_V2.currentOpenedMenu;
+			if (cur == ModRegistry.myIndex + 1)
 			{
-				// 用户主动左翻离开 MODS 页：清除标记，避免 Update 轮询误恢复
-				ModRegistry.lastOnModsPage = false;
+				ModRegistry.EnterMyPage(s);
+				return false;
 			}
-			if (SettingsGUI_V2.currentOpenedMenu == ModRegistry.myIndex + 1)
+			if (cur == 0)
 			{
-				ModRegistry.OpenMyPage(s);
+				// 第一页左翻 → 绕回最后一页（MODS）
+				ModRegistry.EnterMyPage(s);
 				return false;
 			}
 		}
@@ -3308,5 +3539,24 @@ public class TabLeftPatch
 			Plugin.ModLog.LogError((object)("ModManager tab left error: " + ex.Message));
 		}
 		return true;
+	}
+}
+
+/// <summary>原生设置页的异步内容操作门户（游戏 2.1.x 新增的清理/重填路径）：
+/// MODS 页激活期间，原生 ClearContentPage（异步清空）与 UpdateOpenedMenu（重开填充协程）
+/// 会清掉我们的控件 → 与我们的轮询重建形成拉锯循环。统一拦截这两条路径。</summary>
+[HarmonyPatch]
+public static class NativeContentGatePatch
+{
+	private static System.Collections.Generic.IEnumerable<MethodBase> TargetMethods()
+	{
+		yield return AccessTools.Method(typeof(SettingsGUI_V2), nameof(SettingsGUI_V2.ClearContentPage));
+		yield return AccessTools.Method(typeof(SettingsGUI_V2), nameof(SettingsGUI_V2.UpdateOpenedMenu));
+	}
+
+	// 无参 Prefix 对两个目标都兼容；返回 false = 跳过原方法
+	private static bool Prefix()
+	{
+		return !(ModRegistry.myIndex > 0 && SettingsGUI_V2.currentOpenedMenu == ModRegistry.myIndex);
 	}
 }
