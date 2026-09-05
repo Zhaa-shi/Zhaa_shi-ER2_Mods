@@ -15,7 +15,7 @@ using UnityEngine.UI;
 
 namespace ER2ModManager;
 
-[BepInPlugin("er2.modmanager", "ER2 Mod Manager", "1.1.7")]
+[BepInPlugin("er2.modmanager", "ER2 Mod Manager", "1.1.8")]
 public class Plugin : BasePlugin
 {
 	/// <summary>构建语言：CN_BUILD 编译符号 = 中文版（标签中文、页标题"模组"）；否则英文版。</summary>
@@ -45,7 +45,7 @@ public class Plugin : BasePlugin
 		nativeFull = Config.Bind("General", "NativeFull", false, "DEV: render the whole MODS page via native SettingSelectable rows.");
 		HarmonyInstance = new Harmony("er2.modmanager");
 		HarmonyInstance.PatchAll(GetType().Assembly);
-		ModLog.LogInfo((object)"ER2 Mod Manager 1.1.7 loaded.");
+		ModLog.LogInfo((object)"ER2 Mod Manager 1.1.8 loaded.");
 	}
 }
 
@@ -316,7 +316,11 @@ public static class ModRegistry
 
 	internal static Vector2 anchorOrigPos;
 
-	/// <summary>还原被我们改过的 content 锚点。</summary>
+	/// <summary>v1.1.8：接管前原生 content 的原始高度（SelfHealScroll 会写 sizeDelta.y，
+	/// 还原时必须一并恢复——漏还原会留下坏高度：原生页滑条与按键重合、重进 MODS 页布局错乱）。</summary>
+	internal static float anchorOrigHeight = float.NaN;
+
+	/// <summary>还原被我们改过的 content 锚点与高度（v1.1.8：补还原 sizeDelta.y）。</summary>
 	internal static void RestoreScrollAnchors()
 	{
 		try
@@ -327,12 +331,26 @@ public static class ModRegistry
 				anchorChangedTarget.anchorMax = anchorOrigMax;
 				anchorChangedTarget.pivot = anchorOrigPivot;
 				anchorChangedTarget.anchoredPosition = anchorOrigPos;
+				// 高度也还原：原生 content 是拉伸锚点时高度由布局驱动，sizeDelta.y 归 0；
+				// 非拉伸时还原接管前记录的原始值
+				if (!float.IsNaN(anchorOrigHeight))
+				{
+					anchorChangedTarget.sizeDelta = new Vector2(anchorChangedTarget.sizeDelta.x, anchorOrigHeight);
+				}
+				try
+				{
+					UnityEngine.UI.LayoutRebuilder.ForceRebuildLayoutImmediate(anchorChangedTarget);
+				}
+				catch
+				{
+				}
 			}
 		}
 		catch
 		{
 		}
 		anchorChangedTarget = null;
+		anchorOrigHeight = float.NaN;
 	}
 
 	/// <summary>活跃控件监视（轮询值变化——绕开 UnityAction 委托桥接的 marshaling bug）。</summary>
@@ -718,15 +736,15 @@ public static class ModRegistry
 			return y;
 		}
 		// 自动布局容器（锚定 Content 顶部，LayoutGroup 向下排列，Fitter 自动扩展高度）
-		// v1.1.7：右侧收窄改回贴近原版观感（右移 10px + 右边距 20px → 滑条与行间隙 ~20px）。
+		// v1.1.8：间隙再收（右移 4px + 右边距 8px → 行与滑条间隙 ~8px，贴近原版）。
 		GameObject cont = new GameObject("MM_Container");
 		cont.transform.SetParent(contentPage, false);
 		RectTransform crt = cont.AddComponent<RectTransform>();
 		crt.anchorMin = new Vector2(0f, 1f);
 		crt.anchorMax = new Vector2(1f, 1f);
 		crt.pivot = new Vector2(0.5f, 1f);
-		crt.anchoredPosition = new Vector2(-10f, 0f);
-		crt.sizeDelta = new Vector2(-20f, 100f);
+		crt.anchoredPosition = new Vector2(-4f, 0f);
+		crt.sizeDelta = new Vector2(-8f, 100f);
 		UnityEngine.UI.VerticalLayoutGroup lg = cont.AddComponent<UnityEngine.UI.VerticalLayoutGroup>();
 		lg.spacing = 6f;
 		lg.childAlignment = TextAnchor.UpperCenter;
@@ -1001,6 +1019,8 @@ public static class ModRegistry
 							anchorOrigMax = ax;
 							anchorOrigPivot = target.pivot;
 							anchorOrigPos = target.anchoredPosition;
+							// v1.1.8：记录原始 sizeDelta.y（还原时恢复，防坏高度泄漏到原生页）
+							anchorOrigHeight = target.sizeDelta.y;
 						}
 						target.anchorMin = new Vector2(am.x, 1f);
 						target.anchorMax = new Vector2(ax.x, 1f);
@@ -3647,6 +3667,8 @@ public class InjectPollPatch
 					}
 					// v1.1.7：hasOurs 加严——容器存在但零子行 = 坏状态（布局从未展开、看不见任何行），
 					// 与"容器不在"同视，都需要重建。配熔断器防重建风暴。
+					// v1.1.8：布局死状态——容器有行但 rect 高度仍是初始 100（Content 的高也是 200 兜底
+					// 值）= LayoutGroup 从未算过/被清，行全部叠在一点 → 视觉上"没有列表"。同样触发重建。
 					if (hasOurs)
 					{
 						Transform ours = null;
@@ -3666,9 +3688,30 @@ public class InjectPollPatch
 						catch
 						{
 						}
-						if (ours != null && ours.childCount == 0)
+						if (ours != null)
 						{
-							hasOurs = false;
+							bool dead = ours.childCount == 0;
+							if (!dead)
+							{
+								try
+								{
+									RectTransform ort = ours.GetComponent<RectTransform>();
+									RectTransform prt = s.contentPage.GetComponent<RectTransform>();
+									// 行数>0 但容器高未展开（≈初始值）且 content 高也没跟上 = 布局死
+									if (ort != null && prt != null &&
+										ort.rect.height <= 101f && prt.rect.height <= 201f)
+									{
+										dead = true;
+									}
+								}
+								catch
+								{
+								}
+							}
+							if (dead)
+							{
+								hasOurs = false;
+							}
 						}
 					}
 					if (!hasOurs)
