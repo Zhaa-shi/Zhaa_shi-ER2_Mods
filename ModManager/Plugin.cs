@@ -15,7 +15,7 @@ using UnityEngine.UI;
 
 namespace ER2ModManager;
 
-[BepInPlugin("er2.modmanager", "ER2 Mod Manager", "1.1.5")]
+[BepInPlugin("er2.modmanager", "ER2 Mod Manager", "1.1.6")]
 public class Plugin : BasePlugin
 {
 	/// <summary>构建语言：CN_BUILD 编译符号 = 中文版（标签中文、页标题"模组"）；否则英文版。</summary>
@@ -45,7 +45,7 @@ public class Plugin : BasePlugin
 		nativeFull = Config.Bind("General", "NativeFull", false, "DEV: render the whole MODS page via native SettingSelectable rows.");
 		HarmonyInstance = new Harmony("er2.modmanager");
 		HarmonyInstance.PatchAll(GetType().Assembly);
-		ModLog.LogInfo((object)"ER2 Mod Manager 1.1.5 loaded.");
+		ModLog.LogInfo((object)"ER2 Mod Manager 1.1.6 loaded.");
 	}
 }
 
@@ -344,6 +344,9 @@ public static class ModRegistry
 
 		internal bool inputIsFloat;
 
+		/// <summary>v1.1.6：自由文本输入（string 配置无选项列表）——文本变化直接 StageValue 原文。</summary>
+		internal bool isFreeText;
+
 		internal bool hasRange;
 
 		internal float rangeMin;
@@ -581,7 +584,12 @@ public static class ModRegistry
 					if (text != w.lastInputText)
 					{
 						w.lastInputText = text;
-						if (string.IsNullOrEmpty(text))
+						// v1.1.6：自由文本（string 配置）→ 原文直接暂存（空串也写，允许清空）
+						if (w.isFreeText)
+						{
+							StageValue(w.cfg, w.entry, text);
+						}
+						else if (string.IsNullOrEmpty(text))
 						{
 							// 输入中的中间态（空/小数点）：保持上一次有效暂存
 						}
@@ -1909,6 +1917,17 @@ public static class ModRegistry
 				// 每个子选项独立的复制/重置按钮（放最底部）
 				AddEntryActions(container, cfg, entry, label);
 			}
+			else
+			{
+				// v1.1.6：全局兜底——任何类型/模板路径失败都渲染只读文本行，配置项永不静默消失
+				AddFallbackTextRow(container, label + ": " + FormatEntryValue(entry));
+				string desc = GetDescription(entry);
+				if (!string.IsNullOrEmpty(desc))
+				{
+					AddDescriptionRow(container, desc);
+				}
+				ok = true;
+			}
 			return ok;
 		}
 		catch (Exception ex)
@@ -2323,6 +2342,97 @@ public static class ModRegistry
 		}
 	}
 
+	/// <summary>v1.1.6：自由文本输入（string 配置且无 AcceptableValueList，如颜色 #RRGGBBAA）。
+	/// 双行布局同 AddNumericInput：上行标签，下行输入框。文本经轮询直写暂存（原文，含空串）。</summary>
+	private static bool AddFreeTextInput(ConfigFile cfg, ConfigEntryBase entry, Transform container, string label)
+	{
+		try
+		{
+			Font labelFont = GetNativeFont(SettingsGUI_V2.instance);
+			GameObject row = new GameObject("MM_TextRow_Input");
+			row.transform.SetParent(container, false);
+			RectTransform rt = row.AddComponent<RectTransform>();
+			rt.sizeDelta = new Vector2(0f, 64f);
+			// 上：标签
+			GameObject tgo = new GameObject("Label");
+			tgo.transform.SetParent(row.transform, false);
+			RectTransform trt = tgo.AddComponent<RectTransform>();
+			trt.anchorMin = new Vector2(0f, 0.5f);
+			trt.anchorMax = new Vector2(1f, 0.5f);
+			trt.pivot = new Vector2(0.5f, 0.5f);
+			trt.anchoredPosition = new Vector2(0f, 16f);
+			trt.sizeDelta = new Vector2(-12f, 26f);
+			Text txt = tgo.AddComponent<Text>();
+			if (labelFont != null)
+			{
+				txt.font = labelFont;
+			}
+			txt.fontSize = 20;
+			txt.color = new Color(0.85f, 0.85f, 0.85f, 1f);
+			txt.alignment = TextAnchor.MiddleLeft;
+			txt.horizontalOverflow = HorizontalWrapMode.Overflow;
+			txt.resizeTextForBestFit = true;
+			txt.resizeTextMinSize = 10;
+			txt.resizeTextMaxSize = 20;
+			txt.text = label;
+			// 下右：输入框
+			GameObject igo = new GameObject("Value");
+			igo.transform.SetParent(row.transform, false);
+			RectTransform irt = igo.AddComponent<RectTransform>();
+			UnityEngine.UI.Image img = igo.AddComponent<UnityEngine.UI.Image>();
+			UnityEngine.UI.InputField field = igo.AddComponent<UnityEngine.UI.InputField>();
+			irt.anchorMin = new Vector2(1f, 0f);
+			irt.anchorMax = new Vector2(1f, 0f);
+			irt.pivot = new Vector2(1f, 0.5f);
+			irt.anchoredPosition = new Vector2(-8f, 7f);
+			irt.sizeDelta = new Vector2(280f, 26f);
+			img.color = new Color(0.13f, 0.13f, 0.15f, 0.95f);
+			GameObject igoT = new GameObject("Text");
+			igoT.transform.SetParent(igo.transform, false);
+			RectTransform itrt = igoT.AddComponent<RectTransform>();
+			itrt.anchorMin = new Vector2(0f, 0f);
+			itrt.anchorMax = new Vector2(1f, 1f);
+			itrt.offsetMin = new Vector2(8f, 3f);
+			itrt.offsetMax = new Vector2(-8f, -3f);
+			Text itxt = igoT.AddComponent<Text>();
+			Font font = GetDigitSafeFont(SettingsGUI_V2.instance);
+			if (font != null)
+			{
+				itxt.font = font;
+			}
+			itxt.fontSize = 18;
+			itxt.color = Color.white;
+			itxt.alignment = TextAnchor.MiddleLeft;
+			itxt.horizontalOverflow = HorizontalWrapMode.Overflow;
+			field.textComponent = itxt;
+			field.contentType = UnityEngine.UI.InputField.ContentType.Standard;
+			string cur;
+			try
+			{
+				object v = GetStaged(cfg, entry, entry.BoxedValue);
+				cur = (v as string) ?? (v != null ? v.ToString() : "");
+			}
+			catch
+			{
+				cur = "";
+			}
+			field.text = cur;
+			watches.Add(new ControlWatch
+			{
+				input = field,
+				cfg = cfg,
+				entry = entry,
+				isFreeText = true,
+				lastInputText = field.text
+			});
+			return true;
+		}
+		catch
+		{
+			return false;
+		}
+	}
+
 	private static bool AddSlider(ConfigFile cfg, ConfigEntryBase entry, Transform container, string label, bool wholeNumbers)
 	{
 		if (Templates.slider == null)
@@ -2435,16 +2545,23 @@ public static class ModRegistry
 
 	private static bool AddDropdown(ConfigFile cfg, ConfigEntryBase entry, Transform container, string label)
 	{
+		AcceptableValueBase av = (entry.Description != null) ? entry.Description.AcceptableValues : null;
+		if (!(av is AcceptableValueList<string>) )
+		{
+			// v1.1.6：无选项列表的自由字符串（如 SquadCommand 的 #RRGGBBAA 颜色配置）→ 自由文本输入框。
+			// 旧逻辑静默 return false → 整个配置项消失（SquadCommand 颜色项不显示的根因）。
+			return AddFreeTextInput(cfg, entry, container, label);
+		}
 		if (Templates.dropdown == null)
 		{
 			// 无模板：文本行兜底
 			AddFallbackTextRow(container, label + ": " + FormatEntryValue(entry));
 			return true;
 		}
-		AcceptableValueBase av = (entry.Description != null) ? entry.Description.AcceptableValues : null;
-		if (!(av is AcceptableValueList<string> lst) || lst.AcceptableValues == null || lst.AcceptableValues.Length == 0)
+		AcceptableValueList<string> lst = (AcceptableValueList<string>)av;
+		if (lst.AcceptableValues == null || lst.AcceptableValues.Length == 0)
 		{
-			return false;
+			return AddFreeTextInput(cfg, entry, container, label);
 		}
 		string[] vals = lst.AcceptableValues;
 		GameObject go = Templates.Instantiate(Templates.dropdown);
@@ -3192,8 +3309,17 @@ public static class ModRegistry
 	}
 
 	/// <summary>枚举所有已加载插件及其配置（跳过无配置项的插件）。</summary>
+	private static List<PluginConfig> pluginsCache;
+
+	/// <summary>v1.1.6：插件列表缓存。快速翻页/重开设置期间 IL2CPPChainloader.Plugins 字典可能
+	/// 瞬态返回空 → FillContent 空列表 → 轮询每帧判 !hasOurs 反复重建 = 卡死空白页（日志实测
+	/// container=100 连刷几十帧）。插件集合运行期不变，成功收集一次后永久缓存。</summary>
 	internal static List<PluginConfig> CollectPlugins()
 	{
+		if (pluginsCache != null)
+		{
+			return pluginsCache;
+		}
 		List<PluginConfig> list = new List<PluginConfig>();
 		try
 		{
@@ -3241,18 +3367,23 @@ public static class ModRegistry
 					}
 					list.Add(new PluginConfig { name = name, cfg = cfg });
 				}
-				catch (Exception ex)
-				{
-					Plugin.ModLog.LogError((object)("ModManager collect item error: " + ex.Message));
+					catch (Exception ex)
+					{
+						Plugin.ModLog.LogError((object)("ModManager collect item error: " + ex.Message));
+					}
 				}
 			}
+			catch (Exception ex)
+			{
+				Plugin.ModLog.LogError((object)("ModManager collect error: " + ex.Message));
+			}
+			// 只缓存非空结果：空 = 瞬态故障（链加载器字典暂不可读），下次重试
+			if (list.Count > 0)
+			{
+				pluginsCache = list;
+			}
+			return list;
 		}
-		catch (Exception ex)
-		{
-			Plugin.ModLog.LogError((object)("ModManager collect error: " + ex.Message));
-		}
-		return list;
-	}
 
 	private static string FormatEntryValue(ConfigEntryBase entry)
 	{
