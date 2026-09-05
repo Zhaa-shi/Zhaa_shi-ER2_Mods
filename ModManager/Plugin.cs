@@ -15,7 +15,7 @@ using UnityEngine.UI;
 
 namespace ER2ModManager;
 
-[BepInPlugin("er2.modmanager", "ER2 Mod Manager", "1.1.8")]
+[BepInPlugin("er2.modmanager", "ER2 Mod Manager", "1.1.9")]
 public class Plugin : BasePlugin
 {
 	/// <summary>构建语言：CN_BUILD 编译符号 = 中文版（标签中文、页标题"模组"）；否则英文版。</summary>
@@ -45,7 +45,7 @@ public class Plugin : BasePlugin
 		nativeFull = Config.Bind("General", "NativeFull", false, "DEV: render the whole MODS page via native SettingSelectable rows.");
 		HarmonyInstance = new Harmony("er2.modmanager");
 		HarmonyInstance.PatchAll(GetType().Assembly);
-		ModLog.LogInfo((object)"ER2 Mod Manager 1.1.8 loaded.");
+		ModLog.LogInfo((object)"ER2 Mod Manager 1.1.9 loaded.");
 	}
 }
 
@@ -210,6 +210,9 @@ public static class ModRegistry
 		{
 		}
 		ClearContent(s.contentPage);
+		// v1.1.9：先确保 Content 链可见再填充——快速右翻连点会把链停用，建在停用父级下的
+		// 容器永不渲染/布局（STUCK-EVIDENCE 实锤：childCount=42 size=442x100 active=False）
+		EnsureContentVisible(s);
 		float y = FillContent(s.contentPage);
 		// 立即强制修复一次滚动高度，避免长列表打开瞬间只有第一行、要等 0.5s 巡检才恢复。
 		SelfHealScroll(s.contentPage, true);
@@ -912,6 +915,36 @@ public static class ModRegistry
 				sb.Append(nl).Append("  contentPage dump error: ").Append(ex3.Message);
 			}
 			Plugin.ModLog.LogWarning((object)sb.ToString());
+		}
+		catch
+		{
+		}
+	}
+
+	/// <summary>v1.1.9：空列表真凶修复（STUCK-EVIDENCE 实锤：MM_Container childCount=42
+	/// size=442x100 active=False——42 行全在、宽度正常、整个容器 inactive）。快速右翻连点
+	/// 打断原生页填充流程，原生把共享滚动 Content 所在链停用（正是用户看到的"没有滑条的
+	/// 设置界面"）；我们的容器建在停用父级下 → activeInHierarchy=false → 永不渲染/布局。
+	/// MODS 页激活期间 Content 链的可见性归我们管：发现链上被停用就逐级重新激活。</summary>
+	internal static void EnsureContentVisible(SettingsGUI_V2 s)
+	{
+		try
+		{
+			if (s == null || s.contentPage == null)
+			{
+				return;
+			}
+			Transform cur = s.contentPage;
+			int guard = 0;
+			while (cur != null && cur.gameObject != null && guard++ < 8)
+			{
+				if (!cur.gameObject.activeSelf)
+				{
+					cur.gameObject.SetActive(true);
+					Plugin.ModLog.LogInfo((object)("ModManager: re-activated '" + cur.name + "' on content chain (was disabled by native paging)."));
+				}
+				cur = cur.parent;
+			}
 		}
 		catch
 		{
@@ -3626,6 +3659,9 @@ public class InjectPollPatch
 			// 重开设置界面时原生可能重置页码/重新填充我们的页 → 检测并重新接管
 			if (SettingsGUI_V2.currentOpenedMenu == ModRegistry.myIndex)
 			{
+				// v1.1.9：MODS 页激活期间 Content 链必须可见（快速右翻连点会把链停用 →
+				// 我们的容器 inactive 不渲染 = 空列表；STUCK-EVIDENCE 实锤根因）
+				ModRegistry.EnsureContentVisible(s);
 				// 原生填充是异步协程：重开设置界面时协程可能晚到，把原生控件填进我们的页 → 每帧清理非我们容器的子物体
 				bool hasOurs = false;
 				bool nativeMode = (Plugin.nativePoc != null && Plugin.nativePoc.Value) ||
