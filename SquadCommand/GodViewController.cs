@@ -305,6 +305,7 @@ internal static class GodViewController
 	// ===== 0.7.68 重建段：0.7.68 误删段恢复（选择/命令/标记方法与字段，源=各历史版本最终形态）=====
 	private static Vector2 lastRightBlankClickPos;
 	private static Vector3? lastMovePoint; // 0.7.77：最近一次移动目标（双击第二击复用，避免重新 raycast 使标记乱飞）
+	private static string SquadCmdLogVia; // 移动令下达通道（LuaSquad/Fallback），仅用于最终移动日志合并为一条
 	private static bool isDragging;
 	private static Vector2 pressStart;
 	// 手感
@@ -596,14 +597,14 @@ internal static class GodViewController
 			RTSTrace("DriveDecision", "vehicle=" + vehRef.name + " canDrive=true squadInside=rtsSquad");
 			if (SquadCmdLogic.TryIssueNativeMove(tgt, point, Plugin.radius.Value))
 			{
-				SquadCmdLogic.LogAlways("[VehicleMove] vehicle=" + vehRef.name + " squadInside=0x" + ((long)tgt.Pointer).ToString("X")
+				SquadCmdLogic.Log("[VehicleMove] vehicle=" + vehRef.name + " squadInside=0x" + ((long)tgt.Pointer).ToString("X")
 					+ " target=" + point.ToString("0.0") + " via=LuaSquad");
 				RegisterVehicleObservation(vehRef, point);
 				return 1;
 			}
 			// 仅限 RTS 且原生调用失败时保留旧 Lua_Squad 兜底，避免车辆完全失去指令能力。
 			new Lua_Squad(tgt).moveTo(point, Plugin.radius.Value);
-			SquadCmdLogic.LogAlways("[VehicleMove] vehicle=" + vehRef.name + " squadInside=0x" + ((long)tgt.Pointer).ToString("X")
+			SquadCmdLogic.Log("[VehicleMove] vehicle=" + vehRef.name + " squadInside=0x" + ((long)tgt.Pointer).ToString("X")
 				+ " target=" + point.ToString("0.0") + " via=Fallback");
 			RegisterVehicleObservation(vehRef, point);
 			return 1;
@@ -1469,13 +1470,13 @@ internal static class GodViewController
 			Vehicle retryVeh = pendVeh;
 			if (SquadCmdLogic.TryIssueNativeMove(tgt, pendPoint, Plugin.radius.Value))
 			{
-				SquadCmdLogic.LogAlways("[VehicleMove] vehicle=" + retryVeh.name + " squadInside=0x" + ((long)tgt.Pointer).ToString("X")
+				SquadCmdLogic.Log("[VehicleMove] vehicle=" + retryVeh.name + " squadInside=0x" + ((long)tgt.Pointer).ToString("X")
 					+ " target=" + pendPoint.ToString("0.0") + " via=LuaSquad（同步窗口重试）");
 			}
 			else
 			{
 				new Lua_Squad(tgt).moveTo(pendPoint, Plugin.radius.Value);
-				SquadCmdLogic.LogAlways("[VehicleMove] vehicle=" + retryVeh.name + " squadInside=0x" + ((long)tgt.Pointer).ToString("X")
+				SquadCmdLogic.Log("[VehicleMove] vehicle=" + retryVeh.name + " squadInside=0x" + ((long)tgt.Pointer).ToString("X")
 					+ " target=" + pendPoint.ToString("0.0") + " via=Fallback（同步窗口重试）");
 			}
 			pendVeh = null;
@@ -2214,7 +2215,7 @@ internal static class GodViewController
 		catch (Exception ex)
 		{
 			ResetInputState(true);
-			SquadCmdLogic.LogAlways("[SquadCmd] 输入处理失败，已复位 RTS 手势: " + ex.Message);
+			SquadCmdLogic.Log("[SquadCmd] 输入处理失败，已复位 RTS 手势: " + ex.Message);
 		}
 
 		// 0.9.6：RTS 内 ESC 开关原生暂停/设置菜单（自持状态；菜单内"继续"按钮触发的原生
@@ -2227,14 +2228,14 @@ internal static class GodViewController
 				{
 					Pause.SetPause(true);
 					escMenuOpen = true;
-					SquadCmdLogic.LogAlways("[SquadCmd] ESC 打开原生菜单");
+					SquadCmdLogic.Log("[SquadCmd] ESC 打开原生菜单");
 				}
 				else
 				{
 					// 0.9.7：对称关闭——SetPause(false)（Resume 实例方法不确定是否收起菜单）
 					Pause.SetPause(false);
 					escMenuOpen = false;
-					SquadCmdLogic.LogAlways("[SquadCmd] ESC 关闭原生菜单");
+					SquadCmdLogic.Log("[SquadCmd] ESC 关闭原生菜单");
 				}
 			}
 			else if (escMenuOpen && !Pause.IsTimePaused() && !Pause.IsPaused())
@@ -2242,7 +2243,7 @@ internal static class GodViewController
 				escMenuOpen = false; // 用户在菜单里点了"继续"（原生 Resume），自动解除让位
 			}
 		}
-		catch (Exception ex) { SquadCmdLogic.LogAlways("[SquadCmd] ESC 菜单切换失败: " + ex.Message); }
+		catch (Exception ex) { SquadCmdLogic.Log("[SquadCmd] ESC 菜单切换失败: " + ex.Message); }
 
 		try
 		{
@@ -2482,7 +2483,7 @@ internal static class GodViewController
 		catch (Exception ex)
 		{
 			ResetInputState(true);
-			SquadCmdLogic.LogAlways("[SquadCmd] 输入处理失败，已复位 RTS 手势: " + ex.Message);
+			SquadCmdLogic.Log("[SquadCmd] 输入处理失败，已复位 RTS 手势: " + ex.Message);
 		}
 	}
 
@@ -3647,16 +3648,17 @@ internal static class GodViewController
 		ClearMark();
 		List<Soldier> infantry = GetSelectedInfantry();
 		int movedInf;
+		SquadCmdLogVia = "";
 		if (SquadCmdLogic.TryIssueNativeMove(infantry, point, Plugin.radius.Value))
 		{
 			movedInf = infantry.Count;
-			SquadCmdLogic.LogAlways("[SquadCmd] 步兵移动 via=LuaSquad 选中=" + movedInf);
+			SquadCmdLogVia = "LuaSquad";
 		}
 		else
 		{
 			// 部分原生 Squad、跨 Squad 选择或无归属时，保留逐兵兜底。
 			movedInf = MoveUnits(infantry, point);
-			SquadCmdLogic.LogAlways("[SquadCmd] 步兵移动 via=Fallback 执行=" + movedInf + "/选中=" + infantry.Count);
+			SquadCmdLogVia = "Fallback";
 		}
 		int driven = 0;
 		foreach (Vehicle vv in new List<Vehicle>(selVehicleRefs))
@@ -3667,7 +3669,7 @@ internal static class GodViewController
 		lastMovePoint = point;
 		RecordCmdTarget(point);
 		cmdFlash = string.Format(Ui.Tr("移动 → 步兵 {0} + 载具 {1}"), movedInf, driven); cmdFlashUntil = Time.unscaledTime + 3f;
-		SquadCmdLogic.LogAlways("[SquadCmd] 移动 point=" + point.ToString("0.0") + " 步兵=" + movedInf + " 载具=" + driven);
+		SquadCmdLogic.LogAlways("[SquadCmd] 移动 point=" + point.ToString("0.0") + " 步兵=" + movedInf + " 载具=" + driven + (SquadCmdLogVia.Length > 0 ? " via=" + SquadCmdLogVia : ""));
 	}
 
 	/// <summary>停止（选中单位停下，清移动命令）。</summary>
