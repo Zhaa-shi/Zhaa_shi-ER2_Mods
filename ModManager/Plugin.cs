@@ -15,7 +15,7 @@ using UnityEngine.UI;
 
 namespace ER2ModManager;
 
-[BepInPlugin("er2.modmanager", "ER2 Mod Manager", "1.1.6")]
+[BepInPlugin("er2.modmanager", "ER2 Mod Manager", "1.1.7")]
 public class Plugin : BasePlugin
 {
 	/// <summary>构建语言：CN_BUILD 编译符号 = 中文版（标签中文、页标题"模组"）；否则英文版。</summary>
@@ -45,7 +45,7 @@ public class Plugin : BasePlugin
 		nativeFull = Config.Bind("General", "NativeFull", false, "DEV: render the whole MODS page via native SettingSelectable rows.");
 		HarmonyInstance = new Harmony("er2.modmanager");
 		HarmonyInstance.PatchAll(GetType().Assembly);
-		ModLog.LogInfo((object)"ER2 Mod Manager 1.1.6 loaded.");
+		ModLog.LogInfo((object)"ER2 Mod Manager 1.1.7 loaded.");
 	}
 }
 
@@ -718,16 +718,15 @@ public static class ModRegistry
 			return y;
 		}
 		// 自动布局容器（锚定 Content 顶部，LayoutGroup 向下排列，Fitter 自动扩展高度）
-		// v1.1.5：容器右侧收窄（右边距 46px），行不再伸到滚动条下方 —— 修复滑条压列表 +
-		// 列表与滑条无间隔两个问题（模板行 LayoutGroup 控宽，收窄即整体让位）。
+		// v1.1.7：右侧收窄改回贴近原版观感（右移 10px + 右边距 20px → 滑条与行间隙 ~20px）。
 		GameObject cont = new GameObject("MM_Container");
 		cont.transform.SetParent(contentPage, false);
 		RectTransform crt = cont.AddComponent<RectTransform>();
 		crt.anchorMin = new Vector2(0f, 1f);
 		crt.anchorMax = new Vector2(1f, 1f);
 		crt.pivot = new Vector2(0.5f, 1f);
-		crt.anchoredPosition = new Vector2(-23f, 0f);
-		crt.sizeDelta = new Vector2(-46f, 100f);
+		crt.anchoredPosition = new Vector2(-10f, 0f);
+		crt.sizeDelta = new Vector2(-20f, 100f);
 		UnityEngine.UI.VerticalLayoutGroup lg = cont.AddComponent<UnityEngine.UI.VerticalLayoutGroup>();
 		lg.spacing = 6f;
 		lg.childAlignment = TextAnchor.UpperCenter;
@@ -807,6 +806,98 @@ public static class ModRegistry
 		{
 		}
 		return y;
+	}
+
+	/// <summary>v1.1.7：重建风暴熔断状态（0.5s 内第 4 次 !hasOurs 触发证据 dump + 停止重建）。</summary>
+	internal static float lastRebuildTime;
+
+	internal static int rebuildBurst;
+
+	/// <summary>v1.1.7：只做布局强推，不再整页重建（熔断期的保守自愈——若只是 LayoutGroup 未算，
+	/// ForceRebuild + Canvas 刷新就能把零行容器的尺寸撑起来）。</summary>
+	internal static void ForceLayoutOnly(SettingsGUI_V2 s)
+	{
+		try
+		{
+			Transform c = s.contentPage;
+			if (c == null)
+			{
+				return;
+			}
+			for (int i = c.childCount - 1; i >= 0; i--)
+			{
+				Transform ch = c.GetChild(i);
+				if (ch != null && ch.name == "MM_Container")
+				{
+					RectTransform crt = ch.GetComponent<RectTransform>();
+					if (crt != null)
+					{
+						UnityEngine.UI.LayoutRebuilder.ForceRebuildLayoutImmediate(crt);
+					}
+					break;
+				}
+			}
+			Canvas.ForceUpdateCanvases();
+		}
+		catch
+		{
+		}
+	}
+
+	/// <summary>v1.1.7：卡死现场一次性证据 dump（重建风暴熔断时触发）——不猜原因，把全部相关
+	/// 状态写日志：容器子行数、contentPage 子物体清单、插件缓存数、页码、原生实例/协程状态。</summary>
+	internal static void DumpStuckEvidence(SettingsGUI_V2 s)
+	{
+		try
+		{
+			string nl = Environment.NewLine;
+			System.Text.StringBuilder sb = new System.Text.StringBuilder("ModManager STUCK-EVIDENCE dump:");
+			sb.Append(nl).Append("  currentOpenedMenu=").Append(SettingsGUI_V2.currentOpenedMenu)
+			   .Append(" myIndex=").Append(myIndex);
+			try
+			{
+				sb.Append(nl).Append("  pluginsCache=").Append(pluginsCache != null ? pluginsCache.Count.ToString() : "null")
+				   .Append(" chainloaderPlugins=").Append(IL2CPPChainloader.Instance?.Plugins != null ? IL2CPPChainloader.Instance.Plugins.Count.ToString() : "null");
+			}
+			catch (Exception ex2)
+			{
+				sb.Append(nl).Append("  chainloader read error: ").Append(ex2.Message);
+			}
+			try
+			{
+				if (s != null)
+				{
+					sb.Append(nl).Append("  fillingRoutine=").Append(s.fillingRoutine != null ? "live" : "null")
+					   .Append(" instance=").Append(s.gameObject != null ? s.gameObject.activeInHierarchy.ToString() : "?");
+					Transform c = s.contentPage;
+					sb.Append(nl).Append("  contentPage=").Append(c != null ? c.name : "null")
+					   .Append(" childCount=").Append(c != null ? c.childCount : -1);
+					if (c != null)
+					{
+						for (int i = 0; i < c.childCount; i++)
+						{
+							Transform ch = c.GetChild(i);
+							if (ch != null)
+							{
+								RectTransform rt = ch.GetComponent<RectTransform>();
+								sb.Append(nl).Append("    [").Append(i).Append("] ").Append(ch.name)
+								   .Append(" childCount=").Append(ch.childCount)
+								   .Append(" size=").Append(rt != null ? rt.rect.width.ToString("0") + "x" + rt.rect.height.ToString("0") : "?")
+								   .Append(" active=").Append(ch.gameObject != null ? ch.gameObject.activeInHierarchy.ToString() : "?");
+							}
+						}
+					}
+				}
+			}
+			catch (Exception ex3)
+			{
+				sb.Append(nl).Append("  contentPage dump error: ").Append(ex3.Message);
+			}
+			Plugin.ModLog.LogWarning((object)sb.ToString());
+		}
+		catch
+		{
+		}
 	}
 
 	/// <summary>v1.1.3：滚动复位到顶部 + 清理 NaN（翻页/重进后列表不显示的常见根因）。</summary>
@@ -3533,33 +3624,79 @@ public class InjectPollPatch
 						Transform c2 = s.contentPage;
 						if (c2 != null)
 						{
-							for (int i = c2.childCount - 1; i >= 0; i--)
-							{
-								Transform child = c2.GetChild(i);
-								if (child != null)
+								for (int i = c2.childCount - 1; i >= 0; i--)
 								{
-									if (child.name == "MM_Container")
+									Transform child = c2.GetChild(i);
+									if (child != null)
 									{
-										hasOurs = true;
-									}
-									else
-									{
-										UnityEngine.Object.Destroy(child.gameObject);
+										if (child.name == "MM_Container")
+										{
+											hasOurs = true;
+										}
+										else
+										{
+											UnityEngine.Object.Destroy(child.gameObject);
+										}
 									}
 								}
 							}
 						}
+						catch
+						{
+						}
 					}
-					catch
+					// v1.1.7：hasOurs 加严——容器存在但零子行 = 坏状态（布局从未展开、看不见任何行），
+					// 与"容器不在"同视，都需要重建。配熔断器防重建风暴。
+					if (hasOurs)
 					{
+						Transform ours = null;
+						try
+						{
+							Transform c3 = s.contentPage;
+							for (int i = c3.childCount - 1; i >= 0; i--)
+							{
+								Transform ch = c3.GetChild(i);
+								if (ch != null && ch.name == "MM_Container")
+								{
+									ours = ch;
+									break;
+								}
+							}
+						}
+						catch
+						{
+						}
+						if (ours != null && ours.childCount == 0)
+						{
+							hasOurs = false;
+						}
 					}
-				}
-				if (!hasOurs)
-				{
-					ModRegistry.OpenMyPage(s);
-				}
-				// 滚动高度自愈：周期性重测容器实际高度（防原生协程/关闭转场写入错误滚动范围）
-				ModRegistry.SelfHealScroll(s.contentPage);
+					if (!hasOurs)
+					{
+						float now = Time.unscaledTime;
+						// 熔断：1 秒内最多 2 次重建；超限 = 有东西在持续对抗我们（不猜原因），dump 证据 + 停手
+						if (now - ModRegistry.lastRebuildTime < 0.5f)
+						{
+							ModRegistry.rebuildBurst++;
+							if (ModRegistry.rebuildBurst == 4)
+							{
+								ModRegistry.DumpStuckEvidence(s);
+							}
+							if (ModRegistry.rebuildBurst >= 4)
+							{
+								// 停止重建，仅做布局强推（若只是布局未算，这一下就能救活）
+								ModRegistry.ForceLayoutOnly(s);
+							}
+						}
+						else
+						{
+							ModRegistry.rebuildBurst = 1;
+							ModRegistry.lastRebuildTime = now;
+							ModRegistry.OpenMyPage(s);
+						}
+					}
+					// 滚动高度自愈：周期性重测容器实际高度（防原生协程/关闭转场写入错误滚动范围）
+					ModRegistry.SelfHealScroll(s.contentPage);
 			}
 			else
 			{
