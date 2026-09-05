@@ -15,7 +15,7 @@ using UnityEngine.UI;
 
 namespace ER2ModManager;
 
-[BepInPlugin("er2.modmanager", "ER2 Mod Manager", "1.1.9")]
+[BepInPlugin("er2.modmanager", "ER2 Mod Manager", "1.2.0")]
 public class Plugin : BasePlugin
 {
 	/// <summary>构建语言：CN_BUILD 编译符号 = 中文版（标签中文、页标题"模组"）；否则英文版。</summary>
@@ -45,7 +45,7 @@ public class Plugin : BasePlugin
 		nativeFull = Config.Bind("General", "NativeFull", false, "DEV: render the whole MODS page via native SettingSelectable rows.");
 		HarmonyInstance = new Harmony("er2.modmanager");
 		HarmonyInstance.PatchAll(GetType().Assembly);
-		ModLog.LogInfo((object)"ER2 Mod Manager 1.1.9 loaded.");
+		ModLog.LogInfo((object)"ER2 Mod Manager 1.2.0 loaded.");
 	}
 }
 
@@ -226,28 +226,6 @@ public static class ModRegistry
 		catch
 		{
 		}
-		// 诊断：记录滚动层级结构（contentPage 与父级的 ScrollRect 位置），定位局内滚动问题
-		try
-		{
-			Transform cp = s.contentPage;
-			if (cp != null)
-			{
-				string chain = cp.name;
-				Transform cur = cp;
-				for (int i = 0; i < 3 && cur != null; i++)
-				{
-					bool hasSr = cur.GetComponent<UnityEngine.UI.ScrollRect>() != null;
-					bool hasVp = cur.GetComponent<RectMask2D>() != null || cur.GetComponent<UnityEngine.UI.Mask>() != null;
-					chain += " -> [" + cur.name + (hasSr ? ":ScrollRect" : "") + (hasVp ? ":Mask" : "") + "]";
-					cur = cur.parent;
-				}
-				Plugin.ModLog.LogInfo((object)("ModManager: scroll hierarchy " + chain + " contentH=" + y.ToString("0")));
-			}
-		}
-		catch
-		{
-		}
-		Plugin.ModLog.LogInfo((object)("ModManager: opened MODS page."));
 	}
 
 	/// <summary>v1.1.3：上一帧轮询时间（设置界面重开检测——Update 停跑期间时间跳变 &gt; 1.5s）。</summary>
@@ -304,9 +282,6 @@ public static class ModRegistry
 
 	/// <summary>滚动高度自愈节流（原生协程/关闭转场可能写入错误高度 → 周期性重测容器实际高度）。</summary>
 	internal static float nextScrollFixTime;
-
-	/// <summary>滚动纠正诊断日志节流。</summary>
-	internal static float nextScrollDiagTime;
 
 	/// <summary>我们是否改过 ScrollRect.content 的锚点（离开 MODS 页时还原，防影响原生页面）。</summary>
 	internal static RectTransform anchorChangedTarget;
@@ -1072,38 +1047,6 @@ public static class ModRegistry
 				catch
 				{
 				}
-			}
-			// 诊断：记录 content/viewport/锚点数值（限频 1 条/秒）
-			if (Time.unscaledTime > nextScrollDiagTime)
-			{
-				nextScrollDiagTime = Time.unscaledTime + 1f;
-				float vp = 0f;
-				try
-				{
-					vp = (sr != null && sr.viewport != null) ? sr.viewport.rect.height : 0f;
-				}
-				catch
-				{
-				}
-				string srInfo = "sr=?";
-				string canvasInfo = "";
-				try
-				{
-					if (sr != null)
-					{
-						UnityEngine.UI.Scrollbar sb = sr.verticalScrollbar;
-						srInfo = "sr.vertical=" + sr.vertical + " scrollbar=" + (sb != null ? (sb.name + " val=" + sb.value.ToString("0.00") + " size=" + sb.size.ToString("0.00")) : "NONE") + " pos=" + sr.verticalNormalizedPosition.ToString("0.00");
-					}
-					Canvas cv = contentPage.GetComponentInParent<Canvas>();
-					if (cv != null)
-					{
-						canvasInfo = " canvasScale=" + cv.transform.lossyScale.y.ToString("0.00");
-					}
-				}
-				catch
-				{
-				}
-				Plugin.ModLog.LogInfo((object)("ModManager: scroll state target='" + (target != null ? target.name : "?") + "' content=" + (target != null ? target.sizeDelta.y.ToString("0") : "?") + " rect=" + (target != null ? target.rect.height.ToString("0") : "?") + " viewport=" + vp.ToString("0") + " container=" + crt.rect.height.ToString("0") + " anchors=" + (target != null ? (target.anchorMin.ToString() + "/" + target.anchorMax.ToString()) : "?") + " | " + srInfo + canvasInfo));
 			}
 		}
 		catch
