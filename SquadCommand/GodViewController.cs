@@ -3165,23 +3165,39 @@ internal static class GodViewController
 		}
 		catch { }
 
-		// 1.0.3：移动路线标识——观察任务存续期间，每个行进单位/载具 → 目标点白色半透明线
-		//（含双击「前往并防守」的 routeOnly 登记；45s 观察窗到期或全员到位自动消失）
+		// 1.0.3：移动路线标识——观察任务存续期间，每个行进单位/载具 → 目标点灰色半透明虚线
+		//（含双击「前往并防守」的 routeOnly 登记；45s 观察窗到期或全员到位自动消失）1.0.5：减细
 		try
 		{
 			if (obsUnits.Count > 0 || obsVehicles.Count > 0)
 			{
-				Color pathC = new Color(0.7f, 0.7f, 0.7f, 0.4f); // 1.0.4：灰色半透明虚线（不抢视野）
+				Color pathC = new Color(0.7f, 0.7f, 0.7f, 0.4f);
 				int n = 0;
 				for (int i = 0; i < obsUnits.Count && n < RouteLineCap; i++, n++)
 				{
 					Soldier s = obsUnits[i];
-					try { if (s != null && s.transform != null && s.IsAlive) SceneMarkers.Line("PL" + n, s.transform.position + Vector3.up * 0.9f, obsTarget + Vector3.up * 0.3f, pathC, 0.13f, true); } catch { }
+					try { if (s != null && s.transform != null && s.IsAlive) SceneMarkers.Line("PL" + n, s.transform.position + Vector3.up * 0.9f, obsTarget + Vector3.up * 0.3f, pathC, 0.06f, true); } catch { }
 				}
 				for (int i = 0; i < obsVehicles.Count && n < RouteLineCap + 10; i++, n++)
 				{
 					Vehicle v = obsVehicles[i];
-					try { if (v != null && v.transform != null) SceneMarkers.Line("PL" + n, v.transform.position + Vector3.up * 1.2f, obsTarget + Vector3.up * 0.3f, pathC, 0.18f, true); } catch { }
+					try { if (v != null && v.transform != null) SceneMarkers.Line("PL" + n, v.transform.position + Vector3.up * 1.2f, obsTarget + Vector3.up * 0.3f, pathC, 0.08f, true); } catch { }
+				}
+			}
+		}
+		catch { }
+
+		// 1.0.5：登车路线——登车 pending 期间，每个步行登车单位 → 目标载具实时位置
+		try
+		{
+			if (pendingBoardVeh != null && pendingBoardUnits != null && pendingBoardVeh.transform != null)
+			{
+				Color boardC = new Color(0.7f, 0.7f, 0.7f, 0.4f);
+				int n = 0;
+				for (int i = 0; i < pendingBoardUnits.Count && n < RouteLineCap; i++, n++)
+				{
+					Soldier s = pendingBoardUnits[i];
+					try { if (s != null && s.transform != null && s.IsAlive) SceneMarkers.Line("PB" + n, s.transform.position + Vector3.up * 0.9f, pendingBoardVeh.transform.position + Vector3.up * 1.0f, boardC, 0.06f, true); } catch { }
 				}
 			}
 		}

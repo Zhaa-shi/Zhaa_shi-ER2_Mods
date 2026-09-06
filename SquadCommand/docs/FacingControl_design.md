@@ -2,7 +2,11 @@
 
 > 参照《战争召唤：地狱之门东线》的"选中载具后按住右键拖动控制朝向"交互。
 > 逆向依据：`research_out\AIVehicle.decompiled.cs`（2026-09-05 游戏版本 interop 桩）、`SquadCommand\research\report_vehicles_misc.md`、GPT_CONTEXT.md 载具专题铁律。
-> 结论先行：**原生存在"停止时朝向"通道 `AIVehicle.faceDirWhenStopped`（Nullable<Vector3>，get/set 公开），无需 patch 引擎即可实现原地转向；语义（方向向量 or 世界坐标点）需首版实测，两版兼容写法见 §3**。
+> **实施结果定案（1.0.2→1.0.4 实测）**：§3 的原生字段通道 `faceDirWhenStopped` 无效——
+> 原生 `IsRotatedToward` 恒真（issue 后 elapsed=0.0s 实锤）、外部直调 `RotateVehicleTowardEnemy(夹角)` 不转车，
+> 且 `StopAndClearPath` 会顺带停掉原生转向（表现为"拉线后车停止转动"）。
+> **最终实现 = 直驱车体 yaw**：C# `Vector3.SignedAngle` 算夹角，每帧按 60°/s 绕世界 Y 轴
+> `Quaternion.AngleAxis(Δ, up) * rotation` 逼近（保留地形俯仰/侧倾），<4° 判完成、15s 超时，完成/超时清 faceDir 字段。
 
 ---
 

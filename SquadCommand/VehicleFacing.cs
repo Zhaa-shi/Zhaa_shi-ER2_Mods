@@ -32,7 +32,7 @@ internal static class VehicleFacing
     private const float DirPointDist = 30f;      // 朝向兼容点距离
     private const float TimeoutSeconds = 15f;    // 15s 超时兜底
     private const float DoneAngleDeg = 4f;       // 夹角判定阈值（度）
-    private const float FaceSpeedDegPerSec = 60f;// 直驱原地转向角速度
+    private const float FaceSpeedFallback = 60f; // 读不到 rotationSpeed 时的兜底角速度
 
     /// <summary>车上的 AIVehicle 组件（本体找不到再找子级，与 DriveVehicleTo 同款）。</summary>
     private static AIVehicle GetAi(Vehicle v)
@@ -172,11 +172,15 @@ internal static class VehicleFacing
                 }
                 else if (!paused)
                 {
-                    // 直驱车体 yaw：绕世界 Y 轴旋转，保留地形俯仰/侧倾；暂停（timeScale=0）时不驱动
+                    // 直驱车体 yaw：绕世界 Y 轴旋转，保留地形俯仰/侧倾；角速度按各车
+                    // rotationSpeed（车辆配置的原地转速，度/秒），读不到/异常时兜底 60°/s；
+                    // 暂停（timeScale=0）时不驱动
                     float dt = Time.deltaTime;
                     if (dt > 0f)
                     {
-                        float angDelta = Mathf.Clamp(ang, -FaceSpeedDegPerSec * dt, FaceSpeedDegPerSec * dt);
+                        float spd = FaceSpeedFallback;
+                        try { float rs = t.veh.rotationSpeed; if (rs > 0.5f) spd = Mathf.Clamp(rs, 4f, 240f); } catch { }
+                        float angDelta = Mathf.Clamp(ang, -spd * dt, spd * dt);
                         t.veh.transform.rotation = Quaternion.AngleAxis(angDelta, Vector3.up) * t.veh.transform.rotation;
                     }
                 }
