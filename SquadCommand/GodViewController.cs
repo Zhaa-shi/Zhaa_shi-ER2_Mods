@@ -1171,8 +1171,9 @@ internal static class GodViewController
 		if (selVehicleRefs.Count == 0) SquadCmdLogic.Log("[SplitCheck] 无选中载具（纯步兵分队）");
 	}
 
-	/// <summary>0.7.99：下达移动后登记完成度观测。0.9.15：改用原生停火通道 + 压制有效期。</summary>
-	private static void RegisterMoveObservation(Vector3 point, List<Soldier> units)
+	/// <summary>0.7.99：下达移动后登记完成度观测。0.9.15：改用原生停火通道 + 压制有效期。
+	/// 1.0.3：routeOnly=true 仅登记路线显示/到位统计，不加行军停火（双击「前往并防守」用）。</summary>
+	private static void RegisterMoveObservation(Vector3 point, List<Soldier> units, bool routeOnly = false)
 	{
 		obsTarget = point;
 		obsUnits.Clear();
@@ -1184,6 +1185,7 @@ internal static class GodViewController
 			try
 			{
 				SquadCmdLogic.RegisterControlledUnit(s);
+				if (routeOnly) continue; // 只画路线：不停火、不禁找掩护
 				if (!obsNoEngage.Contains(s)) obsNoEngage.Add(s);
 				Squad sq = s.joinedSquad;
 				if (sq != null) squads.Add((long)sq.Pointer);
@@ -1192,6 +1194,7 @@ internal static class GodViewController
 		}
 		// 0.9.15：原生停火（小队级 SetHoldFireOrder）+ 士兵级禁被压制找掩护。
 		// 不再切断 GetBestVisibleEnemy——全盲会引发任务系统异常（罚站/冻结）且拦不住任务级打断。
+		if (routeOnly) squads.Clear();
 		foreach (long k in squads)
 		{
 			try
@@ -1215,7 +1218,7 @@ internal static class GodViewController
 		}
 		obsUntil = Time.unscaledTime + 45f;
 		obsNext = Time.unscaledTime + 1f;
-		obsNoEngageExpire = Time.unscaledTime + NoEngageMaxSeconds; // 保险丝：20s 后自动恢复开火
+		if (!routeOnly) obsNoEngageExpire = Time.unscaledTime + NoEngageMaxSeconds; // 保险丝：20s 后自动恢复开火（routeOnly 未停火，不动保险丝）
 		ObsTotal = obsUnits.Count + obsVehicles.Count;
 		ObsArrived = 0;
 	}
@@ -3066,6 +3069,7 @@ internal static class GodViewController
 	private static float smFriendlyNext = -10f;
 	private static readonly HashSet<long> smSelected = new HashSet<long>();
 	private const int SceneMarkerCap = 200;
+	private const int RouteLineCap = 30; // 1.0.3：路线线数量上限（步兵），载具另加 10
 
 	private static void SceneMarkersFrame()
 	{
@@ -3157,6 +3161,28 @@ internal static class GodViewController
 				Color yellow = new Color(1f, 0.85f, 0.35f, 0.95f);
 				SceneMarkers.Ring("MT", cmdTarget + Vector3.up * 0.1f, 0.45f * pulse, yellow, 0.07f, true);
 				SceneMarkers.Dot("MTD", cmdTarget + Vector3.up * 0.1f, 0.11f * pulse, yellow, true);
+			}
+		}
+		catch { }
+
+		// 1.0.3：移动路线标识——观察任务存续期间，每个行进单位/载具 → 目标点白色半透明线
+		//（含双击「前往并防守」的 routeOnly 登记；45s 观察窗到期或全员到位自动消失）
+		try
+		{
+			if (obsUnits.Count > 0 || obsVehicles.Count > 0)
+			{
+				Color pathC = new Color(1f, 1f, 1f, 0.45f);
+				int n = 0;
+				for (int i = 0; i < obsUnits.Count && n < RouteLineCap; i++, n++)
+				{
+					Soldier s = obsUnits[i];
+					try { if (s != null && s.transform != null && s.IsAlive) SceneMarkers.Line("PL" + n, s.transform.position + Vector3.up * 0.9f, obsTarget + Vector3.up * 0.3f, pathC, 0.13f, true); } catch { }
+				}
+				for (int i = 0; i < obsVehicles.Count && n < RouteLineCap + 10; i++, n++)
+				{
+					Vehicle v = obsVehicles[i];
+					try { if (v != null && v.transform != null) SceneMarkers.Line("PL" + n, v.transform.position + Vector3.up * 1.2f, obsTarget + Vector3.up * 0.3f, pathC, 0.18f, true); } catch { }
+				}
 			}
 		}
 		catch { }
@@ -3700,7 +3726,11 @@ internal static class GodViewController
 		}
 		int driven = 0;
 		foreach (Vehicle vv in new List<Vehicle>(selVehicleRefs)) { VehicleFacing.CancelFor(vv); driven += DriveVehicleTo(vv, point); }
-		if (squads > 0 || driven > 0) SquadCmdLogic.LogAlways("[SquadCmd] 前往并防守 squads=" + squads + " vehicles=" + driven + " target=" + point.ToString("0.0"));
+		if (squads > 0 || driven > 0)
+		{
+			RegisterMoveObservation(point, GetSelectedInfantry(), routeOnly: true); // 1.0.3：行进路线显示（不停火）
+			SquadCmdLogic.LogAlways("[SquadCmd] 前往并防守 squads=" + squads + " vehicles=" + driven + " target=" + point.ToString("0.0"));
+		}
 	}
 
 	/// <summary>移动指令：选中步兵走 + 选中载具开过去（到点击点，标点就在点击处）。移动会解除跟随。</summary>

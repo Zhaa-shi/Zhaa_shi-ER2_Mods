@@ -212,6 +212,31 @@ internal static class SceneMarkers
 		head.startColor = c; head.endColor = c; head.widthMultiplier = width * 0.8f;
 	}
 
+	/// <summary>1.0.3：两点直线（无箭头翼），用于单位行进路线标识。每帧调用刷新位置。</summary>
+	public static void Line(string key, Vector3 from, Vector3 to, Color c, float width, bool visible)
+	{
+		if (!visible) return;
+		used.Add(key);
+		if (!pool.TryGetValue(key, out GameObject go) || go == null)
+		{
+			go = new GameObject("SCML_" + key);
+			UnityEngine.Object.DontDestroyOnLoad(go);
+			LineRenderer lr = go.AddComponent<LineRenderer>();
+			lr.useWorldSpace = true;
+			lr.loop = false;
+			lr.positionCount = 2;
+			lr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+			lr.receiveShadows = false;
+			lr.material = LineMat();
+			pool[key] = go;
+		}
+		go.SetActive(true);
+		LineRenderer l = go.GetComponent<LineRenderer>();
+		arrowMain[0] = from; arrowMain[1] = to;
+		l.SetPositions(arrowMain);
+		l.startColor = c; l.endColor = c; l.widthMultiplier = width;
+	}
+
 	/// <summary>帧末：本轮未被刷新的标记全部隐藏（由 GodViewController.Tick 调用）。</summary>
 	public static void EndFrame()
 	{

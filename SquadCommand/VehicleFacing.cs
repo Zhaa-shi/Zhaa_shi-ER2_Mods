@@ -6,11 +6,11 @@ namespace ER2SquadCommand;
 
 /// <summary>
 /// 1.0.2：载具朝向控制（地狱之门式：选中载具长按右键拖动，松开转向）。
-/// 命令通道 = 原生 AIVehicle.faceDirWhenStopped（"停止时朝向"字段，Nullable&lt;Vector3&gt;）：
-/// 先 StopAndClearPath 停车，写入朝向点后由原生 StaticVehicleRoutine 每帧原地转车体；
-/// IsRotatedToward 到位或 12s 超时后清空字段，防残留让 AI 之后每次停稳都自动回转。
-/// 兼容写法：写入"车位置+方向×30m"的世界点而非短向量——native 无论把它当方向（atan2 定航向）
-/// 还是当目标点（转向该位置），朝向都收敛为拖动方向；短向量在"目标点"语义下会指向世界原点。
+/// 1.0.3 实测定案：faceDirWhenStopped 通道无效且原生 IsRotatedToward 恒真（issue 后 elapsed=0.0s 实锤，
+/// 两个原生判定的语义与预期不符）——改为托管驱动转向：C# 计算车头与目标方向的有向夹角
+///（Vector3.SignedAngle，不依赖原生 GetAngleToward 语义），每帧调原生 RotateVehicleTowardEnemy(角度)
+/// 转车体（与原生 StaticVehicleRoutine 同款调用路径），夹角 &lt;4° 判完成并清 faceDir 字段。
+/// faceDirWhenStopped 仍在下达时写入（无害提示，若某状态原生会消费则方向一致），完成/超时清空防回转。
 /// 注意：Nullable 字段只能整体赋新包装对象，赋 C# null 会在 il2cpp_object_unbox(0) 处崩游戏。
 /// </summary>
 internal static class VehicleFacing
@@ -22,7 +22,7 @@ internal static class VehicleFacing
         public Vector3 dirPoint;   // 朝向点（世界坐标）
         public float issuedAt;
         public float deadline;
-        public int readbacks;      // 门控诊断：issue 后 1s/3s 两次读数
+        public float angle0;       // 下达时夹角（日志判据）
         public int fails;          // interop 异常连续计数（铁律 30：连续 3 次才判死）
     }
 
@@ -30,14 +30,27 @@ internal static class VehicleFacing
 
     internal const float DragThresholdPx = 14f;  // 长按 0.35s 到点时的拖动判定阈值（像素）
     private const float DirPointDist = 30f;      // 朝向兼容点距离
-    private const float TimeoutSeconds = 12f;
-    internal const float ArrowAlpha = 0.95f;
+    private const float TimeoutSeconds = 15f;    // 驱动转向偏慢，放宽到 15s
+    private const float DoneAngleDeg = 4f;       // 夹角判定阈值（度）
 
     /// <summary>车上的 AIVehicle 组件（本体找不到再找子级，与 DriveVehicleTo 同款）。</summary>
     private static AIVehicle GetAi(Vehicle v)
     {
         try { AIVehicle ai = v.GetComponent<AIVehicle>(); if (ai != null) return ai; } catch { }
         try { return v.GetComponentInChildren<AIVehicle>(); } catch { return null; }
+    }
+
+    /// <summary>车头与"车→dirPoint"水平方向的有向夹角（度），纯托管计算。</summary>
+    private static float ManagedSignedAngle(Vehicle v, Vector3 dirPoint)
+    {
+        try
+        {
+            Vector3 to = dirPoint - v.transform.position; to.y = 0f;
+            Vector3 fwd = v.transform.forward; fwd.y = 0f;
+            if (to.sqrMagnitude < 0.01f || fwd.sqrMagnitude < 0.0001f) return 0f;
+            return Vector3.SignedAngle(fwd.normalized, to.normalized, Vector3.up);
+        }
+        catch { return 0f; }
     }
 
     /// <summary>载具是否可转向：非飞机、有 AIVehicle、驾驶员存活、玩家未接管。</summary>
@@ -91,15 +104,16 @@ internal static class VehicleFacing
                 long p = (long)v.Pointer;
                 tasks.RemoveAll(t => { try { return t.veh == null || (long)t.veh.Pointer == p; } catch { return true; } });
                 try { ai.StopAndClearPath(); } catch { }
-                GodViewController.CancelVehicleMoveObservation(v); // 摘除该车移动观察，防与朝向任务互相打架
-                ai.faceDirWhenStopped = new Il2CppSystem.Nullable<Vector3>(point);
-                tasks.Add(new FacingTask { veh = v, ai = ai, dirPoint = point, issuedAt = Time.unscaledTime, deadline = Time.unscaledTime + TimeoutSeconds });
+                GodViewController.CancelVehicleMoveObservation(v); // 摘除该车移动观察/待发重试，防与朝向任务互相打架
+                try { ai.faceDirWhenStopped = new Il2CppSystem.Nullable<Vector3>(point); } catch { }
+                float a0 = ManagedSignedAngle(v, point);
+                tasks.Add(new FacingTask { veh = v, ai = ai, dirPoint = point, issuedAt = Time.unscaledTime, deadline = Time.unscaledTime + TimeoutSeconds, angle0 = a0 });
                 issued++;
             }
             catch (Exception ex) { SquadCmdLogic.Log("[Facing] 下达失败 vehicle=" + GodViewController.SafeName(v) + ": " + ex.Message); }
         }
         if (issued > 0)
-            SquadCmdLogic.LogAlways("[Facing] issue vehicles=" + issued + " point=" + point.ToString("0.0"));
+            SquadCmdLogic.LogAlways("[Facing] issue vehicles=" + issued + " point=" + point.ToString("0.0") + " (驱动转向 RotateVehicleTowardEnemy)");
         return issued;
     }
 
@@ -127,11 +141,12 @@ internal static class VehicleFacing
         if (had) SquadCmdLogic.Log("[Facing] 移动命令覆盖，已清该车朝向任务");
     }
 
-    /// <summary>持久任务段：到位/超时/判死收尾。RTS 退出后继续生效（车在 FPS 视角下也能转完）。</summary>
+    /// <summary>持久任务段：驱动转向 + 到位/超时收尾。RTS 退出后继续生效（车在 FPS 视角下也能转完）。</summary>
     internal static void Tick()
     {
         if (tasks.Count == 0) return;
         float now = Time.unscaledTime;
+        bool paused = GodViewController.Paused;
         for (int i = tasks.Count - 1; i >= 0; i--)
         {
             FacingTask t = tasks[i];
@@ -139,40 +154,24 @@ internal static class VehicleFacing
             try
             {
                 if (t.veh == null || t.veh.transform == null) { tasks.RemoveAt(i); continue; }
-
-                // 读数诊断（debugLog 门控）：角度递减=通道生效；faceDir 读回空=被原生清除/拒收
-                if (t.readbacks < 2 && now - t.issuedAt > (t.readbacks == 0 ? 1f : 3f))
-                {
-                    t.readbacks++;
-                    float ang = float.NaN;
-                    bool hasFd = false;
-                    try { ang = t.ai.GetAngleToward(t.dirPoint); } catch { }
-                    try
-                    {
-                        Il2CppSystem.Nullable<Vector3> fd = t.ai.faceDirWhenStopped;
-                        if (fd != null && fd.Pointer != IntPtr.Zero && fd.HasValue) hasFd = true;
-                    }
-                    catch { }
-                    if (Plugin.debugLog.Value)
-                        SquadCmdLogic.Log("[Facing] readback t+" + (now - t.issuedAt).ToString("0.0") + "s vehicle=" + GodViewController.SafeName(t.veh)
-                            + " angle=" + ang.ToString("0.0") + " faceDir=" + (hasFd ? "set" : "null"));
-                    if (t.readbacks == 1 && !hasFd && Plugin.debugLog.Value)
-                        SquadCmdLogic.Log("[Facing] faceDir 读回 null——字段被原生清除/拒收；若车体未转需降级 RotateVehicleTowardEnemy 驱动");
-                }
-
-                bool done = false;
-                try { done = t.ai.IsRotatedToward(t.dirPoint); } catch { }
-                if (done)
+                float ang = ManagedSignedAngle(t.veh, t.dirPoint);
+                if (Mathf.Abs(ang) <= DoneAngleDeg)
                 {
                     ClearField(t);
-                    SquadCmdLogic.LogAlways("[Facing] done vehicle=" + GodViewController.SafeName(t.veh) + " elapsed=" + (now - t.issuedAt).ToString("0.0") + "s");
+                    SquadCmdLogic.LogAlways("[Facing] done vehicle=" + GodViewController.SafeName(t.veh)
+                        + " elapsed=" + (now - t.issuedAt).ToString("0.0") + "s angle0=" + t.angle0.ToString("0"));
                     remove = true;
                 }
                 else if (now > t.deadline)
                 {
                     ClearField(t);
-                    SquadCmdLogic.LogAlways("[Facing] timeout vehicle=" + GodViewController.SafeName(t.veh) + " 已清字段（" + TimeoutSeconds + "s 未到位）");
+                    SquadCmdLogic.LogAlways("[Facing] timeout vehicle=" + GodViewController.SafeName(t.veh)
+                        + " angle=" + ang.ToString("0") + " angle0=" + t.angle0.ToString("0") + "（" + TimeoutSeconds + "s 未到位，已清字段）");
                     remove = true;
+                }
+                else if (!paused)
+                {
+                    try { t.ai.RotateVehicleTowardEnemy(ang); } catch { }
                 }
             }
             catch
@@ -200,7 +199,7 @@ internal static class VehicleFacing
             point = hit.point;
         }
         catch { return; }
-        Color c = new Color(1f, 0.85f, 0.35f, ArrowAlpha); // 与移动目标点同系黄色
+        Color c = new Color(1f, 1f, 1f, 0.6f); // 白色半透明（与移动路线同系）
         int n = 0;
         foreach (Vehicle v in cands)
         {
