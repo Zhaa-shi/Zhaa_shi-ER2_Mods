@@ -1,6 +1,6 @@
-param(
+﻿param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet("LimbTweaks", "WeatherControl", "AIFood", "NoInteractionHints", "ModManager", "ThrowableWheel", "ZoomAnywhere", "CombatTweaks", "UnitCollision", "UnitInfoOverlay", "HighValueTarget", "InventoryPause", "SquadCommand")]
+    [ValidateSet("LimbTweaks", "WeatherControl", "AIFood", "NoInteractionHints", "ModManager", "ThrowableWheel", "ZoomAnywhere", "CombatTweaks", "UnitCollision", "UnitInfoOverlay", "HighValueTarget", "InventoryPause", "SquadCommand", "UniversalGeneration")]
     [string]$Mod,
     [switch]$SkipDeploy,
     [switch]$SkipPackage,
@@ -28,6 +28,7 @@ switch ($Mod) {
     "HighValueTarget" { $proj = "HighValueTarget.csproj"; $dll = "ER2_VeteranHVT.dll"; $cfg = "er2.highvaluetarget.cfg"; $pkg = "ER2_VeteranHVT"; $assetsDir = "ER2_VeteranHVT" }
     "InventoryPause" { $proj = "InventoryPause.csproj"; $dll = "ER2_InventoryPause.dll"; $cfg = "er2.inventorypause.cfg"; $pkg = "ER2_InventoryPause"; $assetsDir = "" }
     "SquadCommand" { $proj = "SquadCommand.csproj"; $dll = "ER2_BattlefieldCommander.dll"; $cfg = "er2.squadcommand.cfg"; $pkg = "ER2_BattlefieldCommander"; $assetsDir = "" }
+    "UniversalGeneration" { $proj = "UniversalGeneration.csproj"; $dll = "ER2_UniversalGeneration.dll"; $cfg = "er2.universalgeneration.cfg"; $pkg = "ER2_UniversalGeneration"; $assetsDir = "" }
 }
 
 Write-Host "[1/4] Building $Mod ..."

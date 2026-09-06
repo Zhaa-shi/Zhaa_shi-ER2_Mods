@@ -2628,6 +2628,13 @@ internal static class GodViewController
 		return new Vector2(Input.mousePosition.x, Screen.height - Input.mousePosition.y);
 	}
 
+	// 附属 mod（UniversalGeneration 等）注册的额外 GUI 遮挡区：返回 null=无遮挡。
+	// IsMouseOverGui 命中该 Rect 时吞掉战场选择/指令手势，避免附属面板点击误框选。
+	// 由附属 mod 反射赋值（本程序集内无赋值点，CS0649 预期内）。
+#pragma warning disable CS0649
+	internal static Func<Rect?> externalGuiBlock;
+#pragma warning restore CS0649
+
 	private static bool IsMouseOverGui()
 	{
 		try
@@ -2641,6 +2648,7 @@ internal static class GodViewController
 				if (MergeButtonRect().Contains(m)) return true;
 			}
 			if (squadPanelHit.height > 0f && squadPanelHit.Contains(m)) return true;
+			if (externalGuiBlock != null && externalGuiBlock() is Rect ex && ex.Contains(m)) return true;
 		}
 		catch { }
 		return false;
