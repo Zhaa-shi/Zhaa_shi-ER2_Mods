@@ -9,13 +9,14 @@ using UnityEngine;
 
 namespace ER2SquadCommand;
 
-[BepInPlugin("er2.squadcommand", "ER2 Battlefield Commander", "1.0.1")]
+[BepInPlugin("er2.squadcommand", "ER2 Battlefield Commander", "1.0.2")]
 public class Plugin : BasePlugin
 {
 	internal static ManualLogSource ModLog;
 
 	internal static ConfigEntry<bool> enabled;
 	internal static ConfigEntry<float> radius;
+	internal static ConfigEntry<bool> dragFacing;
 	internal static ConfigEntry<bool> debugLog;
 	internal static ConfigEntry<KeyCode> godKey;
 	internal static ConfigEntry<string> uiColorBase;
@@ -28,6 +29,7 @@ public class Plugin : BasePlugin
 
 		enabled = Config.Bind("General", "enabled", true, Ui.Tr("主开关。"));
 		radius = Config.Bind("Control", "moveRadius", 8f, new ConfigDescription(Ui.Tr("移动到达判定半径（米）；双击右键「前往并防守」的防守半径同用此值。"), new AcceptableValueRange<float>(1f, 60f)));
+		dragFacing = Config.Bind("Control", "dragFacing", true, Ui.Tr("载具朝向拖动（地狱之门式）：选中载具后长按右键并拖动出箭头，松开车体原地转向。关闭后长按右键仅开命令环。"));
 		debugLog = Config.Bind("Debug", "debugLog", false, new ConfigDescription(Ui.Tr("调试日志开关（发布版保持关闭）。开启后输出全部指挥/登车/标记诊断日志，用于问题排查。")));
 		godKey = Config.Bind("General", "godKey", KeyCode.F9, Ui.Tr("上帝视角开关（仅进入）。退出＝选中小队后点顶部[控制该小队]随机接管一人；全军覆没时按键紧急退出。空格＝暂停/继续世界。"));
 
@@ -41,7 +43,7 @@ public class Plugin : BasePlugin
 
 		new Harmony("er2.squadcommand").PatchAll(typeof(Plugin).Assembly);
 		FrameEndRunner.Ensure();
-		ModLog.LogInfo("ER2 Battlefield Commander 1.0.1 loaded. godKey=" + godKey.Value);
+		ModLog.LogInfo("ER2 Battlefield Commander 1.0.2 loaded. godKey=" + godKey.Value);
 	}
 }
 

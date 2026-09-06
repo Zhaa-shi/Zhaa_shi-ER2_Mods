@@ -172,6 +172,7 @@ internal static class GodViewController
 	private static Vector2 rightDownScreenPos;
 	private static bool rightDownOnUnit; // 按下点命中单位时不开姿态环（松开一律走短按指令）
 	private static float lastRightBlankClickTime = -10f;
+	private static bool facingDragActive; // 1.0.2：朝向拖动进行中（选中载具长按右键拖出阈值，松开转向）
 	// ===== 标记敌军（集火）——0.7.63 最终形态重建（0.7.68 误删恢复） =====
 	internal sealed class MarkedTarget
 	{
@@ -698,7 +699,7 @@ internal static class GodViewController
 		try { string n = s.name_surname; return string.IsNullOrEmpty(n) ? ("单位#" + s.GetInstanceID()) : n; } catch { return "单位"; }
 	}
 
-	private static string SafeName(Vehicle v)
+	internal static string SafeName(Vehicle v)
 	{
 		try { return string.IsNullOrEmpty(v.name) ? "未知载具" : v.name; } catch { return "未知载具"; }
 	}
@@ -1468,6 +1469,7 @@ internal static class GodViewController
 			}
 			catch { }
 			Vehicle retryVeh = pendVeh;
+			VehicleFacing.CancelFor(retryVeh); // 1.0.2：重试移动同样覆盖朝向
 			if (SquadCmdLogic.TryIssueNativeMove(tgt, pendPoint, Plugin.radius.Value))
 			{
 				SquadCmdLogic.Log("[VehicleMove] vehicle=" + retryVeh.name + " squadInside=0x" + ((long)tgt.Pointer).ToString("X")
@@ -2171,6 +2173,7 @@ internal static class GodViewController
 		{
 			PruneMark();
 			SceneMarkersFrame(); // 0.9.0：3D 场景标记每帧跟随（RTS/FPS 均显示集火/目标环）
+			VehicleFacing.Tick(); // 1.0.2：载具朝向任务维护（到位/超时清字段，FPS 下也生效）
 			ObsMoveTick();
 			BoardPendingTick();
 			VehiclePendingTick();
@@ -2454,6 +2457,7 @@ internal static class GodViewController
 		rightHoldActive = false;
 		rightLongPressOpened = false;
 		rightGestureWheelOpen = false;
+		facingDragActive = false;
 		rightDownTime = -10f;
 		rightDownScreenPos = Vector2.zero;
 		rightDownOnUnit = false;
@@ -2551,21 +2555,37 @@ internal static class GodViewController
 		}
 		// 姿态环只在按在空地/无效目标时开：按在单位上时瞄准按压常超阈值，误弹环打断指令。
 		// 按在单位上的右键无论按压多久，松开一律走短按指令路径。
+		// 1.0.2：长按到点仲裁——已拖出阈值且选中含可转向载具 → 朝向拖动（地狱之门式）；否则命令环（原行为）。
 		if (rightHoldActive && rightHeld && !showInteractionWheel && !rightGestureWheelOpen
 			&& !rightLongPressOpened && !guiNow
 			&& SelTotal > 0 && !rightDownOnUnit && Time.unscaledTime - rightDownTime >= RightLongPressSeconds)
 		{
-			rightLongPressOpened = true;
-			OpenCommandRing();
-			// 命令环成为独立状态；本次右键不再等待 MouseUp 发短按命令。
-			ResetRightGesture();
+			rightLongPressOpened = true; // 本次右键不再等待 MouseUp 发短按命令
+			if (Plugin.dragFacing.Value
+				&& (Input.mousePosition - (Vector3)rightDownScreenPos).sqrMagnitude > VehicleFacing.DragThresholdPx * VehicleFacing.DragThresholdPx
+				&& VehicleFacing.HasEligible(selVehicleRefs))
+			{
+				facingDragActive = true; // 保持手势态直到松开；ResetRightGesture 不调用
+				SquadCmdLogic.Log("[SquadCmd] 朝向拖动开始 vehicles=" + VehicleFacing.EligibleCount(selVehicleRefs));
+			}
+			else
+			{
+				OpenCommandRing();
+				// 命令环成为独立状态。
+				ResetRightGesture();
+			}
 		}
 		if (rightUp)
 		{
+			bool facing = facingDragActive;
 			bool issue = rightHoldActive && !rightLongPressOpened && !rightGestureWheelOpen && !guiNow;
 			Vector2 downPos = rightDownScreenPos;
 			ResetRightGesture();
-			if (issue)
+			if (facing && !guiNow)
+			{
+				IssueFacingFromMouse();
+			}
+			else if (issue)
 			{
 				float nowR = Time.unscaledTime;
 				bool dbl = nowR - lastRightBlankClickTime < 0.6f
@@ -3141,6 +3161,12 @@ internal static class GodViewController
 		}
 		catch { }
 
+		// 1.0.2：载具朝向拖动箭头（仅 RTS 拖动中显示；EndFrame 前刷新，未刷新自动隐藏）
+		if (Active && facingDragActive)
+		{
+			try { VehicleFacing.DrawDrag(MainCam(), selVehicleRefs); } catch { }
+		}
+
 		SceneMarkers.EndFrame();
 	}
 
@@ -3594,6 +3620,60 @@ internal static class GodViewController
 		catch (Exception ex) { SquadCmdLogic.Log("[SquadCmd] 右键指令失败: " + ex.Message); }
 	}
 
+	/// <summary>1.0.2：朝向拖动松开——把选中载具转向当前鼠标落点（原生 AIVehicle.faceDirWhenStopped 通道，详见 VehicleFacing）。</summary>
+	private static void IssueFacingFromMouse()
+	{
+		Camera cam = MainCam();
+		if (cam == null) return;
+		try
+		{
+			if (!Physics.Raycast(cam.ScreenPointToRay(Input.mousePosition), out RaycastHit hit, 1500f))
+			{
+				cmdFlash = Ui.Tr("未命中地面"); cmdFlashUntil = Time.unscaledTime + 2f;
+				return;
+			}
+			int n = VehicleFacing.IssueFacing(selVehicleRefs, hit.point);
+			if (n > 0)
+			{
+				cmdFlash = string.Format(Ui.Tr("载具转向 → {0}"), n); cmdFlashUntil = Time.unscaledTime + 2f;
+			}
+			else
+			{
+				cmdFlash = Ui.Tr("无可转向载具（需有驾驶员的非飞机载具）"); cmdFlashUntil = Time.unscaledTime + 2f;
+			}
+		}
+		catch (Exception ex) { SquadCmdLogic.Log("[SquadCmd] 朝向命令失败: " + ex.Message); }
+	}
+
+	/// <summary>1.0.2：摘除某车的移动观察任务与待发移动重试（朝向命令接管时调用，防两组任务互相打架）。</summary>
+	internal static void CancelVehicleMoveObservation(Vehicle v)
+	{
+		if (v == null) return;
+		try
+		{
+			long p = (long)v.Pointer;
+			for (int i = obsVehicles.Count - 1; i >= 0; i--)
+			{
+				Vehicle o = obsVehicles[i];
+				try
+				{
+					if (o != null && (long)o.Pointer == p)
+					{
+						obsVehicles.RemoveAt(i);
+						ObsTotal = obsUnits.Count + obsVehicles.Count;
+					}
+				}
+				catch { obsVehicles.RemoveAt(i); }
+			}
+			// 待发的"同步窗口重试"移动也是该车 → 撤销（朝向是更新的命令）
+			if (pendVeh != null)
+			{
+				try { if ((long)pendVeh.Pointer == p) pendVeh = null; } catch { pendVeh = null; }
+			}
+		}
+		catch { }
+	}
+
 	/// <summary>
 	/// 0.7.97：双击右键=原生「前往并防守」（Squad.HoldArea）。按选中成员所属原生小队分组，
 	/// 每个小队单条原生命令；不建 Mod 侧跟踪/修正状态。载具仍走原生车组订单链。
@@ -3619,7 +3699,7 @@ internal static class GodViewController
 			catch { }
 		}
 		int driven = 0;
-		foreach (Vehicle vv in new List<Vehicle>(selVehicleRefs)) driven += DriveVehicleTo(vv, point);
+		foreach (Vehicle vv in new List<Vehicle>(selVehicleRefs)) { VehicleFacing.CancelFor(vv); driven += DriveVehicleTo(vv, point); }
 		if (squads > 0 || driven > 0) SquadCmdLogic.LogAlways("[SquadCmd] 前往并防守 squads=" + squads + " vehicles=" + driven + " target=" + point.ToString("0.0"));
 	}
 
@@ -3671,6 +3751,7 @@ internal static class GodViewController
 		int driven = 0;
 		foreach (Vehicle vv in new List<Vehicle>(selVehicleRefs))
 		{
+			VehicleFacing.CancelFor(vv); // 1.0.2：移动命令覆盖朝向，防车到达后自行回转
 			driven += DriveVehicleTo(vv, point);
 		}
 		if (movedInf > 0) RegisterMoveObservation(point, infantry);

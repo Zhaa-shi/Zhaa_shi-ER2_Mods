@@ -164,6 +164,54 @@ internal static class SceneMarkers
 		go.transform.position = groundPos;
 	}
 
+	// 1.0.2：箭头两翼/主线坐标暂存（SetPositions 立即拷贝，多支箭头可复用）
+	private static Il2CppStructArray<Vector3> arrowMain = new Il2CppStructArray<Vector3>(2);
+	private static Il2CppStructArray<Vector3> arrowHead = new Il2CppStructArray<Vector3>(3);
+
+	/// <summary>
+	/// 1.0.2：世界空间箭头（主线 + 两翼），用于载具朝向拖动指示。每帧调用刷新位置。
+	/// </summary>
+	public static void Arrow(string key, Vector3 from, Vector3 to, Color c, float width, bool visible)
+	{
+		if (!visible) return;
+		used.Add(key);
+		if (!pool.TryGetValue(key, out GameObject parent) || parent == null)
+		{
+			parent = new GameObject("SCMA_" + key);
+			UnityEngine.Object.DontDestroyOnLoad(parent);
+			for (int i = 0; i < 2; i++)
+			{
+				GameObject seg = new GameObject(i == 0 ? "line" : "head");
+				seg.transform.SetParent(parent.transform, false);
+				LineRenderer lr = seg.AddComponent<LineRenderer>();
+				lr.useWorldSpace = true;
+				lr.loop = false;
+				lr.positionCount = i == 0 ? 2 : 3;
+				lr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+				lr.receiveShadows = false;
+				lr.material = LineMat();
+			}
+			pool[key] = parent;
+		}
+		parent.SetActive(true);
+		Vector3 dir = to - from;
+		if (dir.sqrMagnitude < 0.01f) dir = Vector3.forward; else dir.Normalize();
+		Vector3 up = Mathf.Abs(Vector3.Dot(dir, Vector3.up)) > 0.95f ? Vector3.right : Vector3.up;
+		Vector3 right = Vector3.Cross(up, dir).normalized;
+		float wing = Mathf.Max(width * 4f, 0.9f);
+		LineRenderer[] lrs = parent.GetComponentsInChildren<LineRenderer>();
+		if (lrs == null || lrs.Length < 2) return;
+		LineRenderer main = lrs[0], head = lrs[1];
+		arrowMain[0] = from; arrowMain[1] = to;
+		main.SetPositions(arrowMain);
+		arrowHead[0] = to - dir * wing + right * wing * 0.6f;
+		arrowHead[1] = to;
+		arrowHead[2] = to - dir * wing - right * wing * 0.6f;
+		head.SetPositions(arrowHead);
+		main.startColor = c; main.endColor = c; main.widthMultiplier = width;
+		head.startColor = c; head.endColor = c; head.widthMultiplier = width * 0.8f;
+	}
+
 	/// <summary>帧末：本轮未被刷新的标记全部隐藏（由 GodViewController.Tick 调用）。</summary>
 	public static void EndFrame()
 	{
