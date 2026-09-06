@@ -15,8 +15,9 @@ internal static class Ui
 	private static readonly Dictionary<string, string> En = new Dictionary<string, string>
 	{
 		// ===== 底栏提示 / 状态 =====
-		["WASD 移动    滚轮 缩放    中键 旋转    Q/E 升降    │    左键 选择/框选    右键 指令    长按空地 命令环    │    空格 暂停    ESC 设置"]
-			= "WASD Move    Wheel Zoom    MMB Rotate    Q/E Height    │    LMB Select/Box    RMB Orders    Hold-RMB Command Ring    │    Space Pause    ESC Menu",
+		["WASD 移动    滚轮 缩放    中键 旋转    Q/E 升降    │    左键 选择/框选    右键 指令    长按空地 命令环    载具长按拖动 朝向    │    空格 暂停    ESC 设置"]
+			= "WASD Move    Wheel Zoom    MMB Rotate    Q/E Height    │    LMB Select/Box    RMB Orders    Hold-RMB Ring    Vehicle Hold-Drag Facing    │    Space Pause    ESC Menu",
+		["  高度 "] = "  Alt ",
 		["⏸ 已暂停（空格继续）"] = "⏸ Paused (Space to resume)",
 		["已选 "] = "Selected: ",
 		["步兵 "] = "Infantry ",
@@ -139,6 +140,12 @@ internal static class Ui
 		["合并 → {0} 人入{1}"] = "Merged → {0} into {1}",
 		["标记目标物 → {0}（持续到失效）"] = "Marked prop → {0} (until destroyed)",
 		["集火标记 → {0}（持续到死亡/失控）"] = "Focus-fire mark → {0} (until death/lost)",
+
+		// ===== 1.0.2+ 载具朝向拖动 =====
+		["载具转向 → {0}"] = "Face → {0} vehicles",
+		["无可转向载具（需有驾驶员的非飞机载具）"] = "No steerable vehicles (crewed, non-air)",
+		["载具朝向拖动（地狱之门式）：选中载具后长按右键并拖动出箭头，松开车体原地转向。关闭后长按右键仅开命令环。"]
+			= "Vehicle facing drag (Gates of Hell style): select vehicles, hold RMB and drag an arrow, release to pivot in place. Off = hold RMB opens the command ring only.",
 	};
 
 	public static string Tr(string cn)

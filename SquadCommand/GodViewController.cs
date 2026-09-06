@@ -3171,7 +3171,7 @@ internal static class GodViewController
 		{
 			if (obsUnits.Count > 0 || obsVehicles.Count > 0)
 			{
-				Color pathC = new Color(1f, 1f, 1f, 0.45f);
+				Color pathC = new Color(0.7f, 0.7f, 0.7f, 0.4f); // 1.0.4：灰色半透明虚线（不抢视野）
 				int n = 0;
 				for (int i = 0; i < obsUnits.Count && n < RouteLineCap; i++, n++)
 				{
@@ -3274,10 +3274,10 @@ internal static class GodViewController
 			GUIStyle st = SquadCmdLogic.HudStyle();
 			if (st == null) return;
 			Camera cam = MainCam();
-			string info = cam != null ? "  高度 " + cam.transform.position.y.ToString("0") + "m" : "";
+			string info = cam != null ? Ui.Tr("  高度 ") + cam.transform.position.y.ToString("0") + "m" : "";
 
 			// 底部指令提示（0.9.1：分组拉开间距）
-			string hint = Ui.Tr("WASD 移动    滚轮 缩放    中键 旋转    Q/E 升降    │    左键 选择/框选    右键 指令    长按空地 命令环    │    空格 暂停    ESC 设置") + info;
+			string hint = Ui.Tr("WASD 移动    滚轮 缩放    中键 旋转    Q/E 升降    │    左键 选择/框选    右键 指令    长按空地 命令环    载具长按拖动 朝向    │    空格 暂停    ESC 设置") + info;
 			GUIStyle hs = SquadCmdLogic.HudStyleSmall();
 			GUI.color = new Color(0.03f, 0.06f, 0.03f, 0.72f);
 			GUI.DrawTexture(new Rect((Screen.width - 1150f) * 0.5f, Screen.height - 30f, 1150f, 22f), Texture2D.whiteTexture);

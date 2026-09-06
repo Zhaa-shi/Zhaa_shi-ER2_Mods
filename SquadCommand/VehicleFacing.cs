@@ -6,10 +6,10 @@ namespace ER2SquadCommand;
 
 /// <summary>
 /// 1.0.2：载具朝向控制（地狱之门式：选中载具长按右键拖动，松开转向）。
-/// 1.0.3 实测定案：faceDirWhenStopped 通道无效且原生 IsRotatedToward 恒真（issue 后 elapsed=0.0s 实锤，
-/// 两个原生判定的语义与预期不符）——改为托管驱动转向：C# 计算车头与目标方向的有向夹角
-///（Vector3.SignedAngle，不依赖原生 GetAngleToward 语义），每帧调原生 RotateVehicleTowardEnemy(角度)
-/// 转车体（与原生 StaticVehicleRoutine 同款调用路径），夹角 &lt;4° 判完成并清 faceDir 字段。
+/// 1.0.3/1.0.4 实测定案：faceDirWhenStopped 通道无效（原生 IsRotatedToward 恒真、RotateVehicleTowardEnemy
+/// 外部直调不转车，且 StopAndClearPath 会停掉原生转向）——改为直驱车体 yaw：
+/// C# 计算车头与目标方向的有向夹角（Vector3.SignedAngle），每帧按 FaceSpeedDegPerSec 角速度
+/// 绕世界 Y 轴旋转车体（AngleAxis*rotation，保留地形俯仰/侧倾），夹角 &lt;4° 判完成并清 faceDir 字段。
 /// faceDirWhenStopped 仍在下达时写入（无害提示，若某状态原生会消费则方向一致），完成/超时清空防回转。
 /// 注意：Nullable 字段只能整体赋新包装对象，赋 C# null 会在 il2cpp_object_unbox(0) 处崩游戏。
 /// </summary>
@@ -30,8 +30,9 @@ internal static class VehicleFacing
 
     internal const float DragThresholdPx = 14f;  // 长按 0.35s 到点时的拖动判定阈值（像素）
     private const float DirPointDist = 30f;      // 朝向兼容点距离
-    private const float TimeoutSeconds = 15f;    // 驱动转向偏慢，放宽到 15s
+    private const float TimeoutSeconds = 15f;    // 15s 超时兜底
     private const float DoneAngleDeg = 4f;       // 夹角判定阈值（度）
+    private const float FaceSpeedDegPerSec = 60f;// 直驱原地转向角速度
 
     /// <summary>车上的 AIVehicle 组件（本体找不到再找子级，与 DriveVehicleTo 同款）。</summary>
     private static AIVehicle GetAi(Vehicle v)
@@ -113,7 +114,7 @@ internal static class VehicleFacing
             catch (Exception ex) { SquadCmdLogic.Log("[Facing] 下达失败 vehicle=" + GodViewController.SafeName(v) + ": " + ex.Message); }
         }
         if (issued > 0)
-            SquadCmdLogic.LogAlways("[Facing] issue vehicles=" + issued + " point=" + point.ToString("0.0") + " (驱动转向 RotateVehicleTowardEnemy)");
+            SquadCmdLogic.LogAlways("[Facing] issue vehicles=" + issued + " point=" + point.ToString("0.0") + " (直驱车体 yaw)");
         return issued;
     }
 
@@ -171,7 +172,13 @@ internal static class VehicleFacing
                 }
                 else if (!paused)
                 {
-                    try { t.ai.RotateVehicleTowardEnemy(ang); } catch { }
+                    // 直驱车体 yaw：绕世界 Y 轴旋转，保留地形俯仰/侧倾；暂停（timeScale=0）时不驱动
+                    float dt = Time.deltaTime;
+                    if (dt > 0f)
+                    {
+                        float angDelta = Mathf.Clamp(ang, -FaceSpeedDegPerSec * dt, FaceSpeedDegPerSec * dt);
+                        t.veh.transform.rotation = Quaternion.AngleAxis(angDelta, Vector3.up) * t.veh.transform.rotation;
+                    }
                 }
             }
             catch

@@ -212,7 +212,22 @@ internal static class SceneMarkers
 		head.startColor = c; head.endColor = c; head.widthMultiplier = width * 0.8f;
 	}
 
-	/// <summary>1.0.3：两点直线（无箭头翼），用于单位行进路线标识。每帧调用刷新位置。</summary>
+	private static Texture2D dashTex;
+	/// <summary>1.0.4：程序化虚线纹理（前段不透明/后段透明，Repeat 平铺）——路线用 LineTextureMode.Tile 拉成虚线。</summary>
+	private static Texture2D DashTex()
+	{
+		if (dashTex != null) return dashTex;
+		Texture2D t = new Texture2D(32, 1, TextureFormat.RGBA32, false);
+		t.wrapMode = TextureWrapMode.Repeat;
+		Color[] cols = new Color[32];
+		for (int i = 0; i < 32; i++) cols[i] = i < 14 ? Color.white : new Color(1f, 1f, 1f, 0f);
+		t.SetPixels(cols);
+		t.Apply();
+		dashTex = t;
+		return t;
+	}
+
+	/// <summary>1.0.3：两点直线（1.0.4 起为灰色虚线），用于单位行进路线标识。每帧调用刷新位置。</summary>
 	public static void Line(string key, Vector3 from, Vector3 to, Color c, float width, bool visible)
 	{
 		if (!visible) return;
@@ -227,7 +242,13 @@ internal static class SceneMarkers
 			lr.positionCount = 2;
 			lr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
 			lr.receiveShadows = false;
-			lr.material = LineMat();
+			lr.textureMode = LineTextureMode.Tile; // 虚线：按线长平铺 DashTex
+			Material m = LineMat() != null ? new Material(LineMat().shader) : null;
+			if (m != null)
+			{
+				m.mainTexture = DashTex();
+				lr.material = m;
+			}
 			pool[key] = go;
 		}
 		go.SetActive(true);
@@ -235,6 +256,13 @@ internal static class SceneMarkers
 		arrowMain[0] = from; arrowMain[1] = to;
 		l.SetPositions(arrowMain);
 		l.startColor = c; l.endColor = c; l.widthMultiplier = width;
+		// 平铺密度：约 2m 一个虚线周期（shader 不吃 ST 时 Tile 本身按 1m 重复，仍是虚线）
+		try
+		{
+			float len = Vector3.Distance(from, to);
+			if (l.material != null) l.material.mainTextureScale = new Vector2(Mathf.Max(0.5f, len / 2f), 1f);
+		}
+		catch { }
 	}
 
 	/// <summary>帧末：本轮未被刷新的标记全部隐藏（由 GodViewController.Tick 调用）。</summary>
