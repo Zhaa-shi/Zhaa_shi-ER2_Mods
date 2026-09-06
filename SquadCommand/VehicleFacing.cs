@@ -23,6 +23,7 @@ internal static class VehicleFacing
         public float issuedAt;
         public float deadline;
         public float angle0;       // 下达时夹角（日志判据）
+        public float speedDeg;     // 该车原地转向角速度（度/秒，下达时解析缓存）
         public int fails;          // interop 异常连续计数（铁律 30：连续 3 次才判死）
     }
 
@@ -32,7 +33,29 @@ internal static class VehicleFacing
     private const float DirPointDist = 30f;      // 朝向兼容点距离
     private const float TimeoutSeconds = 15f;    // 15s 超时兜底
     private const float DoneAngleDeg = 4f;       // 夹角判定阈值（度）
-    private const float FaceSpeedFallback = 60f; // 读不到 rotationSpeed 时的兜底角速度
+    private const float FaceSpeedFallback = 60f; // 轮式车兜底角速度（读不到任何转速源时）
+    private const float TankSpeedFallback = 28f; // 坦克兜底角速度（明显慢于轮式）
+
+    /// <summary>解析该车原地转向角速度：rotationSpeed → 坦克 curRotationSpeed → 按坦克/轮式兜底。
+    /// 1.0.5 实测各车转速无差异（疑似 rotationSpeed 运行时读不到/同值），原始读数随 issue 日志输出待校准。</summary>
+    private static float ResolveTurnSpeed(Vehicle v, out float rs, out float crs, out bool isTank)
+    {
+        rs = 0f; crs = 0f; isTank = false;
+        try { rs = v.rotationSpeed; } catch { }
+        try
+        {
+            VehicleTank tank = v.TryCast<VehicleTank>(); // 铁律 4：IL2CPP 必须 TryCast
+            if (tank != null)
+            {
+                isTank = true;
+                try { crs = tank.curRotationSpeed; } catch { }
+            }
+        }
+        catch { }
+        if (rs > 0.5f) return Mathf.Clamp(rs, 4f, 240f);
+        if (crs > 0.5f) return Mathf.Clamp(crs, 4f, 240f);
+        return isTank ? TankSpeedFallback : FaceSpeedFallback;
+    }
 
     /// <summary>车上的 AIVehicle 组件（本体找不到再找子级，与 DriveVehicleTo 同款）。</summary>
     private static AIVehicle GetAi(Vehicle v)
@@ -95,6 +118,8 @@ internal static class VehicleFacing
     internal static int IssueFacing(List<Vehicle> cands, Vector3 point)
     {
         int issued = 0;
+        float logSpd = 0f, logRs = 0f, logCrs = 0f;
+        bool logTank = false;
         if (cands == null || cands.Count == 0) return 0;
         foreach (Vehicle v in new List<Vehicle>(cands))
         {
@@ -107,14 +132,17 @@ internal static class VehicleFacing
                 try { ai.StopAndClearPath(); } catch { }
                 GodViewController.CancelVehicleMoveObservation(v); // 摘除该车移动观察/待发重试，防与朝向任务互相打架
                 try { ai.faceDirWhenStopped = new Il2CppSystem.Nullable<Vector3>(point); } catch { }
+                float spd = ResolveTurnSpeed(v, out float rs, out float crs, out bool tank);
+                if (issued == 0) { logSpd = spd; logRs = rs; logCrs = crs; logTank = tank; }
                 float a0 = ManagedSignedAngle(v, point);
-                tasks.Add(new FacingTask { veh = v, ai = ai, dirPoint = point, issuedAt = Time.unscaledTime, deadline = Time.unscaledTime + TimeoutSeconds, angle0 = a0 });
+                tasks.Add(new FacingTask { veh = v, ai = ai, dirPoint = point, issuedAt = Time.unscaledTime, deadline = Time.unscaledTime + TimeoutSeconds, angle0 = a0, speedDeg = spd });
                 issued++;
             }
             catch (Exception ex) { SquadCmdLogic.Log("[Facing] 下达失败 vehicle=" + GodViewController.SafeName(v) + ": " + ex.Message); }
         }
         if (issued > 0)
-            SquadCmdLogic.LogAlways("[Facing] issue vehicles=" + issued + " point=" + point.ToString("0.0") + " (直驱车体 yaw)");
+            SquadCmdLogic.LogAlways("[Facing] issue vehicles=" + issued + " point=" + point.ToString("0.0")
+                + " spd=" + logSpd.ToString("0") + " rs=" + logRs.ToString("0.00") + " crs=" + logCrs.ToString("0.00") + " tank=" + (logTank ? "Y" : "N"));
         return issued;
     }
 
@@ -172,14 +200,12 @@ internal static class VehicleFacing
                 }
                 else if (!paused)
                 {
-                    // 直驱车体 yaw：绕世界 Y 轴旋转，保留地形俯仰/侧倾；角速度按各车
-                    // rotationSpeed（车辆配置的原地转速，度/秒），读不到/异常时兜底 60°/s；
-                    // 暂停（timeScale=0）时不驱动
+                    // 直驱车体 yaw：绕世界 Y 轴旋转，保留地形俯仰/侧倾；角速度按下达时解析的
+                    // 该车转速（speedDeg），暂停（timeScale=0）时不驱动
                     float dt = Time.deltaTime;
                     if (dt > 0f)
                     {
-                        float spd = FaceSpeedFallback;
-                        try { float rs = t.veh.rotationSpeed; if (rs > 0.5f) spd = Mathf.Clamp(rs, 4f, 240f); } catch { }
+                        float spd = t.speedDeg > 0.5f ? t.speedDeg : FaceSpeedFallback;
                         float angDelta = Mathf.Clamp(ang, -spd * dt, spd * dt);
                         t.veh.transform.rotation = Quaternion.AngleAxis(angDelta, Vector3.up) * t.veh.transform.rotation;
                     }
@@ -210,18 +236,17 @@ internal static class VehicleFacing
             point = hit.point;
         }
         catch { return; }
-        Color c = new Color(1f, 1f, 1f, 0.6f); // 白色半透明（与移动路线同系）
+        Color c = new Color(0.7f, 0.7f, 0.7f, 0.5f); // 1.0.6：灰色半透明实线（与路线同系）
         int n = 0;
         foreach (Vehicle v in cands)
         {
             try
             {
                 if (!IsEligible(v) || v.transform == null) continue;
-                SceneMarkers.Arrow("FD" + n, v.transform.position + Vector3.up * 1.2f, point + Vector3.up * 0.4f, c, 0.22f, true);
+                SceneMarkers.Arrow("FD" + n, v.transform.position + Vector3.up * 1.2f, point + Vector3.up * 0.4f, c, 0.1f, true);
                 n++;
             }
             catch { }
         }
-        SceneMarkers.Dot("FDP", point + Vector3.up * 0.1f, 0.35f, c, true);
     }
 }

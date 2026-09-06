@@ -198,7 +198,7 @@ internal static class SceneMarkers
 		if (dir.sqrMagnitude < 0.01f) dir = Vector3.forward; else dir.Normalize();
 		Vector3 up = Mathf.Abs(Vector3.Dot(dir, Vector3.up)) > 0.95f ? Vector3.right : Vector3.up;
 		Vector3 right = Vector3.Cross(up, dir).normalized;
-		float wing = Mathf.Max(width * 4f, 0.9f);
+		float wing = Mathf.Max(width * 5f, 0.4f); // 1.0.6：箭头翼随线宽缩放（细线不再配大翼）
 		LineRenderer[] lrs = parent.GetComponentsInChildren<LineRenderer>();
 		if (lrs == null || lrs.Length < 2) return;
 		LineRenderer main = lrs[0], head = lrs[1];
