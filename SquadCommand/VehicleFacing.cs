@@ -7,10 +7,10 @@ namespace ER2SquadCommand;
 /// <summary>
 /// 1.0.2：载具朝向控制（地狱之门式：选中载具长按右键拖动，松开转向）。
 /// 1.0.3/1.0.4 实测定案：faceDirWhenStopped 通道无效（原生 IsRotatedToward 恒真、RotateVehicleTowardEnemy
-/// 外部直调不转车，且 StopAndClearPath 会停掉原生转向）——改为直驱车体 yaw：
-/// C# 计算车头与目标方向的有向夹角（Vector3.SignedAngle），每帧按 FaceSpeedDegPerSec 角速度
-/// 绕世界 Y 轴旋转车体（AngleAxis*rotation，保留地形俯仰/侧倾），夹角 &lt;4° 判完成并清 faceDir 字段。
-/// faceDirWhenStopped 仍在下达时写入（无害提示，若某状态原生会消费则方向一致），完成/超时清空防回转。
+/// 外部直调不转车，且 StopAndClearPath 会停掉原生转向）——最终机制 = 直驱车体 yaw：
+/// C# Vector3.SignedAngle 算车头与目标方向夹角，每帧按该车转速（ResolveTurnSpeed，坦克慢/轮式快）
+/// 绕世界 Y 轴逼近（AngleAxis*rotation，保留地形俯仰/侧倾），夹角 &lt;4° 判完成并清 faceDir 字段。
+/// faceDirWhenStopped 仍在下达时写入（无害提示），完成/超时清空防回转。
 /// 注意：Nullable 字段只能整体赋新包装对象，赋 C# null 会在 il2cpp_object_unbox(0) 处崩游戏。
 /// </summary>
 internal static class VehicleFacing
@@ -30,31 +30,27 @@ internal static class VehicleFacing
     private static readonly List<FacingTask> tasks = new List<FacingTask>();
 
     internal const float DragThresholdPx = 14f;  // 长按 0.35s 到点时的拖动判定阈值（像素）
-    private const float DirPointDist = 30f;      // 朝向兼容点距离
     private const float TimeoutSeconds = 15f;    // 15s 超时兜底
     private const float DoneAngleDeg = 4f;       // 夹角判定阈值（度）
     private const float FaceSpeedFallback = 60f; // 轮式车兜底角速度（读不到任何转速源时）
     private const float TankSpeedFallback = 28f; // 坦克兜底角速度（明显慢于轮式）
 
-    /// <summary>解析该车原地转向角速度：rotationSpeed → 坦克 curRotationSpeed → 按坦克/轮式兜底。
-    /// 1.0.5 实测各车转速无差异（疑似 rotationSpeed 运行时读不到/同值），原始读数随 issue 日志输出待校准。</summary>
-    private static float ResolveTurnSpeed(Vehicle v, out float rs, out float crs, out bool isTank)
+    /// <summary>解析该车原地转向角速度（度/秒）：rotationSpeed → 坦克 curRotationSpeed → 按坦克/轮式兜底。
+    /// 1.0.5 实测各车读数无差异（rotationSpeed 疑似未接运行时数据），分类兜底保证坦克明显慢于轮式。</summary>
+    private static float ResolveTurnSpeed(Vehicle v)
     {
-        rs = 0f; crs = 0f; isTank = false;
-        try { rs = v.rotationSpeed; } catch { }
+        try { float rs = v.rotationSpeed; if (rs > 0.5f) return Mathf.Clamp(rs, 4f, 240f); } catch { }
         try
         {
             VehicleTank tank = v.TryCast<VehicleTank>(); // 铁律 4：IL2CPP 必须 TryCast
             if (tank != null)
             {
-                isTank = true;
-                try { crs = tank.curRotationSpeed; } catch { }
+                try { float crs = tank.curRotationSpeed; if (crs > 0.5f) return Mathf.Clamp(crs, 4f, 240f); } catch { }
+                return TankSpeedFallback;
             }
         }
         catch { }
-        if (rs > 0.5f) return Mathf.Clamp(rs, 4f, 240f);
-        if (crs > 0.5f) return Mathf.Clamp(crs, 4f, 240f);
-        return isTank ? TankSpeedFallback : FaceSpeedFallback;
+        return FaceSpeedFallback;
     }
 
     /// <summary>车上的 AIVehicle 组件（本体找不到再找子级，与 DriveVehicleTo 同款）。</summary>
@@ -118,7 +114,7 @@ internal static class VehicleFacing
     internal static int IssueFacing(List<Vehicle> cands, Vector3 point)
     {
         int issued = 0;
-        float logSpd = 0f, logRs = 0f, logCrs = 0f;
+        float logSpd = 0f;
         bool logTank = false;
         if (cands == null || cands.Count == 0) return 0;
         foreach (Vehicle v in new List<Vehicle>(cands))
@@ -132,8 +128,12 @@ internal static class VehicleFacing
                 try { ai.StopAndClearPath(); } catch { }
                 GodViewController.CancelVehicleMoveObservation(v); // 摘除该车移动观察/待发重试，防与朝向任务互相打架
                 try { ai.faceDirWhenStopped = new Il2CppSystem.Nullable<Vector3>(point); } catch { }
-                float spd = ResolveTurnSpeed(v, out float rs, out float crs, out bool tank);
-                if (issued == 0) { logSpd = spd; logRs = rs; logCrs = crs; logTank = tank; }
+                float spd = ResolveTurnSpeed(v);
+                if (issued == 0)
+                {
+                    logSpd = spd;
+                    try { logTank = v.TryCast<VehicleTank>() != null; } catch { }
+                }
                 float a0 = ManagedSignedAngle(v, point);
                 tasks.Add(new FacingTask { veh = v, ai = ai, dirPoint = point, issuedAt = Time.unscaledTime, deadline = Time.unscaledTime + TimeoutSeconds, angle0 = a0, speedDeg = spd });
                 issued++;
@@ -141,8 +141,7 @@ internal static class VehicleFacing
             catch (Exception ex) { SquadCmdLogic.Log("[Facing] 下达失败 vehicle=" + GodViewController.SafeName(v) + ": " + ex.Message); }
         }
         if (issued > 0)
-            SquadCmdLogic.LogAlways("[Facing] issue vehicles=" + issued + " point=" + point.ToString("0.0")
-                + " spd=" + logSpd.ToString("0") + " rs=" + logRs.ToString("0.00") + " crs=" + logCrs.ToString("0.00") + " tank=" + (logTank ? "Y" : "N"));
+            SquadCmdLogic.LogAlways("[Facing] 载具转向 vehicles=" + issued + " spd=" + logSpd.ToString("0") + " tank=" + (logTank ? "Y" : "N"));
         return issued;
     }
 

@@ -9,7 +9,7 @@ using UnityEngine;
 
 namespace ER2SquadCommand;
 
-[BepInPlugin("er2.squadcommand", "ER2 Battlefield Commander", "1.0.6")]
+[BepInPlugin("er2.squadcommand", "ER2 Battlefield Commander", "1.1.0")]
 public class Plugin : BasePlugin
 {
 	internal static ManualLogSource ModLog;
@@ -43,7 +43,7 @@ public class Plugin : BasePlugin
 
 		new Harmony("er2.squadcommand").PatchAll(typeof(Plugin).Assembly);
 		FrameEndRunner.Ensure();
-		ModLog.LogInfo("ER2 Battlefield Commander 1.0.6 loaded. godKey=" + godKey.Value);
+		ModLog.LogInfo("ER2 Battlefield Commander 1.1.0 loaded. godKey=" + godKey.Value);
 	}
 }
 

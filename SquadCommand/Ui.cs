@@ -113,7 +113,6 @@ internal static class Ui
 		["登车完成"] = "Boarded",
 		["载具已满"] = "Vehicle full",
 		["已下车 {0} 辆载具"] = "Dismounted {0} vehicles",
-		["车辆未分队：先点【分队】再移动"] = "Vehicle not split: click [Split] first",
 
 		// ===== 进阶命令环 =====
 		["无可用步兵小队"] = "No available infantry squads",

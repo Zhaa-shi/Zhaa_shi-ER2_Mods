@@ -1,4 +1,4 @@
-ER2 Battlefield Commander v1.0.0
+ER2 Battlefield Commander v1.1.0
 =================================
 
 A BepInEx plugin for Easy Red 2 that adds an "RTS god-view squad command" layer — mouse operations inspired by Gates of Hell: Ostfront.
@@ -16,6 +16,12 @@ A BepInEx plugin for Easy Red 2 that adds an "RTS god-view squad command" layer 
   Only the top [Split] button creates a real new squad; vehicle crews stay together as one unit; Shift+box = append.
 * RMB short press = order: ground = move (selected units only), enemy = persistent focus-fire mark (fire priority only, no auto-advance), friendly/neutral vehicle = open interaction ring.
 * RMB double-click (same spot within 0.6s) = native "Move & Defend" (HoldArea): one native order per selected squad, no extra orchestration.
+* RMB hold + drag with vehicles selected (drag past 14px within 0.35s) = vehicle facing drag (Gates of Hell style):
+  an arrow from every selected vehicle follows the cursor; release pivots each hull in place toward the release point.
+  Turn rate follows the vehicle class (tanks turn slower than wheeled vehicles). Holding still opens the command ring as before;
+  pressed on a unit the facing drag never engages.
+* Route lines: after a move or boarding order, a thin grey dashed line is drawn from every marching unit to its target
+  (boarding lines follow the target vehicle in real time) and disappears when everyone arrives.
 * RMB long press (0.35s) = command ring: on empty ground → Stand / Crouch / Prone / Halt / Cover / Rally / Hold Fire (toggle) / Scatter;
   pressed on a unit the ring never opens — release issues the short-press order (friendly/neutral vehicle = Board / Dismount / Repair). Space pauses.
 * Ctrl+1~9 = save current selection as a group; 1~9 = recall group (dead units auto-pruned, replaces selection).
@@ -29,6 +35,7 @@ A BepInEx plugin for Easy Red 2 that adds an "RTS god-view squad command" layer 
 [Config] BepInEx\config\er2.squadcommand.cfg
 * enabled: master switch.
 * moveRadius: move arrival / defend radius, default 8 m.
+* dragFacing: vehicle facing drag toggle, default on (off = RMB long press always opens the command ring).
 * debugLog: debug logging, default off.
 * godKey: god view key, default F9.
 * UI section colorBase/colorHover/colorText: UI theme colors (hex, defaults are translucent dark greens),
@@ -37,7 +44,7 @@ A BepInEx plugin for Easy Red 2 that adds an "RTS god-view squad command" layer 
 [Install]
 1. Install BepInEx (IL2CPP version) into the game root folder.
 2. Drop ER2_BattlefieldCommander.dll into <game root>\BepInEx\plugins\.
-3. Launch the game — "Loading [ER2 Battlefield Commander 1.0.0]" in the log means success.
+3. Launch the game — "Loading [ER2 Battlefield Commander 1.1.0]" in the log means success.
 
 [Notes]
 * Entering god view detaches every friendly squad from native task pulling; takeover auto-closes leftover native "select squad" panels.
