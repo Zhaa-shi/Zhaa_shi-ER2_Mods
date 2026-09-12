@@ -1,6 +1,6 @@
 ER2 Mod Manager - In-Game Mod Settings Manager
 ===============================================
-Version 1.2.2 | Easy Red 2 (BepInEx 6 / IL2CPP)
+Version 1.2.3 | Easy Red 2 (BepInEx 6 / IL2CPP)
 
 WHAT IT DOES
 ------------
@@ -45,6 +45,14 @@ FEATURES
   arrow on the MODS page returns to the first page. Native click sounds are kept.
 - Auto-save staged changes; per-mod master switches honored.
 - Compatible with the game 2.1.x settings rework (async page filling is handled).
+
+v1.2.3 changelog
+----------------
+- Fixed the row-width flicker introduced by 1.2.2: the overlap was measured against the
+  already-inset row container, so it read "no overlap" the moment it inset and reset on the
+  next frame (24/8 flip-flop). The measurement now uses a fixed reference (the vanilla
+  content page edge), and the resulting inset is latched monotonically per page build, so
+  the list width is stable no matter which scrollbar state vanilla is in.
 
 v1.2.2 changelog
 ----------------

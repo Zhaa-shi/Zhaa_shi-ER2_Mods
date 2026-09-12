@@ -1,4 +1,6 @@
-# ER2 Mod Manager v1.2.2
+# ER2 Mod Manager v1.2.3
+
+> **v1.2.3:** row-width flicker fix (the scrollbar clearance is now measured against a fixed reference and latched, instead of being re-measured against the already-inset list).
 
 > **v1.2.2:** fixed the scrollbar overlapping the mod rows after leaving and re-entering the settings (the row list now keeps clear of the scrollbar by its real on-screen position).
 

@@ -12,7 +12,7 @@
 | 2 | `WeatherControl` | `er2.weathercontrol` | ER2 Weather Control | **1.7.2** | `ER2_WeatherControl.dll` | 已部署 |
 | 3 | `AIFood` | `er2.aifood` | ER2 AI Food | **1.4.0** | `ER2_AIFood.dll` | 已部署 |
 | 4 | `NoInteractionHints` | `com.ryan.er2.nointeractionhints` | ER2 Hide Anything | **4.5.4** | `ER2_NoInteractionHints_DoneProMaxEnd.dll` | 已部署 |
-| 5 | `ModManager` | `er2.modmanager` | ER2 Mod Manager | **1.2.2** | `ER2_ModManager.dll` | 已部署 |
+| 5 | `ModManager` | `er2.modmanager` | ER2 Mod Manager | **1.2.3** | `ER2_ModManager.dll` | 已部署 |
 | 6 | `ThrowableWheel` | `er2.throwablewheel` | ER2 Throwable Wheel | **1.3.6** | `ER2_ThrowableWheel.dll` | 已部署 |
 | 7 | `CombatTweaks` | `er2.combattweaks` | ER2 Combat Tweaks | **1.2.2** | `ER2_CombatTweaks.dll` | 已部署 |
 | 8 | `ZoomAnywhere` | `er2.zoomanywhere` | ER2 Zoom Anywhere | **1.0.1** | `ER2_ZoomAnywhere.dll` | 已部署 |
@@ -46,9 +46,10 @@ AI 血量低于 `eatBelowHp`（默认 **40**）自动吃背包食物回血：`Fi
 **关键机制**：`UiGroups` 注册表（Register/IsHidden/ApplyAll/Enforce）；`UiHiders`（ElementHider 记忆式隐藏 + RefCache 5s 冷却）；所有节流用 `Time.unscaledTime`。
 **v4.5.3+ 游戏 2.1.x 兼容**：`FindGameType("PhaseBarGUI")` 运行时探测，类型缺失时该类别跳过（不再 TypeLoadException）。
 
-### 2.5 ModManager `er2.modmanager` v1.2.2
+### 2.5 ModManager `er2.modmanager` v1.2.3
 把 mod 设置页**嵌进游戏原生设置界面**（`SettingsGUI_V2.Update` / `SettingsTabRight` / `SettingsTabLeft` patch）：自动枚举 `IL2CPPChainloader.Plugins` 渲染全部配置项（折叠分区 + 小字简介直接用 mod 自带 BepInEx 描述原文）。
-**v1.2.2（"滑条压住 mod 名称栏"根治，含实测几何证据）**：原生只在部分路径把滚动条那 17px 收窄（日志实测正常态 `Viewport sd=-17` → Viewport 433、容器右缘世界 x=1875 vs 滚动条 1882 = 间隙 7px；**"退出设置再进去"那条路径不收窄** → `Viewport 450`、容器右缘 1900 与滚动条区间 1882..1912 **重叠 18px**，而滚动条此时 `active=1`）→ 名称栏灰色背景被滚动条及其背景盖住。修法 `ApplyScrollbarInset`：不再依赖原生预留，按**滚动条实际世界区间**算容器内缩（`over = 容器右缘 - 滚动条左缘 + 6` 世界像素，除以 `lossyScale.x` 换回本地单位；基础内缩左 0/右 8 与原硬编码等价），带 200px 安全阀，值变化 >0.5px 才写并打日志。**方法学：先加几何 dump（LAYOUT/SCROLL），用世界坐标重叠量定位，再改代码——不要靠肉眼猜"重叠"。**
+**v1.2.3（内缩闪烁根治）**：v1.2.2 的 `ApplyScrollbarInset` **拿容器自己的当前 rect 当基准量重叠** → 缩进去之后就算不出重叠 → 下一帧退回基础值 8 → 24/8 每帧横跳（用户实测"一直重叠与不重叠之间切换/闪烁"，日志里 9 轮交替实锤）。修法：① 基准改为**固定参考**（`contentPage` 右缘 − 基础内缩，不随我们改动变化）；② 内缩值**按页面会话单调锁存**（只增不减，建页时 `ResetInsetLatch` 重置），原生在"预留/不预留滚动条"两态间切换也不会来回跳；③ 滚动条查找不再要求 `activeInHierarchy`（隐藏时原生不收窄 Viewport，但它随时会显示，按矩形位置一律预留）；④ 单次额外内缩上限 26 本地像素（滚动条竖条约 20px，超过必是过场瞬态）。**教训：任何"测量 → 写回几何"的自愈逻辑，测量基准必须是**不被自己改动影响**的量，否则就是振荡器。**
+**v1.2.2（"滑条压住 mod 名称栏"根治，含实测几何证据）**：原生只在部分路径把滚动条那 17px 收窄（日志实测正常态 `Viewport sd=-17` → Viewport 433、容器右缘世界 x=1875 vs 滚动条 1882 = 间隙 7px；**"退出设置再进去"那条路径不收窄** → `Viewport 450`、容器右缘 1900 与滚动条区间 1882..1912 **重叠 18px**，而滚动条此时 `active=1`）→ 名称栏灰色背景被滚动条及其背景盖住。修法 `ApplyScrollbarInset`：按滚动条实际世界区间算容器内缩（`over = 容器右缘 - 滚动条左缘 + 6` 世界像素，除以 `lossyScale.x` 换回本地单位；基础内缩左 0/右 8 与原硬编码等价），带 200px 安全阀。**方法学：先加几何 dump（LAYOUT/SCROLL），用世界坐标重叠量定位，再改代码——不要靠肉眼猜"重叠"。**
 **v1.2.1（2026-09-12 游戏更新适配）**：① **原生方法签名变更踩雷**——游戏把 `SettingsGUI_V2.UpdateOpenedMenu(bool)` 改成 `UpdateOpenedMenu(bool setFirstButtonSeected, bool preservePosition)`、`FillSettingPage(bool)` 改成 `FillSettingPage(bool, bool restorePosition, float selectedY, float scrollbarValue)`（另加 `GetSettingRow(Transform)`/`lastScrollbarValue`）。旧编译产物里 `UpdateOpenedMenu(true)` 的调用点运行时解析不到方法 → `MissingMethodException` **从 Harmony Prefix 逃逸**（异常发生在 JIT 解析调用点，前缀里的 try/catch 拦不住）→ 整个 Prefix 失败、原生 `SettingsTabRight` 一并中断 = **按右翻页键不能翻页**。现改为**反射按名 + 参数个数自适应**调用（未来再加参数也不会复发）。**教训：游戏更新后凡是"编译期直接调用原生方法"的点都要复查签名，翻页/设置这类核心交互优先反射或 `AccessTools` 按名取。** ② 行高归一化（`Templates.Instantiate` → `NormalizeRowHeight`）：行容器是 `VerticalLayoutGroup(childControlHeight=false)`，uGUI 取的行高是 `sizeDelta[1]`，克隆来的原生行若带垂直拉伸锚点/零 sizeDelta → 行高 0 → 所有行叠在同一点。③ `FillSettingPage` 也纳入 MODS 页拦截（原生重开设置会直接起这条协程恢复滚动位置，不经 `UpdateOpenedMenu`）。④ 重进设置界面前先 `RestoreScrollAnchors()` 再重建（用户在 MODS 页直接关设置时 `Update` 停跑，锚点/高度还原没有机会执行 → 坏高度泄漏）。**注意**：两套渲染实现（`Plugin.cs` 的 MODS 页 / `NativePage`）**分支必须同步维护**，新类型支持两边一起加。
 **零维护设计（v1.1.0 起）**：无任何硬编码翻译表/mod 名单，新 mod（含第三方）加载即自动适配。类型自动映射：bool→开关；float/int→**数值输入框 + 范围提示**（非滑条）；string+`AcceptableValueList`→下拉；热键（KeyCode / string 键名含 key·toggle 且选项像按键表 / **枚举类型**）→**点击改键按钮 + `Input.GetKeyDown` 捕获**；未知类型→跳过不崩。
 **显式保存语义**：改动只进 `staged` 暂存字典，【保存】才写 `BoxedValue` + `cfg.Save()`；`SaveOnConfigSet=false` 防运行中自动落盘（**BepInEx 退出时会自动保存全部 cfg**，所以必须暂存机制才能实现"按下才保存"）。

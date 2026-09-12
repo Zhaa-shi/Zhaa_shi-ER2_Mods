@@ -15,7 +15,7 @@ using UnityEngine.UI;
 
 namespace ER2ModManager;
 
-[BepInPlugin("er2.modmanager", "ER2 Mod Manager", "1.2.2")]
+[BepInPlugin("er2.modmanager", "ER2 Mod Manager", "1.2.3")]
 public class Plugin : BasePlugin
 {
 	/// <summary>构建语言：CN_BUILD 编译符号 = 中文版（标签中文、页标题"模组"）；否则英文版。</summary>
@@ -45,7 +45,7 @@ public class Plugin : BasePlugin
 		nativeFull = Config.Bind("General", "NativeFull", false, "DEV: render the whole MODS page via native SettingSelectable rows.");
 		HarmonyInstance = new Harmony("er2.modmanager");
 		HarmonyInstance.PatchAll(GetType().Assembly);
-		ModLog.LogInfo((object)"ER2 Mod Manager 1.2.2 loaded.");
+		ModLog.LogInfo((object)"ER2 Mod Manager 1.2.3 loaded.");
 	}
 }
 
@@ -210,6 +210,8 @@ public static class ModRegistry
 		{
 		}
 		ClearContent(s.contentPage);
+		// v1.2.3：重建时重置行内缩锁存（按当前几何重新测，见 ApplyScrollbarInset）
+		ResetInsetLatch();
 		// v1.1.9：先确保 Content 链可见再填充——快速右翻连点会把链停用，建在停用父级下的
 		// 容器永不渲染/布局（STUCK-EVIDENCE 实锤：childCount=42 size=442x100 active=False）
 		EnsureContentVisible(s);
@@ -372,6 +374,19 @@ public static class ModRegistry
 
 	/// <summary>滚动高度自愈节流（原生协程/关闭转场可能写入错误高度 → 周期性重测容器实际高度）。</summary>
 	internal static float nextScrollFixTime;
+
+	/// <summary>v1.2.3：行内缩的单调锁存值（本地像素）。同一页面会话内只增不减——
+	/// 原生在"预留/不预留滚动条"两种状态间切换时不会来回跳，消灭闪烁；建页时重置。</summary>
+	private static float insetLeftLatched;
+
+	private static float insetRightLatched;
+
+	/// <summary>建页时重置内缩锁存（每次重建都按当时几何重新测一遍）。</summary>
+	internal static void ResetInsetLatch()
+	{
+		insetLeftLatched = 0f;
+		insetRightLatched = 0f;
+	}
 
 	/// <summary>我们是否改过 ScrollRect.content 的锚点（离开 MODS 页时还原，防影响原生页面）。</summary>
 	internal static RectTransform anchorChangedTarget;
@@ -1052,13 +1067,14 @@ public static class ModRegistry
 		}
 	}
 
-	/// <summary>v1.2.2：让行容器避开竖直滚动条所占的竖条（"灰色名称栏被滑条压住"的根治）。
+	/// <summary>v1.2.3：让行容器避开竖直滚动条所占的竖条（"灰色名称栏被滑条压住"的根治，且不闪）。
 	/// 实测证据（2026-09-12 日志）：原生只有在部分路径里把 Viewport 收窄 17px 预留滚动条
 	/// （`Viewport sd=-17` → 容器右缘 1875 vs 滚动条 1882，间隙 7px = 正常，图一）；
 	/// 但"退出设置再进去"那条路径不收窄（`Viewport 450`）而滚动条已 active → 容器右缘 1900
 	/// 与滚动条区间 1882..1912 重叠 18px = 用户看到的"滑条和他的背景压住名称栏背景"（图二）。
-	/// 所以宽度不能只靠原生预留：这里按滚动条的实际世界坐标把我们容器的内缩补齐。
-	/// 基础内缩与原值等价（左 0 / 右 8），只额外补"被压住的那部分 + 6 世界像素间隙"。</summary>
+	/// 所以宽度不能只靠原生预留：按滚动条世界区间算我们容器的内缩。
+	/// **量法必须是固定参考**（contentPage 右缘 - 基础内缩），不能用容器当前 rect —— 用后者会
+	/// 缩进去之后就算不出重叠、下一帧又退回 → 每帧横跳（v1.2.2 实测闪烁根因）。</summary>
 	internal static void ApplyScrollbarInset(Transform contentPage, Transform cont, RectTransform crt, RectTransform rt)
 	{
 		try
@@ -1077,16 +1093,16 @@ public static class ModRegistry
 					sr = cur.GetComponent<UnityEngine.UI.ScrollRect>();
 					cur = cur.parent;
 				}
-				if (sr != null && sr.verticalScrollbar != null && sr.verticalScrollbar.gameObject != null &&
-					sr.verticalScrollbar.gameObject.activeInHierarchy)
+				if (sr != null && sr.verticalScrollbar != null && sr.verticalScrollbar.gameObject != null)
 				{
+					// 不看 activeInHierarchy：滚动条隐藏时原生不收窄 Viewport，但随时可能显示出来
+					// （实测同一位置），所以按它的矩形位置一律预留，避免"它一显示就压住名称栏"。
 					sbrt = sr.verticalScrollbar.GetComponent<RectTransform>();
 				}
 				if (sbrt == null)
 				{
 					SettingsGUI_V2 s = SettingsGUI_V2.instance;
-					if (s != null && s.leftScrollbar != null && s.leftScrollbar.gameObject != null &&
-						s.leftScrollbar.gameObject.activeInHierarchy)
+					if (s != null && s.leftScrollbar != null && s.leftScrollbar.gameObject != null)
 					{
 						sbrt = s.leftScrollbar.GetComponent<RectTransform>();
 					}
@@ -1099,33 +1115,50 @@ public static class ModRegistry
 			float rightInset = 8f;
 			if (sbrt != null)
 			{
-				float cx0, cx1, cy0, cy1, sx0, sx1, sy0, sy1;
-				WorldRect(crt, out cx0, out cx1, out cy0, out cy1);
+				// 关键：重叠量必须相对**固定参考 contentPage** 量，不能用容器当前 rect。
+				// v1.2.2 用容器当前 rect 量 → 缩进去之后就算不出重叠 → 下一帧退回基础值 →
+				// 24/8 每帧反复横跳（用户实测的闪烁）。这里按 "contentPage 右缘 - 基础内缩"
+				// 这个不随我们改动变化的基准量。
+				float rx0, rx1, ry0, ry1, sx0, sx1, sy0, sy1;
+				WorldRect(rt, out rx0, out rx1, out ry0, out ry1);
 				WorldRect(sbrt, out sx0, out sx1, out sy0, out sy1);
-				float ovY = Math.Min(cy1, sy1) - Math.Max(cy0, sy0);
-				float scale = Math.Abs(crt.lossyScale.x) > 0.0001f ? Math.Abs(crt.lossyScale.x) : 1f;
+				float ovY = Math.Min(ry1, sy1) - Math.Max(ry0, sy0);
+				float scale = Math.Abs(rt.lossyScale.x) > 0.0001f ? Math.Abs(rt.lossyScale.x) : 1f;
 				if (ovY > 1f)
 				{
-					float mid = (cx0 + cx1) * 0.5f;
+					float mid = (rx0 + rx1) * 0.5f;
 					if (sx0 >= mid)
 					{
-						// 滚动条在右侧：补重叠量 + 6 世界像素间隙
-						float over = cx1 - sx0 + 6f;
+						// 滚动条在右侧：把"基础内缩后仍被压住的量 + 6 世界像素间隙"补上
+						float over = (rx1 - rightInset * scale) - sx0 + 6f;
 						if (over > 0f)
 						{
-							rightInset += over / scale;
+							// 上限 26：滚动条竖条约 20 本地像素，超过必然是过场瞬态，别锁死
+							rightInset += Math.Min(26f, over / scale);
 						}
 					}
 					else if (sx1 <= mid)
 					{
-						float over = sx1 - cx0 + 6f;
+						float over = sx1 - (rx0 + leftInset * scale) + 6f;
 						if (over > 0f)
 						{
-							leftInset += over / scale;
+							leftInset += Math.Min(26f, over / scale);
 						}
 					}
 				}
 			}
+			// 单调锁存（同一页面会话内只增不减）：原生在"预留/不预留滚动条"两种状态间切换时
+			// 内缩值不会来回跳，彻底消灭闪烁；代价是偶尔多留几像素空隙（肉眼无感）。
+			if (leftInset > insetLeftLatched)
+			{
+				insetLeftLatched = leftInset;
+			}
+			if (rightInset > insetRightLatched)
+			{
+				insetRightLatched = rightInset;
+			}
+			leftInset = insetLeftLatched;
+			rightInset = insetRightLatched;
 			// 安全阀：别把列表压成一条
 			if (rt.rect.width - leftInset - rightInset < 200f)
 			{
@@ -1144,7 +1177,7 @@ public static class ModRegistry
 				catch
 				{
 				}
-				Plugin.ModLog.LogInfo((object)("ModManager: row inset adjusted -> left=" + leftInset.ToString("F1")
+				Plugin.ModLog.LogInfo((object)("ModManager: row inset applied -> left=" + leftInset.ToString("F1")
 					+ " right=" + rightInset.ToString("F1") + " (row width " + (rt.rect.width - w).ToString("F0") + ")"));
 			}
 		}
