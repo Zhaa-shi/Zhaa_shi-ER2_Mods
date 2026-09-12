@@ -51,6 +51,10 @@ v1.5.0 changelog
 - Fixed the white flash when clicking: mod, section and setting rows are now all created once and
   only toggled active/inactive in place. Nothing rebuilds the page on click any more, so no frame
   can ever show the whole list relaid out (which is what made every value box flash white).
+- Fixed expanding a setting wiping its own name (the row label was being replaced by the chevron
+  instead of having its prefix swapped).
+- Sections now default to open, carry a fold chevron on their title, and their settings are
+  indented one level deeper - so a section can no longer be mistaken for a setting row.
 - Mod names now have a hairline rule underneath, which also separates them clearly from the
   single-letter group headings (those got dimmer and smaller).
 - Removed the temporary layout/scroll diagnostics used while chasing the scrollbar overlap; the

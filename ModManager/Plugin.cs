@@ -376,8 +376,9 @@ public static class ModRegistry
 	/// <summary>展开的 mod（默认全折叠，点击标题切换）。</summary>
 	internal static readonly HashSet<string> expandedMods = new HashSet<string>();
 
-	/// <summary>展开的配置分区（默认全收起；多分区 mod 的展开页内显示分区小标题，点击折叠/展开）。</summary>
-	internal static readonly HashSet<string> expandedSections = new HashSet<string>();
+	/// <summary>展开的配置分区（v1.5.0 起语义反转：记录**收起**的分区，默认全部展开——
+	/// 玩家反馈"子文件夹默认关闭"= 展开 mod 后看不到任何选项）。</summary>
+	internal static readonly HashSet<string> collapsedSections = new HashSet<string>();
 
 	/// <summary>滚动高度自愈节流（原生协程/关闭转场可能写入错误高度 → 周期性重测容器实际高度）。</summary>
 	internal static float nextScrollFixTime;
@@ -674,7 +675,9 @@ public static class ModRegistry
 				}
 				if (ex.arrow != null)
 				{
-					ex.arrow.text = now ? "▾  " : "▸  ";
+					// v1.5.0 修复：原来直接把标签 text 覆盖成箭头 → 展开后**选项名消失**。
+					// 正确做法是剥掉旧前缀再拼新前缀（保留名称与范围富文本）。
+					ex.arrow.text = (now ? "▾  " : "") + StripArrowPrefix(ex.arrow.text);
 				}
 				try
 				{
@@ -2491,14 +2494,18 @@ public static class ModRegistry
 				foreach (string sec in sections)
 				{
 					string key = p.name + "|" + sec;
-					bool expanded = expandedSections.Contains(key);
+					bool expanded = !collapsedSections.Contains(key);
 					AddSectionHeader(container, HumanizeKey(sec), expanded, key, bySection[sec].Count);
 					// v1.5.0：分区正文也**始终建好**，按展开态显隐（点击分区标题原地切换，不重建页面）
 					int secStart = container.childCount;
+					// 分区内的配置项再缩进一级，形成"分区标题 ↔ 内容"的层级（玩家反馈两者只有颜色差异）
+					float savedIndent = RowIndent;
+					RowIndent = savedIndent + 12f;
 					foreach (ConfigEntryBase e in bySection[sec])
 					{
 						AddSetting(p.cfg, e, container);
 					}
+					RowIndent = savedIndent;
 					SectionBody sb = new SectionBody();
 					sb.key = key;
 					sb.expanded = expanded;
@@ -2528,8 +2535,9 @@ public static class ModRegistry
 		}
 	}
 
-	/// <summary>v1.4.0：分区小标题——只保留"分组"这一个作用：暗色小字 + 一条极淡的分隔线，
-	/// 去掉项数徽章与箭头装饰（玩家要求：每个元素都要有用）。点标题折叠/展开。</summary>
+	/// <summary>v1.5.0：分区小标题——目的有二：① 分组（下方一条极淡分隔线）② 与配置项明确区分
+	/// （玩家反馈"子文件夹和选项只有颜色差异，不容易区分"）：带 ▸/▾ 折叠箭头、字号更小、
+	/// 且其下的配置项会**再缩进一级**，形成"标题 ↔ 内容"的层级。点标题折叠/展开。</summary>
 	private static void AddSectionHeader(Transform container, string title, bool expanded, string key, int count)
 	{
 		try
@@ -2537,7 +2545,7 @@ public static class ModRegistry
 			GameObject row = new GameObject("MM_SectionTitle");
 			row.transform.SetParent(container, false);
 			RectTransform rt = row.AddComponent<RectTransform>();
-			rt.sizeDelta = new Vector2(0f, 30f);
+			rt.sizeDelta = new Vector2(0f, 32f);
 			GameObject tgo = new GameObject("Label");
 			tgo.transform.SetParent(row.transform, false);
 			RectTransform trt = tgo.AddComponent<RectTransform>();
@@ -2547,7 +2555,7 @@ public static class ModRegistry
 			float li = LabelLeft + RowIndent;
 			float ri = ControlRight;
 			trt.sizeDelta = new Vector2(-(li + ri), 20f);
-			trt.anchoredPosition = new Vector2((li - ri) * 0.5f, 3f);
+			trt.anchoredPosition = new Vector2((li - ri) * 0.5f, 4f);
 			Text txt = tgo.AddComponent<Text>();
 			Font font = GetNativeFont(SettingsGUI_V2.instance);
 			if (font != null)
@@ -2560,8 +2568,8 @@ public static class ModRegistry
 			txt.alignment = TextAnchor.MiddleLeft;
 			txt.horizontalOverflow = HorizontalWrapMode.Overflow;
 			txt.raycastTarget = false;
-			txt.text = (Plugin.DefaultChinese ? title : title.ToUpperInvariant());
-			AddHLine(row.transform, 0.10f);
+			txt.text = (expanded ? "▾  " : "▸  ") + (Plugin.DefaultChinese ? title : title.ToUpperInvariant());
+			AddHLine(row.transform, 0.16f);
 			GameObject hit = new GameObject("HitArea");
 			hit.transform.SetParent(row.transform, false);
 			hit.transform.SetAsFirstSibling();
@@ -2641,7 +2649,7 @@ public static class ModRegistry
 				}
 				if (mb.title != null)
 				{
-					mb.title.text = (now ? "▾  " : "") + StripTitlePrefix(mb.title.text);
+					mb.title.text = (now ? "▾  " : "") + StripArrowPrefix(mb.title.text);
 				}
 				RelayoutContainer(mb.rows);
 				break;
@@ -2653,7 +2661,8 @@ public static class ModRegistry
 		}
 	}
 
-	private static string StripTitlePrefix(string s)
+	/// <summary>剥掉行首的展开箭头（▸/▾）与后续空格，保留名称与富文本后缀。</summary>
+	private static string StripArrowPrefix(string s)
 	{
 		try
 		{
@@ -2661,7 +2670,11 @@ public static class ModRegistry
 			{
 				return s ?? "";
 			}
-			return s.StartsWith("▾", StringComparison.Ordinal) ? s.Substring(1).TrimStart() : s;
+			if (s[0] == '▾' || s[0] == '▸')
+			{
+				return s.Substring(1).TrimStart();
+			}
+			return s;
 		}
 		catch
 		{
@@ -2704,14 +2717,14 @@ public static class ModRegistry
 		try
 		{
 			bool now;
-			if (!expandedSections.Add(key))
+			if (!collapsedSections.Add(key))
 			{
-				expandedSections.Remove(key);
-				now = false;
+				collapsedSections.Remove(key);
+				now = true;
 			}
 			else
 			{
-				now = true;
+				now = false;
 			}
 			PlayClick();
 			for (int i = 0; i < sectionBodies.Count; i++)

@@ -201,7 +201,7 @@ internal static class NativePage
 			foreach (string sec in sections)
 			{
 				string key = p.name + "|" + sec;
-				bool expanded = ModRegistry.expandedSections.Contains(key);
+				bool expanded = !ModRegistry.collapsedSections.Contains(key);
 				string mark = expanded ? "▾" : "▸";
 				System.Action toggleAction = delegate { ModRegistry.ToggleSection(key); };
 				AddButtonRow(cp, ref y, ModRegistry.HumanizeKey(sec), mark, toggleAction);
