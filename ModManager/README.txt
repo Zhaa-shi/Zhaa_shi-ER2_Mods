@@ -1,6 +1,6 @@
 ER2 Mod Manager - In-Game Mod Settings Manager
 ===============================================
-Version 1.2.0 | Easy Red 2 (BepInEx 6 / IL2CPP)
+Version 1.2.1 | Easy Red 2 (BepInEx 6 / IL2CPP)
 
 WHAT IT DOES
 ------------
@@ -45,6 +45,21 @@ FEATURES
   arrow on the MODS page returns to the first page. Native click sounds are kept.
 - Auto-save staged changes; per-mod master switches honored.
 - Compatible with the game 2.1.x settings rework (async page filling is handled).
+
+v1.2.1 changelog
+----------------
+- Fixed right-arrow paging dying after the 2026-09-12 game update: the game changed
+  SettingsGUI_V2.UpdateOpenedMenu(bool) to UpdateOpenedMenu(bool, bool), so the compiled
+  call could no longer be resolved at runtime (MissingMethodException) and aborted the
+  whole paging hook. The call is now made by reflection with parameter-count detection,
+  so future signature changes cannot break paging again.
+- Hardened the MODS page layout: template rows cloned from vanilla settings rows now get
+  a normalized height (vertically stretched / zero-height rows were laid out on top of
+  each other, which is what made rows and the scrollbar overlap after re-entering).
+- The vanilla page-fill coroutine is now gated on the MODS page as well, so re-opening
+  the settings cannot refill/restore positions behind our back.
+- Content anchors/height are restored before a MODS page rebuild, so closing the settings
+  while on the MODS page can no longer leak a bad scroll height into the next open.
 
 v1.2.0 changelog
 ----------------

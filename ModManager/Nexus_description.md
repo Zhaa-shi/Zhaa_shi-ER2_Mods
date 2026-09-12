@@ -1,4 +1,6 @@
-# ER2 Mod Manager v1.2.0
+# ER2 Mod Manager v1.2.1
+
+> **v1.2.1:** compatibility fix for the 2026-09-12 game update — right-arrow paging works again (the game changed a native settings method signature, which had silently broken the paging hook), plus hardened MODS page layout so rows/scrollbar no longer overlap after re-entering the settings.
 
 > **v1.2.0:** alphabetical mod list with letter section headers, "Easy Red 2"/"ER2" prefixes stripped for sorting, name truncation by measured width, two-way page looping with native sounds, and a batch of stability fixes (empty page after fast flipping, scrollbar overlap after re-entering settings, free-form string settings now editable).
 

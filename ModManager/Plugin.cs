@@ -15,7 +15,7 @@ using UnityEngine.UI;
 
 namespace ER2ModManager;
 
-[BepInPlugin("er2.modmanager", "ER2 Mod Manager", "1.2.0")]
+[BepInPlugin("er2.modmanager", "ER2 Mod Manager", "1.2.1")]
 public class Plugin : BasePlugin
 {
 	/// <summary>构建语言：CN_BUILD 编译符号 = 中文版（标签中文、页标题"模组"）；否则英文版。</summary>
@@ -45,7 +45,7 @@ public class Plugin : BasePlugin
 		nativeFull = Config.Bind("General", "NativeFull", false, "DEV: render the whole MODS page via native SettingSelectable rows.");
 		HarmonyInstance = new Harmony("er2.modmanager");
 		HarmonyInstance.PatchAll(GetType().Assembly);
-		ModLog.LogInfo((object)"ER2 Mod Manager 1.2.0 loaded.");
+		ModLog.LogInfo((object)"ER2 Mod Manager 1.2.1 loaded.");
 	}
 }
 
@@ -226,6 +226,96 @@ public static class ModRegistry
 		catch
 		{
 		}
+	}
+
+	/// <summary>v1.2.1：MODS 页（末页）右翻绕回第一页。**原生调用必须走反射**——游戏
+	/// 2026-09-12 更新把 `SettingsGUI_V2.UpdateOpenedMenu(bool)` 改成
+	/// `UpdateOpenedMenu(bool setFirstButtonSeected, bool preservePosition)`：直接写调用，
+	/// 编译期令牌在运行时找不到方法 → MissingMethodException 从 Prefix 逃逸（连 try/catch
+	/// 都拦不住，异常发生在 JIT 解析调用点时）→ 整个 Prefix 失败 → 原生 SettingsTabRight
+	/// 也一起中断 = 用户报的"按右翻页键不能翻页"。反射按名 + 参数个数自适应，将来再加
+	/// 参数也不会复发。</summary>
+	internal static void WrapToFirstPage(SettingsGUI_V2 s)
+	{
+		try
+		{
+			SoundManager.ClickSound();
+		}
+		catch
+		{
+		}
+		SettingsGUI_V2.currentOpenedMenu = 0;
+		CallUpdateOpenedMenu(s, true, false);
+	}
+
+	/// <summary>版本容错调用原生 UpdateOpenedMenu：参数个数自适应（1 参=旧版 / 2 参=2026-09-12 起）。</summary>
+	internal static bool CallUpdateOpenedMenu(SettingsGUI_V2 s, bool setFirstButtonSelected, bool preservePosition)
+	{
+		try
+		{
+			if (s == null || s.Equals(null))
+			{
+				return false;
+			}
+			System.Reflection.MethodInfo mi = FindUpdateOpenedMenu();
+			if (mi == null)
+			{
+				Plugin.ModLog.LogWarning((object)"ModManager: native SettingsGUI_V2.UpdateOpenedMenu not found in this game build.");
+				return false;
+			}
+			System.Reflection.ParameterInfo[] ps = mi.GetParameters();
+			object[] args = (ps != null && ps.Length >= 2)
+				? new object[2] { setFirstButtonSelected, preservePosition }
+				: new object[1] { setFirstButtonSelected };
+			mi.Invoke(s, args);
+			return true;
+		}
+		catch (Exception ex)
+		{
+			Plugin.ModLog.LogError((object)("ModManager: UpdateOpenedMenu invoke failed: " + ex.Message));
+			return false;
+		}
+	}
+
+	private static System.Reflection.MethodInfo cachedUpdateOpenedMenu;
+
+	private static bool searchedUpdateOpenedMenu;
+
+	private static System.Reflection.MethodInfo FindUpdateOpenedMenu()
+	{
+		if (searchedUpdateOpenedMenu)
+		{
+			return cachedUpdateOpenedMenu;
+		}
+		searchedUpdateOpenedMenu = true;
+		try
+		{
+			System.Reflection.MethodInfo[] all = typeof(SettingsGUI_V2).GetMethods(
+				System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+			for (int i = 0; i < all.Length; i++)
+			{
+				System.Reflection.MethodInfo m = all[i];
+				if (m == null || m.Name != "UpdateOpenedMenu")
+				{
+					continue;
+				}
+				System.Reflection.ParameterInfo[] ps = m.GetParameters();
+				int n = (ps != null) ? ps.Length : 0;
+				if (n < 1)
+				{
+					continue;
+				}
+				if (cachedUpdateOpenedMenu == null || n > cachedUpdateOpenedMenu.GetParameters().Length)
+				{
+					cachedUpdateOpenedMenu = m;
+				}
+			}
+		}
+		catch (Exception ex)
+		{
+			Plugin.ModLog.LogError((object)("ModManager: UpdateOpenedMenu lookup failed: " + ex.Message));
+		}
+		return cachedUpdateOpenedMenu;
 	}
 
 	/// <summary>v1.1.3：上一帧轮询时间（设置界面重开检测——Update 停跑期间时间跳变 &gt; 1.5s）。</summary>
@@ -801,6 +891,9 @@ public static class ModRegistry
 		catch
 		{
 		}
+		// v1.2.1 诊断（发布前删）：每次建页 dump 一次行几何/重叠，便于与"重进后"对照
+		LogLayoutSnapshot("build", contentPage);
+		LogScrollChain("build", contentPage);
 		return y;
 	}
 
@@ -1052,6 +1145,228 @@ public static class ModRegistry
 		catch
 		{
 		}
+	}
+
+	/// <summary>v1.2.1（临时诊断，定位"重进模组页后控件重叠"；发布前删）：dump 行几何 + 重叠检测。
+	/// 行高口径 = sizeDelta.y（VerticalLayoutGroup 在 childControlHeight=false 时用的就是它）。</summary>
+	internal static void LogLayoutSnapshot(string tag, Transform contentPage)
+	{
+		try
+		{
+			if (contentPage == null)
+			{
+				return;
+			}
+			Transform cont = null;
+			for (int i = contentPage.childCount - 1; i >= 0; i--)
+			{
+				Transform ch = contentPage.GetChild(i);
+				if (ch != null && ch.name == "MM_Container")
+				{
+					cont = ch;
+					break;
+				}
+			}
+			System.Text.StringBuilder sb = new System.Text.StringBuilder("ModManager LAYOUT[" + tag + "]");
+			RectTransform prt = contentPage.GetComponent<RectTransform>();
+			if (prt != null)
+			{
+				sb.Append(" content=").Append(prt.rect.width.ToString("0")).Append("x").Append(prt.rect.height.ToString("0"))
+				   .Append(" contentSd=").Append(prt.sizeDelta.x.ToString("0")).Append(",").Append(prt.sizeDelta.y.ToString("0"));
+			}
+			if (cont == null)
+			{
+				sb.Append(" container=MISSING");
+				Plugin.ModLog.LogInfo((object)sb.ToString());
+				return;
+			}
+			RectTransform crt = cont.GetComponent<RectTransform>();
+			if (crt != null)
+			{
+				sb.Append(" container=").Append(crt.rect.width.ToString("0")).Append("x").Append(crt.rect.height.ToString("0"));
+			}
+			sb.Append(" rows=").Append(cont.childCount).Append(" frame=").Append(Time.frameCount);
+			Plugin.ModLog.LogInfo((object)sb.ToString());
+			int collapsed = 0;
+			int stretched = 0;
+			int overlaps = 0;
+			float prevBot = 0f;
+			string prevName = null;
+			for (int i = 0; i < cont.childCount; i++)
+			{
+				Transform c = cont.GetChild(i);
+				if (c == null)
+				{
+					continue;
+				}
+				RectTransform rt = c.GetComponent<RectTransform>();
+				if (rt == null)
+				{
+					continue;
+				}
+				float h = rt.sizeDelta.y;
+				float pv = rt.pivot.y;
+				float top = rt.anchoredPosition.y + (1f - pv) * h;
+				float bot = top - h;
+				bool isStretched = Math.Abs(rt.anchorMax.y - rt.anchorMin.y) > 0.01f;
+				if (h <= 1f)
+				{
+					collapsed++;
+				}
+				if (isStretched)
+				{
+					stretched++;
+				}
+				if (prevName != null && bot < prevBot - 0.5f)
+				{
+					overlaps++;
+					if (overlaps <= 6)
+					{
+						Plugin.ModLog.LogInfo((object)("ModManager LAYOUT[" + tag + "] OVERLAP #" + overlaps + ": '" + prevName
+							+ "' bottom=" + prevBot.ToString("F1") + " vs '" + c.name + "' top=" + top.ToString("F1")
+							+ " (overlap " + (prevBot - top).ToString("F1") + "px)"));
+					}
+				}
+				if (i < 10 || i >= cont.childCount - 2)
+				{
+					Plugin.ModLog.LogInfo((object)("ModManager LAYOUT[" + tag + "] row[" + i + "] " + c.name
+						+ " h=" + h.ToString("F1") + " y=" + rt.anchoredPosition.y.ToString("F1")
+						+ " pivotY=" + pv.ToString("F2") + " anchorY=" + rt.anchorMin.y.ToString("F2") + ".." + rt.anchorMax.y.ToString("F2")
+						+ (isStretched ? " STRETCHED" : "") + (h <= 1f ? " COLLAPSED" : "")));
+				}
+				prevBot = bot;
+				prevName = c.name;
+			}
+			Plugin.ModLog.LogInfo((object)("ModManager LAYOUT[" + tag + "] summary: rows=" + cont.childCount + " collapsed=" + collapsed
+				+ " stretched=" + stretched + " overlappingPairs=" + overlaps));
+		}
+		catch (Exception ex)
+		{
+			Plugin.ModLog.LogError((object)("ModManager layout snapshot error: " + ex.Message));
+		}
+	}
+
+	/// <summary>v1.2.1（临时诊断，发布前删）：dump Content 链 + ScrollRect + 左侧滚动条几何（世界坐标重叠量）。
+	/// 用来定位"重进模组设置后滑条（滚动条）压住 mod 选项"到底是滚动条位移还是行内容变宽。</summary>
+	internal static void LogScrollChain(string tag, Transform contentPage)
+	{
+		try
+		{
+			if (contentPage == null)
+			{
+				return;
+			}
+			Transform cur = contentPage;
+			int depth = 0;
+			while (cur != null && cur.gameObject != null && depth < 10)
+			{
+				RectTransform rt = cur.GetComponent<RectTransform>();
+				string comps = "";
+				try
+				{
+					if (cur.GetComponent<UnityEngine.UI.ScrollRect>() != null) comps += "ScrollRect ";
+					if (cur.GetComponent<UnityEngine.UI.Scrollbar>() != null) comps += "Scrollbar ";
+					if (cur.GetComponent<UnityEngine.UI.RectMask2D>() != null) comps += "RectMask2D ";
+					if (cur.GetComponent<UnityEngine.UI.VerticalLayoutGroup>() != null) comps += "VLG ";
+				}
+				catch
+				{
+				}
+				Plugin.ModLog.LogInfo((object)("ModManager SCROLL[" + tag + "] chain+" + depth + " '" + cur.name + "' rect="
+					+ (rt != null ? rt.rect.width.ToString("0") + "x" + rt.rect.height.ToString("0") : "?")
+					+ " sd=" + (rt != null ? rt.sizeDelta.x.ToString("0") + "," + rt.sizeDelta.y.ToString("0") : "?")
+					+ " anchorMin=" + (rt != null ? rt.anchorMin.x.ToString("F2") + "," + rt.anchorMin.y.ToString("F2") : "?")
+					+ " anchorMax=" + (rt != null ? rt.anchorMax.x.ToString("F2") + "," + rt.anchorMax.y.ToString("F2") : "?")
+					+ " pivot=" + (rt != null ? rt.pivot.x.ToString("F2") + "," + rt.pivot.y.ToString("F2") : "?")
+					+ " pos=" + (rt != null ? rt.anchoredPosition.x.ToString("0") + "," + rt.anchoredPosition.y.ToString("0") : "?")
+					+ " active=" + (cur.gameObject.activeInHierarchy ? "1" : "0")
+					+ (comps.Length > 0 ? " [" + comps.Trim() + "]" : "")));
+				cur = cur.parent;
+				depth++;
+			}
+			SettingsGUI_V2 s = SettingsGUI_V2.instance;
+			if (s == null)
+			{
+				return;
+			}
+			UnityEngine.UI.ScrollRect sr = null;
+			cur = contentPage;
+			while (cur != null && sr == null)
+			{
+				sr = cur.GetComponent<UnityEngine.UI.ScrollRect>();
+				cur = cur.parent;
+			}
+			RectTransform cont = null;
+			for (int i = contentPage.childCount - 1; i >= 0; i--)
+			{
+				Transform ch = contentPage.GetChild(i);
+				if (ch != null && ch.name == "MM_Container")
+				{
+					cont = ch.GetComponent<RectTransform>();
+					break;
+				}
+			}
+			if (sr != null)
+			{
+				RectTransform vp = sr.viewport;
+				RectTransform ct = sr.content;
+				Plugin.ModLog.LogInfo((object)("ModManager SCROLL[" + tag + "] ScrollRect content='"
+					+ (ct != null ? ct.name : "null") + "' " + (ct != null ? ct.rect.width.ToString("0") + "x" + ct.rect.height.ToString("0") : "?")
+					+ " viewport='" + (vp != null ? vp.name : "null") + "' " + (vp != null ? vp.rect.width.ToString("0") + "x" + vp.rect.height.ToString("0") : "?")
+					+ " vPos=" + sr.verticalNormalizedPosition.ToString("F3")
+					+ " vScrollbar=" + (sr.verticalScrollbar != null ? sr.verticalScrollbar.name : "null")));
+			}
+			RectTransform brow = null;
+			if (s.leftScrollbar != null)
+			{
+				brow = s.leftScrollbar.GetComponent<RectTransform>();
+				Plugin.ModLog.LogInfo((object)("ModManager SCROLL[" + tag + "] leftScrollbar '" + s.leftScrollbar.name + "' rect="
+					+ (brow != null ? brow.rect.width.ToString("0") + "x" + brow.rect.height.ToString("0") : "?")
+					+ " sd=" + (brow != null ? brow.sizeDelta.x.ToString("0") + "," + brow.sizeDelta.y.ToString("0") : "?")
+					+ " anchorMin=" + (brow != null ? brow.anchorMin.x.ToString("F2") + "," + brow.anchorMin.y.ToString("F2") : "?")
+					+ " anchorMax=" + (brow != null ? brow.anchorMax.x.ToString("F2") + "," + brow.anchorMax.y.ToString("F2") : "?")
+					+ " pos=" + (brow != null ? brow.anchoredPosition.x.ToString("0") + "," + brow.anchoredPosition.y.ToString("0") : "?")
+					+ " value=" + s.leftScrollbar.value.ToString("F3")
+					+ " size=" + s.leftScrollbar.size.ToString("F3")
+					+ " active=" + (s.leftScrollbar.gameObject.activeInHierarchy ? "1" : "0")));
+			}
+			// 世界坐标下：容器行区域与滚动条的横向重叠量（>0 = 真的压住了）
+			if (brow != null && cont != null)
+			{
+				float c0x, c0y, c1x, c1y, b0x, b0y, b1x, b1y;
+				WorldRect(cont, out c0x, out c1x, out c0y, out c1y);
+				WorldRect(brow, out b0x, out b1x, out b0y, out b1y);
+				float ovX = Math.Min(c1x, b1x) - Math.Max(c0x, b0x);
+				float ovY = Math.Min(c1y, b1y) - Math.Max(c0y, b0y);
+				Plugin.ModLog.LogInfo((object)("ModManager SCROLL[" + tag + "] overlap: container.world x=" + c0x.ToString("0") + ".." + c1x.ToString("0")
+					+ " y=" + c0y.ToString("0") + ".." + c1y.ToString("0")
+					+ " | scrollbar.world x=" + b0x.ToString("0") + ".." + b1x.ToString("0")
+					+ " y=" + b0y.ToString("0") + ".." + b1y.ToString("0")
+					+ " => overlapX=" + ovX.ToString("0") + "px overlapY=" + ovY.ToString("0") + "px"));
+			}
+		}
+		catch (Exception ex)
+		{
+			Plugin.ModLog.LogError((object)("ModManager scroll chain error: " + ex.Message));
+		}
+	}
+
+	private static void WorldRect(RectTransform rt, out float xmin, out float xmax, out float ymin, out float ymax)
+	{
+		xmin = 0f;
+		xmax = 0f;
+		ymin = 0f;
+		ymax = 0f;
+		if (rt == null)
+		{
+			return;
+		}
+		Vector3 a = rt.TransformPoint(new Vector3(rt.rect.xMin, rt.rect.yMin, 0f));
+		Vector3 b = rt.TransformPoint(new Vector3(rt.rect.xMax, rt.rect.yMax, 0f));
+		xmin = Math.Min(a.x, b.x);
+		xmax = Math.Max(a.x, b.x);
+		ymin = Math.Min(a.y, b.y);
+		ymax = Math.Max(a.y, b.y);
 	}
 
 	/// <summary>v1.1.4：字母分组小标题行（"A"…"Z" / "0-9" / "#"）：小字号灰字，样式同旧分类行。</summary>
@@ -3255,6 +3570,7 @@ public static class ModRegistry
 						{
 							toggle = tpl;
 							toggle.transform.SetParent(holder, false);
+							RememberTemplateHeight(tpl, c);
 						}
 					}
 					else if (slider == null && nm.IndexOf("Slider", StringComparison.OrdinalIgnoreCase) >= 0)
@@ -3264,6 +3580,7 @@ public static class ModRegistry
 						{
 							slider = tpl;
 							slider.transform.SetParent(holder, false);
+							RememberTemplateHeight(tpl, c);
 						}
 					}
 					else if (dropdown == null && nm.IndexOf("Dropdown", StringComparison.OrdinalIgnoreCase) >= 0)
@@ -3273,6 +3590,7 @@ public static class ModRegistry
 						{
 							dropdown = tpl;
 							dropdown.transform.SetParent(holder, false);
+							RememberTemplateHeight(tpl, c);
 						}
 					}
 					else if (panel == null && (nm.IndexOf("Panel", StringComparison.OrdinalIgnoreCase) >= 0 || nm.IndexOf("Title", StringComparison.OrdinalIgnoreCase) >= 0))
@@ -3282,6 +3600,7 @@ public static class ModRegistry
 						{
 							panel = tpl;
 							panel.transform.SetParent(holder, false);
+							RememberTemplateHeight(tpl, c);
 						}
 					}
 				}
@@ -3300,12 +3619,111 @@ public static class ModRegistry
 				{
 					return null;
 				}
-				return UnityEngine.Object.Instantiate(tpl);
+				GameObject go = UnityEngine.Object.Instantiate(tpl);
+				NormalizeRowHeight(tpl, go);
+				return go;
 			}
 			catch (Exception ex)
 			{
 				Plugin.ModLog.LogError((object)("ModManager instantiate error: " + ex.Message));
 				return null;
+			}
+		}
+
+		/// <summary>v1.2.1：模板原生行的实测高度（缓存模板时从原生页那一行读）。
+		/// 带拉伸锚点的克隆自己推算不出高度（sizeDelta.y 可能就是 0）。</summary>
+		private static readonly Dictionary<int, float> templateHeights = new Dictionary<int, float>();
+
+		private static void RememberTemplateHeight(GameObject tpl, Transform nativeRow)
+		{
+			try
+			{
+				if (tpl == null)
+				{
+					return;
+				}
+				float h = 0f;
+				if (nativeRow != null)
+				{
+					RectTransform nrt = nativeRow.GetComponent<RectTransform>();
+					if (nrt != null)
+					{
+						h = nrt.rect.height;
+					}
+				}
+				if (h <= 1f)
+				{
+					RectTransform trt = tpl.GetComponent<RectTransform>();
+					if (trt != null && trt.sizeDelta.y > 1f)
+					{
+						h = trt.sizeDelta.y;
+					}
+				}
+				if (h > 1f)
+				{
+					templateHeights[tpl.GetInstanceID()] = h;
+				}
+			}
+			catch
+			{
+			}
+		}
+
+		/// <summary>v1.2.1：**行高归一化**（重进模组页后"滑条与选项重叠"的根因修复）。
+		/// 行容器用的是 VerticalLayoutGroup(childControlHeight=false)——这种情况下 uGUI 取的行高
+		/// 是 `sizeDelta[1]`（不是 rect.height）：克隆来的原生行若带垂直拉伸锚点、sizeDelta.y=0，
+		/// 行高就算成 0 → 所有行被摆到同一个 y → 视觉上整页控件叠在一起。这里对有病的行
+		/// 统一改成非拉伸顶部锚点 + 显式高度（优先用模板实测高度，其次 sizeDelta，最后 48 兜底）。</summary>
+		private static void NormalizeRowHeight(GameObject tpl, GameObject go)
+		{
+			try
+			{
+				if (go == null)
+				{
+					return;
+				}
+				RectTransform rt = go.GetComponent<RectTransform>();
+				if (rt == null)
+				{
+					return;
+				}
+				bool stretched = Math.Abs(rt.anchorMax.y - rt.anchorMin.y) > 0.01f;
+				bool zeroHeight = rt.sizeDelta.y <= 1f;
+				if (!stretched && !zeroHeight)
+				{
+					return;
+				}
+				float h = 0f;
+				try
+				{
+					if (tpl != null)
+					{
+						templateHeights.TryGetValue(tpl.GetInstanceID(), out h);
+					}
+				}
+				catch
+				{
+				}
+				if (h <= 1f && rt.sizeDelta.y > 1f)
+				{
+					h = rt.sizeDelta.y;
+				}
+				if (h <= 1f)
+				{
+					h = 48f;
+				}
+				if (stretched)
+				{
+					rt.anchorMin = new Vector2(rt.anchorMin.x, 1f);
+					rt.anchorMax = new Vector2(rt.anchorMax.x, 1f);
+					rt.pivot = new Vector2(rt.pivot.x, 1f);
+				}
+				rt.sizeDelta = new Vector2(rt.sizeDelta.x, h);
+				Plugin.ModLog.LogInfo((object)("ModManager: normalized template row '" + go.name + "' -> h=" + h.ToString("F1")
+					+ (stretched ? " (was vertically stretched)" : " (sizeDelta.y was ~0)")));
+			}
+			catch
+			{
 			}
 		}
 	}
@@ -3581,14 +3999,28 @@ public class InjectPollPatch
 				if (Time.unscaledTime - ModRegistry.lastPollTime > 1.5f)
 				{
 					ModRegistry.lastPollTime = Time.unscaledTime;
+					// v1.2.1：重开设置界面前先把上次接管时改过的 content 锚点/高度还原再重建。
+					// 用户"直接关掉设置界面"时 Update 停跑 → RestoreScrollAnchors 没有机会执行，
+					// content 会带着我们的顶部锚点+旧高度进入原生重开流程（坏高度泄漏的老根因）。
+					ModRegistry.RestoreScrollAnchors();
 					ModRegistry.OpenMyPage(s);
 					ModRegistry.ResetScrollTop(s.contentPage);
+					// v1.2.1 诊断（发布前删）：重开设置界面后的现场
+					ModRegistry.LogLayoutSnapshot("reopen", s.contentPage);
+					ModRegistry.LogScrollChain("reopen", s.contentPage);
 					return;
 				}
 				ModRegistry.lastPollTime = Time.unscaledTime;
 			}
 			else
 			{
+				// v1.2.1 诊断（发布前删）：重开设置界面后页码没落在 MODS 页时也 dump 一次，
+				// 用来看是不是上一轮残留容器/坏高度与原生页争用
+				if (Time.unscaledTime - ModRegistry.lastPollTime > 1.5f)
+				{
+					ModRegistry.LogLayoutSnapshot("reopen-native", s.contentPage);
+					ModRegistry.LogScrollChain("reopen-native", s.contentPage);
+				}
 				ModRegistry.lastPollTime = Time.unscaledTime;
 			}
 			// 轮询活跃控件（开关/滑条/下拉）的值变化（绕开 UnityAction 委托桥接的 marshaling bug）
@@ -3771,16 +4203,7 @@ public class TabRightPatch
 			if (cur == ModRegistry.myIndex)
 			{
 				// 已是 MODS 页（末页）：右翻绕回第一页（走原生 UpdateOpenedMenu 恢复原生气/行为）
-				try
-				{
-					SoundManager.ClickSound();
-					SettingsGUI_V2.currentOpenedMenu = 0;
-					s.UpdateOpenedMenu(true);
-				}
-				catch
-				{
-					SettingsGUI_V2.currentOpenedMenu = 0;
-				}
+				ModRegistry.WrapToFirstPage(s);
 				return false;
 			}
 			if (cur + 1 == ModRegistry.myIndex)
@@ -3840,8 +4263,26 @@ public static class NativeContentGatePatch
 {
 	private static System.Collections.Generic.IEnumerable<MethodBase> TargetMethods()
 	{
-		yield return AccessTools.Method(typeof(SettingsGUI_V2), nameof(SettingsGUI_V2.ClearContentPage));
-		yield return AccessTools.Method(typeof(SettingsGUI_V2), nameof(SettingsGUI_V2.UpdateOpenedMenu));
+		// 注意：TargetMethods 里不能 yield 任何 null（Harmony 会判定目标非法并中断整个 PatchAll），
+		// 所以先收集再过滤——游戏版本变化导致某个方法消失时，剩下的照常拦截。
+		MethodBase[] candidates = new MethodBase[]
+		{
+			AccessTools.Method(typeof(SettingsGUI_V2), nameof(SettingsGUI_V2.ClearContentPage)),
+			AccessTools.Method(typeof(SettingsGUI_V2), nameof(SettingsGUI_V2.UpdateOpenedMenu)),
+			// v1.2.1：游戏 2026-09-12 更新后，原生重开设置界面还会直接起 FillSettingPage 协程
+			//（新签名带 restorePosition/selectedY/scrollbarValue，用来恢复上次滚动位置），
+			// 这条路不经过 UpdateOpenedMenu → 必须一并拦，否则原生填充协程会往我们的页里灌行/改布局。
+			AccessTools.Method(typeof(SettingsGUI_V2), "FillSettingPage")
+		};
+		System.Collections.Generic.List<MethodBase> targets = new System.Collections.Generic.List<MethodBase>();
+		foreach (MethodBase mb in candidates)
+		{
+			if (mb != null)
+			{
+				targets.Add(mb);
+			}
+		}
+		return targets;
 	}
 
 	// 无参 Prefix 对两个目标都兼容；返回 false = 跳过原方法

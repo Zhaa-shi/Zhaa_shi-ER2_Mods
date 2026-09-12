@@ -21,6 +21,8 @@
 
 **游戏 2.1.x 重大变更（2026-09-05 起）**：游戏移除了 `PhaseBarGUI` 类型 —— 任何 `typeof(PhaseBarGUI)` / 直接 patch 会 `TypeLoadException` 导致**整个插件加载失败**。现行做法：`NoInteractionHints` 用 `FindGameType("PhaseBarGUI")` 运行时探测 + 条件 patch；字体获取改「活体 uGUI Text → GUI.skin」回退链（`LimbTweaks/NativeUi.cs`、`WeatherControl/NativeUi.cs`、`ModManager/Plugin.cs` 四处）。
 
+**游戏静默更新（2026-09-12，`GameAssembly.dll` 17:21 重写、buildid 未变）**：BepInEx 下次启动重新生成 interop；原生签名变了（`SettingsGUI_V2.UpdateOpenedMenu` 由 1 参变 2 参、`FillSettingPage` 由 1 参变 4 参，新增 `GetSettingRow`/`lastScrollbarValue`）→ 旧编译产物运行时 `MissingMethodException`（**详见 §4 陷阱 29**）。**判定"游戏是否更新过"看 `GameAssembly.dll` / `global-metadata.dat` 的修改时间，别只看 buildid。**
+
 ## 1. 启动时必读（上下文加载顺序）
 
 1. **本文件**（`AGENTS.md`）—— 现况、陷阱、工作流契约
@@ -114,6 +116,7 @@ ER2_Mods/
 26. **未验证的 interop 信号不能当门控**：`DeathPanel.instance.gameObject.activeInHierarchy` 战斗中恒 true、`LoadingCircle.IsLoading()` 战斗中恒 false —— **先加诊断日志实测，再当门控用**（UnitInfoOverlay v1.0.2 悬浮窗消失根因）
 27. **"上下文窗口"类拦​截必须校验对象身份边界**：CombatTweaks 友军爆炸窗口未校验 responsible 阵营 → 敌人手雷也建窗口 → 敌方死亡士兵倒地全被拦（v1.2.2 修复）
 28. **`Creature.SetIncapacitated` 主动调用（血量>0）会被游戏判死**（失能 + 血量归零 = 死亡），不是"只是趴下"
+29. **游戏更新会静默改原生方法签名 → 旧编译产物运行时 `MissingMethodException`**（2026-09-12 实测定案）：游戏把 `SettingsGUI_V2.UpdateOpenedMenu(bool)` 改成 `(bool, bool)`、`FillSettingPage(bool)` 改成 `(bool, bool, float, float)`（`GameAssembly.dll` 当天 17:21 更新，BepInEx 下次启动重新生成 interop）。ModManager 里 `s.UpdateOpenedMenu(true)` 的直接调用点运行时解析不到方法 → 异常**从 Harmony Prefix 逃逸**（发生在 JIT 解析调用点，前缀自己的 try/catch 拦不住）→ 整个 Prefix 失败 + 原生 `SettingsTabRight` 一起中断 = "按右翻页键不能翻页"。**对策：核心交互的原生调用走反射/`AccessTools` 按名取值 + 参数个数自适应；每次游戏更新后先看 `LogOutput.log` 有没有 `MissingMethodException`，再 `ilspycmd -t <Type> <Game>\BepInEx\interop\Assembly-CSharp.dll` 对比签名。**
 
 ## 5. 跨 mod UI 联动契约（改任何 mod 的 UI 前必读）
 
