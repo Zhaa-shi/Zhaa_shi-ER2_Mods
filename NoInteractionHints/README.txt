@@ -1,4 +1,4 @@
-ER2 Hide Anything v4.5.3
+ER2 Hide Anything v4.5.4
 ========================
 
 Hide anything on your HUD - check boxes, done. No hotkeys to remember:
@@ -30,6 +30,14 @@ Unit Inspector, ...): each one gets its own checkbox under
 Mods are detected the moment they are installed (pre-registered); no
 waiting for the first battle. Uncheck = that mod's UI stays visible
 while everything else hides. Per-mod, independent control.
+
+v4.5.4
+------
+- Compatibility with game build 2.1.x, which removed the PhaseBarGUI class:
+  the type is now looked up directly in Assembly-CSharp (instead of letting
+  AccessTools scan the new game modules and log exceptions), and every
+  PhaseBar-related patch is skipped cleanly when it is absent. No more
+  TypeLoadException / failed plugin load on the updated game.
 
 v4.5.3
 ------

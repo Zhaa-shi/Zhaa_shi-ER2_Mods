@@ -1,4 +1,4 @@
-ER2 Unit Inspector v1.0.4
+ER2 Unit Inspector v1.0.5
 =========================
 
 Developer-oriented unit status overlay for Easy Red 2: compact, color-coded
@@ -24,7 +24,8 @@ Features
 - Hidden automatically while the settings/pause menu is open, while dead
   or waiting to respawn, and for the first seconds after a scene loads
   (hideAfterLoad, covers the loading-screen tail).
-- Respects the "Hide Anything" F5 HUD-hide contract (per-mod toggle).
+- Respects the "Hide Anything" HUD-hide contract (per-mod checkbox in the
+  in-game Mod Manager).
 - Performance: 10 Hz refresh throttle (Time.unscaledTime, pause-safe),
   distance culling, in-front-of-camera and off-screen culling, unit cap;
   iterates Creature.allCreatures (no FindObjectsOfType).
@@ -73,4 +74,10 @@ Notes
 - The HP "max" is an observed maximum (the game does not expose a max-HP
   field through interop): it starts at the first HP value seen for a unit
   and tracks the highest value since.
+- v1.0.5: font handling updated for game build 2.1.x, which removed the
+  PhaseBarGUI class the overlay used to take its font from. The overlay now
+  falls back to GUI.skin -> LegacyRuntime.ttf, so it keeps rendering on the
+  updated game.
+- Respects the "Hide Anything" HUD-hide contract (per-mod checkbox in the
+  in-game Mod Manager; there is no F5 hotkey in v4+).
 - Developer tool: low-frequency functional logs only.

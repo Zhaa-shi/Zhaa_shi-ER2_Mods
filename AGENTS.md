@@ -29,6 +29,11 @@
 4. `ER2_mod_经验.md` —— 致命陷阱全集 + 逐会话复盘（**动手前尤其要读对应 mod 的复盘**）
 5. 目标 mod 的 `Plugin.cs`（**改动前通读**）
 
+**两套记忆的分工（2026-09-12 起）**：
+- **仓库文档（本文件 + 台账 + zcode 成果）= 事实源**，随 git 走、任何 AI 工具都能读、跨工具迁移不丢。改代码后同步更新它。
+- **DSH 记忆插件（`dsh-memory-evolve`）= 会话记忆层**：项目关键记忆自动注入（`~/.dsh/memories/projects/0f0497177829/KEY.md`），项目日志与待办按需读写（同目录 `MEMORY.md` / `TODOS.md`）。它只在 DSH 里可见。
+- 两者冲突时**以仓库文档和源码为准**；把长期有效的结论回写进仓库文档，别只留在插件记忆里。
+
 ## 2. 目录结构
 
 ```
@@ -144,7 +149,10 @@ if (ER2Shared.NoHintsHudLink.IsHidden("er2.你的modid", "显示名")) return; /
 
 **验收三件套**（漏一 = 没部署完）：① 源码与部署 DLL sha256 一致 ② 日志有 `Loading [<插件名> x.y.z]` 且与 `BepInPlugin` 一致 ③ 源码内版本字符串 grep 计数 ≥2（`BepInPlugin` + 启动日志）。
 
-**发布前另查文档漂移**（2026-09-06 核对发现，见 `ER2_projects_status.md` §5）：README 首行版本号 ≠ `BepInPlugin` 版本的已存在两处（`NoInteractionHints` 源码 4.5.4 / README 4.5.3；`UnitInfoOverlay` 源码 1.0.5 / README 1.0.4）；另有 5 个 mod 无 `README.txt`（打包时会被静默跳过）。
+**发布前查文档三项**（2026-09-12 已修一轮；此后新增 mod 照此自检，脚本见 `ER2_projects_status.md` §5）：
+① README 版本号 = `BepInPlugin` 版本（曾有两处漂移：`NoInteractionHints` 4.5.4 / README 4.5.3、`UnitInfoOverlay` 1.0.5 / README 1.0.4）；
+② `README.txt` 与 `Nexus_description.md` 都存在 —— `build.ps1` 对缺失文档**静默跳过**，曾导致 `ER2_LimbTweaks_v2.13.101.zip` / `ER2_WeatherControl_v1.7.2.zip` 里**只有 DLL**；
+③ 打包后拆 zip 核对内容（DLL + README.txt + Nexus_description.md），别只看"打包成功"。
 
 ## 7. 版本号与发布约定
 

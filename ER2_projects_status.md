@@ -135,18 +135,21 @@ RTS 上帝视角内**自定义生成单位/载具**（作弊向）。详见 `ER2
 
 ## 5. 台账自检（改完 mod 后跑这个核对）
 
-### ⚠️ 当前已知文档漂移（2026-09-06 核对发现，**待修**）
+### 文档漂移（2026-09-06 发现 → 2026-09-12 已修，以源码为准）
 
-**README 首行版本号 vs `BepInPlugin` 版本不一致的 mod**（发布包内 README 会误导用户，下次改动时顺手修）：
+**README 版本号 vs `BepInPlugin` 版本**：
 
-| mod | 源码版本 | README 首行 |
-|---|---|---|
-| `NoInteractionHints` | **4.5.4** | `ER2 Hide Anything v4.5.3` ❌ |
-| `UnitInfoOverlay` | **1.0.5** | `ER2 Unit Inspector v1.0.4` ❌ |
-| `ModManager` | 1.2.0 | 标题不含版本号（可接受，但建议补） |
+| mod | 源码版本 | 原 README | 处置 |
+|---|---|---|---|
+| `NoInteractionHints` | **4.5.4** | `v4.5.3` ❌ | ✅ 已修（首行 + 补 v4.5.4 变更说明） |
+| `UnitInfoOverlay` | **1.0.5** | `v1.0.4` ❌ | ✅ 已修（首行 + 补 v1.0.5 说明 + 去 F5 旧术语） |
+| `ModManager` | 1.2.0 | 第 3 行写 `Version 1.2.0` ✅ | 无需修（先前误报：只查了首行） |
 
-**无 README.txt 的 mod**（发布包缺文档，或文档名不同需确认）：`LimbTweaks`、`WeatherControl`、`AIFood`、`ThrowableWheel`、`FleshWoundsFixed`（`HvtTestDriver` 不发布可忽略）。
-> 注：`build.ps1` 打包时 README 不存在则跳过 —— 所以这些包的 zip 里**可能只有 DLL + Nexus_description.md**。下次发布前确认。
+**补齐的缺失 README.txt**（2026-09-12，4 个可打包 mod）：`LimbTweaks`、`WeatherControl`、`AIFood`、`ThrowableWheel`
+**补齐的缺失 Nexus_description.md**（2026-09-12，同样 4 个）：`LimbTweaks`、`WeatherControl`、`AIFood`、`ThrowableWheel`
+> `FleshWoundsFixed` 已有详尽 `README.md` 且**不在 build.ps1**（手动构建部署、不打包），故无需 README.txt；`HvtTestDriver` 是内部工具不发布。
+> **实锤影响**（拆包核对）：`ER2_LimbTweaks_v2.13.101.zip` 与 `ER2_WeatherControl_v1.7.2.zip` 内**只有 DLL**——`build.ps1` 对缺失文档**静默跳过**。文档已补齐，**需重打包**才会进 zip（见 TODOS）。
+> **注意**：新补的 README / Nexus 描述均为**英文**（与其余 mod 一致）；若要出 `_CN_` 包需另建 `README_CN.txt` / `Nexus_description_CN.md`。
 
 ### 版本一致性核对脚本
 
