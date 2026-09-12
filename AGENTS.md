@@ -1,110 +1,173 @@
-# DeepSeek Harness 工作区配置
+# ER2_Mods 工作区 — AI 记忆与工作流（第一轮必读）
 
-项目根目录：`C:\Users\71011\Documents\ER2_Mods`（将此目录设为 harness 的 workspace root）
+> **当前状态快照：2026-09-06（zcode 时代末次工作）**。本文件是**唯一每轮必读**的入口。
+> 项目：Easy Red 2（Unity 2022.3.62f3 / IL2CPP）的 BepInEx 6 插件集合。
+> 详细机制/API/全部踩坑 → `ER2_mod_dev_guide.md`（编码规范/机制大全）、`ER2_mod_经验.md`（陷阱全集 + 会话复盘）。
+> 各 mod 现状与版本台账 → `ER2_projects_status.md`；zcode 时代成果 → `ER2_zcode_era.md`。
 
-## 1. 启动时必读（上下文加载）
+## 0. 环境事实（先确认，别猜）
 
-1. `AGENTS.md` — 工作流、关键事实、致命陷阱（**第一轮必须读**）
-2. `ER2_mod_dev_guide.md` — 完整机制/API/踩坑参考（按需查）
-3. 对应 mod 的 `Plugin.cs` — 修改前通读
+| 项 | 值 |
+|---|---|
+| 工作区根 | `D:\Users\71011\Documents\ER2_Mods`（**2026-09 从 C 盘迁到 D 盘**，旧文档里的 `C:\Users\71011\Documents\ER2_Mods` 已失效） |
+| 游戏根 | `E:\SteamLibrary\steamapps\common\Easy Red 2`（Steam appid 1324780，buildid 25255578） |
+| 插件/配置/日志 | `<Game>\BepInEx\plugins\` / `config\` / `LogOutput.log` |
+| interop | `<Game>\BepInEx\interop\`（`Assembly-CSharp.dll` 约 8.7 MB，游戏启动时重新生成） |
+| BepInEx | 6.0.0.0（IL2CPP 版），插件 `<TargetFramework>net6.0</TargetFramework>` |
+| 目标框架 | 引用 interop/core 程序集，全部 `Private=false` |
+| 分支 | `master`（**无远端**，纯本地版本库，66 个提交） |
+| 反编译 | `ilspycmd -t <Type> <dll> -o <dir>`（`-l c <dll>` 列类型）；**可从已部署 plugins DLL 恢复源码** |
+| rar 解压 | `"C:\Users\71011\新建文件夹\WinRAR.exe" x -o+ -y <rar> "<out>\"`（WinRAR 在非标准路径） |
 
-## 2. 目录约定
+**游戏 2.1.x 重大变更（2026-09-05 起）**：游戏移除了 `PhaseBarGUI` 类型 —— 任何 `typeof(PhaseBarGUI)` / 直接 patch 会 `TypeLoadException` 导致**整个插件加载失败**。现行做法：`NoInteractionHints` 用 `FindGameType("PhaseBarGUI")` 运行时探测 + 条件 patch；字体获取改「活体 uGUI Text → GUI.skin」回退链（`LimbTweaks/NativeUi.cs`、`WeatherControl/NativeUi.cs`、`ModManager/Plugin.cs` 四处）。
+
+## 1. 启动时必读（上下文加载顺序）
+
+1. **本文件**（`AGENTS.md`）—— 现况、陷阱、工作流契约
+2. `ER2_projects_status.md` —— 每个 mod 是什么/什么版本/什么状态（**别凭记忆猜版本号**）
+3. `ER2_mod_dev_guide.md` —— 完整机制/API/踩坑参考（按需查；§2 机制、§3 陷阱 1-49、§3.6 跨 mod UI 契约）
+4. `ER2_mod_经验.md` —— 致命陷阱全集 + 逐会话复盘（**动手前尤其要读对应 mod 的复盘**）
+5. 目标 mod 的 `Plugin.cs`（**改动前通读**）
+
+## 2. 目录结构
 
 ```
 ER2_Mods/
-├── LimbTweaks/          # mod 1：肢体断肢+流血系统（er2.limbtweaks）
-├── WeatherControl/      # mod 2：天气/氛围控制（er2.weathercontrol）
-├── AIFood/              # mod 4：AI 自动吃食物回血（er2.aifood）
-├── NoInteractionHints/  # mod 5：F5 隐藏互动提示（com.ryan.er2.nointeractionhints）
-├── ModManager/          # mod 6：游戏内 mod 设置管理页（er2.modmanager，嵌原生设置界面）
-├── ThrowableWheel/      # mod 7：自定义投掷物转盘（er2.throwablewheel，替换原生手雷轮盘+背包补货）
-├── CombatTweaks/        # mod 8：战场调整（友军伤害保护/弹药调整，er2.combattweaks）
-├── ZoomAnywhere/        # mod 10：任意位置放大（er2.zoomanywhere）
-├── HighValueTarget/     # mod 14：ER2 Veteran HVT（老兵高危目标：击杀追踪+集火+叛徒机制，er2.highvaluetarget）
-├── InventoryPause/      # mod 15：背包暂停（打开自己/尸体背包时冻结世界，er2.inventorypause）
-├── SquadCommand/        # 战场指挥官（RTS 上帝视角小队指挥，er2.squadcommand）
-├── UnitCollision/       # mod 11：MorePhysics 附属轻量版——单位/尸体碰撞（er2.morephysics.unitcollision）
-├── UnitInfoOverlay/     # mod 12：单位状态悬浮显示（开发者调试工具，er2.unitinfooverlay）
-├── Shared/              # 跨 mod 共享（NoHintsHudLink 等）
-├── FleshWoundsFixed/    # 第三方 Flesh Wounds 重建修复版（v1.0.1，紫贴图 bug 修复，见其 README.md）
-├── scripts/build.ps1    # 一体化构建脚本（支持全部 10 个原创 mod；FleshWoundsFixed 需手动构建部署）
-├── AGENTS.md / ER2_mod_dev_guide.md / ER2_physics_system.md 等文档
-└── research_out/        # 游戏/第三方 mod 反编译研究（deployed_dump/ 是部署 DLL 的批量反编译）
+├── LimbTweaks/           er2.limbtweaks               肢体断肢+流血系统
+├── WeatherControl/       er2.weathercontrol           天气/氛围控制
+├── AIFood/               er2.aifood                   AI 自动吃食物回血
+├── NoInteractionHints/   com.ryan.er2.nointeractionhints  Hide Anything：勾选制 UI 隐藏
+├── ModManager/           er2.modmanager               游戏内 mod 设置页（嵌原生设置界面）
+├── ThrowableWheel/       er2.throwablewheel           自定义投掷物转盘 + 背包补货
+├── CombatTweaks/         er2.combattweaks             友军伤害保护 / 弹药与战场调整
+├── ZoomAnywhere/         er2.zoomanywhere             任意姿态/移动中屏息与武器放大
+├── HighValueTarget/      er2.highvaluetarget          Veteran HVT：老兵高危目标 + 叛徒机制
+├── InventoryPause/       er2.inventorypause           背包暂停（开背包冻结世界）
+├── SquadCommand/         er2.squadcommand             Battlefield Commander：上帝视角 RTS 小队指挥（最大工程）
+├── UniversalGeneration/  er2.universalgeneration      RTS 内自定义生成单位/载具（作弊向，SquadCommand 附属）
+├── UnitCollision/        er2.morephysics.unitcollision 单位/尸体碰撞（MorePhysics 轻量保留版）
+├── UnitInfoOverlay/      er2.unitinfooverlay          单位状态悬浮显示（开发者调试工具）
+├── HvtTestDriver/        er2.hvt.testdriver           HVT 自测工具（内部，不发布）
+├── FleshWoundsFixed/     ER2_FleshWounds              第三方 Flesh Wounds 重建修复（紫贴图 bug）
+├── Shared/NoHintsHudLink.cs                           跨 mod F5 隐藏联动（反射，无编译期依赖）
+├── scripts/build.ps1                                   一体化构建：编译+部署+清cfg+打包
+├── research_out/                                       反编译/解包研究（17.9 MB，259 文件）
+└── *.md                                                知识文档（见 §1）
 ```
 
-**部署目录注意**：`游戏\BepInEx\plugins\` 里除上述原创 mod 外还有一批第三方 mod（Flesh Wounds/ImpactFX/Reactive Ragdoll/Remove Stains/Realistic Blood/Decals & Shells/Bullet Penetration/Death Screen Effect 等，其 DLL 名 ≠ 插件名）。第三方 mod 中 **Flesh Wounds（ER2_FleshWoundsBW.dll，子目录内）会在运行时克隆/销毁士兵材质**——2026-08 曾导致"单位贴图变紫"恶性 bug，修复版在 FleshWoundsFixed/。诊断紫贴图问题先看它。
+**文档地图**：`ER2_mod_dev_guide.md`（工作流/机制/陷阱/各 mod 状态，102 KB）· `ER2_mod_经验.md`（陷阱全集 + 复盘，73 KB）· `ER2_mod_技能.md`（可复用技能）· `ER2_mod_工具.md`（工具速查）· `ER2_physics_system.md`（16 层碰撞矩阵解包）· `ER2_scene_objects_classification.md`（场景物分类体系）· `ER2_UI_design.md`（UI/IMGUI 机制）。
 
-## 3. 命令白名单（harness 允许执行的命令）
+## 3. 命令白名单
 
 | 命令 | 用途 |
 |---|---|
-| `powershell -ExecutionPolicy Bypass -File scripts\build.ps1 -Mod <名字>` | 构建+部署+清cfg+打包（一次完成；`-SkipDeploy` 只打包不部署；`-SkipPackage` 只部署；**`-Cn` 编译中文版并打包 `_CN_` 命名 zip**） |
-| `dotnet build -c Release <proj>` | 仅编译（workdir 为 mod 目录；错误信息用 `2>&1 \| Select-String "error"` 查看） |
-| `Select-String <log> -Pattern "..."` | 查日志/过滤本 mod 日志（**每次测试后必查**） |
-| `ilspycmd -t <Type> <dll> -o <dir>` | 反编译查 API；**也可反编译已部署的 plugins DLL 恢复源码**（`-l c <dll>` 列类型） |
-| `Get-Item <game>\BepInEx\plugins\<name>.dll` | 确认部署 |
-| `"C:\Users\71011\新建文件夹\WinRAR.exe" x -o+ -y <rar> "<out>\"` | 解压 rar 发布包（用户 mod 有时只有 rar） |
+| `powershell -ExecutionPolicy Bypass -File scripts\build.ps1 -Mod <名字>` | **构建+部署+清cfg+打包一次完成**；`-SkipDeploy` 只打包；`-SkipPackage` 只部署；**`-Cn` 编译中文版并出 `_CN_` 包** |
+| `dotnet build -c Release <proj>` | 仅编译（workdir 为 mod 目录；查错 `2>&1 \| Select-String "error"`） |
+| `Select-String <log> -Pattern "..."` | 查日志 / 过滤本 mod 日志（**每次实测后必查，不要猜**） |
+| `ilspycmd -t <Type> <dll> -o <dir>` | 反编译查 API；也可反编译已部署 plugins DLL 恢复源码 |
+| `Get-Item <game>\BepInEx\plugins\<name>.dll` | 确认部署（比对时间戳/sha256） |
+| `"C:\Users\71011\新建文件夹\WinRAR.exe" x -o+ -y <rar> "<out>\"` | 解压 rar 发布包 |
 
-**禁止**：修改游戏原文件；删除 plugins 其他 mod；`FindObjectsOfType` 类每帧扫描代码（用 `Creature.allCreatures/aliveCreatures` 或按需 `Physics.OverlapSphere`）。
+**禁止**：修改游戏原文件 · 删除 plugins 里其他 mod · `FindObjectsOfType` 类每帧全场景扫描（用 `Creature.allCreatures` / `Creature.aliveCreatures` 静态列表，或按需 `Physics.OverlapSphere`）。
 
-## 4. 致命陷阱（本次开发验证，全部踩过）
+## 4. 致命陷阱（全部实测定案；完整 49 条见 guide §3）
 
-1. **写血量必须整体赋值**：`soldier.life_total = new ProtectedInt(hp);`（getter 返回值类型副本，`life_total.Value = x` 编译报 CS1612）
-2. **血量只能渐进小步写**：单帧大幅扣血（跳变）→ 游戏判死/覆盖；每帧 ±1 内安全（累积器模式）；绷带补血跳变安全（游戏认可治疗）
-3. **活体断肢不要调 `DetachLimb`**：原生自带失血 DoT（约 20-30/s，断肢必死）——活体断肢用视觉隐藏（HideArm）+ 自己控制血量
-4. **IL2CPP 类型转换必须 `TryCast<T>()`**：interop 返回基类包装，C# `as` 按 CLR 类型检查恒失败
-5. **`new GUIStyle()` 默认 normal.textColor 是黑色**（GUI.color 是乘法 tint）→ 必须显式 `normal.textColor = Color.white`；`new GUIStyle(其他style)` 拷贝构造被 IL2CPP 裁剪
-6. **AI 移动无法外部驱动**：`Soldier.Move()` / `NavMeshAgent.SetDestination` 都会被游戏 AI 控制器覆盖——不要做"让 AI 走过去"的功能
-7. **游戏原生流血特征**：`isBleeding=true` 时游戏调 `Damage(1.0)` 级小伤害（dam ≤ 5 可作特征区分）；`SetBleeding(false)` 止血后触发游戏自然回血——断肢单位需拦截止血（Prefix return false）防回血
-8. **投降单位血量被游戏接管**：外部扣血无效 → 用计时器 Kill 等效"流血而死"
-9. **跨 mod 联动用反射**：AppDomain.GetAssemblies 找程序集 + GetField 读静态字段（缓存引用），避免编译期依赖（对方 mod 缺失时自动跳过）
-10. **游戏内部血量状态**：伤害记录/同步会覆盖外部写入的 life_total——不要与游戏 Damage 路径打架，优先走游戏原生路径（Damage()/SetBleeding/RecoverLife）
-11. **背包添加物品会降级成基类**：`Inventory.AddVirtualItem` 和 `InventoryManager.AddItemToInventory` 都会把物品归一化成基类 VirtualItem（原生转盘按 VirtualThrowable 类型过滤会无视）→ 需要正确子类时**直接 `inv.items.Add(vi)`**
-12. **原生回调拒绝外部替换的 UI 数据**：`CircularMenu2.ShowCircle` 的数据替换后，原生选择回调匹配不到条目（选了什么都不发生）——能走原生管线就走原生（补货让原生自己构建转盘）
-13. **协程方法 patch 可能不触发**：`ShowGrenadeSelectionMenu` 方法从未被调用（原生直接构造状态机）→ 入口 patch 失效，改用**定时循环**（PlayerController.Update Postfix + 节流）
-14. **不要在 Prefix 里递归重调原方法**（Throw 重定向方案）：IL2CPP 下重入参数异常，还会破坏原生调用链（AI 投掷被干扰）
-15. **BepInEx 自动落盘防不胜防**：`SaveOnConfigSet=true`（默认）运行中自动写盘 + **游戏退出时自动保存全部 cfg**——要实现"按下才保存"必须用**暂存机制**（改动不碰 BoxedValue，保存按钮才写入+Save）
-16. **KeyCode 枚举配置没有 AcceptableValueList**：cfg 里 "Acceptable values" 注释是自动生成的；uGUI Dropdown 在 IL2CPP 下值变化检测不可靠 → 热键改键用**点击按钮+Input.GetKeyDown 捕获**方案
-17. **ModManager 中文词典严禁重复键**：`Dictionary<string,string>(OrdinalIgnoreCase)` 加重复键（如 enabled/Enabled）→ 静态构造抛异常 → 整个 MODS 页空白只剩页脚（踩过两次）
-18. **原生 Hint 在设置界面打开时延迟显示**（关闭设置才出现）→ 即时反馈用控件按钮文字闪烁（FlashItem 轮询恢复）
-19. **uGUI 文字溢出被滚动区裁切**：`horizontalOverflow=Overflow` 超长文字会被滚动 Mask 裁掉 → 长名截断+省略号，完整名展开时另起一行显示；描述行高度必须保守估算（420px/行、8px/字、+1 行余量），否则文字压到下一行按钮
-20. **DLL 文件名 ≠ 插件名**：插件以 BepInPlugin 元数据识别（ER2_RecoilOverhaul.dll 里是 Universal Recoil Control）——查插件用日志 Loading 行或二进制搜 GUID，别按文件名猜
-21. **语言一致性**：配置简介来自插件代码——EN ModManager + CN 版插件 = 界面英文但简介中文；发布截图需双端同语言
-22. **Copy-Item -Recurse 嵌套坑**：目标目录已存在时会把源文件夹复制成子目录 → 部署前先确认/清理目标，或用"目标=父目录"方式
-23. **资源清单读 manifest**：er2items 3.7GB 全量读太重，`CorvoBundles\*.manifest`（0.1MB）直接列出全部资源路径
-24. **GetWorldCorners 传 C# 数组返回全零**：IL2CPP interop 下 `RectTransform.GetWorldCorners(new Vector3[4])` 实测全 0 → 用 `Il2CppStructArray<Vector3>` 显式类型，或 `TransformPoint(rect 四角)` 绕开；`GetScreenCoordinatesOfCorners` 返回世界/UI 坐标不是屏幕像素
-25. **ER2 无常驻小地图**：只有按 M 的大地图；`MiniMapGUI.miniMap` 容器一直 active（600×600 UI 单位）但平时不可见；开关读 `MiniMapGUI.MiniMapOpened`；大地图图标用"跟随 unitsContainer 游戏标记"方案（GetPositionInContainer 匹配最近标记 + 标记 position 绘制），别猜映射公式
-26. **ER2 暂停机制（全实测定案）**：原生 `Pause.SetPause` = timeScale=0+弹菜单+disableOnPause（藏菜单=死锁）；手动 `Pause.isPaused=true` 禁用输入但不冻结世界；`timeScale=0` 真暂停但卡 UI 协程动画 + 丢弃武器浮空（用"延迟冻结等动画完成"+扫描 `ItemObject.spawnedItems` 拉下道具解决）；`enableAiBehaviour(false)` 无效（true 才有效）；背包开关读 `InventoryPanel.isOpen`
+**写游戏状态类**
+1. **写血量必须整体赋值**：`soldier.life_total = new ProtectedInt(hp);`（getter 返回值类型副本，`.Value = x` 报 CS1612）
+2. **血量只能渐进小步写**：单帧大幅跳变 → 游戏判死/覆盖；每帧 ±1 累积器安全（绷带补血跳变安全，游戏认可治疗）
+3. **活体断肢不要调 `DetachLimb`**：原生自带 20-30/s 失血 DoT（必死）——用视觉隐藏 + 自己控血；尸体可以调
+4. **不要和游戏 Damage 路径打架**：优先走原生路径（`Damage()`/`SetBleeding`/`RecoverLife`）
 
-## 5. 工作流契约（每次修改必须遵守）
+**IL2CPP / Harmony 类**
+5. **类型转换必须 `TryCast<T>()`**：interop 返回基类包装，C# `as` 按 CLR 类型检查恒失败
+6. **Harmony 参数按名注入**：参数名必须与 interop 参数名完全一致（`SetBleeding(bool bleeding)` 不是 `value`），不匹配 = 静默注入 null
+7. **重载方法必须显式类型**：`[HarmonyPatch(typeof(X), "M", new Type[]{...})]`，否则 Ambiguous 异常中断整个 PatchAll
+8. **interop 不存在的方法不能 patch**：先 `ilspycmd` 确认签名再写，否则 `Undefined target method` → 插件加载失败
+9. **跨 mod 补丁顺序用优先级**：`[HarmonyPriority(Priority.First)]` 先短路、`Priority.Last` 做清场（同方法多 Postfix 顺序由优先级决定）
+10. **`ref` 参数在 IL2CPP 下生效**：改的是托管 interop 桩，实测 before=6→after=60（CombatTweaks 弹药/伤害倍率实证）
 
-1. 改 `Plugin.cs` → 跑 build.ps1（或 dotnet build + 部署轮询脚本）
-2. **部署时游戏可能运行** → build.ps1 已内置 10 分钟轮询；若失败告知用户退出游戏
-3. 用户测试后 → **读 LogOutput.log 验证**（不要猜）
+**UI / 渲染类**
+11. **`new GUIStyle()` 默认 `normal.textColor` 是黑**，`GUI.color` 是乘法 tint → 必须显式 `normal.textColor = Color.white`；拷贝构造被 IL2CPP 裁剪
+12. **运行时创建的 Texture2D/AudioClip 必须 `hideFlags=(HideFlags)61`**：否则进战斗场景被 Unity 卸载 → "日志全绿但什么都看不见"（排查此症状先怀疑对象被销毁）
+13. **`GetWorldCorners(new Vector3[4])` 返回全零**：改用 `Il2CppStructArray<Vector3>` 或 `TransformPoint` 四角绕开
+
+**构建 / 流程类**
+14. **`[BepInPlugin]` 版本必须 `x.y.z`**，禁字母后缀（带后缀 = BepInEx 直接跳过插件）；**启动日志里的版本字符串也要同步改**（最容易漏）
+15. **DLL 文件名 ≠ 插件名**：按 BepInPlugin 元数据识别，别按文件名猜（`ER2_RecoilOverhaul.dll` 里是 Universal Recoil Control）
+16. **源码文件一律用 write/edit 工具**，不要用 PowerShell `Get-Content`/`Set-Content`（默认 ANSI/GBK 编解码 → 中文乱码 + CS1513）
+17. **别用字符串搜索验证构建语言**：元数据字符串堆编码反直觉，EN/CN 两种构建都含中文串；看 `ilspycmd -t ER2ModManager.Plugin` 的 `DefaultChinese` 常量
+
+**游戏机制类（改功能前必查）**
+18. **AI 移动无法外部驱动**：`Soldier.Move()`/`NavMeshAgent.SetDestination` 都会被 AI 控制器覆盖——**唯一官方通道是 Lua API**（`Lua_Soldier/Lua_Squad.moveTo` + AI 三连释放，见 `ER2_zcode_era.md`）
+19. **单位移动途中本来就会边走边打**（原生行为）——不要加"攻击移动"指令
+20. **局内暂停时 `Time.time` 冻结**（timeScale=0）：所有节流/冷却/看门狗必须用 `Time.unscaledTime`，否则局内设置界面里永久停摆
+21. **投降单位血量被游戏接管**：外部扣血无效 → 用计时器 `Kill` 等效"流血而死"
+22. **背包添加物品会降级成基类**：`AddVirtualItem`/`AddItemToInventory` 都归一成 `VirtualItem` → 需要正确子类时**直接 `inv.items.Add(vi)`**
+23. **原生回调拒绝外部替换的 UI 数据**：`CircularMenu2.ShowCircle` 换数据后原生选择回调匹配不到（选了没反应）——能走原生管线就走原生
+24. **`BattleManager` 在主菜单也存在**：等场景实例（如 `DayNightCycle.instance`）就绪再操作
+25. **`SpawnManager.SpawnAI`/`SpawnAISquadGlobal` 返回的是原生协程对象**（`Il2CppSystem.Collections.IEnumerator`）——**必须显式 `StartCoroutine` 启动才会运行**，否则回调永不来（"调了但什么都没生成"）。范式见 `UniversalGeneration/GenRunner.cs` 的 `StartCoroutineNative`
+26. **未验证的 interop 信号不能当门控**：`DeathPanel.instance.gameObject.activeInHierarchy` 战斗中恒 true、`LoadingCircle.IsLoading()` 战斗中恒 false —— **先加诊断日志实测，再当门控用**（UnitInfoOverlay v1.0.2 悬浮窗消失根因）
+27. **"上下文窗口"类拦​截必须校验对象身份边界**：CombatTweaks 友军爆炸窗口未校验 responsible 阵营 → 敌人手雷也建窗口 → 敌方死亡士兵倒地全被拦（v1.2.2 修复）
+28. **`Creature.SetIncapacitated` 主动调用（血量>0）会被游戏判死**（失能 + 血量归零 = 死亡），不是"只是趴下"
+
+## 5. 跨 mod UI 联动契约（改任何 mod 的 UI 前必读）
+
+原生 UI 隐藏由 **Hide Anything**（`com.ryan.er2.nointeractionhints`，GUID 不变）统一管理，**14 类原生 UI**（`hints`/`notifications`/`objectiveBanner`/`hud`/`phaseBar`/`objectives`/`map`/`vehicle`/`misc`/`hitmarker`/`bloodSplash`/`chat`/`scope`/`worldMarkers`）+ 逐 mod 开关。
+
+> **术语坑**：v4 起**已无 F5 热键**，改为「勾选 = 始终隐藏且严格生效」。但 `Shared/NoHintsHudLink.cs` 的注释仍写"F5 隐藏"、部分代码注释也残留 "F5"——**语义以 `HudCompat`（勾选制）为准**，别被旧注释误导。
+
+新 mod 接入方式（**推荐方式 A，无编译期依赖**）：
+
+```csharp
+// csproj 加 <Compile Include="..\Shared\NoHintsHudLink.cs" Link="NoHintsHudLink.cs" />
+if (ER2Shared.NoHintsHudLink.IsHidden("er2.你的modid", "显示名")) return; // 跳过绘制/入队
+```
+
+- 反射调用 `ER2NoInteractionHints.HudCompat.IsHudHidden(id, displayName)`，对方缺失/未就绪时**静默返回 false**（本 mod 独立运行不受影响，每帧查询开销可接受）
+- **首次查询自动注册**该 id 的配置项（默认**不勾选**=显示），无需注册代码
+- **想让它立刻出现在 ModManager**（不等进战斗懒注册）：在 Hide Anything 的 `HudCompat.knownNames` 预注册表**加一行**（`{"er2.你的modid","显示名"}`）——**新接入的 mod 必须加在这里**，否则开关要等首次查询才出现
+- 持久型 UI（每帧 OnGUI）每帧开头查一次；提示型（`Hint.Display`）显示前查一次
+- **方式 B（零代码）**：插件程序集里定义 `public/internal static bool` 字段，名为 `HudEnabled` / `HudVisible` / `ShowHud`（语义 true=显示 UI），会被**自动发现**；勾选后写 false 隐藏并被 `Enforce()` 锁定（外部改回 true 立即再写 false）
+- 陷阱：别在 `Load()` 里"注册"（对方可能还没加载）——查询式自动注册无此问题
+- 契约逻辑测试宿主在 guide §3.6 引用（改契约先跑测试再部署）
+
+## 6. 工作流契约（每次改动必须遵守）
+
+1. 改 `Plugin.cs`/源码 → 跑 `build.ps1`（或 `dotnet build` + 手动部署）
+2. **部署时游戏可能在运行**（DLL 被锁）→ build.ps1 已内置 10 分钟轮询；失败就告知用户退出游戏
+3. 请用户实测 → **回读 `LogOutput.log` 验证，不要猜**
 4. 诊断规则：
-   - patch 不生效 → 查参数名（guide 陷阱 2）、版本号（陷阱 1）、Ambiguous（陷阱 3）
-   - 无日志/加载失败 → 查 `Skipping type`/`Ambiguous`/`Error loading`
-   - 功能时灵时不灵 → 查游戏重置/覆盖（如战役改天气）；**机制不确定时先加诊断日志让用户测一轮，用日志定位而非猜测**
-5. 修改后同步：源码已在 ER2_Mods（原位），发布包由 build.ps1 自动生成，无需额外备份
+   - patch 不生效 → 查参数名（陷阱 6）、版本号（陷阱 14）、Ambiguous（陷阱 7）
+   - 无日志/加载失败 → 查 `Skipping type` / `Ambiguous` / `Error loading` / `TypeLoadException`
+   - 功能时灵时不灵 → 查游戏重置/覆盖（战役改天气等）；**机制不确定时先加诊断日志让用户测一轮，用日志定位而非猜测**
+5. `research_out/` 的反编译产物用完即清或并入根目录（.gitignore 已忽略 `tmp_*`/`deployed_dump/` 等）
 
-## 6. 版本号规则（极易踩坑）
+**验收三件套**（漏一 = 没部署完）：① 源码与部署 DLL sha256 一致 ② 日志有 `Loading [<插件名> x.y.z]` 且与 `BepInPlugin` 一致 ③ 源码内版本字符串 grep 计数 ≥2（`BepInPlugin` + 启动日志）。
 
-- `[BepInPlugin(...)]` 版本必须 `x.y.z`（如 `2.13.93`），**禁止字母后缀**（带后缀=BepInEx 跳过插件）
-- 每次改动递增版本号（z+1），zip 名一致；**启动日志里的版本字符串也要同步改**（容易漏）
+**发布前另查文档漂移**（2026-09-06 核对发现，见 `ER2_projects_status.md` §5）：README 首行版本号 ≠ `BepInPlugin` 版本的已存在两处（`NoInteractionHints` 源码 4.5.4 / README 4.5.3；`UnitInfoOverlay` 源码 1.0.5 / README 1.0.4）；另有 5 个 mod 无 `README.txt`（打包时会被静默跳过）。
 
-## 7. 发布约定（用户已确认）
+## 7. 版本号与发布约定
 
-- 发布简介一律按 N 网格式：**Description / Installation instructions / Main features / Requirements / Shout outs**
-- 更新时只提**更新内容和达成效果**（简洁），完整 README 按需输出
-- 发布前清理调试/诊断日志（高频日志、限频诊断），保留低频功能日志
-- 发布包在 `C:\Users\71011\Downloads\<ModName>_v<版本>.zip`；zip 内 = DLL + README.txt + Nexus_description.md
+- 版本号 `x.y.z` 纯数字；每次改动 z+1（大功能可进位）；**zip 名、启动日志字符串、Plugin.cs 三处同步**
+- 发布简介按 N 网格式：**Description / Installation instructions / Main features / Requirements / Shout outs**
+- 更新说明只讲**更新内容与达成效果**（简洁）；完整 README 按需
+- **发布前清理调试/诊断日志**（高频日志、限频诊断全清），保留低频功能日志
+- 发布包在 `C:\Users\71011\Downloads\<pkg>_v<版本>.zip`（zip 内 = DLL + README.txt + Nexus_description.md）
+- **双语发布**（2026-09-05 起）：默认包 EN，`-Cn` 出中文包 → `README_CN.txt` / `Nexus_description_CN.md` 按包语言取（build.ps1 自动）；仅 SquadCommand、UniversalGeneration 已做双语，其余 mod 只有 EN 文档
 
 ## 8. 快速验证清单
 
 ```
-[ ] 日志有 "Loading [ER2 Xxx x.y.z]"
-[ ] 无 "Skipping type" / "Ambiguous" / "Error loading"
-[ ] 功能触发日志（如 "Limb detached" / "Weather set to Rain" / "AI ate food"）
-[ ] 发布包 zip 已更新（版本号一致）
-[ ] 启动日志版本字符串与 BepInPlugin 一致
+[ ] 日志有 "Loading [<插件名> x.y.z]"，版本与 BepInPlugin 一致
+[ ] 无 "Skipping type" / "Ambiguous" / "Error loading" / "TypeLoadException"
+[ ] 有本 mod 的功能触发日志
+[ ] 源码/部署 DLL sha256 一致
+[ ] 发布包 zip 已更新且版本号三处一致
 ```
+
+## 9. 历史教训（避免重走弯路）
+
+- **已删除并终止的项目**：`MorePhysics` 完整物理化（19 版迭代后废弃）、`DirectControl` 单位接管、`SuperSoldiers` 精英单位、`HealthBars` 血条、`BattlefieldHud` 命中标记 —— **复盘全部保留在 `ER2_mod_经验.md`**，再碰同类需求先读。
+- **BattleJournal（勋章/战报 mod）已放弃**：做完全流程后被用户发现 Nexus 有平替 → **提新 mod 方向前先确认生态里没有现成方案**（先搜 Nexus/问用户），别再主动提"勋章/战报/生涯统计"方向。
+- **需求理解偏差的代价**：`DirectControl` 在错误理解（"接管单单位" vs 用户要的"框选多单位 RTS 指挥"）上做了 3 个版本才对齐 → **指挥/控制类需求先问清是「接管单个」还是「RTS 框选指挥」**（两者技术跨度天差地别）。
+- **功能减法比加法更难也更重要**：Hide Anything 从"F5 热键+锁定+保存按钮"演化到"勾选制"，三个概念全被砍掉——每个存废都来自实际使用体验。

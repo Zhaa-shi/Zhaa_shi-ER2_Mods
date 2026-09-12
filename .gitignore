@@ -16,3 +16,7 @@ research_out/killfeed_ref/
 patch_*.py
 rebuild_*.py
 mm_toggle_dump/
+
+# AI 工具产生的本地状态（zcode 计划/会话产物，不入库）
+.zcode/
+.jspace/
