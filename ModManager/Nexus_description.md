@@ -1,4 +1,6 @@
-# ER2 Mod Manager v1.2.5
+# ER2 Mod Manager v1.3.0
+
+> **v1.3.0:** layout refresh — single-line settings rows with one unified right-hand control column, section headers with hairline rules and item counts, dark value boxes with a top highlight, hover feedback, card-style mod rows with colour accents, and per-setting descriptions/Reset/Copy tucked behind a click so the list stays clean.
 
 > **v1.2.5:** the scrollbar clearance is recomputed every frame, so a list that opens before vanilla settles its viewport width no longer shows a wide dark gap for a second.
 

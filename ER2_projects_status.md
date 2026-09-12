@@ -12,7 +12,7 @@
 | 2 | `WeatherControl` | `er2.weathercontrol` | ER2 Weather Control | **1.7.2** | `ER2_WeatherControl.dll` | 已部署 |
 | 3 | `AIFood` | `er2.aifood` | ER2 AI Food | **1.4.0** | `ER2_AIFood.dll` | 已部署 |
 | 4 | `NoInteractionHints` | `com.ryan.er2.nointeractionhints` | ER2 Hide Anything | **4.5.4** | `ER2_NoInteractionHints_DoneProMaxEnd.dll` | 已部署 |
-| 5 | `ModManager` | `er2.modmanager` | ER2 Mod Manager | **1.2.5** | `ER2_ModManager.dll` | 已部署 |
+| 5 | `ModManager` | `er2.modmanager` | ER2 Mod Manager | **1.3.0** | `ER2_ModManager.dll` | 已部署 |
 | 6 | `ThrowableWheel` | `er2.throwablewheel` | ER2 Throwable Wheel | **1.3.6** | `ER2_ThrowableWheel.dll` | 已部署 |
 | 7 | `CombatTweaks` | `er2.combattweaks` | ER2 Combat Tweaks | **1.2.2** | `ER2_CombatTweaks.dll` | 已部署 |
 | 8 | `ZoomAnywhere` | `er2.zoomanywhere` | ER2 Zoom Anywhere | **1.0.1** | `ER2_ZoomAnywhere.dll` | 已部署 |
@@ -46,7 +46,10 @@ AI 血量低于 `eatBelowHp`（默认 **40**）自动吃背包食物回血：`Fi
 **关键机制**：`UiGroups` 注册表（Register/IsHidden/ApplyAll/Enforce）；`UiHiders`（ElementHider 记忆式隐藏 + RefCache 5s 冷却）；所有节流用 `Time.unscaledTime`。
 **v4.5.3+ 游戏 2.1.x 兼容**：`FindGameType("PhaseBarGUI")` 运行时探测，类型缺失时该类别跳过（不再 TypeLoadException）。
 
-### 2.5 ModManager `er2.modmanager` v1.2.5
+### 2.5 ModManager `er2.modmanager` v1.3.0
+把 mod 设置页**嵌进游戏原生设置界面**（`SettingsGUI_V2.Update` / `SettingsTabRight` / `SettingsTabLeft` patch）：自动枚举 `IL2CPPChainloader.Plugins` 渲染全部配置项（折叠分区 + 小字简介直接用 mod 自带 BepInEx 描述原文）。
+**v1.3.0（排版改造 A+B 档，玩家拿别的 mod 设置页当参考提的需求）**：核心是**统一右列**——`ControlWidth=220 / ControlHeight=30 / ControlRight=8`，所有值控件（数值框、下拉、开关、改键按钮）右对齐成同一列（以前 200/280/原生模板各不同，参差）；行改**单行 38px**（标签左、控件右），范围提示从"独占一行"降级为标签尾部的富文本小灰字（`<color=#6E6E78><size=13>`，Unity Text 支持富文本）；分区标题改参考图样式（16px 粗体 + 标题下 1px 全宽分隔线 + 右侧项数徽章 + 上方留白，行高 48）；字母分组行降为 14px 灰字 + 右侧渐隐细线；**降噪**：每项的简介与【重置】【复制】收进 `expandedEntries`（点该行才展开，行首 ▸/▾ 指示），列表本体每项只占一行；mod 标题改**卡片头**（4px 哈希色条 + ▸/▾ + 展开内容缩进 14px 形成父子层次，`RowIndent` 全局缩进位）；所有行加**悬停高亮**（整行透明 HitArea `SetAsFirstSibling()` 垫底 + Button ColorTint，控件在上会先吃掉点击，所以点值框不会误触展开）。
+**坑（本次踩到并当场修掉）**：`PlaceLabel` 一开始只用 `offsetMin/offsetMax` 表达——水平轴是拉伸锚点没问题，但**垂直轴是固定锚点，两个 offset 都设 0 会把行高压成 0，标签直接不可见**；必须"水平用 sizeDelta/anchoredPosition、垂直用 sizeDelta.y"。另：`Selectable.fadeDuration` 在这个 interop 里没暴露，别设。
 把 mod 设置页**嵌进游戏原生设置界面**（`SettingsGUI_V2.Update` / `SettingsTabRight` / `SettingsTabLeft` patch）：自动枚举 `IL2CPPChainloader.Plugins` 渲染全部配置项（折叠分区 + 小字简介直接用 mod 自带 BepInEx 描述原文）。
 **v1.2.5（内缩纠正提速）**：用户实测"宽深色缝过 1 秒左右才恢复正常" = 建页那一瞬原生 Viewport 宽度/滚动条位置还没定型（量成 450 就缩 24，随后原生定到 433），而纠正只能等 `SelfHealScroll` 那一拍 0.5s 节拍。既然内缩公式已无反馈（基准 contentPage），就改成**每帧重算**（`RefreshRowInset`，在 `InjectPollPatch` 的 MODS 页分支里逐帧调用）→ 当帧纠正。
 把 mod 设置页**嵌进游戏原生设置界面**（`SettingsGUI_V2.Update` / `SettingsTabRight` / `SettingsTabLeft` patch）：自动枚举 `IL2CPPChainloader.Plugins` 渲染全部配置项（折叠分区 + 小字简介直接用 mod 自带 BepInEx 描述原文）。

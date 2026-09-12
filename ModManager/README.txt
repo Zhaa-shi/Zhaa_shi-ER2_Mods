@@ -1,6 +1,6 @@
 ER2 Mod Manager - In-Game Mod Settings Manager
 ===============================================
-Version 1.2.5 | Easy Red 2 (BepInEx 6 / IL2CPP)
+Version 1.3.0 | Easy Red 2 (BepInEx 6 / IL2CPP)
 
 WHAT IT DOES
 ------------
@@ -45,6 +45,22 @@ FEATURES
   arrow on the MODS page returns to the first page. Native click sounds are kept.
 - Auto-save staged changes; per-mod master switches honored.
 - Compatible with the game 2.1.x settings rework (async page filling is handled).
+
+v1.3.0 changelog
+----------------
+- Layout refresh (the whole MODS page was rebuilt around a fixed control column):
+  * section titles now render as an uppercase-ish header with a full-width hairline rule
+    underneath and a right-aligned item-count badge; letter separators became thin grey
+    labels with a fading rule, so the hierarchy reads at a glance;
+  * every setting is a single 38 px row: label on the left, value control right-aligned in
+    one unified 220 px column (toggles, dropdowns, hotkey buttons and numeric boxes all line
+    up, instead of the old ragged mix of 200/280 px controls);
+  * numeric rows no longer waste two lines: the range hint moved into the label as dim small
+    text, and the value box got the reference look (dark fill, 1 px top highlight, centered);
+  * noise reduction: per-setting description and Reset/Copy buttons are hidden until you
+    click that row (arrow marker shows state) - the list body is one clean line per setting;
+  * mod rows became card heads: 4 px hash-coloured accent bar, chevron, and expanded content
+    indented 14 px; every row highlights on hover (previously there was no mouse feedback).
 
 v1.2.5 changelog
 ----------------

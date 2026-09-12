@@ -15,7 +15,7 @@ using UnityEngine.UI;
 
 namespace ER2ModManager;
 
-[BepInPlugin("er2.modmanager", "ER2 Mod Manager", "1.2.5")]
+[BepInPlugin("er2.modmanager", "ER2 Mod Manager", "1.3.0")]
 public class Plugin : BasePlugin
 {
 	/// <summary>构建语言：CN_BUILD 编译符号 = 中文版（标签中文、页标题"模组"）；否则英文版。</summary>
@@ -45,7 +45,7 @@ public class Plugin : BasePlugin
 		nativeFull = Config.Bind("General", "NativeFull", false, "DEV: render the whole MODS page via native SettingSelectable rows.");
 		HarmonyInstance = new Harmony("er2.modmanager");
 		HarmonyInstance.PatchAll(GetType().Assembly);
-		ModLog.LogInfo((object)"ER2 Mod Manager 1.2.5 loaded.");
+		ModLog.LogInfo((object)"ER2 Mod Manager 1.3.0 loaded.");
 	}
 }
 
@@ -375,6 +375,220 @@ public static class ModRegistry
 
 	/// <summary>v1.2.4：行右缘与滚动条左缘之间保留的世界像素间隙（实测原生"正常态"就是这个观感）。</summary>
 	private const float GapWorld = 6f;
+
+	// ── v1.3.0 排版套件（A/B 档视觉改造）─────────────────────────────
+	// 参考目标（玩家截的另一个 mod 设置页）：分区标题带全宽分隔线、每行单行、值控件右对齐成
+	// 同一列、深底值框顶部 1px 高光、无多余边框、留白撑起层次。
+	/// <summary>值控件列：统一宽度，所有值控件右对齐成一列（参考图的核心观感）。</summary>
+	private const float ControlWidth = 220f;
+
+	private const float ControlHeight = 30f;
+
+	private const float ControlRight = 8f;
+
+	private const float LabelLeft = 14f;
+
+	private const float LabelGap = 10f;
+
+	/// <summary>单行行高（标签与值框同行）。</summary>
+	private const float EntryRowHeight = 38f;
+
+	/// <summary>展开的配置项（键 = cfg|section.key）：默认收起 → 小字简介与【重置】【复制】只在展开时出现，
+	/// 把每项 4 行的噪音压到 1 行。</summary>
+	internal static readonly HashSet<string> expandedEntries = new HashSet<string>();
+
+	internal static string EntryKey(ConfigFile cfg, ConfigEntryBase entry)
+	{
+		try
+		{
+			return ((cfg != null) ? cfg.ToString() : "?") + "|" +
+				((entry != null) ? entry.Definition.Section + "." + entry.Definition.Key : "?");
+		}
+		catch
+		{
+			return "?";
+		}
+	}
+
+	/// <summary>行缩进：展开的 mod 内容整体右移，形成父子层次。</summary>
+	internal static float RowIndent;
+
+	/// <summary>值控件列统一定位：右对齐 + 固定宽高。</summary>
+	private static void PlaceControlColumn(RectTransform crt)
+	{
+		if (crt == null)
+		{
+			return;
+		}
+		crt.anchorMin = new Vector2(1f, 0.5f);
+		crt.anchorMax = new Vector2(1f, 0.5f);
+		crt.pivot = new Vector2(1f, 0.5f);
+		crt.anchoredPosition = new Vector2(-ControlRight, 0f);
+		crt.sizeDelta = new Vector2(ControlWidth, ControlHeight);
+	}
+
+	/// <summary>标签占位：左起 LabelLeft+缩进，右侧让出控件列，垂直居中。
+	/// 注意：水平轴用"拉伸锚点 + sizeDelta/anchoredPosition"表达（不能只写 offsetMin/Max —— 垂直轴
+	/// 是固定锚点，offset 全 0 会把行高压成 0，标签直接看不见）。</summary>
+	private static void PlaceLabel(RectTransform trt)
+	{
+		if (trt == null)
+		{
+			return;
+		}
+		float leftInset = LabelLeft + RowIndent;
+		float rightInset = ControlRight + ControlWidth + LabelGap;
+		trt.anchorMin = new Vector2(0f, 0.5f);
+		trt.anchorMax = new Vector2(1f, 0.5f);
+		trt.pivot = new Vector2(0.5f, 0.5f);
+		trt.sizeDelta = new Vector2(-(leftInset + rightInset), ControlHeight);
+		trt.anchoredPosition = new Vector2((leftInset - rightInset) * 0.5f, 0f);
+	}
+
+	/// <summary>全宽 1px 分隔线（无 sprite 的 Image 就是纯色块；raycastTarget 关掉免得挡点击）。</summary>
+	private static void AddHLine(Transform parent, float alpha, float insetLeft = -1f, float insetRight = -1f)
+	{
+		try
+		{
+			GameObject go = new GameObject("MM_Line");
+			go.transform.SetParent(parent, false);
+			RectTransform rt = go.AddComponent<RectTransform>();
+			rt.anchorMin = new Vector2(0f, 0f);
+			rt.anchorMax = new Vector2(1f, 0f);
+			rt.pivot = new Vector2(0.5f, 0f);
+			rt.offsetMin = new Vector2((insetLeft >= 0f) ? insetLeft : (LabelLeft + RowIndent), 0f);
+			rt.offsetMax = new Vector2(-((insetRight >= 0f) ? insetRight : ControlRight), 0f);
+			rt.sizeDelta = new Vector2(rt.sizeDelta.x, 1f);
+			Image img = go.AddComponent<Image>();
+			img.raycastTarget = false;
+			img.color = new Color(1f, 1f, 1f, alpha);
+		}
+		catch
+		{
+		}
+	}
+
+	/// <summary>v1.3.0：按名字 hash 取柔和强调色（卡片头色条用）。</summary>
+	private static Color AccentColor(string name)
+	{
+		try
+		{
+			int h = 0;
+			if (!string.IsNullOrEmpty(name))
+			{
+				for (int i = 0; i < name.Length; i++)
+				{
+					h = (h * 31 + name[i]) & 0x7fffffff;
+				}
+			}
+			Color[] palette = new Color[]
+			{
+				new Color(0.36f, 0.62f, 0.92f, 0.95f),
+				new Color(0.42f, 0.78f, 0.55f, 0.95f),
+				new Color(0.92f, 0.72f, 0.35f, 0.95f),
+				new Color(0.85f, 0.50f, 0.42f, 0.95f),
+				new Color(0.68f, 0.55f, 0.90f, 0.95f),
+				new Color(0.45f, 0.78f, 0.85f, 0.95f),
+				new Color(0.80f, 0.60f, 0.78f, 0.95f),
+				new Color(0.60f, 0.72f, 0.45f, 0.95f)
+			};
+			return palette[h % palette.Length];
+		}
+		catch
+		{
+			return new Color(0.5f, 0.6f, 0.8f, 0.9f);
+		}
+	}
+
+	/// <summary>行级交互装饰：整行透明点击区（悬停高亮 + 点击标签区展开/收起该项）。
+	/// 放在最底层（SetAsFirstSibling），控件在它上面会先吃掉点击，所以点值框/开关不会误触展开。</summary>
+	private static void FinishEntryRow(GameObject row, ConfigFile cfg, ConfigEntryBase entry)
+	{
+		try
+		{
+			if (row == null)
+			{
+				return;
+			}
+			Text lbl = null;
+			try
+			{
+				if (row.transform.childCount > 0)
+				{
+					lbl = row.transform.GetChild(0).GetComponent<Text>();
+				}
+			}
+			catch
+			{
+			}
+			if (lbl == null)
+			{
+				try
+				{
+					lbl = row.GetComponentInChildren<Text>(true);
+				}
+				catch
+				{
+				}
+			}
+			if (lbl != null)
+			{
+				lbl.raycastTarget = false;
+			}
+			GameObject hit = new GameObject("HitArea");
+			hit.transform.SetParent(row.transform, false);
+			hit.transform.SetAsFirstSibling();
+			RectTransform hrt = hit.AddComponent<RectTransform>();
+			hrt.anchorMin = Vector2.zero;
+			hrt.anchorMax = Vector2.one;
+			hrt.offsetMin = Vector2.zero;
+			hrt.offsetMax = Vector2.zero;
+			Image img = hit.AddComponent<Image>();
+			img.color = Color.white;
+			Button btn = hit.AddComponent<Button>();
+			btn.targetGraphic = img;
+			btn.transition = UnityEngine.UI.Selectable.Transition.ColorTint;
+			UnityEngine.UI.ColorBlock cb = btn.colors;
+			cb.colorMultiplier = 1f;
+			cb.normalColor = new Color(1f, 1f, 1f, 0.012f);
+			cb.highlightedColor = new Color(1f, 1f, 1f, 0.06f);
+			cb.pressedColor = new Color(1f, 1f, 1f, 0.1f);
+			cb.selectedColor = new Color(1f, 1f, 1f, 0.03f);
+			cb.disabledColor = new Color(1f, 1f, 1f, 0f);
+			btn.colors = cb;
+			string key = EntryKey(cfg, entry);
+			btn.onClick.RemoveAllListeners();
+			System.Action act = delegate
+			{
+				ToggleEntry(key);
+			};
+			btn.onClick.AddListener(act);
+		}
+		catch
+		{
+		}
+	}
+
+	/// <summary>切换单个配置项的展开态（简介 + 每项操作按钮只在展开时显示）并重建页面。</summary>
+	internal static void ToggleEntry(string key)
+	{
+		try
+		{
+			if (!expandedEntries.Add(key))
+			{
+				expandedEntries.Remove(key);
+			}
+			SettingsGUI_V2 s = SettingsGUI_V2.instance;
+			if (s != null)
+			{
+				OpenMyPage(s);
+			}
+		}
+		catch (Exception ex)
+		{
+			Plugin.ModLog.LogError((object)("ModManager entry toggle error: " + ex.Message));
+		}
+	}
 
 	/// <summary>我们是否改过 ScrollRect.content 的锚点（离开 MODS 页时还原，防影响原生页面）。</summary>
 	internal static RectTransform anchorChangedTarget;
@@ -817,7 +1031,8 @@ public static class ModRegistry
 		crt.anchoredPosition = new Vector2(-4f, 0f);
 		crt.sizeDelta = new Vector2(-8f, 100f);
 		UnityEngine.UI.VerticalLayoutGroup lg = cont.AddComponent<UnityEngine.UI.VerticalLayoutGroup>();
-		lg.spacing = 6f;
+		// v1.3.0：行距收到 4（行内单行、行高压到 38），分区之间靠"48px 标题行 + 分隔线"拉开层次
+		lg.spacing = 4f;
 		lg.childAlignment = TextAnchor.UpperCenter;
 		lg.childControlWidth = true;
 		lg.childControlHeight = false;
@@ -849,17 +1064,21 @@ public static class ModRegistry
 				if (letter != null && letter != lastLetter)
 				{
 					lastLetter = letter;
+					RowIndent = 0f;
 					AddCategoryRow(container, letter);
 				}
 				// 可点击标题（剥离前缀的短名；展开行小字显示完整原名）
 				string name = p.name;
 				bool expanded = expandedMods.Contains(name);
+				RowIndent = 0f;
 				AddSectionButton(SettingsGUI_V2.instance, container, p.shortName, expanded, name);
 				if (expanded)
 				{
+					// v1.3.0：展开内容整体右移 14px，形成"卡片头 + 缩进正文"的父子层次
+					RowIndent = 14f;
 					FillModEntries(p, container);
-					// 展开内容末尾：重置（恢复默认）+ 复制全部文本
 					AddFooterRow(container, p.name, p.cfg);
+					RowIndent = 0f;
 				}
 			}
 			catch (Exception ex)
@@ -1513,7 +1732,8 @@ public static class ModRegistry
 		ymax = Math.Max(a.y, b.y);
 	}
 
-	/// <summary>v1.1.4：字母分组小标题行（"A"…"Z" / "0-9" / "#"）：小字号灰字，样式同旧分类行。</summary>
+	/// <summary>v1.3.0：字母分组小标题行（"A"…"Z" / "0-9" / "#"）——小号灰字 + 右侧渐隐细线，
+	/// 与"分区标题（带全宽分隔线）"区分开，不再和 mod 名抢同一档视觉。</summary>
 	private static float AddCategoryRow(Transform container, string text)
 	{
 		try
@@ -1522,25 +1742,41 @@ public static class ModRegistry
 			GameObject row = new GameObject("MM_CatRow");
 			row.transform.SetParent(container, false);
 			RectTransform rt = row.AddComponent<RectTransform>();
-			rt.sizeDelta = new Vector2(0f, 32f);
+			rt.sizeDelta = new Vector2(0f, 28f);
 			GameObject tgo = new GameObject("Label");
 			tgo.transform.SetParent(row.transform, false);
 			RectTransform trt = tgo.AddComponent<RectTransform>();
-			trt.anchorMin = new Vector2(0f, 0f);
-			trt.anchorMax = new Vector2(1f, 1f);
-			trt.offsetMin = new Vector2(4f, 2f);
-			trt.offsetMax = new Vector2(-4f, -2f);
+			trt.anchorMin = new Vector2(0f, 0.5f);
+			trt.anchorMax = new Vector2(0f, 0.5f);
+			trt.pivot = new Vector2(0f, 0.5f);
+			trt.anchoredPosition = new Vector2(LabelLeft, 0f);
+			trt.sizeDelta = new Vector2(60f, 22f);
 			Text txt = tgo.AddComponent<Text>();
 			if (font != null)
 			{
 				txt.font = font;
 			}
-			txt.fontSize = 16;
+			txt.fontSize = 14;
 			txt.fontStyle = FontStyle.Bold;
-			txt.color = new Color(0.75f, 0.75f, 0.75f, 1f);
+			txt.color = new Color(0.62f, 0.62f, 0.66f, 1f);
 			txt.alignment = TextAnchor.MiddleLeft;
+			txt.horizontalOverflow = HorizontalWrapMode.Overflow;
+			txt.raycastTarget = false;
 			txt.text = text;
-			return 32f;
+			// 字母右侧渐隐细线（起于字母之后，止于行右缘）
+			GameObject line = new GameObject("MM_Line");
+			line.transform.SetParent(row.transform, false);
+			RectTransform lrt = line.AddComponent<RectTransform>();
+			lrt.anchorMin = new Vector2(0f, 0.5f);
+			lrt.anchorMax = new Vector2(1f, 0.5f);
+			lrt.pivot = new Vector2(0.5f, 0.5f);
+			lrt.offsetMin = new Vector2(LabelLeft + 62f, 0f);
+			lrt.offsetMax = new Vector2(-ControlRight, 0f);
+			lrt.sizeDelta = new Vector2(lrt.sizeDelta.x, 1f);
+			Image img = line.AddComponent<Image>();
+			img.raycastTarget = false;
+			img.color = new Color(1f, 1f, 1f, 0.10f);
+			return 28f;
 		}
 		catch
 		{
@@ -1621,11 +1857,29 @@ public static class ModRegistry
 			RectTransform rt = row.AddComponent<RectTransform>();
 			// v1.1.4：按实测宽度判断是否截断。可用宽度 = viewport 实宽 - 标签两侧边距(24) - 滚动条余量(30)；
 			// 放不下才截断省略号，展开行仍显示完整原始名。
-			string prefix = expanded ? "v " : "> ";
+			string prefix = expanded ? "▾ " : "▸ ";
 			float availWidth = TitleAvailWidth(s);
 			bool longName = MeasuresWiderThan(rawName, font, fontSize + 2, prefix, availWidth);
-			float rowH = (expanded && longName) ? 64f : 42f;
+			float rowH = (expanded && longName) ? 60f : 42f;
 			rt.sizeDelta = new Vector2(0f, rowH);
+			// v1.3.0：卡片头左侧色条（按 mod 名 hash 取柔和色）→ 列表能靠色块快速定位
+			try
+			{
+				GameObject bar = new GameObject("MM_ColorBar");
+				bar.transform.SetParent(row.transform, false);
+				RectTransform brt = bar.AddComponent<RectTransform>();
+				brt.anchorMin = new Vector2(0f, 0.5f);
+				brt.anchorMax = new Vector2(0f, 0.5f);
+				brt.pivot = new Vector2(0f, 0.5f);
+				brt.anchoredPosition = new Vector2(2f, 0f);
+				brt.sizeDelta = new Vector2(4f, rowH - 12f);
+				Image bimg = bar.AddComponent<Image>();
+				bimg.raycastTarget = false;
+				bimg.color = AccentColor(rawName);
+			}
+			catch
+			{
+			}
 			// label（锚点拉伸到行宽，左对齐）
 			GameObject tgo = new GameObject("Label");
 			tgo.transform.SetParent(row.transform, false);
@@ -1633,8 +1887,8 @@ public static class ModRegistry
 			trt.anchorMin = new Vector2(0f, 0.5f);
 			trt.anchorMax = new Vector2(1f, 0.5f);
 			trt.pivot = new Vector2(0.5f, 0.5f);
-			trt.sizeDelta = new Vector2(-24f, 38f);
-			trt.anchoredPosition = Vector2.zero;
+			trt.sizeDelta = new Vector2(-30f, 38f);
+			trt.anchoredPosition = new Vector2(3f, expanded && longName ? 8f : 0f);
 			Text txt = tgo.AddComponent<Text>();
 			if (font != null)
 			{
@@ -1648,6 +1902,7 @@ public static class ModRegistry
 			txt.resizeTextForBestFit = true;
 			txt.resizeTextMinSize = 12;
 			txt.resizeTextMaxSize = fontSize + 2;
+			txt.raycastTarget = false;
 			// 超长 mod 名截断为省略号（仅当实测宽度放不下；二分收敛到可容纳的前缀长度）
 			string display = name;
 			if (longName)
@@ -1664,20 +1919,21 @@ public static class ModRegistry
 				srt.anchorMin = new Vector2(0f, 0f);
 				srt.anchorMax = new Vector2(1f, 0f);
 				srt.pivot = new Vector2(0.5f, 0f);
-				srt.sizeDelta = new Vector2(-24f, 20f);
-				srt.anchoredPosition = new Vector2(0f, -2f);
+				srt.sizeDelta = new Vector2(-30f, 20f);
+				srt.anchoredPosition = new Vector2(3f, 1f);
 				Text stxt = sub.AddComponent<Text>();
 				if (font != null)
 				{
 					stxt.font = font;
 				}
 				stxt.fontSize = Math.Max(12, fontSize - 5);
-				stxt.color = new Color(labelColor.r, labelColor.g, labelColor.b, 0.65f);
+				stxt.color = new Color(labelColor.r, labelColor.g, labelColor.b, 0.6f);
 				stxt.alignment = TextAnchor.MiddleLeft;
 				stxt.horizontalOverflow = HorizontalWrapMode.Overflow;
+				stxt.raycastTarget = false;
 				stxt.text = rawName;
 			}
-			// 透明点击区（覆盖整行）
+			// 透明点击区（覆盖整行）+ 悬停高亮（v1.3.0：原来 Transition.None 完全没有鼠标反馈）
 			GameObject hit = new GameObject("HitArea");
 			hit.transform.SetParent(row.transform, false);
 			RectTransform hrt = hit.AddComponent<RectTransform>();
@@ -1687,9 +1943,18 @@ public static class ModRegistry
 			hrt.offsetMin = Vector2.zero;
 			hrt.offsetMax = Vector2.zero;
 			UnityEngine.UI.Image img = hit.AddComponent<UnityEngine.UI.Image>();
-			img.color = new Color(1f, 1f, 1f, 0.01f);
+			img.color = Color.white;
 			UnityEngine.UI.Button btn = hit.AddComponent<UnityEngine.UI.Button>();
-			btn.transition = UnityEngine.UI.Selectable.Transition.None;
+			btn.targetGraphic = img;
+			btn.transition = UnityEngine.UI.Selectable.Transition.ColorTint;
+			UnityEngine.UI.ColorBlock cb = btn.colors;
+			cb.colorMultiplier = 1f;
+			cb.normalColor = new Color(1f, 1f, 1f, 0.02f);
+			cb.highlightedColor = new Color(1f, 1f, 1f, 0.075f);
+			cb.pressedColor = new Color(1f, 1f, 1f, 0.12f);
+			cb.selectedColor = new Color(1f, 1f, 1f, 0.04f);
+			cb.disabledColor = new Color(1f, 1f, 1f, 0f);
+			btn.colors = cb;
 			string modName = rawName;
 			btn.onClick.RemoveAllListeners();
 			System.Action act = delegate
@@ -1822,16 +2087,15 @@ public static class ModRegistry
 			GameObject row = new GameObject("MM_FooterRow");
 			row.transform.SetParent(container, false);
 			RectTransform rt = row.AddComponent<RectTransform>();
-			rt.sizeDelta = new Vector2(0f, 38f);
+			rt.sizeDelta = new Vector2(0f, 34f);
 			// 注：v1.0.32 起无【保存】按钮——退出设置（Esc/继续）时自动保存所有暂存改动
-			// 重置按钮（最右）
-			MakeFooterButton(row, new Vector2(1f, 0.5f), new Vector2(1f, 0.5f), new Vector2(-12f, 0f), new Vector2(96f, 30f), Plugin.DefaultChinese ? "重置全部" : "Reset all", delegate
+			// v1.3.0：两个小按钮统一进右列，与值控件列右对齐（以前是 96+96 挤在右端、和值框不对齐）
+			MakeFooterButton(row, new Vector2(1f, 0.5f), new Vector2(1f, 0.5f), new Vector2(-ControlRight, 0f), new Vector2(104f, 28f), Plugin.DefaultChinese ? "重置全部" : "Reset all", delegate
 			{
 				ResetModSettings(cfg, modName);
 			});
-			// 复制按钮（重置按钮左侧）
 			Text copyTxt = null;
-			copyTxt = MakeFooterButton(row, new Vector2(1f, 0.5f), new Vector2(1f, 0.5f), new Vector2(-116f, 0f), new Vector2(96f, 30f), Plugin.DefaultChinese ? "复制全部文本" : "Copy all text", delegate
+			copyTxt = MakeFooterButton(row, new Vector2(1f, 0.5f), new Vector2(1f, 0.5f), new Vector2(-(ControlRight + 110f), 0f), new Vector2(104f, 28f), Plugin.DefaultChinese ? "复制全部" : "Copy all", delegate
 			{
 				CopyModText(modName, cfg);
 				FlashText(copyTxt, Plugin.DefaultChinese ? "已复制 ✓" : "Copied ✓", 1.5f);
@@ -2261,7 +2525,7 @@ public static class ModRegistry
 				{
 					string key = p.name + "|" + sec;
 					bool expanded = expandedSections.Contains(key);
-					AddSectionHeader(container, HumanizeKey(sec), expanded, key);
+					AddSectionHeader(container, HumanizeKey(sec), expanded, key, bySection[sec].Count);
 					if (!expanded)
 					{
 						continue;
@@ -2286,38 +2550,87 @@ public static class ModRegistry
 		}
 	}
 
-	/// <summary>分区小标题（可点击折叠/展开）。</summary>
-	private static void AddSectionHeader(Transform container, string title, bool expanded, string key)
+	/// <summary>v1.3.0：分区小标题（可点击折叠/展开）——参考图样式：标题在上、下方一条全宽分隔线、
+	/// 上方留白，右侧带项数徽章的观感。收起时只留标题 + 淡线。</summary>
+	private static void AddSectionHeader(Transform container, string title, bool expanded, string key, int count)
 	{
 		try
 		{
 			GameObject row = new GameObject("MM_SectionTitle");
 			row.transform.SetParent(container, false);
 			RectTransform rt = row.AddComponent<RectTransform>();
-			rt.sizeDelta = new Vector2(0f, 32f);
+			rt.sizeDelta = new Vector2(0f, expanded ? 48f : 40f);
 			GameObject tgo = new GameObject("Label");
 			tgo.transform.SetParent(row.transform, false);
 			RectTransform trt = tgo.AddComponent<RectTransform>();
 			trt.anchorMin = new Vector2(0f, 0.5f);
 			trt.anchorMax = new Vector2(1f, 0.5f);
 			trt.pivot = new Vector2(0.5f, 0.5f);
-			trt.sizeDelta = new Vector2(-24f, 30f);
-			trt.anchoredPosition = Vector2.zero;
+			float li = LabelLeft + RowIndent;
+			float ri = ControlRight + 92f;
+			trt.sizeDelta = new Vector2(-(li + ri), 26f);
+			trt.anchoredPosition = new Vector2((li - ri) * 0.5f, 12f);
 			Text txt = tgo.AddComponent<Text>();
 			Font font = GetNativeFont(SettingsGUI_V2.instance);
 			if (font != null)
 			{
 				txt.font = font;
 			}
-			txt.fontSize = 18;
+			txt.fontSize = 16;
 			txt.fontStyle = FontStyle.Bold;
-			txt.color = new Color(0.85f, 0.85f, 0.9f, 0.95f);
+			txt.color = new Color(0.88f, 0.88f, 0.92f, 0.98f);
 			txt.alignment = TextAnchor.MiddleLeft;
 			txt.horizontalOverflow = HorizontalWrapMode.Overflow;
-			txt.text = (expanded ? "▾ " : "▸ ") + title;
-			// 点击切换折叠并重建整页（System.Action → UnityAction 隐式转换，与 Footer 按钮同一已验证模式）
-			UnityEngine.UI.Button btn = row.AddComponent<UnityEngine.UI.Button>();
-			btn.transition = UnityEngine.UI.Selectable.Transition.None;
+			txt.raycastTarget = false;
+			string arrow = expanded ? "▾  " : "▸  ";
+			txt.text = arrow + (Plugin.DefaultChinese ? title : title.ToUpperInvariant());
+			// 项数徽章（右侧小灰字）
+			if (count > 0)
+			{
+				GameObject cgo = new GameObject("Count");
+				cgo.transform.SetParent(row.transform, false);
+				RectTransform crt = cgo.AddComponent<RectTransform>();
+				crt.anchorMin = new Vector2(1f, 0.5f);
+				crt.anchorMax = new Vector2(1f, 0.5f);
+				crt.pivot = new Vector2(1f, 0.5f);
+				crt.anchoredPosition = new Vector2(-ControlRight, 12f);
+				crt.sizeDelta = new Vector2(84f, 24f);
+				Text ctxt = cgo.AddComponent<Text>();
+				if (font != null)
+				{
+					ctxt.font = font;
+				}
+				ctxt.fontSize = 13;
+				ctxt.color = new Color(0.62f, 0.62f, 0.68f, 1f);
+				ctxt.alignment = TextAnchor.MiddleRight;
+				ctxt.horizontalOverflow = HorizontalWrapMode.Overflow;
+				ctxt.raycastTarget = false;
+				ctxt.text = Plugin.DefaultChinese ? (count + " 项") : (count + (count == 1 ? " item" : " items"));
+			}
+			// 分隔线（贴在标题下方）
+			AddHLine(row.transform, 0.22f);
+			// 点击切换折叠并重建整页
+			GameObject hit = new GameObject("HitArea");
+			hit.transform.SetParent(row.transform, false);
+			hit.transform.SetAsFirstSibling();
+			RectTransform hrt = hit.AddComponent<RectTransform>();
+			hrt.anchorMin = Vector2.zero;
+			hrt.anchorMax = Vector2.one;
+			hrt.offsetMin = Vector2.zero;
+			hrt.offsetMax = Vector2.zero;
+			Image img = hit.AddComponent<Image>();
+			img.color = Color.white;
+			UnityEngine.UI.Button btn = hit.AddComponent<UnityEngine.UI.Button>();
+			btn.targetGraphic = img;
+			btn.transition = UnityEngine.UI.Selectable.Transition.ColorTint;
+			UnityEngine.UI.ColorBlock cb = btn.colors;
+			cb.colorMultiplier = 1f;
+			cb.normalColor = new Color(1f, 1f, 1f, 0f);
+			cb.highlightedColor = new Color(1f, 1f, 1f, 0.05f);
+			cb.pressedColor = new Color(1f, 1f, 1f, 0.09f);
+			cb.selectedColor = new Color(1f, 1f, 1f, 0.02f);
+			cb.disabledColor = new Color(1f, 1f, 1f, 0f);
+			btn.colors = cb;
 			System.Action toggleAction = delegate
 			{
 				ToggleSection(key);
@@ -2373,7 +2686,9 @@ public static class ModRegistry
 		}
 	}
 
-	/// <summary>克隆模板、挂到自动布局容器、设置 label 文本。返回是否成功创建。</summary>
+	/// <summary>克隆模板、挂到自动布局容器、设置 label 文本。
+	/// v1.3.0：统一行高，并把行内标签与值控件分别对齐到"左 + 缩进"和"统一右列"——
+	/// 原生模板各有各的宽度，不对齐就会像以前那样参差。</summary>
 	private static bool SetupControl(GameObject go, Transform container, string label, string valueText)
 	{
 		if (go == null)
@@ -2384,8 +2699,49 @@ public static class ModRegistry
 		RectTransform rt = go.GetComponent<RectTransform>();
 		if (rt != null)
 		{
-			// LayoutGroup 控制宽度，这里只固定高度
-			rt.sizeDelta = new Vector2(rt.sizeDelta.x, rt.sizeDelta.y);
+			rt.sizeDelta = new Vector2(rt.sizeDelta.x, EntryRowHeight);
+		}
+		try
+		{
+			if (go.transform.childCount > 0)
+			{
+				RectTransform lrt = go.transform.GetChild(0).GetComponent<RectTransform>();
+				if (lrt != null)
+				{
+					PlaceLabel(lrt);
+				}
+				Text t0 = go.transform.GetChild(0).GetComponent<Text>();
+				if (t0 != null)
+				{
+					t0.raycastTarget = false;
+					t0.fontSize = Math.Max(15, Math.Min(19, t0.fontSize));
+					t0.color = new Color(0.88f, 0.88f, 0.9f, 1f);
+					t0.alignment = TextAnchor.MiddleLeft;
+					t0.horizontalOverflow = HorizontalWrapMode.Overflow;
+					t0.verticalOverflow = VerticalWrapMode.Overflow;
+				}
+				if (go.transform.childCount > 1)
+				{
+					RectTransform crt = go.transform.GetChild(1).GetComponent<RectTransform>();
+					if (crt != null)
+					{
+						// 值控件：进统一右列；宽度统一，高度保留模板自身（夹到 24..40，别把原生控件压扁）
+						float h = crt.sizeDelta.y;
+						if (h < 24f || h > 40f)
+						{
+							h = ControlHeight;
+						}
+						crt.anchorMin = new Vector2(1f, 0.5f);
+						crt.anchorMax = new Vector2(1f, 0.5f);
+						crt.pivot = new Vector2(1f, 0.5f);
+						crt.anchoredPosition = new Vector2(-ControlRight, 0f);
+						crt.sizeDelta = new Vector2(ControlWidth, h);
+					}
+				}
+			}
+		}
+		catch
+		{
 		}
 		try
 		{
@@ -2407,19 +2763,24 @@ public static class ModRegistry
 		{
 			// label 人性化键名（驼峰/下划线拆词）
 			string label = HumanizeKey(entry.Definition.Key);
+			string ekey = EntryKey(cfg, entry);
+			bool entryExpanded = expandedEntries.Contains(ekey);
+			// v1.3.0：默认收起 → 简介与【重置】【复制】收进"点这一行才展开"的二级层
+			string rowLabel = (entryExpanded ? "▾  " : "▸  ") + label;
 			Type t = entry.SettingType;
+			int before = container.childCount;
 			bool ok = false;
 			if (t == typeof(bool))
 			{
-				ok = AddToggle(cfg, entry, container, label);
+				ok = AddToggle(cfg, entry, container, rowLabel);
 			}
 			else if (t == typeof(float))
 			{
-				ok = AddNumericInput(cfg, entry, container, label, true);
+				ok = AddNumericInput(cfg, entry, container, rowLabel, true);
 			}
 			else if (t == typeof(int))
 			{
-				ok = AddNumericInput(cfg, entry, container, label, false);
+				ok = AddNumericInput(cfg, entry, container, rowLabel, false);
 			}
 			else if (t == typeof(string))
 			{
@@ -2427,17 +2788,17 @@ public static class ModRegistry
 				// 其余 string → 下拉
 				if (IsHotkeyEntry(entry) && LooksLikeKeyList(entry))
 				{
-					ok = AddHotkeyRebind(cfg, entry, container, label, false);
+					ok = AddHotkeyRebind(cfg, entry, container, rowLabel, false);
 				}
 				else
 				{
-					ok = AddDropdown(cfg, entry, container, label);
+					ok = AddDropdown(cfg, entry, container, rowLabel);
 				}
 			}
 			else if (t == typeof(KeyCode))
 			{
 				// 原生快捷键（KeyCode 类型）→ 点击改键按钮（按下新键即捕获）
-				ok = AddHotkeyRebind(cfg, entry, container, label, true);
+				ok = AddHotkeyRebind(cfg, entry, container, rowLabel, true);
 			}
 			else if (t.IsEnum)
 			{
@@ -2445,34 +2806,35 @@ public static class ModRegistry
 				// 其他枚举 → 下拉选择
 				if (IsHotkeyEntry(entry))
 				{
-					ok = AddHotkeyRebind(cfg, entry, container, label, false, t);
+					ok = AddHotkeyRebind(cfg, entry, container, rowLabel, false, t);
 				}
 				else
 				{
-					ok = AddDropdownEnum(cfg, entry, container, label);
+					ok = AddDropdownEnum(cfg, entry, container, rowLabel);
 				}
 			}
-			if (ok)
-			{
-				// 控件下方的小字介绍
-				string desc = GetDescription(entry);
-				if (!string.IsNullOrEmpty(desc))
-				{
-					AddDescriptionRow(container, desc);
-				}
-				// 每个子选项独立的复制/重置按钮（放最底部）
-				AddEntryActions(container, cfg, entry, label);
-			}
-			else
+			bool createdRow = container.childCount > before;
+			if (!ok)
 			{
 				// v1.1.6：全局兜底——任何类型/模板路径失败都渲染只读文本行，配置项永不静默消失
-				AddFallbackTextRow(container, label + ": " + FormatEntryValue(entry));
-				string desc = GetDescription(entry);
-				if (!string.IsNullOrEmpty(desc))
-				{
-					AddDescriptionRow(container, desc);
-				}
+				AddFallbackTextRow(container, rowLabel + ": " + FormatEntryValue(entry));
+				createdRow = true;
 				ok = true;
+			}
+			if (createdRow)
+			{
+				// 行级交互：整行悬停高亮 + 点击标签区展开该项（控件会先吃掉自己的点击）
+				GameObject row = container.GetChild(container.childCount - 1).gameObject;
+				FinishEntryRow(row, cfg, entry);
+				if (entryExpanded)
+				{
+					string desc = GetDescription(entry);
+					if (!string.IsNullOrEmpty(desc))
+					{
+						AddDescriptionRow(container, desc);
+					}
+					AddEntryActions(container, cfg, entry, label);
+				}
 			}
 			return ok;
 		}
@@ -2496,7 +2858,8 @@ public static class ModRegistry
 		}
 	}
 
-	/// <summary>控件下方的小字介绍行（灰色小字，按文本长度估算行高，稳定不重叠）。</summary>
+	/// <summary>v1.3.0：配置项展开后的小字介绍行（灰色小字，按文本长度估算行高，稳定不重叠）。
+	/// 默认收起 → 只在点开该项时出现，列表本体保持单行清爽。</summary>
 	private static void AddDescriptionRow(Transform container, string text)
 	{
 		try
@@ -2512,8 +2875,8 @@ public static class ModRegistry
 			{
 				width += (ch > 127) ? 16f : 8f;
 			}
-			int lines = Math.Max(1, (int)Math.Ceiling(width / 420f) + 1);
-			float h = lines * 21f + 10f;
+			int lines = Math.Max(1, (int)Math.Ceiling(width / 400f) + 1);
+			float h = lines * 20f + 6f;
 			GameObject row = new GameObject("MM_DescRow");
 			row.transform.SetParent(container, false);
 			RectTransform rt = row.AddComponent<RectTransform>();
@@ -2524,21 +2887,22 @@ public static class ModRegistry
 			trt.anchorMin = new Vector2(0f, 0f);
 			trt.anchorMax = new Vector2(1f, 1f);
 			trt.pivot = new Vector2(0.5f, 0.5f);
-			trt.sizeDelta = new Vector2(-24f, 0f);
-			trt.offsetMin = new Vector2(12f, 2f);
-			trt.offsetMax = new Vector2(-12f, -2f);
+			trt.sizeDelta = new Vector2(0f, 0f);
+			trt.offsetMin = new Vector2(LabelLeft + RowIndent + 18f, 0f);
+			trt.offsetMax = new Vector2(-ControlRight, 0f);
 			Text txt = tgo.AddComponent<Text>();
 			Font font = GetNativeFont(SettingsGUI_V2.instance);
 			if (font != null)
 			{
 				txt.font = font;
 			}
-			txt.fontSize = 15;
+			txt.fontSize = 14;
 			txt.fontStyle = FontStyle.Normal;
-			txt.color = new Color(0.68f, 0.68f, 0.72f, 0.95f);
+			txt.color = new Color(0.62f, 0.62f, 0.68f, 0.95f);
 			txt.alignment = TextAnchor.UpperLeft;
 			txt.horizontalOverflow = HorizontalWrapMode.Wrap;
 			txt.verticalOverflow = VerticalWrapMode.Overflow;
+			txt.raycastTarget = false;
 			txt.text = text;
 		}
 		catch
@@ -2781,87 +3145,78 @@ public static class ModRegistry
 
 			Font labelFont = GetNativeFont(SettingsGUI_V2.instance);
 			Font font = GetDigitSafeFont(SettingsGUI_V2.instance);
-			// 双行布局：上行标签 + 下行输入框/范围提示，彻底避免文字与输入框重叠。
+			// v1.3.0 单行布局：标签左、值框在统一右列（参考图观感）；范围收进标签尾部的小灰字，
+			// 不再单独占一行（旧版三件套 = 上行标签 + 下行输入框 + 左下范围提示，行高 64 且显挤）。
 			GameObject row = new GameObject("MM_NumRow");
 			row.transform.SetParent(container, false);
 			RectTransform rt = row.AddComponent<RectTransform>();
-			rt.sizeDelta = new Vector2(0f, 64f);
+			rt.sizeDelta = new Vector2(0f, EntryRowHeight);
 
-			// 上：标签（整行宽度，右端不与下方输入框争空间）
 			GameObject tgo = new GameObject("Label");
 			tgo.transform.SetParent(row.transform, false);
 			RectTransform trt = tgo.AddComponent<RectTransform>();
-			trt.anchorMin = new Vector2(0f, 0.5f);
-			trt.anchorMax = new Vector2(1f, 0.5f);
-			trt.pivot = new Vector2(0.5f, 0.5f);
-			trt.anchoredPosition = new Vector2(0f, 16f);
-			trt.sizeDelta = new Vector2(-12f, 26f);
+			PlaceLabel(trt);
 			Text txt = tgo.AddComponent<Text>();
 			if (labelFont != null)
 			{
 				txt.font = labelFont;
 			}
-			txt.fontSize = 20;
-			txt.color = new Color(0.85f, 0.85f, 0.85f, 1f);
+			txt.fontSize = 19;
+			txt.color = new Color(0.88f, 0.88f, 0.9f, 1f);
 			txt.alignment = TextAnchor.MiddleLeft;
 			txt.horizontalOverflow = HorizontalWrapMode.Overflow;
 			txt.resizeTextForBestFit = true;
-			txt.resizeTextMinSize = 10;
-			txt.resizeTextMaxSize = 20;
-			txt.text = label;
-
-			// 下左：范围提示（有范围时显示）
+			txt.resizeTextMinSize = 11;
+			txt.resizeTextMaxSize = 19;
+			txt.raycastTarget = false;
+			// Unity Text 支持富文本：范围提示做成标签尾部的暗色小字
+			string rangeSuffix = "";
 			if (hasRange)
 			{
-				GameObject rgo = new GameObject("RangeHint");
-				rgo.transform.SetParent(row.transform, false);
-				RectTransform rrt = rgo.AddComponent<RectTransform>();
-				rrt.anchorMin = new Vector2(0f, 0f);
-				rrt.anchorMax = new Vector2(1f, 0f);
-				rrt.pivot = new Vector2(0.5f, 0.5f);
-				rrt.anchoredPosition = new Vector2(0f, 7f);
-				rrt.sizeDelta = new Vector2(-216f, 22f);
-				Text rtxt = rgo.AddComponent<Text>();
-				if (font != null)
-				{
-					rtxt.font = font;
-				}
-				rtxt.fontSize = 13;
-				rtxt.color = new Color(0.5f, 0.5f, 0.5f, 1f);
-				rtxt.alignment = TextAnchor.MiddleLeft;
-				rtxt.horizontalOverflow = HorizontalWrapMode.Overflow;
-				rtxt.text = (isFloat ? min.ToString("0.##") : ((int)min).ToString()) + " – " + (isFloat ? max.ToString("0.##") : ((int)max).ToString());
+				string lo = isFloat ? min.ToString("0.##") : ((int)min).ToString();
+				string hi = isFloat ? max.ToString("0.##") : ((int)max).ToString();
+				rangeSuffix = "   <color=#6E6E78><size=13>" + lo + " – " + hi + "</size></color>";
 			}
+			txt.text = label + rangeSuffix;
 
-			// 下右：数字输入框
+			// 值框：统一右列 + 深底 + 顶部 1px 高光 + 数字居中（照参考图）
 			GameObject igo = new GameObject("Value");
 			igo.transform.SetParent(row.transform, false);
 			RectTransform irt = igo.AddComponent<RectTransform>();
+			PlaceControlColumn(irt);
 			UnityEngine.UI.Image img = igo.AddComponent<UnityEngine.UI.Image>();
 			UnityEngine.UI.InputField field = igo.AddComponent<UnityEngine.UI.InputField>();
-			irt.anchorMin = new Vector2(1f, 0f);
-			irt.anchorMax = new Vector2(1f, 0f);
-			irt.pivot = new Vector2(1f, 0.5f);
-			irt.anchoredPosition = new Vector2(-8f, 7f);
-			irt.sizeDelta = new Vector2(200f, 26f);
-			img.color = new Color(0.13f, 0.13f, 0.15f, 0.95f);
+			img.color = new Color(0.09f, 0.09f, 0.11f, 0.96f);
+			GameObject hl = new GameObject("TopHighlight");
+			hl.transform.SetParent(igo.transform, false);
+			RectTransform hlrt = hl.AddComponent<RectTransform>();
+			hlrt.anchorMin = new Vector2(0f, 1f);
+			hlrt.anchorMax = new Vector2(1f, 1f);
+			hlrt.pivot = new Vector2(0.5f, 1f);
+			hlrt.offsetMin = new Vector2(0f, 0f);
+			hlrt.offsetMax = new Vector2(0f, 0f);
+			hlrt.sizeDelta = new Vector2(0f, 1f);
+			Image hlimg = hl.AddComponent<Image>();
+			hlimg.raycastTarget = false;
+			hlimg.color = new Color(1f, 1f, 1f, 0.10f);
 
 			GameObject igoT = new GameObject("Text");
 			igoT.transform.SetParent(igo.transform, false);
 			RectTransform itrt = igoT.AddComponent<RectTransform>();
 			itrt.anchorMin = new Vector2(0f, 0f);
 			itrt.anchorMax = new Vector2(1f, 1f);
-			itrt.offsetMin = new Vector2(8f, 3f);
-			itrt.offsetMax = new Vector2(-8f, -3f);
+			itrt.offsetMin = new Vector2(10f, 3f);
+			itrt.offsetMax = new Vector2(-10f, -3f);
 			Text itxt = igoT.AddComponent<Text>();
 			if (font != null)
 			{
 				itxt.font = font;
 			}
-			itxt.fontSize = 18;
-			itxt.color = Color.white;
-			itxt.alignment = TextAnchor.MiddleLeft;
+			itxt.fontSize = 17;
+			itxt.color = new Color(0.96f, 0.96f, 0.96f, 1f);
+			itxt.alignment = TextAnchor.MiddleCenter;
 			itxt.horizontalOverflow = HorizontalWrapMode.Overflow;
+			itxt.raycastTarget = false;
 			field.textComponent = itxt;
 			field.contentType = isFloat ? UnityEngine.UI.InputField.ContentType.DecimalNumber : UnityEngine.UI.InputField.ContentType.IntegerNumber;
 
@@ -2888,8 +3243,8 @@ public static class ModRegistry
 		}
 	}
 
-	/// <summary>v1.1.6：自由文本输入（string 配置且无 AcceptableValueList，如颜色 #RRGGBBAA）。
-	/// 双行布局同 AddNumericInput：上行标签，下行输入框。文本经轮询直写暂存（原文，含空串）。</summary>
+	/// <summary>v1.3.0：自由文本输入（string 配置且无 AcceptableValueList，如颜色 #RRGGBBAA）。
+	/// 单行布局同数值行：标签左 + 值框在统一右列。文本经轮询直写暂存（原文，含空串）。</summary>
 	private static bool AddFreeTextInput(ConfigFile cfg, ConfigEntryBase entry, Transform container, string label)
 	{
 		try
@@ -2898,58 +3253,63 @@ public static class ModRegistry
 			GameObject row = new GameObject("MM_TextRow_Input");
 			row.transform.SetParent(container, false);
 			RectTransform rt = row.AddComponent<RectTransform>();
-			rt.sizeDelta = new Vector2(0f, 64f);
-			// 上：标签
+			rt.sizeDelta = new Vector2(0f, EntryRowHeight);
 			GameObject tgo = new GameObject("Label");
 			tgo.transform.SetParent(row.transform, false);
 			RectTransform trt = tgo.AddComponent<RectTransform>();
-			trt.anchorMin = new Vector2(0f, 0.5f);
-			trt.anchorMax = new Vector2(1f, 0.5f);
-			trt.pivot = new Vector2(0.5f, 0.5f);
-			trt.anchoredPosition = new Vector2(0f, 16f);
-			trt.sizeDelta = new Vector2(-12f, 26f);
+			PlaceLabel(trt);
 			Text txt = tgo.AddComponent<Text>();
 			if (labelFont != null)
 			{
 				txt.font = labelFont;
 			}
-			txt.fontSize = 20;
-			txt.color = new Color(0.85f, 0.85f, 0.85f, 1f);
+			txt.fontSize = 19;
+			txt.color = new Color(0.88f, 0.88f, 0.9f, 1f);
 			txt.alignment = TextAnchor.MiddleLeft;
 			txt.horizontalOverflow = HorizontalWrapMode.Overflow;
 			txt.resizeTextForBestFit = true;
-			txt.resizeTextMinSize = 10;
-			txt.resizeTextMaxSize = 20;
+			txt.resizeTextMinSize = 11;
+			txt.resizeTextMaxSize = 19;
+			txt.raycastTarget = false;
 			txt.text = label;
-			// 下右：输入框
+			// 值框（统一右列 + 顶部高光）
 			GameObject igo = new GameObject("Value");
 			igo.transform.SetParent(row.transform, false);
 			RectTransform irt = igo.AddComponent<RectTransform>();
+			PlaceControlColumn(irt);
 			UnityEngine.UI.Image img = igo.AddComponent<UnityEngine.UI.Image>();
 			UnityEngine.UI.InputField field = igo.AddComponent<UnityEngine.UI.InputField>();
-			irt.anchorMin = new Vector2(1f, 0f);
-			irt.anchorMax = new Vector2(1f, 0f);
-			irt.pivot = new Vector2(1f, 0.5f);
-			irt.anchoredPosition = new Vector2(-8f, 7f);
-			irt.sizeDelta = new Vector2(280f, 26f);
-			img.color = new Color(0.13f, 0.13f, 0.15f, 0.95f);
+			img.color = new Color(0.09f, 0.09f, 0.11f, 0.96f);
+			GameObject hl = new GameObject("TopHighlight");
+			hl.transform.SetParent(igo.transform, false);
+			RectTransform hlrt = hl.AddComponent<RectTransform>();
+			hlrt.anchorMin = new Vector2(0f, 1f);
+			hlrt.anchorMax = new Vector2(1f, 1f);
+			hlrt.pivot = new Vector2(0.5f, 1f);
+			hlrt.offsetMin = Vector2.zero;
+			hlrt.offsetMax = Vector2.zero;
+			hlrt.sizeDelta = new Vector2(0f, 1f);
+			Image hlimg = hl.AddComponent<Image>();
+			hlimg.raycastTarget = false;
+			hlimg.color = new Color(1f, 1f, 1f, 0.10f);
 			GameObject igoT = new GameObject("Text");
 			igoT.transform.SetParent(igo.transform, false);
 			RectTransform itrt = igoT.AddComponent<RectTransform>();
 			itrt.anchorMin = new Vector2(0f, 0f);
 			itrt.anchorMax = new Vector2(1f, 1f);
-			itrt.offsetMin = new Vector2(8f, 3f);
-			itrt.offsetMax = new Vector2(-8f, -3f);
+			itrt.offsetMin = new Vector2(10f, 3f);
+			itrt.offsetMax = new Vector2(-10f, -3f);
 			Text itxt = igoT.AddComponent<Text>();
 			Font font = GetDigitSafeFont(SettingsGUI_V2.instance);
 			if (font != null)
 			{
 				itxt.font = font;
 			}
-			itxt.fontSize = 18;
-			itxt.color = Color.white;
-			itxt.alignment = TextAnchor.MiddleLeft;
+			itxt.fontSize = 17;
+			itxt.color = new Color(0.96f, 0.96f, 0.96f, 1f);
+			itxt.alignment = TextAnchor.MiddleCenter;
 			itxt.horizontalOverflow = HorizontalWrapMode.Overflow;
+			itxt.raycastTarget = false;
 			field.textComponent = itxt;
 			field.contentType = UnityEngine.UI.InputField.ContentType.Standard;
 			string cur;
@@ -3239,26 +3599,26 @@ public static class ModRegistry
 			GameObject row = new GameObject("MM_KeyRebind");
 			row.transform.SetParent(container, false);
 			RectTransform rt = row.AddComponent<RectTransform>();
-			rt.sizeDelta = new Vector2(0f, 42f);
+			rt.sizeDelta = new Vector2(0f, EntryRowHeight);
 			// 标签（左）
 			GameObject tgo = new GameObject("Label");
 			tgo.transform.SetParent(row.transform, false);
 			RectTransform trt = tgo.AddComponent<RectTransform>();
-			trt.anchorMin = new Vector2(0f, 0.5f);
-			trt.anchorMax = new Vector2(1f, 0.5f);
-			trt.pivot = new Vector2(0.5f, 0.5f);
-			trt.sizeDelta = new Vector2(-214f, 38f);
-			trt.anchoredPosition = Vector2.zero;
+			PlaceLabel(trt);
 			Text ltxt = tgo.AddComponent<Text>();
 			Font font = GetNativeFont(SettingsGUI_V2.instance);
 			if (font != null)
 			{
 				ltxt.font = font;
 			}
-			ltxt.fontSize = 18;
-			ltxt.color = Color.white;
+			ltxt.fontSize = 19;
+			ltxt.color = new Color(0.88f, 0.88f, 0.9f, 1f);
 			ltxt.alignment = TextAnchor.MiddleLeft;
 			ltxt.horizontalOverflow = HorizontalWrapMode.Overflow;
+			ltxt.resizeTextForBestFit = true;
+			ltxt.resizeTextMinSize = 11;
+			ltxt.resizeTextMaxSize = 19;
+			ltxt.raycastTarget = false;
 			ltxt.text = label;
 			// 改键按钮（右）
 			string cur = "None";
@@ -3271,7 +3631,8 @@ public static class ModRegistry
 			{
 			}
 			Text btnTxt = null;
-			btnTxt = MakeFooterButton(row, new Vector2(1f, 0.5f), new Vector2(1f, 0.5f), new Vector2(-12f, 0f), new Vector2(140f, 30f), HumanizeKey(cur), delegate
+			// v1.3.0：改键按钮 + None 按钮一起占满统一右列（220 宽：None 50 + 间隔 6 + 键位 164）
+			btnTxt = MakeFooterButton(row, new Vector2(1f, 0.5f), new Vector2(1f, 0.5f), new Vector2(-(ControlRight + 56f), 0f), new Vector2(ControlWidth - 56f, ControlHeight), HumanizeKey(cur), delegate
 			{
 				StartKeyCapture(cfg, entry, btnTxt, isKeyCode, enumType);
 			});
@@ -3294,7 +3655,7 @@ public static class ModRegistry
 			}
 			if (noneVal != null)
 			{
-				MakeFooterButton(row, new Vector2(1f, 0.5f), new Vector2(1f, 0.5f), new Vector2(-160f, 0f), new Vector2(50f, 30f), "None", delegate
+				MakeFooterButton(row, new Vector2(1f, 0.5f), new Vector2(1f, 0.5f), new Vector2(-ControlRight, 0f), new Vector2(50f, ControlHeight), "None", delegate
 				{
 					StageValue(cfg, entry, noneVal);
 					SettingsGUI_V2 s = SettingsGUI_V2.instance;
@@ -3575,10 +3936,10 @@ public static class ModRegistry
 			GameObject row = new GameObject("MM_EntryActions");
 			row.transform.SetParent(container, false);
 			RectTransform rt = row.AddComponent<RectTransform>();
-			rt.sizeDelta = new Vector2(0f, 24f);
-			// 布局与分区底部一致：重置在右、复制在左；小灰字 = 次级操作
+			rt.sizeDelta = new Vector2(0f, 26f);
+			// 布局与分区底部一致：重置在右、复制在左；v1.3.0 起只在展开该项时出现
 			Text resetTxt = null;
-			resetTxt = MakeSmallTextButton(row, new Vector2(1f, 0.5f), new Vector2(1f, 0.5f), new Vector2(-12f, 0f), new Vector2(64f, 22f), Plugin.DefaultChinese ? "重置" : "Reset", delegate
+			resetTxt = MakeSmallTextButton(row, new Vector2(1f, 0.5f), new Vector2(1f, 0.5f), new Vector2(-ControlRight, 0f), new Vector2(64f, 22f), Plugin.DefaultChinese ? "重置" : "Reset", delegate
 			{
 				try
 				{
@@ -3596,7 +3957,7 @@ public static class ModRegistry
 				}
 			});
 			Text copyTxt = null;
-			copyTxt = MakeSmallTextButton(row, new Vector2(1f, 0.5f), new Vector2(1f, 0.5f), new Vector2(-84f, 0f), new Vector2(64f, 22f), Plugin.DefaultChinese ? "复制" : "Copy", delegate
+			copyTxt = MakeSmallTextButton(row, new Vector2(1f, 0.5f), new Vector2(1f, 0.5f), new Vector2(-(ControlRight + 70f), 0f), new Vector2(64f, 22f), Plugin.DefaultChinese ? "复制" : "Copy", delegate
 			{
 				try
 				{
@@ -4056,29 +4417,26 @@ public static class ModRegistry
 			GameObject row = new GameObject("MM_TextRow");
 			row.transform.SetParent(container, false);
 			RectTransform rt = row.AddComponent<RectTransform>();
-			rt.sizeDelta = new Vector2(0f, 34f);
+			rt.sizeDelta = new Vector2(0f, EntryRowHeight);
 			GameObject tgo = new GameObject("Label");
 			tgo.transform.SetParent(row.transform, false);
 			RectTransform trt = tgo.AddComponent<RectTransform>();
-			trt.anchorMin = new Vector2(0f, 0.5f);
-			trt.anchorMax = new Vector2(1f, 0.5f);
-			trt.pivot = new Vector2(0.5f, 0.5f);
-			trt.anchoredPosition = Vector2.zero;
-			trt.sizeDelta = new Vector2(-48f, 30f);
+			PlaceLabel(trt);
 			Text txt = tgo.AddComponent<Text>();
 			if (font != null)
 			{
 				txt.font = font;
 			}
-			txt.fontSize = 20;
-			txt.color = new Color(0.85f, 0.85f, 0.85f, 1f);
+			txt.fontSize = 19;
+			txt.color = new Color(0.82f, 0.82f, 0.86f, 1f);
 			txt.alignment = TextAnchor.MiddleLeft;
 			txt.horizontalOverflow = HorizontalWrapMode.Overflow;
 			txt.resizeTextForBestFit = true;
-			txt.resizeTextMinSize = 10;
-			txt.resizeTextMaxSize = 20;
+			txt.resizeTextMinSize = 11;
+			txt.resizeTextMaxSize = 19;
+			txt.raycastTarget = false;
 			txt.text = text;
-			return 34f;
+			return EntryRowHeight;
 		}
 		catch
 		{
