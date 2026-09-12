@@ -376,9 +376,9 @@ public static class ModRegistry
 	/// <summary>展开的 mod（默认全折叠，点击标题切换）。</summary>
 	internal static readonly HashSet<string> expandedMods = new HashSet<string>();
 
-	/// <summary>展开的配置分区（v1.5.0 起语义反转：记录**收起**的分区，默认全部展开——
-	/// 玩家反馈"子文件夹默认关闭"= 展开 mod 后看不到任何选项）。</summary>
-	internal static readonly HashSet<string> collapsedSections = new HashSet<string>();
+	/// <summary>展开的配置分区（v1.5.0 定为**默认收起**：多分区 mod 展开后先看到分区标题列表，
+	/// 逐个点开——玩家明确要求；标题带 ▸/▾ 箭头显示状态，其下内容再缩进一级以防混淆）。</summary>
+	internal static readonly HashSet<string> expandedSections = new HashSet<string>();
 
 	/// <summary>滚动高度自愈节流（原生协程/关闭转场可能写入错误高度 → 周期性重测容器实际高度）。</summary>
 	internal static float nextScrollFixTime;
@@ -2494,8 +2494,8 @@ public static class ModRegistry
 				foreach (string sec in sections)
 				{
 					string key = p.name + "|" + sec;
-					bool expanded = !collapsedSections.Contains(key);
-					AddSectionHeader(container, HumanizeKey(sec), expanded, key, bySection[sec].Count);
+					bool expanded = expandedSections.Contains(key);
+					Text secTitle = AddSectionHeader(container, HumanizeKey(sec), expanded, key, bySection[sec].Count);
 					// v1.5.0：分区正文也**始终建好**，按展开态显隐（点击分区标题原地切换，不重建页面）
 					int secStart = container.childCount;
 					// 分区内的配置项再缩进一级，形成"分区标题 ↔ 内容"的层级（玩家反馈两者只有颜色差异）
@@ -2509,6 +2509,7 @@ public static class ModRegistry
 					SectionBody sb = new SectionBody();
 					sb.key = key;
 					sb.expanded = expanded;
+					sb.title = secTitle;
 					for (int ci = secStart; ci < container.childCount; ci++)
 					{
 						Transform ch = container.GetChild(ci);
@@ -2536,9 +2537,10 @@ public static class ModRegistry
 	}
 
 	/// <summary>v1.5.0：分区小标题——目的有二：① 分组（下方一条极淡分隔线）② 与配置项明确区分
-	/// （玩家反馈"子文件夹和选项只有颜色差异，不容易区分"）：带 ▸/▾ 折叠箭头、字号更小、
-	/// 且其下的配置项会**再缩进一级**，形成"标题 ↔ 内容"的层级。点标题折叠/展开。</summary>
-	private static void AddSectionHeader(Transform container, string title, bool expanded, string key, int count)
+	/// （玩家反馈"子文件夹和选项只有颜色差异，不容易区分"）：带 ▸/▾ 折叠箭头（**默认收起**，
+	/// 箭头随展开状态切换）、字号更小、且其下的配置项会**再缩进一级**。点标题折叠/展开。
+	/// 返回标题 Text，供 ToggleSection 原地切换箭头。</summary>
+	private static Text AddSectionHeader(Transform container, string title, bool expanded, string key, int count)
 	{
 		try
 		{
@@ -2589,9 +2591,11 @@ public static class ModRegistry
 			};
 			btn.onClick.RemoveAllListeners();
 			btn.onClick.AddListener(toggleAction);
+			return txt;
 		}
 		catch
 		{
+			return null;
 		}
 	}
 
@@ -2604,10 +2608,11 @@ public static class ModRegistry
 		internal readonly List<GameObject> rows = new List<GameObject>();
 	}
 
-	/// <summary>v1.5.0：一个分区的正文行集合（同上）。</summary>
+	/// <summary>v1.5.0：一个分区的正文行集合（同上）。title = 标题 Text，用于切换 ▸/▾ 状态显示。</summary>
 	private sealed class SectionBody
 	{
 		internal string key;
+		internal Text title;
 		internal bool expanded;
 		internal readonly List<GameObject> rows = new List<GameObject>();
 	}
@@ -2717,14 +2722,14 @@ public static class ModRegistry
 		try
 		{
 			bool now;
-			if (!collapsedSections.Add(key))
+			if (!expandedSections.Add(key))
 			{
-				collapsedSections.Remove(key);
-				now = true;
+				expandedSections.Remove(key);
+				now = false;
 			}
 			else
 			{
-				now = false;
+				now = true;
 			}
 			PlayClick();
 			for (int i = 0; i < sectionBodies.Count; i++)
@@ -2741,6 +2746,11 @@ public static class ModRegistry
 					{
 						sb.rows[j].SetActive(now);
 					}
+				}
+				// v1.5.0 修复：分区箭头以前不更新（玩家："箭头不会变化，无法显示展开状态"）
+				if (sb.title != null)
+				{
+					sb.title.text = (now ? "▾  " : "▸  ") + StripArrowPrefix(sb.title.text);
 				}
 				RelayoutContainer(sb.rows);
 				break;

@@ -53,8 +53,10 @@ v1.5.0 changelog
   can ever show the whole list relaid out (which is what made every value box flash white).
 - Fixed expanding a setting wiping its own name (the row label was being replaced by the chevron
   instead of having its prefix swapped).
-- Sections now default to open, carry a fold chevron on their title, and their settings are
-  indented one level deeper - so a section can no longer be mistaken for a setting row.
+- Sections stay collapsed by default, and their titles now carry a fold chevron that really does
+  update when you open/close them (it previously never changed), so the open/closed state is
+  always visible; their settings are also indented one level deeper, so a section can no longer be
+  mistaken for a setting row.
 - Mod names now have a hairline rule underneath, which also separates them clearly from the
   single-letter group headings (those got dimmer and smaller).
 - Removed the temporary layout/scroll diagnostics used while chasing the scrollbar overlap; the
