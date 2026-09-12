@@ -49,15 +49,24 @@ FEATURES
 v1.5.0 changelog
 ----------------
 - Fixed the white flash when clicking: mod, section and setting rows are now all created once and
-  only toggled active/inactive in place. Nothing rebuilds the page on click any more, so no frame
-  can ever show the whole list relaid out (which is what made every value box flash white).
+  only toggled active/inactive in place, with visibility recomputed per level (mod -> section ->
+  setting). Nothing rebuilds the page on click any more, so no frame can ever show the whole list
+  relaid out (which is what made every value box flash white).
 - Fixed expanding a setting wiping its own name (the row label was being replaced by the chevron
-  instead of having its prefix swapped).
-- Sections stay collapsed by default, and their titles now carry a fold chevron that really does
-  update when you open/close them (it previously never changed), so the open/closed state is
-  always visible; their settings are also indented one level deeper, so a section can no longer be
-  mistaken for a setting row.
-- Mod names now have a hairline rule underneath, which also separates them clearly from the
+  instead of having its prefix swapped), and fixed the chevrons: they are always visible now
+  (collapsed / expanded) and they really do update when you fold a section.
+- Fixed descriptions leaking between mods: the per-setting state key used ConfigFile.ToString(),
+  which BepInEx does not override, so identically named settings in different mods shared one key.
+  The key is now the config file path.
+- Sections stay collapsed by default and their settings are indented one level deeper, so a
+  section can no longer be mistaken for a setting row.
+- Row labels are plain text at one uniform size: the rich-text range hint was rendered literally
+  (<color=...>) and long names ran underneath the value box. Ranges moved into the row's "info"
+  line (shown when you click the row), and over-long names are ellipsized instead of being
+  shrunk, so the list keeps a consistent type size.
+- Value controls are smaller (200x28 -> 130x24) and toggles now sit at the right edge of the
+  value column like every other control.
+- Mod names have a hairline rule underneath, which also separates them clearly from the
   single-letter group headings (those got dimmer and smaller).
 - Removed the temporary layout/scroll diagnostics used while chasing the scrollbar overlap; the
   released build only logs meaningful events.

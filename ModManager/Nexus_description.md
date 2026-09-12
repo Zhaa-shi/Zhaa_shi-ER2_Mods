@@ -1,6 +1,6 @@
 # ER2 Mod Manager v1.5.0
 
-> **v1.5.0:** no more white flash when clicking (mod/section/setting rows are created once and toggled in place - nothing rebuilds the page), a hairline rule under mod names, clearly dimmer letter group headings, and the temporary diagnostics removed from the release build.
+> **v1.5.0:** no page rebuilds on click (so no more white flash), always-visible fold chevrons on mods/sections/settings, sections collapsed by default with their settings indented one level deeper, per-setting state no longer leaks between mods, uniform label size with ellipsis instead of font shrinking, smaller value controls, and a hairline rule under mod names. The temporary diagnostics are gone from this build.
 
 > **v1.4.0:** minimalism pass — decoration removed (accent bars, count badges, per-row arrows and per-row Reset/Copy), palette reduced to two text tones plus one light value box, and tighter row spacing. Only elements that carry information remain.
 
