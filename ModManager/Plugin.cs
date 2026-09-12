@@ -15,7 +15,7 @@ using UnityEngine.UI;
 
 namespace ER2ModManager;
 
-[BepInPlugin("er2.modmanager", "ER2 Mod Manager", "1.2.4")]
+[BepInPlugin("er2.modmanager", "ER2 Mod Manager", "1.2.5")]
 public class Plugin : BasePlugin
 {
 	/// <summary>构建语言：CN_BUILD 编译符号 = 中文版（标签中文、页标题"模组"）；否则英文版。</summary>
@@ -45,7 +45,7 @@ public class Plugin : BasePlugin
 		nativeFull = Config.Bind("General", "NativeFull", false, "DEV: render the whole MODS page via native SettingSelectable rows.");
 		HarmonyInstance = new Harmony("er2.modmanager");
 		HarmonyInstance.PatchAll(GetType().Assembly);
-		ModLog.LogInfo((object)"ER2 Mod Manager 1.2.4 loaded.");
+		ModLog.LogInfo((object)"ER2 Mod Manager 1.2.5 loaded.");
 	}
 }
 
@@ -1150,6 +1150,44 @@ public static class ModRegistry
 					+ " right=" + rightInset.ToString("F1") + " (content " + rt.rect.width.ToString("F0")
 					+ " -> row width " + (rt.rect.width - w).ToString("F0") + ")"));
 			}
+		}
+		catch
+		{
+		}
+	}
+
+	/// <summary>v1.2.5：每帧重算行内缩。建页那一瞬原生 Viewport 宽度/滚动条位置可能还没定型
+	/// （实测：进页后"宽深色缝"约 1 秒才恢复 = 只能等 SelfHealScroll 那一拍 0.5s 自愈），
+	/// 而本公式基准是 contentPage（无反馈）→ 每帧重算是安全的，能把纠正提前到当帧。</summary>
+	internal static void RefreshRowInset(Transform contentPage)
+	{
+		try
+		{
+			if (contentPage == null)
+			{
+				return;
+			}
+			Transform cont = null;
+			for (int i = contentPage.childCount - 1; i >= 0; i--)
+			{
+				Transform ch = contentPage.GetChild(i);
+				if (ch != null && ch.name == "MM_Container")
+				{
+					cont = ch;
+					break;
+				}
+			}
+			if (cont == null)
+			{
+				return;
+			}
+			RectTransform crt = cont.GetComponent<RectTransform>();
+			RectTransform rt = contentPage.GetComponent<RectTransform>();
+			if (crt == null || rt == null)
+			{
+				return;
+			}
+			ApplyScrollbarInset(contentPage, cont, crt, rt);
 		}
 		catch
 		{
@@ -4143,6 +4181,9 @@ public class InjectPollPatch
 				// v1.1.9：MODS 页激活期间 Content 链必须可见（快速右翻连点会把链停用 →
 				// 我们的容器 inactive 不渲染 = 空列表；STUCK-EVIDENCE 实锤根因）
 				ModRegistry.EnsureContentVisible(s);
+				// v1.2.5：每帧重算行内缩（无反馈公式，重算安全）——建页瞬间原生几何未定型时
+				// 当帧就能纠正，不用等 0.5s 的自愈节拍（用户实测"宽深色缝约 1 秒后恢复"）。
+				ModRegistry.RefreshRowInset(s.contentPage);
 				// 原生填充是异步协程：重开设置界面时协程可能晚到，把原生控件填进我们的页 → 每帧清理非我们容器的子物体
 				bool hasOurs = false;
 				bool nativeMode = (Plugin.nativePoc != null && Plugin.nativePoc.Value) ||

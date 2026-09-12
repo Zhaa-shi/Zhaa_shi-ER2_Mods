@@ -12,7 +12,7 @@
 | 2 | `WeatherControl` | `er2.weathercontrol` | ER2 Weather Control | **1.7.2** | `ER2_WeatherControl.dll` | 已部署 |
 | 3 | `AIFood` | `er2.aifood` | ER2 AI Food | **1.4.0** | `ER2_AIFood.dll` | 已部署 |
 | 4 | `NoInteractionHints` | `com.ryan.er2.nointeractionhints` | ER2 Hide Anything | **4.5.4** | `ER2_NoInteractionHints_DoneProMaxEnd.dll` | 已部署 |
-| 5 | `ModManager` | `er2.modmanager` | ER2 Mod Manager | **1.2.4** | `ER2_ModManager.dll` | 已部署 |
+| 5 | `ModManager` | `er2.modmanager` | ER2 Mod Manager | **1.2.5** | `ER2_ModManager.dll` | 已部署 |
 | 6 | `ThrowableWheel` | `er2.throwablewheel` | ER2 Throwable Wheel | **1.3.6** | `ER2_ThrowableWheel.dll` | 已部署 |
 | 7 | `CombatTweaks` | `er2.combattweaks` | ER2 Combat Tweaks | **1.2.2** | `ER2_CombatTweaks.dll` | 已部署 |
 | 8 | `ZoomAnywhere` | `er2.zoomanywhere` | ER2 Zoom Anywhere | **1.0.1** | `ER2_ZoomAnywhere.dll` | 已部署 |
@@ -46,7 +46,9 @@ AI 血量低于 `eatBelowHp`（默认 **40**）自动吃背包食物回血：`Fi
 **关键机制**：`UiGroups` 注册表（Register/IsHidden/ApplyAll/Enforce）；`UiHiders`（ElementHider 记忆式隐藏 + RefCache 5s 冷却）；所有节流用 `Time.unscaledTime`。
 **v4.5.3+ 游戏 2.1.x 兼容**：`FindGameType("PhaseBarGUI")` 运行时探测，类型缺失时该类别跳过（不再 TypeLoadException）。
 
-### 2.5 ModManager `er2.modmanager` v1.2.4
+### 2.5 ModManager `er2.modmanager` v1.2.5
+把 mod 设置页**嵌进游戏原生设置界面**（`SettingsGUI_V2.Update` / `SettingsTabRight` / `SettingsTabLeft` patch）：自动枚举 `IL2CPPChainloader.Plugins` 渲染全部配置项（折叠分区 + 小字简介直接用 mod 自带 BepInEx 描述原文）。
+**v1.2.5（内缩纠正提速）**：用户实测"宽深色缝过 1 秒左右才恢复正常" = 建页那一瞬原生 Viewport 宽度/滚动条位置还没定型（量成 450 就缩 24，随后原生定到 433），而纠正只能等 `SelfHealScroll` 那一拍 0.5s 节拍。既然内缩公式已无反馈（基准 contentPage），就改成**每帧重算**（`RefreshRowInset`，在 `InjectPollPatch` 的 MODS 页分支里逐帧调用）→ 当帧纠正。
 把 mod 设置页**嵌进游戏原生设置界面**（`SettingsGUI_V2.Update` / `SettingsTabRight` / `SettingsTabLeft` patch）：自动枚举 `IL2CPPChainloader.Plugins` 渲染全部配置项（折叠分区 + 小字简介直接用 mod 自带 BepInEx 描述原文）。
 **v1.2.4（内缩改成绝对目标，收尾）**：v1.2.3 的**单调锁存**在原生切回"收窄态"时行宽短掉 25px（用户截图**逐像素实测**：灰色名称栏右缘 1849 vs 图一正常的 1874，露出一条深色缝）。改为**无反馈的绝对目标**：`desiredLocal = (contentPage 右缘 − (滚动条左缘 − 6 世界像素)) / lossyScale.x`，`Mathf.Clamp(…, 8, 60)` + 行宽 ≥200px 安全阀。基准是 contentPage（不随我们的写入变化）→ 原生在"`Viewport 433` 预留 / `Viewport 450` 不预留"两态间来回切时，本地内缩自动给出 8 ↔ 24，而**行右缘的世界坐标恒定 ≈1875**：既不压住滚动条，也不短一截、更不振荡。**方法学沉淀：这类"按外部几何调自己布局"的逻辑，目标要用绝对量（世界坐标）表达，基准必须不被自己改动影响；单纯加锁存/滞后只能压住振荡，换个原生状态就变成另一种错。**
 **截图逐像素取证法（本次新增，值得复用）**：DSH 把用户贴的图存到 `~/.dsh/attachments/v1/objects/<sha前2>/<sha>`（原始分辨率，本机 1918x1092），用 `System.Drawing` 逐点扫同一 y 的 RGB 跳变即可量出"行右缘 / 滚动条左缘 / 手柄区间"的确切像素——**比肉眼比对截图可信得多**，三次迭代的结论都靠它定的。

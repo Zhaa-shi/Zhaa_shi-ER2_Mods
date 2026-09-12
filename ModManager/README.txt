@@ -1,6 +1,6 @@
 ER2 Mod Manager - In-Game Mod Settings Manager
 ===============================================
-Version 1.2.4 | Easy Red 2 (BepInEx 6 / IL2CPP)
+Version 1.2.5 | Easy Red 2 (BepInEx 6 / IL2CPP)
 
 WHAT IT DOES
 ------------
@@ -45,6 +45,12 @@ FEATURES
   arrow on the MODS page returns to the first page. Native click sounds are kept.
 - Auto-save staged changes; per-mod master switches honored.
 - Compatible with the game 2.1.x settings rework (async page filling is handled).
+
+v1.2.5 changelog
+----------------
+- The scrollbar clearance is now recomputed every frame instead of on the 0.5 s self-heal
+  tick, so a page that opens while vanilla has not settled its viewport width (which used to
+  show a wide dark gap for about a second) is corrected in the same frame.
 
 v1.2.4 changelog
 ----------------

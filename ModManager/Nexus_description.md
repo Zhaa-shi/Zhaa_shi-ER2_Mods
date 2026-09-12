@@ -1,4 +1,6 @@
-# ER2 Mod Manager v1.2.4
+# ER2 Mod Manager v1.2.5
+
+> **v1.2.5:** the scrollbar clearance is recomputed every frame, so a list that opens before vanilla settles its viewport width no longer shows a wide dark gap for a second.
 
 > **v1.2.4:** scrollbar clearance is pinned to an absolute on-screen target, so the mod rows stay clear of the scrollbar in both of the vanilla layout states (no overlap, no flicker, no oversized gap).
 
