@@ -421,7 +421,24 @@ public static class ModRegistry
 	{
 		try
 		{
-			return ((cfg != null) ? cfg.ToString() : "?") + "|" +
+			// v1.5.0 修复（玩家："展开一个 mod 的子选项描述，另一个 mod 的描述也显示了"）：
+			// ConfigFile 没重写 ToString() → 所有 cfg 都得到同一个类型名字符串 → 不同 mod 里
+			// 同名 section.key（如 General.Enabled）**键冲突**，一处展开处处展开。
+			// 改用配置文件的真实路径做唯一标识（同 mod 的 cfg 路径唯一）。
+			string id = null;
+			try
+			{
+				id = (cfg != null) ? cfg.ConfigFilePath : null;
+			}
+			catch
+			{
+				id = null;
+			}
+			if (string.IsNullOrEmpty(id))
+			{
+				id = (cfg != null) ? ("cfg#" + cfg.GetHashCode().ToString()) : "?";
+			}
+			return id + "|" +
 				((entry != null) ? entry.Definition.Section + "." + entry.Definition.Key : "?");
 		}
 		catch
@@ -637,6 +654,11 @@ public static class ModRegistry
 		internal GameObject actionsRow;
 		internal Text arrow;
 		internal bool expanded;
+
+		/// <summary>v1.5.0：逐级可见性所需的归属（mod → 分区 → 单项）。</summary>
+		internal ModBody ownerMod;
+
+		internal SectionBody ownerSection;
 	}
 
 	private static readonly List<EntryExtras> entryExtras = new List<EntryExtras>();
@@ -665,20 +687,14 @@ public static class ModRegistry
 					continue;
 				}
 				ex.expanded = now;
-				if (ex.descRow != null)
-				{
-					ex.descRow.SetActive(now);
-				}
-				if (ex.actionsRow != null)
-				{
-					ex.actionsRow.SetActive(now);
-				}
 				if (ex.arrow != null)
 				{
 					// v1.5.0 修复：原来直接把标签 text 覆盖成箭头 → 展开后**选项名消失**。
 					// 正确做法是剥掉旧前缀再拼新前缀（保留名称与范围富文本）。
-					ex.arrow.text = (now ? "▾  " : "") + StripArrowPrefix(ex.arrow.text);
+					ex.arrow.text = (now ? "▾  " : "▸  ") + StripArrowPrefix(ex.arrow.text);
 				}
+				// 简介行可见性由三层状态统一重算（mod → 分区 → 单项）
+				ReapplyInnerVisibility();
 				try
 				{
 					RectTransform crt = ex.container as RectTransform;
@@ -1189,15 +1205,18 @@ public static class ModRegistry
 				Text titleTxt = AddSectionButton(SettingsGUI_V2.instance, container, p.shortName, expanded, name);
 				// v1.5.0：正文**始终建好**（收起的 SetActive(false)），点击只原地显隐 —— 不再重建整页
 				// （重建时整页新行在同一帧重排，浅色值框会瞬间叠在一起 = 用户看到的"全部选项闪白"）
+				ModBody body = new ModBody();
+				body.name = name;
+				body.title = titleTxt;
+				body.expanded = expanded;
+				ModBody savedMod = currentModBody;
+				currentModBody = body;
 				int bodyStart = container.childCount;
 				RowIndent = 10f;
 				FillModEntries(p, container);
 				AddFooterRow(container, p.name, p.cfg);
 				RowIndent = 0f;
-				ModBody body = new ModBody();
-				body.name = name;
-				body.title = titleTxt;
-				body.expanded = expanded;
+				currentModBody = savedMod;
 				for (int ci = bodyStart; ci < container.childCount; ci++)
 				{
 					Transform ch = container.GetChild(ci);
@@ -1208,6 +1227,10 @@ public static class ModRegistry
 					}
 				}
 				modBodies.Add(body);
+				// v1.5.0 修复：上面按 mod 状态批量激活会**连带打开**该 mod 里本应收起的分区与简介行
+				//（玩家："分区还是默认开启的"、"展开一个 mod 的选项描述，另一个 mod 的描述也显示了"）。
+				// 层级由外到内重新压一遍：mod → 分区 → 单项简介，后写的状态覆盖前面的。
+				ReapplyInnerVisibility();
 			}
 			catch (Exception ex)
 			{
@@ -1764,7 +1787,7 @@ public static class ModRegistry
 			RectTransform rt = row.AddComponent<RectTransform>();
 			// v1.1.4：按实测宽度判断是否截断。可用宽度 = viewport 实宽 - 标签两侧边距(24) - 滚动条余量(30)；
 			// 放不下才截断省略号，展开行仍显示完整原始名。
-			string prefix = expanded ? "▾  " : "";
+			string prefix = expanded ? "▾  " : "▸  ";
 			float availWidth = TitleAvailWidth(s);
 			bool longName = MeasuresWiderThan(rawName, font, fontSize + 2, prefix, availWidth);
 			float rowH = (expanded && longName) ? 52f : 34f;
@@ -2497,6 +2520,13 @@ public static class ModRegistry
 					bool expanded = expandedSections.Contains(key);
 					Text secTitle = AddSectionHeader(container, HumanizeKey(sec), expanded, key, bySection[sec].Count);
 					// v1.5.0：分区正文也**始终建好**，按展开态显隐（点击分区标题原地切换，不重建页面）
+					SectionBody sb = new SectionBody();
+					sb.key = key;
+					sb.expanded = expanded;
+					sb.title = secTitle;
+					sb.owner = currentModBody;
+					SectionBody savedSec = currentSectionBody;
+					currentSectionBody = sb;
 					int secStart = container.childCount;
 					// 分区内的配置项再缩进一级，形成"分区标题 ↔ 内容"的层级（玩家反馈两者只有颜色差异）
 					float savedIndent = RowIndent;
@@ -2506,10 +2536,7 @@ public static class ModRegistry
 						AddSetting(p.cfg, e, container);
 					}
 					RowIndent = savedIndent;
-					SectionBody sb = new SectionBody();
-					sb.key = key;
-					sb.expanded = expanded;
-					sb.title = secTitle;
+					currentSectionBody = savedSec;
 					for (int ci = secStart; ci < container.childCount; ci++)
 					{
 						Transform ch = container.GetChild(ci);
@@ -2608,18 +2635,65 @@ public static class ModRegistry
 		internal readonly List<GameObject> rows = new List<GameObject>();
 	}
 
-	/// <summary>v1.5.0：一个分区的正文行集合（同上）。title = 标题 Text，用于切换 ▸/▾ 状态显示。</summary>
+	/// <summary>v1.5.0：一个分区的正文行集合（同上）。title = 标题 Text，用于切换 ▸/▾ 状态显示；
+	/// owner = 所属 mod（可见性要逐级与：mod 收起时分区内容也不能露出来）。</summary>
 	private sealed class SectionBody
 	{
 		internal string key;
 		internal Text title;
 		internal bool expanded;
+		internal ModBody owner;
 		internal readonly List<GameObject> rows = new List<GameObject>();
 	}
+
+	private static ModBody currentModBody;
+
+	private static SectionBody currentSectionBody;
 
 	private static readonly List<ModBody> modBodies = new List<ModBody>();
 
 	private static readonly List<SectionBody> sectionBodies = new List<SectionBody>();
+
+	/// <summary>v1.5.0：按"mod → 分区 → 单项简介"三层状态重算每一行的可见性（由内到外都要为真）。
+	/// 建页与任何一次展开/收起之后都要调用——否则会出现"分区默认是开的""另一个 mod 的简介
+	/// 也显示了"这类串状态问题。</summary>
+	internal static void ReapplyInnerVisibility()
+	{
+		try
+		{
+			for (int i = 0; i < sectionBodies.Count; i++)
+			{
+				SectionBody sb = sectionBodies[i];
+				if (sb == null)
+				{
+					continue;
+				}
+				bool on = sb.expanded && (sb.owner == null || sb.owner.expanded);
+				for (int j = 0; j < sb.rows.Count; j++)
+				{
+					if (sb.rows[j] != null)
+					{
+						sb.rows[j].SetActive(on);
+					}
+				}
+			}
+			for (int i = 0; i < entryExtras.Count; i++)
+			{
+				EntryExtras ex = entryExtras[i];
+				if (ex == null || ex.descRow == null)
+				{
+					continue;
+				}
+				bool on = ex.expanded
+					&& (ex.ownerSection == null || ex.ownerSection.expanded)
+					&& (ex.ownerMod == null || ex.ownerMod.expanded);
+				ex.descRow.SetActive(on);
+			}
+		}
+		catch
+		{
+		}
+	}
 
 	/// <summary>v1.5.0：原地切换一个 mod 的展开态（不重建页面 → 不闪）。</summary>
 	internal static void ToggleMod(string name)
@@ -2654,12 +2728,12 @@ public static class ModRegistry
 				}
 				if (mb.title != null)
 				{
-					mb.title.text = (now ? "▾  " : "") + StripArrowPrefix(mb.title.text);
+					mb.title.text = (now ? "▾  " : "▸  ") + StripArrowPrefix(mb.title.text);
 				}
+				ReapplyInnerVisibility();
 				RelayoutContainer(mb.rows);
 				break;
-			}
-		}
+			}		}
 		catch (Exception ex)
 		{
 			Plugin.ModLog.LogError((object)("ModManager toggle error: " + ex.Message));
@@ -2752,6 +2826,7 @@ public static class ModRegistry
 				{
 					sb.title.text = (now ? "▾  " : "▸  ") + StripArrowPrefix(sb.title.text);
 				}
+				ReapplyInnerVisibility();
 				RelayoutContainer(sb.rows);
 				break;
 			}
@@ -2841,8 +2916,8 @@ public static class ModRegistry
 			string label = HumanizeKey(entry.Definition.Key);
 			string ekey = EntryKey(cfg, entry);
 			bool entryExpanded = expandedEntries.Contains(ekey);
-			// v1.4.0：不再给每行加箭头（装饰）——只在展开时显示一个 ▾，提示可收起
-			string rowLabel = (entryExpanded ? "▾  " : "") + label;
+			// v1.5.0：箭头**一直显示**（玩家要求）：收起 ▸ / 展开 ▾ —— 一眼能看出这行可展开
+			string rowLabel = (entryExpanded ? "▾  " : "▸  ") + label;
 			Type t = entry.SettingType;
 			int before = container.childCount;
 			bool ok = false;
@@ -2905,6 +2980,8 @@ public static class ModRegistry
 				ex.key = ekey;
 				ex.container = container;
 				ex.expanded = entryExpanded;
+				ex.ownerMod = currentModBody;
+				ex.ownerSection = currentSectionBody;
 				FinishEntryRow(row, cfg, entry, ex);
 				// v1.4.0：二级内容只保留"简介"（信息，按需查看）；每项的【重置】【复制】删掉——
 				// mod 末尾的"复制全部/重置全部"已覆盖同一用途，逐项按钮纯属噪音（玩家要求：元素要有用）。
