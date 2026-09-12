@@ -1,6 +1,6 @@
 ER2 Mod Manager - In-Game Mod Settings Manager
 ===============================================
-Version 1.4.0 | Easy Red 2 (BepInEx 6 / IL2CPP)
+Version 1.5.0 | Easy Red 2 (BepInEx 6 / IL2CPP)
 
 WHAT IT DOES
 ------------
@@ -45,6 +45,16 @@ FEATURES
   arrow on the MODS page returns to the first page. Native click sounds are kept.
 - Auto-save staged changes; per-mod master switches honored.
 - Compatible with the game 2.1.x settings rework (async page filling is handled).
+
+v1.5.0 changelog
+----------------
+- Fixed the white flash when clicking: mod, section and setting rows are now all created once and
+  only toggled active/inactive in place. Nothing rebuilds the page on click any more, so no frame
+  can ever show the whole list relaid out (which is what made every value box flash white).
+- Mod names now have a hairline rule underneath, which also separates them clearly from the
+  single-letter group headings (those got dimmer and smaller).
+- Removed the temporary layout/scroll diagnostics used while chasing the scrollbar overlap; the
+  released build only logs meaningful events.
 
 v1.4.0 changelog
 ----------------

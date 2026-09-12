@@ -15,7 +15,7 @@ using UnityEngine.UI;
 
 namespace ER2ModManager;
 
-[BepInPlugin("er2.modmanager", "ER2 Mod Manager", "1.4.0")]
+[BepInPlugin("er2.modmanager", "ER2 Mod Manager", "1.5.0")]
 public class Plugin : BasePlugin
 {
 	/// <summary>构建语言：CN_BUILD 编译符号 = 中文版（标签中文、页标题"模组"）；否则英文版。</summary>
@@ -45,7 +45,7 @@ public class Plugin : BasePlugin
 		nativeFull = Config.Bind("General", "NativeFull", false, "DEV: render the whole MODS page via native SettingSelectable rows.");
 		HarmonyInstance = new Harmony("er2.modmanager");
 		HarmonyInstance.PatchAll(GetType().Assembly);
-		ModLog.LogInfo((object)"ER2 Mod Manager 1.4.0 loaded.");
+		ModLog.LogInfo((object)"ER2 Mod Manager 1.5.0 loaded.");
 	}
 }
 
@@ -1125,6 +1125,9 @@ public static class ModRegistry
 		Templates.Ensure(contentPage);
 		// v1.3.1：新一页 → 旧的"二级内容"登记表作废（对象已随整页销毁）
 		entryExtras.Clear();
+		// v1.5.0：正文/分区的行集合登记表同样作废
+		modBodies.Clear();
+		sectionBodies.Clear();
 		if (plugins.Count == 0)
 		{
 			return y;
@@ -1180,15 +1183,28 @@ public static class ModRegistry
 				string name = p.name;
 				bool expanded = expandedMods.Contains(name);
 				RowIndent = 0f;
-				AddSectionButton(SettingsGUI_V2.instance, container, p.shortName, expanded, name);
-				if (expanded)
+				Text titleTxt = AddSectionButton(SettingsGUI_V2.instance, container, p.shortName, expanded, name);
+				// v1.5.0：正文**始终建好**（收起的 SetActive(false)），点击只原地显隐 —— 不再重建整页
+				// （重建时整页新行在同一帧重排，浅色值框会瞬间叠在一起 = 用户看到的"全部选项闪白"）
+				int bodyStart = container.childCount;
+				RowIndent = 10f;
+				FillModEntries(p, container);
+				AddFooterRow(container, p.name, p.cfg);
+				RowIndent = 0f;
+				ModBody body = new ModBody();
+				body.name = name;
+				body.title = titleTxt;
+				body.expanded = expanded;
+				for (int ci = bodyStart; ci < container.childCount; ci++)
 				{
-					// v1.3.0：展开内容整体右移 14px，形成"卡片头 + 缩进正文"的父子层次
-					RowIndent = 14f;
-					FillModEntries(p, container);
-					AddFooterRow(container, p.name, p.cfg);
-					RowIndent = 0f;
+					Transform ch = container.GetChild(ci);
+					if (ch != null && ch.gameObject != null)
+					{
+						body.rows.Add(ch.gameObject);
+						ch.gameObject.SetActive(expanded);
+					}
 				}
+				modBodies.Add(body);
 			}
 			catch (Exception ex)
 			{
@@ -1222,9 +1238,7 @@ public static class ModRegistry
 		catch
 		{
 		}
-		// v1.2.1 诊断（发布前删）：每次建页 dump 一次行几何/重叠，便于与"重进后"对照
-		LogLayoutSnapshot("build", contentPage);
-		LogScrollChain("build", contentPage);
+		// v1.5.0：一次性 LAYOUT/SCROLL 诊断（v1.2.1 引入）已在发布前移除
 		return y;
 	}
 
@@ -1618,211 +1632,6 @@ public static class ModRegistry
 		{
 		}
 	}
-
-	/// <summary>v1.2.1（临时诊断，定位"重进模组页后控件重叠"；发布前删）：dump 行几何 + 重叠检测。
-	/// 行高口径 = sizeDelta.y（VerticalLayoutGroup 在 childControlHeight=false 时用的就是它）。</summary>
-	internal static void LogLayoutSnapshot(string tag, Transform contentPage)
-	{
-		try
-		{
-			if (contentPage == null)
-			{
-				return;
-			}
-			Transform cont = null;
-			for (int i = contentPage.childCount - 1; i >= 0; i--)
-			{
-				Transform ch = contentPage.GetChild(i);
-				if (ch != null && ch.name == "MM_Container")
-				{
-					cont = ch;
-					break;
-				}
-			}
-			System.Text.StringBuilder sb = new System.Text.StringBuilder("ModManager LAYOUT[" + tag + "]");
-			RectTransform prt = contentPage.GetComponent<RectTransform>();
-			if (prt != null)
-			{
-				sb.Append(" content=").Append(prt.rect.width.ToString("0")).Append("x").Append(prt.rect.height.ToString("0"))
-				   .Append(" contentSd=").Append(prt.sizeDelta.x.ToString("0")).Append(",").Append(prt.sizeDelta.y.ToString("0"));
-			}
-			if (cont == null)
-			{
-				sb.Append(" container=MISSING");
-				Plugin.ModLog.LogInfo((object)sb.ToString());
-				return;
-			}
-			RectTransform crt = cont.GetComponent<RectTransform>();
-			if (crt != null)
-			{
-				sb.Append(" container=").Append(crt.rect.width.ToString("0")).Append("x").Append(crt.rect.height.ToString("0"));
-			}
-			sb.Append(" rows=").Append(cont.childCount).Append(" frame=").Append(Time.frameCount);
-			Plugin.ModLog.LogInfo((object)sb.ToString());
-			int collapsed = 0;
-			int stretched = 0;
-			int overlaps = 0;
-			float prevBot = 0f;
-			string prevName = null;
-			for (int i = 0; i < cont.childCount; i++)
-			{
-				Transform c = cont.GetChild(i);
-				if (c == null)
-				{
-					continue;
-				}
-				RectTransform rt = c.GetComponent<RectTransform>();
-				if (rt == null)
-				{
-					continue;
-				}
-				float h = rt.sizeDelta.y;
-				float pv = rt.pivot.y;
-				float top = rt.anchoredPosition.y + (1f - pv) * h;
-				float bot = top - h;
-				bool isStretched = Math.Abs(rt.anchorMax.y - rt.anchorMin.y) > 0.01f;
-				if (h <= 1f)
-				{
-					collapsed++;
-				}
-				if (isStretched)
-				{
-					stretched++;
-				}
-				if (prevName != null && top > prevBot + 0.5f)
-				{
-					overlaps++;
-					if (overlaps <= 6)
-					{
-						Plugin.ModLog.LogInfo((object)("ModManager LAYOUT[" + tag + "] OVERLAP #" + overlaps + ": '" + prevName
-							+ "' bottom=" + prevBot.ToString("F1") + " vs '" + c.name + "' top=" + top.ToString("F1")
-							+ " (overlap " + (top - prevBot).ToString("F1") + "px)"));
-					}
-				}
-				if (i < 10 || i >= cont.childCount - 2)
-				{
-					Plugin.ModLog.LogInfo((object)("ModManager LAYOUT[" + tag + "] row[" + i + "] " + c.name
-						+ " h=" + h.ToString("F1") + " y=" + rt.anchoredPosition.y.ToString("F1")
-						+ " pivotY=" + pv.ToString("F2") + " anchorY=" + rt.anchorMin.y.ToString("F2") + ".." + rt.anchorMax.y.ToString("F2")
-						+ (isStretched ? " STRETCHED" : "") + (h <= 1f ? " COLLAPSED" : "")));
-				}
-				prevBot = bot;
-				prevName = c.name;
-			}
-			Plugin.ModLog.LogInfo((object)("ModManager LAYOUT[" + tag + "] summary: rows=" + cont.childCount + " collapsed=" + collapsed
-				+ " stretched=" + stretched + " overlappingPairs=" + overlaps));
-		}
-		catch (Exception ex)
-		{
-			Plugin.ModLog.LogError((object)("ModManager layout snapshot error: " + ex.Message));
-		}
-	}
-
-	/// <summary>v1.2.1（临时诊断，发布前删）：dump Content 链 + ScrollRect + 左侧滚动条几何（世界坐标重叠量）。
-	/// 用来定位"重进模组设置后滑条（滚动条）压住 mod 选项"到底是滚动条位移还是行内容变宽。</summary>
-	internal static void LogScrollChain(string tag, Transform contentPage)
-	{
-		try
-		{
-			if (contentPage == null)
-			{
-				return;
-			}
-			Transform cur = contentPage;
-			int depth = 0;
-			while (cur != null && cur.gameObject != null && depth < 10)
-			{
-				RectTransform rt = cur.GetComponent<RectTransform>();
-				string comps = "";
-				try
-				{
-					if (cur.GetComponent<UnityEngine.UI.ScrollRect>() != null) comps += "ScrollRect ";
-					if (cur.GetComponent<UnityEngine.UI.Scrollbar>() != null) comps += "Scrollbar ";
-					if (cur.GetComponent<UnityEngine.UI.RectMask2D>() != null) comps += "RectMask2D ";
-					if (cur.GetComponent<UnityEngine.UI.VerticalLayoutGroup>() != null) comps += "VLG ";
-				}
-				catch
-				{
-				}
-				Plugin.ModLog.LogInfo((object)("ModManager SCROLL[" + tag + "] chain+" + depth + " '" + cur.name + "' rect="
-					+ (rt != null ? rt.rect.width.ToString("0") + "x" + rt.rect.height.ToString("0") : "?")
-					+ " sd=" + (rt != null ? rt.sizeDelta.x.ToString("0") + "," + rt.sizeDelta.y.ToString("0") : "?")
-					+ " anchorMin=" + (rt != null ? rt.anchorMin.x.ToString("F2") + "," + rt.anchorMin.y.ToString("F2") : "?")
-					+ " anchorMax=" + (rt != null ? rt.anchorMax.x.ToString("F2") + "," + rt.anchorMax.y.ToString("F2") : "?")
-					+ " pivot=" + (rt != null ? rt.pivot.x.ToString("F2") + "," + rt.pivot.y.ToString("F2") : "?")
-					+ " pos=" + (rt != null ? rt.anchoredPosition.x.ToString("0") + "," + rt.anchoredPosition.y.ToString("0") : "?")
-					+ " active=" + (cur.gameObject.activeInHierarchy ? "1" : "0")
-					+ (comps.Length > 0 ? " [" + comps.Trim() + "]" : "")));
-				cur = cur.parent;
-				depth++;
-			}
-			SettingsGUI_V2 s = SettingsGUI_V2.instance;
-			if (s == null)
-			{
-				return;
-			}
-			UnityEngine.UI.ScrollRect sr = null;
-			cur = contentPage;
-			while (cur != null && sr == null)
-			{
-				sr = cur.GetComponent<UnityEngine.UI.ScrollRect>();
-				cur = cur.parent;
-			}
-			RectTransform cont = null;
-			for (int i = contentPage.childCount - 1; i >= 0; i--)
-			{
-				Transform ch = contentPage.GetChild(i);
-				if (ch != null && ch.name == "MM_Container")
-				{
-					cont = ch.GetComponent<RectTransform>();
-					break;
-				}
-			}
-			if (sr != null)
-			{
-				RectTransform vp = sr.viewport;
-				RectTransform ct = sr.content;
-				Plugin.ModLog.LogInfo((object)("ModManager SCROLL[" + tag + "] ScrollRect content='"
-					+ (ct != null ? ct.name : "null") + "' " + (ct != null ? ct.rect.width.ToString("0") + "x" + ct.rect.height.ToString("0") : "?")
-					+ " viewport='" + (vp != null ? vp.name : "null") + "' " + (vp != null ? vp.rect.width.ToString("0") + "x" + vp.rect.height.ToString("0") : "?")
-					+ " vPos=" + sr.verticalNormalizedPosition.ToString("F3")
-					+ " vScrollbar=" + (sr.verticalScrollbar != null ? sr.verticalScrollbar.name : "null")));
-			}
-			RectTransform brow = null;
-			if (s.leftScrollbar != null)
-			{
-				brow = s.leftScrollbar.GetComponent<RectTransform>();
-				Plugin.ModLog.LogInfo((object)("ModManager SCROLL[" + tag + "] leftScrollbar '" + s.leftScrollbar.name + "' rect="
-					+ (brow != null ? brow.rect.width.ToString("0") + "x" + brow.rect.height.ToString("0") : "?")
-					+ " sd=" + (brow != null ? brow.sizeDelta.x.ToString("0") + "," + brow.sizeDelta.y.ToString("0") : "?")
-					+ " anchorMin=" + (brow != null ? brow.anchorMin.x.ToString("F2") + "," + brow.anchorMin.y.ToString("F2") : "?")
-					+ " anchorMax=" + (brow != null ? brow.anchorMax.x.ToString("F2") + "," + brow.anchorMax.y.ToString("F2") : "?")
-					+ " pos=" + (brow != null ? brow.anchoredPosition.x.ToString("0") + "," + brow.anchoredPosition.y.ToString("0") : "?")
-					+ " value=" + s.leftScrollbar.value.ToString("F3")
-					+ " size=" + s.leftScrollbar.size.ToString("F3")
-					+ " active=" + (s.leftScrollbar.gameObject.activeInHierarchy ? "1" : "0")));
-			}
-			// 世界坐标下：容器行区域与滚动条的横向重叠量（>0 = 真的压住了）
-			if (brow != null && cont != null)
-			{
-				float c0x, c0y, c1x, c1y, b0x, b0y, b1x, b1y;
-				WorldRect(cont, out c0x, out c1x, out c0y, out c1y);
-				WorldRect(brow, out b0x, out b1x, out b0y, out b1y);
-				float ovX = Math.Min(c1x, b1x) - Math.Max(c0x, b0x);
-				float ovY = Math.Min(c1y, b1y) - Math.Max(c0y, b0y);
-				Plugin.ModLog.LogInfo((object)("ModManager SCROLL[" + tag + "] overlap: container.world x=" + c0x.ToString("0") + ".." + c1x.ToString("0")
-					+ " y=" + c0y.ToString("0") + ".." + c1y.ToString("0")
-					+ " | scrollbar.world x=" + b0x.ToString("0") + ".." + b1x.ToString("0")
-					+ " y=" + b0y.ToString("0") + ".." + b1y.ToString("0")
-					+ " => overlapX=" + ovX.ToString("0") + "px overlapY=" + ovY.ToString("0") + "px"));
-			}
-		}
-		catch (Exception ex)
-		{
-			Plugin.ModLog.LogError((object)("ModManager scroll chain error: " + ex.Message));
-		}
-	}
-
 	private static void WorldRect(RectTransform rt, out float xmin, out float xmax, out float ymin, out float ymax)
 	{
 		xmin = 0f;
@@ -1850,28 +1659,28 @@ public static class ModRegistry
 			GameObject row = new GameObject("MM_CatRow");
 			row.transform.SetParent(container, false);
 			RectTransform rt = row.AddComponent<RectTransform>();
-			rt.sizeDelta = new Vector2(0f, 24f);
+			rt.sizeDelta = new Vector2(0f, 26f);
 			GameObject tgo = new GameObject("Label");
 			tgo.transform.SetParent(row.transform, false);
 			RectTransform trt = tgo.AddComponent<RectTransform>();
 			trt.anchorMin = new Vector2(0f, 0.5f);
 			trt.anchorMax = new Vector2(0f, 0.5f);
 			trt.pivot = new Vector2(0f, 0.5f);
-			trt.anchoredPosition = new Vector2(LabelLeft, 0f);
+			trt.anchoredPosition = new Vector2(LabelLeft, -2f);
 			trt.sizeDelta = new Vector2(60f, 20f);
 			Text txt = tgo.AddComponent<Text>();
 			if (font != null)
 			{
 				txt.font = font;
 			}
-			txt.fontSize = 13;
+			txt.fontSize = 12;
 			txt.fontStyle = FontStyle.Bold;
-			txt.color = TextDim;
+			txt.color = new Color(0.42f, 0.42f, 0.46f, 1f);
 			txt.alignment = TextAnchor.MiddleLeft;
 			txt.horizontalOverflow = HorizontalWrapMode.Overflow;
 			txt.raycastTarget = false;
 			txt.text = text;
-			return 24f;
+			return 26f;
 		}
 		catch
 		{
@@ -1918,7 +1727,7 @@ public static class ModRegistry
 	/// mod 名称标题（可点击展开/折叠）。自建 uGUI 行，样式对齐原生设置项 label（字号/颜色/字体），
 	/// 宽度交给 LayoutGroup，文字拉伸到行宽、左对齐、字号自适应。
 	/// </summary>
-	private static float AddSectionButton(SettingsGUI_V2 s, Transform container, string name, bool expanded, string rawName)
+	private static Text AddSectionButton(SettingsGUI_V2 s, Transform container, string name, bool expanded, string rawName)
 	{
 		try
 		{
@@ -2010,9 +1819,12 @@ public static class ModRegistry
 				stxt.raycastTarget = false;
 				stxt.text = rawName;
 			}
-			// 透明点击区（覆盖整行）+ 悬停高亮（v1.3.0：原来 Transition.None 完全没有鼠标反馈）
+			// v1.5.0：mod 名下方加一条横线（玩家要求）——把"mod 标题"与"首字母分组"明确分开
+			AddHLine(row.transform, 0.14f);
+			// 透明点击区（覆盖整行）+ 悬停高亮
 			GameObject hit = new GameObject("HitArea");
 			hit.transform.SetParent(row.transform, false);
+			hit.transform.SetAsFirstSibling();
 			RectTransform hrt = hit.AddComponent<RectTransform>();
 			hrt.anchorMin = Vector2.zero;
 			hrt.anchorMax = Vector2.one;
@@ -2031,12 +1843,12 @@ public static class ModRegistry
 				ToggleMod(modName);
 			};
 			btn.onClick.AddListener(act);
-			return rowH;
+			return txt;
 		}
 		catch (Exception ex)
 		{
 			Plugin.ModLog.LogError((object)("ModManager header error: " + ex.Message));
-			return 0f;
+			return null;
 		}
 	}
 
@@ -2681,14 +2493,25 @@ public static class ModRegistry
 					string key = p.name + "|" + sec;
 					bool expanded = expandedSections.Contains(key);
 					AddSectionHeader(container, HumanizeKey(sec), expanded, key, bySection[sec].Count);
-					if (!expanded)
-					{
-						continue;
-					}
+					// v1.5.0：分区正文也**始终建好**，按展开态显隐（点击分区标题原地切换，不重建页面）
+					int secStart = container.childCount;
 					foreach (ConfigEntryBase e in bySection[sec])
 					{
 						AddSetting(p.cfg, e, container);
 					}
+					SectionBody sb = new SectionBody();
+					sb.key = key;
+					sb.expanded = expanded;
+					for (int ci = secStart; ci < container.childCount; ci++)
+					{
+						Transform ch = container.GetChild(ci);
+						if (ch != null && ch.gameObject != null)
+						{
+							sb.rows.Add(ch.gameObject);
+							ch.gameObject.SetActive(expanded);
+						}
+					}
+					sectionBodies.Add(sb);
 				}
 			}
 			else
@@ -2764,48 +2587,155 @@ public static class ModRegistry
 		}
 	}
 
-	/// <summary>切换分区展开状态并重建整页。</summary>
+	/// <summary>v1.5.0：一个 mod 的正文行集合（收起时整体 SetActive(false)，点击标题原地显隐）。</summary>
+	private sealed class ModBody
+	{
+		internal string name;
+		internal Text title;
+		internal bool expanded;
+		internal readonly List<GameObject> rows = new List<GameObject>();
+	}
+
+	/// <summary>v1.5.0：一个分区的正文行集合（同上）。</summary>
+	private sealed class SectionBody
+	{
+		internal string key;
+		internal bool expanded;
+		internal readonly List<GameObject> rows = new List<GameObject>();
+	}
+
+	private static readonly List<ModBody> modBodies = new List<ModBody>();
+
+	private static readonly List<SectionBody> sectionBodies = new List<SectionBody>();
+
+	/// <summary>v1.5.0：原地切换一个 mod 的展开态（不重建页面 → 不闪）。</summary>
+	internal static void ToggleMod(string name)
+	{
+		try
+		{
+			bool now;
+			if (!expandedMods.Add(name))
+			{
+				expandedMods.Remove(name);
+				now = false;
+			}
+			else
+			{
+				now = true;
+			}
+			PlayClick();
+			for (int i = 0; i < modBodies.Count; i++)
+			{
+				if (modBodies[i] == null || modBodies[i].name != name)
+				{
+					continue;
+				}
+				ModBody mb = modBodies[i];
+				mb.expanded = now;
+				for (int j = 0; j < mb.rows.Count; j++)
+				{
+					if (mb.rows[j] != null)
+					{
+						mb.rows[j].SetActive(now);
+					}
+				}
+				if (mb.title != null)
+				{
+					mb.title.text = (now ? "▾  " : "") + StripTitlePrefix(mb.title.text);
+				}
+				RelayoutContainer(mb.rows);
+				break;
+			}
+		}
+		catch (Exception ex)
+		{
+			Plugin.ModLog.LogError((object)("ModManager toggle error: " + ex.Message));
+		}
+	}
+
+	private static string StripTitlePrefix(string s)
+	{
+		try
+		{
+			if (string.IsNullOrEmpty(s))
+			{
+				return s ?? "";
+			}
+			return s.StartsWith("▾", StringComparison.Ordinal) ? s.Substring(1).TrimStart() : s;
+		}
+		catch
+		{
+			return s ?? "";
+		}
+	}
+
+	/// <summary>行集合变更后重排 + 重算滚动高度（不重建页面）。</summary>
+	private static void RelayoutContainer(List<GameObject> rows)
+	{
+		try
+		{
+			Transform container = null;
+			if (rows != null)
+			{
+				for (int i = 0; i < rows.Count; i++)
+				{
+					if (rows[i] != null)
+					{
+						container = rows[i].transform.parent;
+						break;
+					}
+				}
+			}
+			if (container == null)
+			{
+				return;
+			}
+			UnityEngine.UI.LayoutRebuilder.ForceRebuildLayoutImmediate(container as RectTransform);
+			SelfHealScroll(container, true);
+		}
+		catch
+		{
+		}
+	}
+
+	/// <summary>切换分区展开状态（v1.5.0：原地显隐，不重建页面）。</summary>
 	internal static void ToggleSection(string key)
 	{
 		try
 		{
+			bool now;
 			if (!expandedSections.Add(key))
 			{
 				expandedSections.Remove(key);
+				now = false;
+			}
+			else
+			{
+				now = true;
 			}
 			PlayClick();
-			SettingsGUI_V2 s = SettingsGUI_V2.instance;
-			if (s != null)
+			for (int i = 0; i < sectionBodies.Count; i++)
 			{
-				OpenMyPage(s);
+				SectionBody sb = sectionBodies[i];
+				if (sb == null || sb.key != key)
+				{
+					continue;
+				}
+				sb.expanded = now;
+				for (int j = 0; j < sb.rows.Count; j++)
+				{
+					if (sb.rows[j] != null)
+					{
+						sb.rows[j].SetActive(now);
+					}
+				}
+				RelayoutContainer(sb.rows);
+				break;
 			}
 		}
 		catch (Exception ex)
 		{
 			Plugin.ModLog.LogError((object)("ModManager section toggle error: " + ex.Message));
-		}
-	}
-
-	/// <summary>切换 mod 展开状态并重建整页。</summary>
-	internal static void ToggleMod(string name)
-	{
-		try
-		{
-			if (!expandedMods.Add(name))
-			{
-				expandedMods.Remove(name);
-			}
-			PlayClick();
-			SettingsGUI_V2 s = SettingsGUI_V2.instance;
-			if (s == null)
-			{
-				return;
-			}
-			OpenMyPage(s);
-		}
-		catch (Exception ex)
-		{
-			Plugin.ModLog.LogError((object)("ModManager toggle error: " + ex.Message));
 		}
 	}
 
@@ -4659,22 +4589,12 @@ public class InjectPollPatch
 					ModRegistry.RestoreScrollAnchors();
 					ModRegistry.OpenMyPage(s);
 					ModRegistry.ResetScrollTop(s.contentPage);
-					// v1.2.1 诊断（发布前删）：重开设置界面后的现场
-					ModRegistry.LogLayoutSnapshot("reopen", s.contentPage);
-					ModRegistry.LogScrollChain("reopen", s.contentPage);
 					return;
 				}
 				ModRegistry.lastPollTime = Time.unscaledTime;
 			}
 			else
 			{
-				// v1.2.1 诊断（发布前删）：重开设置界面后页码没落在 MODS 页时也 dump 一次，
-				// 用来看是不是上一轮残留容器/坏高度与原生页争用
-				if (Time.unscaledTime - ModRegistry.lastPollTime > 1.5f)
-				{
-					ModRegistry.LogLayoutSnapshot("reopen-native", s.contentPage);
-					ModRegistry.LogScrollChain("reopen-native", s.contentPage);
-				}
 				ModRegistry.lastPollTime = Time.unscaledTime;
 			}
 			// 轮询活跃控件（开关/滑条/下拉）的值变化（绕开 UnityAction 委托桥接的 marshaling bug）
