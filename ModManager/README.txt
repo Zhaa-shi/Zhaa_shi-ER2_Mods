@@ -1,6 +1,6 @@
 ER2 Mod Manager - In-Game Mod Settings Manager
 ===============================================
-Version 1.3.0 | Easy Red 2 (BepInEx 6 / IL2CPP)
+Version 1.3.1 | Easy Red 2 (BepInEx 6 / IL2CPP)
 
 WHAT IT DOES
 ------------
@@ -45,6 +45,17 @@ FEATURES
   arrow on the MODS page returns to the first page. Native click sounds are kept.
 - Auto-save staged changes; per-mod master switches honored.
 - Compatible with the game 2.1.x settings rework (async page filling is handled).
+
+v1.3.1 changelog
+----------------
+- Fixed the "grey stripe / light pollution" look: rows no longer carry a permanent background tint
+  (the hit area is fully transparent now and only lights up while hovered or pressed).
+- Fixed the flash when clicking: expanding a setting no longer rebuilds the whole page (its
+  description and Reset/Copy row are built once and just activated), and page rebuilds detach the
+  old rows before destroying them so old and new rows can no longer draw on top of each other.
+- Native click sound (SoundManager.ClickSound) is now played by every control the mod draws.
+- Value boxes now use the vanilla look: light fill with dark centred numbers (plus a subtle top
+  highlight and bottom shade) instead of the dark box with white text.
 
 v1.3.0 changelog
 ----------------

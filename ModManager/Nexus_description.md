@@ -1,4 +1,6 @@
-# ER2 Mod Manager v1.3.0
+# ER2 Mod Manager v1.3.1
+
+> **v1.3.1:** polish pass — no more permanent row tinting ("light pollution"), no flash when clicking a setting (expansion is in-place instead of a page rebuild), native click sounds on every control, and vanilla-style light value boxes with dark numbers.
 
 > **v1.3.0:** layout refresh — single-line settings rows with one unified right-hand control column, section headers with hairline rules and item counts, dark value boxes with a top highlight, hover feedback, card-style mod rows with colour accents, and per-setting descriptions/Reset/Copy tucked behind a click so the list stays clean.
 

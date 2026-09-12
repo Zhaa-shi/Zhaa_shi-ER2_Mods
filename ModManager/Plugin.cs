@@ -15,7 +15,7 @@ using UnityEngine.UI;
 
 namespace ER2ModManager;
 
-[BepInPlugin("er2.modmanager", "ER2 Mod Manager", "1.3.0")]
+[BepInPlugin("er2.modmanager", "ER2 Mod Manager", "1.3.1")]
 public class Plugin : BasePlugin
 {
 	/// <summary>构建语言：CN_BUILD 编译符号 = 中文版（标签中文、页标题"模组"）；否则英文版。</summary>
@@ -45,7 +45,7 @@ public class Plugin : BasePlugin
 		nativeFull = Config.Bind("General", "NativeFull", false, "DEV: render the whole MODS page via native SettingSelectable rows.");
 		HarmonyInstance = new Harmony("er2.modmanager");
 		HarmonyInstance.PatchAll(GetType().Assembly);
-		ModLog.LogInfo((object)"ER2 Mod Manager 1.3.0 loaded.");
+		ModLog.LogInfo((object)"ER2 Mod Manager 1.3.1 loaded.");
 	}
 }
 
@@ -349,11 +349,20 @@ public static class ModRegistry
 		{
 			// 注意：IL2CPP 下 foreach (Transform child in transform) 枚举元素是 Il2CppSystem.Object，
 			// 不能隐式转 Transform —— 用 childCount + GetChild
+			// v1.3.1：先脱离父级再 Destroy。Destroy 是帧末才生效，旧行会在本帧继续与新行**叠着画**
+			// （重建时整页闪一下的根因）；SetParent(null) 让它立刻退出布局与渲染。
 			for (int i = contentPage.childCount - 1; i >= 0; i--)
 			{
 				Transform child = contentPage.GetChild(i);
 				if (child != null && child.gameObject != null)
 				{
+					try
+					{
+						child.SetParent(null, false);
+					}
+					catch
+					{
+					}
 					UnityEngine.Object.Destroy(child.gameObject);
 				}
 			}
@@ -500,9 +509,47 @@ public static class ModRegistry
 		}
 	}
 
+	/// <summary>v1.3.1：点击音效（原生设置项点击都有 ClickSound；我们自建的控件以前没声）。</summary>
+	internal static void PlayClick()
+	{
+		try
+		{
+			SoundManager.ClickSound();
+		}
+		catch
+		{
+		}
+	}
+
+	/// <summary>v1.3.1：行的悬停/点击反馈色——**底噪必须为 0**（v1.3.0 给每行铺了 1.2%~2% 白底，
+	/// 实测截图里整页都是灰条 = 用户说的"光污染"），只在悬停/按下时短暂提亮。</summary>
+	private static void ApplyRowHoverTint(Button btn)
+	{
+		try
+		{
+			if (btn == null)
+			{
+				return;
+			}
+			btn.transition = UnityEngine.UI.Selectable.Transition.ColorTint;
+			UnityEngine.UI.ColorBlock cb = btn.colors;
+			cb.colorMultiplier = 1f;
+			cb.normalColor = new Color(1f, 1f, 1f, 0f);
+			cb.highlightedColor = new Color(1f, 1f, 1f, 0.035f);
+			cb.pressedColor = new Color(1f, 1f, 1f, 0.06f);
+			cb.selectedColor = new Color(1f, 1f, 1f, 0f);
+			cb.disabledColor = new Color(1f, 1f, 1f, 0f);
+			btn.colors = cb;
+		}
+		catch
+		{
+		}
+	}
+
 	/// <summary>行级交互装饰：整行透明点击区（悬停高亮 + 点击标签区展开/收起该项）。
-	/// 放在最底层（SetAsFirstSibling），控件在它上面会先吃掉点击，所以点值框/开关不会误触展开。</summary>
-	private static void FinishEntryRow(GameObject row, ConfigFile cfg, ConfigEntryBase entry)
+	/// 放在最底层（SetAsFirstSibling），控件在它上面会先吃掉点击，所以点值框/开关不会误触展开。
+	/// v1.3.1：底色 alpha=0（不再铺灰底），点击带原生音效，并把"二级内容"登记到 extras 以便原地展开。</summary>
+	private static void FinishEntryRow(GameObject row, ConfigFile cfg, ConfigEntryBase entry, EntryExtras extras)
 	{
 		try
 		{
@@ -534,6 +581,10 @@ public static class ModRegistry
 			if (lbl != null)
 			{
 				lbl.raycastTarget = false;
+				if (extras != null)
+				{
+					extras.arrow = lbl;
+				}
 			}
 			GameObject hit = new GameObject("HitArea");
 			hit.transform.SetParent(row.transform, false);
@@ -547,15 +598,7 @@ public static class ModRegistry
 			img.color = Color.white;
 			Button btn = hit.AddComponent<Button>();
 			btn.targetGraphic = img;
-			btn.transition = UnityEngine.UI.Selectable.Transition.ColorTint;
-			UnityEngine.UI.ColorBlock cb = btn.colors;
-			cb.colorMultiplier = 1f;
-			cb.normalColor = new Color(1f, 1f, 1f, 0.012f);
-			cb.highlightedColor = new Color(1f, 1f, 1f, 0.06f);
-			cb.pressedColor = new Color(1f, 1f, 1f, 0.1f);
-			cb.selectedColor = new Color(1f, 1f, 1f, 0.03f);
-			cb.disabledColor = new Color(1f, 1f, 1f, 0f);
-			btn.colors = cb;
+			ApplyRowHoverTint(btn);
 			string key = EntryKey(cfg, entry);
 			btn.onClick.RemoveAllListeners();
 			System.Action act = delegate
@@ -563,30 +606,84 @@ public static class ModRegistry
 				ToggleEntry(key);
 			};
 			btn.onClick.AddListener(act);
+			if (extras != null)
+			{
+				entryExtras.Add(extras);
+			}
 		}
 		catch
 		{
 		}
 	}
 
-	/// <summary>切换单个配置项的展开态（简介 + 每项操作按钮只在展开时显示）并重建页面。</summary>
+	/// <summary>v1.3.1：一个配置项的"二级内容"（简介行 + 重置/复制行）——建页时一次性建好，
+	/// 点行只做 SetActive 原地切换：**不再整页重建**（v1.3.0 每次点击都重建整页 = 用户看到的闪烁）。</summary>
+	private sealed class EntryExtras
+	{
+		internal string key;
+		internal Transform container;
+		internal GameObject descRow;
+		internal GameObject actionsRow;
+		internal Text arrow;
+		internal bool expanded;
+	}
+
+	private static readonly List<EntryExtras> entryExtras = new List<EntryExtras>();
+
+	/// <summary>切换单个配置项的展开态（原地激活/隐藏简介与操作行，不重建页面）。</summary>
 	internal static void ToggleEntry(string key)
 	{
 		try
 		{
+			bool now;
 			if (!expandedEntries.Add(key))
 			{
 				expandedEntries.Remove(key);
+				now = false;
 			}
-			SettingsGUI_V2 s = SettingsGUI_V2.instance;
-			if (s != null)
+			else
 			{
-				OpenMyPage(s);
+				now = true;
+			}
+			PlayClick();
+			for (int i = 0; i < entryExtras.Count; i++)
+			{
+				EntryExtras ex = entryExtras[i];
+				if (ex == null || ex.key != key)
+				{
+					continue;
+				}
+				ex.expanded = now;
+				if (ex.descRow != null)
+				{
+					ex.descRow.SetActive(now);
+				}
+				if (ex.actionsRow != null)
+				{
+					ex.actionsRow.SetActive(now);
+				}
+				if (ex.arrow != null)
+				{
+					ex.arrow.text = now ? "▾  " : "▸  ";
+				}
+				try
+				{
+					RectTransform crt = ex.container as RectTransform;
+					if (crt != null)
+					{
+						UnityEngine.UI.LayoutRebuilder.ForceRebuildLayoutImmediate(crt);
+					}
+				}
+				catch
+				{
+				}
+				SelfHealScroll(ex.container, true);
+				break;
 			}
 		}
-		catch (Exception ex)
+		catch (Exception ex2)
 		{
-			Plugin.ModLog.LogError((object)("ModManager entry toggle error: " + ex.Message));
+			Plugin.ModLog.LogError((object)("ModManager entry toggle error: " + ex2.Message));
 		}
 	}
 
@@ -1016,6 +1113,8 @@ public static class ModRegistry
 			return y;
 		}
 		Templates.Ensure(contentPage);
+		// v1.3.1：新一页 → 旧的"二级内容"登记表作废（对象已随整页销毁）
+		entryExtras.Clear();
 		if (plugins.Count == 0)
 		{
 			return y;
@@ -1946,15 +2045,7 @@ public static class ModRegistry
 			img.color = Color.white;
 			UnityEngine.UI.Button btn = hit.AddComponent<UnityEngine.UI.Button>();
 			btn.targetGraphic = img;
-			btn.transition = UnityEngine.UI.Selectable.Transition.ColorTint;
-			UnityEngine.UI.ColorBlock cb = btn.colors;
-			cb.colorMultiplier = 1f;
-			cb.normalColor = new Color(1f, 1f, 1f, 0.02f);
-			cb.highlightedColor = new Color(1f, 1f, 1f, 0.075f);
-			cb.pressedColor = new Color(1f, 1f, 1f, 0.12f);
-			cb.selectedColor = new Color(1f, 1f, 1f, 0.04f);
-			cb.disabledColor = new Color(1f, 1f, 1f, 0f);
-			btn.colors = cb;
+			ApplyRowHoverTint(btn);
 			string modName = rawName;
 			btn.onClick.RemoveAllListeners();
 			System.Action act = delegate
@@ -2145,7 +2236,18 @@ public static class ModRegistry
 		btxt.resizeTextMaxSize = 15;
 		btxt.text = label;
 		bbtn.onClick.RemoveAllListeners();
-		bbtn.onClick.AddListener(onClick);
+		System.Action wrapped = delegate
+		{
+			PlayClick();
+			try
+			{
+				onClick();
+			}
+			catch
+			{
+			}
+		};
+		bbtn.onClick.AddListener(wrapped);
 		result = btxt;
 		}
 		catch
@@ -2622,15 +2724,7 @@ public static class ModRegistry
 			img.color = Color.white;
 			UnityEngine.UI.Button btn = hit.AddComponent<UnityEngine.UI.Button>();
 			btn.targetGraphic = img;
-			btn.transition = UnityEngine.UI.Selectable.Transition.ColorTint;
-			UnityEngine.UI.ColorBlock cb = btn.colors;
-			cb.colorMultiplier = 1f;
-			cb.normalColor = new Color(1f, 1f, 1f, 0f);
-			cb.highlightedColor = new Color(1f, 1f, 1f, 0.05f);
-			cb.pressedColor = new Color(1f, 1f, 1f, 0.09f);
-			cb.selectedColor = new Color(1f, 1f, 1f, 0.02f);
-			cb.disabledColor = new Color(1f, 1f, 1f, 0f);
-			btn.colors = cb;
+			ApplyRowHoverTint(btn);
 			System.Action toggleAction = delegate
 			{
 				ToggleSection(key);
@@ -2652,6 +2746,7 @@ public static class ModRegistry
 			{
 				expandedSections.Remove(key);
 			}
+			PlayClick();
 			SettingsGUI_V2 s = SettingsGUI_V2.instance;
 			if (s != null)
 			{
@@ -2673,6 +2768,7 @@ public static class ModRegistry
 			{
 				expandedMods.Remove(name);
 			}
+			PlayClick();
 			SettingsGUI_V2 s = SettingsGUI_V2.instance;
 			if (s == null)
 			{
@@ -2825,16 +2921,22 @@ public static class ModRegistry
 			{
 				// 行级交互：整行悬停高亮 + 点击标签区展开该项（控件会先吃掉自己的点击）
 				GameObject row = container.GetChild(container.childCount - 1).gameObject;
-				FinishEntryRow(row, cfg, entry);
-				if (entryExpanded)
+				EntryExtras ex = new EntryExtras();
+				ex.key = ekey;
+				ex.container = container;
+				ex.expanded = entryExpanded;
+				FinishEntryRow(row, cfg, entry, ex);
+				// v1.3.1：简介行与【重置】【复制】行**始终建好**（避免点击时重建整页），按展开态激活
+				string desc = GetDescription(entry);
+				if (!string.IsNullOrEmpty(desc))
 				{
-					string desc = GetDescription(entry);
-					if (!string.IsNullOrEmpty(desc))
-					{
-						AddDescriptionRow(container, desc);
-					}
-					AddEntryActions(container, cfg, entry, label);
+					AddDescriptionRow(container, desc);
+					ex.descRow = container.GetChild(container.childCount - 1).gameObject;
+					ex.descRow.SetActive(entryExpanded);
 				}
+				AddEntryActions(container, cfg, entry, label);
+				ex.actionsRow = container.GetChild(container.childCount - 1).gameObject;
+				ex.actionsRow.SetActive(entryExpanded);
 			}
 			return ok;
 		}
@@ -3186,7 +3288,8 @@ public static class ModRegistry
 			PlaceControlColumn(irt);
 			UnityEngine.UI.Image img = igo.AddComponent<UnityEngine.UI.Image>();
 			UnityEngine.UI.InputField field = igo.AddComponent<UnityEngine.UI.InputField>();
-			img.color = new Color(0.09f, 0.09f, 0.11f, 0.96f);
+			// v1.3.1：改成原生/参考图那种**浅色值框 + 深色数字**（以前是深底白字，跟原生设置页不搭）
+			img.color = new Color(0.78f, 0.78f, 0.80f, 1f);
 			GameObject hl = new GameObject("TopHighlight");
 			hl.transform.SetParent(igo.transform, false);
 			RectTransform hlrt = hl.AddComponent<RectTransform>();
@@ -3198,7 +3301,19 @@ public static class ModRegistry
 			hlrt.sizeDelta = new Vector2(0f, 1f);
 			Image hlimg = hl.AddComponent<Image>();
 			hlimg.raycastTarget = false;
-			hlimg.color = new Color(1f, 1f, 1f, 0.10f);
+			hlimg.color = new Color(1f, 1f, 1f, 0.55f);
+			GameObject sh = new GameObject("BottomShade");
+			sh.transform.SetParent(igo.transform, false);
+			RectTransform shrt = sh.AddComponent<RectTransform>();
+			shrt.anchorMin = new Vector2(0f, 0f);
+			shrt.anchorMax = new Vector2(1f, 0f);
+			shrt.pivot = new Vector2(0.5f, 0f);
+			shrt.offsetMin = Vector2.zero;
+			shrt.offsetMax = Vector2.zero;
+			shrt.sizeDelta = new Vector2(0f, 1f);
+			Image shimg = sh.AddComponent<Image>();
+			shimg.raycastTarget = false;
+			shimg.color = new Color(0f, 0f, 0f, 0.25f);
 
 			GameObject igoT = new GameObject("Text");
 			igoT.transform.SetParent(igo.transform, false);
@@ -3213,7 +3328,7 @@ public static class ModRegistry
 				itxt.font = font;
 			}
 			itxt.fontSize = 17;
-			itxt.color = new Color(0.96f, 0.96f, 0.96f, 1f);
+			itxt.color = new Color(0.10f, 0.10f, 0.12f, 1f);
 			itxt.alignment = TextAnchor.MiddleCenter;
 			itxt.horizontalOverflow = HorizontalWrapMode.Overflow;
 			itxt.raycastTarget = false;
@@ -3279,7 +3394,7 @@ public static class ModRegistry
 			PlaceControlColumn(irt);
 			UnityEngine.UI.Image img = igo.AddComponent<UnityEngine.UI.Image>();
 			UnityEngine.UI.InputField field = igo.AddComponent<UnityEngine.UI.InputField>();
-			img.color = new Color(0.09f, 0.09f, 0.11f, 0.96f);
+			img.color = new Color(0.78f, 0.78f, 0.80f, 1f);
 			GameObject hl = new GameObject("TopHighlight");
 			hl.transform.SetParent(igo.transform, false);
 			RectTransform hlrt = hl.AddComponent<RectTransform>();
@@ -3291,7 +3406,7 @@ public static class ModRegistry
 			hlrt.sizeDelta = new Vector2(0f, 1f);
 			Image hlimg = hl.AddComponent<Image>();
 			hlimg.raycastTarget = false;
-			hlimg.color = new Color(1f, 1f, 1f, 0.10f);
+			hlimg.color = new Color(1f, 1f, 1f, 0.55f);
 			GameObject igoT = new GameObject("Text");
 			igoT.transform.SetParent(igo.transform, false);
 			RectTransform itrt = igoT.AddComponent<RectTransform>();
@@ -3306,7 +3421,7 @@ public static class ModRegistry
 				itxt.font = font;
 			}
 			itxt.fontSize = 17;
-			itxt.color = new Color(0.96f, 0.96f, 0.96f, 1f);
+			itxt.color = new Color(0.10f, 0.10f, 0.12f, 1f);
 			itxt.alignment = TextAnchor.MiddleCenter;
 			itxt.horizontalOverflow = HorizontalWrapMode.Overflow;
 			itxt.raycastTarget = false;
@@ -3919,7 +4034,18 @@ public static class ModRegistry
 			bbtn.transition = UnityEngine.UI.Selectable.Transition.None;
 			bbtn.targetGraphic = bt;
 			bbtn.onClick.RemoveAllListeners();
-			bbtn.onClick.AddListener(onClick);
+			System.Action wrapped = delegate
+			{
+				PlayClick();
+				try
+				{
+					onClick();
+				}
+				catch
+				{
+				}
+			};
+			bbtn.onClick.AddListener(wrapped);
 			result = bt;
 		}
 		catch
