@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Reflection;
@@ -389,11 +389,11 @@ public static class ModRegistry
 	// ── v1.3.0 排版套件（A/B 档视觉改造）─────────────────────────────
 	// 参考目标（玩家截的另一个 mod 设置页）：分区标题带全宽分隔线、每行单行、值控件右对齐成
 	// 同一列、深底值框顶部 1px 高光、无多余边框、留白撑起层次。
-	/// <summary>值控件列：统一宽度，所有值控件右对齐成一列。v1.5.0：200→184，给左边标签留出宽度
-	/// （实测长选项名如 "Material Tier 1 Velocity Base" 在 200 宽的值框下会被挤到压框）。</summary>
-	private const float ControlWidth = 184f;
+	/// <summary>值控件列：统一宽度，所有值控件右对齐成一列。
+	/// v1.5.0：200→**130**（玩家反馈"输入框太大了"），同时给左边标签留出宽度。</summary>
+	private const float ControlWidth = 130f;
 
-	private const float ControlHeight = 28f;
+	private const float ControlHeight = 24f;
 
 	private const float ControlRight = 8f;
 
@@ -1879,11 +1879,35 @@ public static class ModRegistry
 		}
 	}
 
-	/// <summary>v1.5.0：行标签按可用宽度**显式**选字号 / 截断。
-	/// 不能只靠 `resizeTextForBestFit`：Unity 的 Text 在 `horizontalOverflow = Overflow` 下
-	/// bestFit 不会缩（没有可缩的边界）→ 长标签直接压到右边的值框下面（玩家截图实测）。
-	/// 这里从 maxSize 往下试，最小字号仍放不下就二分截断加省略号。</summary>
-	private static void FitRowLabel(Text txt, string text, int maxSize, int minSize)
+	/// <summary>配置项的取值范围文本（有 AcceptableValueRange 时）。供"展开后的信息行"使用。</summary>
+	private static string RangeText(ConfigEntryBase entry)
+	{
+		try
+		{
+			AcceptableValueBase av = (entry != null && entry.Description != null) ? entry.Description.AcceptableValues : null;
+			if (av is AcceptableValueRange<float> rf)
+			{
+				return rf.MinValue.ToString("0.##") + " – " + rf.MaxValue.ToString("0.##");
+			}
+			if (av is AcceptableValueRange<int> ri)
+			{
+				return ri.MinValue + " – " + ri.MaxValue;
+			}
+		}
+		catch
+		{
+		}
+		return null;
+	}
+
+	/// <summary>行标签统一字号（玩家反馈"文字改变大小后不好看"）：**所有配置项标签同一号**，
+	/// 放不下只做省略号截断，绝不逐行改字号。</summary>
+	private const int RowLabelFontSize = 16;
+
+	/// <summary>行标签按可用宽度**显式**截断（字号恒为 RowLabelFontSize）。
+	/// 说明：不能只靠 `resizeTextForBestFit` —— Unity 的 Text 在 `horizontalOverflow = Overflow`
+	/// 下 bestFit 不会缩（没有可缩的边界），长标签会直接压到右边值框下面（玩家截图实测）。</summary>
+	private static void FitRowLabel(Text txt, string text)
 	{
 		try
 		{
@@ -1895,42 +1919,34 @@ public static class ModRegistry
 			float avail = RowLabelAvailWidth();
 			txt.resizeTextForBestFit = false;
 			txt.horizontalOverflow = HorizontalWrapMode.Overflow;
+			txt.fontSize = RowLabelFontSize;
 			if (font == null || avail <= 40f || string.IsNullOrEmpty(text))
 			{
-				txt.fontSize = maxSize;
 				txt.text = text;
 				return;
 			}
-			int size = maxSize;
-			while (size > minSize && MeasureTextWidth(text, font, size) > avail)
+			if (MeasureTextWidth(text, font, RowLabelFontSize) <= avail)
 			{
-				size--;
+				txt.text = text;
+				return;
 			}
-			if (MeasureTextWidth(text, font, size) > avail)
+			int lo = 2;
+			int hi = Math.Max(2, text.Length - 1);
+			int best = 2;
+			while (lo <= hi)
 			{
-				int lo = 2;
-				int hi = Math.Max(2, text.Length - 1);
-				int best = 2;
-				while (lo <= hi)
+				int mid = (lo + hi) / 2;
+				if (MeasureTextWidth(text.Substring(0, mid) + "…", font, RowLabelFontSize) <= avail)
 				{
-					int mid = (lo + hi) / 2;
-					if (MeasureTextWidth(text.Substring(0, mid) + "…", font, size) <= avail)
-					{
-						best = mid;
-						lo = mid + 1;
-					}
-					else
-					{
-						hi = mid - 1;
-					}
+					best = mid;
+					lo = mid + 1;
 				}
-				if (best < text.Length)
+				else
 				{
-					text = text.Substring(0, best) + "…";
+					hi = mid - 1;
 				}
 			}
-			txt.fontSize = size;
-			txt.text = text;
+			txt.text = (best < text.Length) ? (text.Substring(0, best) + "…") : text;
 		}
 		catch
 		{
@@ -2198,7 +2214,7 @@ public static class ModRegistry
 			{
 				btxt.font = font;
 			}
-			btxt.fontSize = 16;
+			btxt.fontSize = 15;
 			btxt.color = ValueText;
 			btxt.alignment = TextAnchor.MiddleCenter;
 			btxt.horizontalOverflow = HorizontalWrapMode.Overflow;
@@ -2948,25 +2964,34 @@ public static class ModRegistry
 					t0.raycastTarget = false;
 					t0.color = new Color(0.88f, 0.88f, 0.9f, 1f);
 					t0.alignment = TextAnchor.MiddleLeft;
-					// v1.5.0：原生模板行的标签同样按可用宽度显式适配（否则长名会压到值控件上）
-					FitRowLabel(t0, label, Math.Max(15, Math.Min(18, t0.fontSize)), 11);
+					// v1.5.0：原生模板行的标签同样统一字号 + 超宽截断（否则长名会压到值控件上）
+					FitRowLabel(t0, label);
 				}
 				if (go.transform.childCount > 1)
 				{
-					RectTransform crt = go.transform.GetChild(1).GetComponent<RectTransform>();
-					if (crt != null)
+					RectTransform crt2 = go.transform.GetChild(1).GetComponent<RectTransform>();
+					if (crt2 != null)
 					{
-						// 值控件：进统一右列；宽度统一，高度保留模板自身（夹到 24..40，别把原生控件压扁）
-						float h = crt.sizeDelta.y;
-						if (h < 24f || h > 40f)
+						// 开关：复选框本身贴在容器左端，所以容器只给窄宽并右对齐 → 复选框落在右列边缘；
+						// 其余控件（下拉/滑条/输入框）占满统一右列。
+						bool isToggle = false;
+						try
+						{
+							isToggle = go.transform.GetChild(1).GetComponent<UnityEngine.UI.Toggle>() != null;
+						}
+						catch
+						{
+						}
+						float h = crt2.sizeDelta.y;
+						if (h < 20f || h > 40f)
 						{
 							h = ControlHeight;
 						}
-						crt.anchorMin = new Vector2(1f, 0.5f);
-						crt.anchorMax = new Vector2(1f, 0.5f);
-						crt.pivot = new Vector2(1f, 0.5f);
-						crt.anchoredPosition = new Vector2(-ControlRight, 0f);
-						crt.sizeDelta = new Vector2(ControlWidth, h);
+						crt2.anchorMin = new Vector2(1f, 0.5f);
+						crt2.anchorMax = new Vector2(1f, 0.5f);
+						crt2.pivot = new Vector2(1f, 0.5f);
+						crt2.anchoredPosition = new Vector2(-ControlRight, 0f);
+						crt2.sizeDelta = new Vector2(isToggle ? 34f : ControlWidth, h);
 					}
 				}
 			}
@@ -3063,12 +3088,21 @@ public static class ModRegistry
 				ex.ownerMod = currentModBody;
 				ex.ownerSection = currentSectionBody;
 				FinishEntryRow(row, cfg, entry, ex);
-				// v1.4.0：二级内容只保留"简介"（信息，按需查看）；每项的【重置】【复制】删掉——
-				// mod 末尾的"复制全部/重置全部"已覆盖同一用途，逐项按钮纯属噪音（玩家要求：元素要有用）。
+				// v1.5.0：二级内容 = 取值范围 + 简介（都是"需要时再看"的信息，纯文本，无富文本标签）
 				string desc = GetDescription(entry);
+				string range = RangeText(entry);
+				string info = "";
+				if (!string.IsNullOrEmpty(range))
+				{
+					info = (Plugin.DefaultChinese ? "取值范围 " : "Range ") + range;
+				}
 				if (!string.IsNullOrEmpty(desc))
 				{
-					AddDescriptionRow(container, desc);
+					info = string.IsNullOrEmpty(info) ? desc : (info + "   ·   " + desc);
+				}
+				if (!string.IsNullOrEmpty(info))
+				{
+					AddDescriptionRow(container, info);
 					ex.descRow = container.GetChild(container.childCount - 1).gameObject;
 					ex.descRow.SetActive(entryExpanded);
 				}
@@ -3401,15 +3435,9 @@ public static class ModRegistry
 			txt.color = new Color(0.88f, 0.88f, 0.9f, 1f);
 			txt.alignment = TextAnchor.MiddleLeft;
 			txt.raycastTarget = false;
-			// Unity Text 支持富文本：范围提示做成标签尾部的暗色小字；字号按可用宽度显式适配
-			string rangeSuffix = "";
-			if (hasRange)
-			{
-				string lo = isFloat ? min.ToString("0.##") : ((int)min).ToString();
-				string hi = isFloat ? max.ToString("0.##") : ((int)max).ToString();
-				rangeSuffix = "   <color=#6E6E78><size=12>" + lo + "–" + hi + "</size></color>";
-			}
-			FitRowLabel(txt, label + rangeSuffix, 18, 11);
+			// v1.5.0：标签**只用纯文本**（富文本 <color>/<size> 在这个 Text 上不生效，标签会
+			// 原样显示出一串 <COLOR=#6E6E78> 又变超长 → 继续压框）。范围提示改到"展开后的简介行"。
+			FitRowLabel(txt, label);
 
 			// 值框：统一右列 + 深底 + 顶部 1px 高光 + 数字居中（照参考图）
 			GameObject igo = new GameObject("Value");
@@ -3457,7 +3485,7 @@ public static class ModRegistry
 			{
 				itxt.font = font;
 			}
-			itxt.fontSize = 17;
+			itxt.fontSize = 15;
 			itxt.color = new Color(0.10f, 0.10f, 0.12f, 1f);
 			itxt.alignment = TextAnchor.MiddleCenter;
 			itxt.horizontalOverflow = HorizontalWrapMode.Overflow;
@@ -3511,7 +3539,7 @@ public static class ModRegistry
 			txt.color = new Color(0.88f, 0.88f, 0.9f, 1f);
 			txt.alignment = TextAnchor.MiddleLeft;
 			txt.raycastTarget = false;
-			FitRowLabel(txt, label, 18, 11);
+			FitRowLabel(txt, label);
 			// 值框（统一右列 + 顶部高光）
 			GameObject igo = new GameObject("Value");
 			igo.transform.SetParent(row.transform, false);
@@ -3545,7 +3573,7 @@ public static class ModRegistry
 			{
 				itxt.font = font;
 			}
-			itxt.fontSize = 17;
+			itxt.fontSize = 15;
 			itxt.color = new Color(0.10f, 0.10f, 0.12f, 1f);
 			itxt.alignment = TextAnchor.MiddleCenter;
 			itxt.horizontalOverflow = HorizontalWrapMode.Overflow;
@@ -3854,7 +3882,7 @@ public static class ModRegistry
 			ltxt.color = new Color(0.88f, 0.88f, 0.9f, 1f);
 			ltxt.alignment = TextAnchor.MiddleLeft;
 			ltxt.raycastTarget = false;
-			FitRowLabel(ltxt, label, 18, 11);
+			FitRowLabel(ltxt, label);
 			// 改键按钮（右）
 			string cur = "None";
 			try
@@ -4677,7 +4705,7 @@ public static class ModRegistry
 			txt.color = new Color(0.82f, 0.82f, 0.86f, 1f);
 			txt.alignment = TextAnchor.MiddleLeft;
 			txt.raycastTarget = false;
-			FitRowLabel(txt, text, 18, 11);
+			FitRowLabel(txt, text);
 			return EntryRowHeight;
 		}
 		catch
