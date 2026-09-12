@@ -1,4 +1,6 @@
-# ER2 Mod Manager v1.2.3
+# ER2 Mod Manager v1.2.4
+
+> **v1.2.4:** scrollbar clearance is pinned to an absolute on-screen target, so the mod rows stay clear of the scrollbar in both of the vanilla layout states (no overlap, no flicker, no oversized gap).
 
 > **v1.2.3:** row-width flicker fix (the scrollbar clearance is now measured against a fixed reference and latched, instead of being re-measured against the already-inset list).
 

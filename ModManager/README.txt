@@ -1,6 +1,6 @@
 ER2 Mod Manager - In-Game Mod Settings Manager
 ===============================================
-Version 1.2.3 | Easy Red 2 (BepInEx 6 / IL2CPP)
+Version 1.2.4 | Easy Red 2 (BepInEx 6 / IL2CPP)
 
 WHAT IT DOES
 ------------
@@ -45,6 +45,16 @@ FEATURES
   arrow on the MODS page returns to the first page. Native click sounds are kept.
 - Auto-save staged changes; per-mod master switches honored.
 - Compatible with the game 2.1.x settings rework (async page filling is handled).
+
+v1.2.4 changelog
+----------------
+- Scrollbar clearance is now an absolute target instead of an accumulated inset: the row's
+  right edge is pinned 6 px (world) left of the scrollbar, expressed relative to the vanilla
+  content page. Vanilla reserves the 17 px scrollbar strip in some code paths but not others,
+  and it switches between those two states at runtime; the new formula yields a different
+  local inset per state (8 vs 24 px) while the rows stay put on screen - so the list neither
+  runs under the scrollbar (1.2.2/1.2.3 symptom) nor leaves the wide dark gap that the
+  monotonic latch of 1.2.3 produced.
 
 v1.2.3 changelog
 ----------------
