@@ -15,7 +15,7 @@ using UnityEngine.UI;
 
 namespace ER2ModManager;
 
-[BepInPlugin("er2.modmanager", "ER2 Mod Manager", "1.2.1")]
+[BepInPlugin("er2.modmanager", "ER2 Mod Manager", "1.2.2")]
 public class Plugin : BasePlugin
 {
 	/// <summary>构建语言：CN_BUILD 编译符号 = 中文版（标签中文、页标题"模组"）；否则英文版。</summary>
@@ -45,7 +45,7 @@ public class Plugin : BasePlugin
 		nativeFull = Config.Bind("General", "NativeFull", false, "DEV: render the whole MODS page via native SettingSelectable rows.");
 		HarmonyInstance = new Harmony("er2.modmanager");
 		HarmonyInstance.PatchAll(GetType().Assembly);
-		ModLog.LogInfo((object)"ER2 Mod Manager 1.2.1 loaded.");
+		ModLog.LogInfo((object)"ER2 Mod Manager 1.2.2 loaded.");
 	}
 }
 
@@ -1052,6 +1052,107 @@ public static class ModRegistry
 		}
 	}
 
+	/// <summary>v1.2.2：让行容器避开竖直滚动条所占的竖条（"灰色名称栏被滑条压住"的根治）。
+	/// 实测证据（2026-09-12 日志）：原生只有在部分路径里把 Viewport 收窄 17px 预留滚动条
+	/// （`Viewport sd=-17` → 容器右缘 1875 vs 滚动条 1882，间隙 7px = 正常，图一）；
+	/// 但"退出设置再进去"那条路径不收窄（`Viewport 450`）而滚动条已 active → 容器右缘 1900
+	/// 与滚动条区间 1882..1912 重叠 18px = 用户看到的"滑条和他的背景压住名称栏背景"（图二）。
+	/// 所以宽度不能只靠原生预留：这里按滚动条的实际世界坐标把我们容器的内缩补齐。
+	/// 基础内缩与原值等价（左 0 / 右 8），只额外补"被压住的那部分 + 6 世界像素间隙"。</summary>
+	internal static void ApplyScrollbarInset(Transform contentPage, Transform cont, RectTransform crt, RectTransform rt)
+	{
+		try
+		{
+			if (cont == null || crt == null || rt == null || cont.name != "MM_Container")
+			{
+				return;
+			}
+			RectTransform sbrt = null;
+			try
+			{
+				UnityEngine.UI.ScrollRect sr = null;
+				Transform cur = contentPage;
+				while (cur != null && sr == null)
+				{
+					sr = cur.GetComponent<UnityEngine.UI.ScrollRect>();
+					cur = cur.parent;
+				}
+				if (sr != null && sr.verticalScrollbar != null && sr.verticalScrollbar.gameObject != null &&
+					sr.verticalScrollbar.gameObject.activeInHierarchy)
+				{
+					sbrt = sr.verticalScrollbar.GetComponent<RectTransform>();
+				}
+				if (sbrt == null)
+				{
+					SettingsGUI_V2 s = SettingsGUI_V2.instance;
+					if (s != null && s.leftScrollbar != null && s.leftScrollbar.gameObject != null &&
+						s.leftScrollbar.gameObject.activeInHierarchy)
+					{
+						sbrt = s.leftScrollbar.GetComponent<RectTransform>();
+					}
+				}
+			}
+			catch
+			{
+			}
+			float leftInset = 0f;
+			float rightInset = 8f;
+			if (sbrt != null)
+			{
+				float cx0, cx1, cy0, cy1, sx0, sx1, sy0, sy1;
+				WorldRect(crt, out cx0, out cx1, out cy0, out cy1);
+				WorldRect(sbrt, out sx0, out sx1, out sy0, out sy1);
+				float ovY = Math.Min(cy1, sy1) - Math.Max(cy0, sy0);
+				float scale = Math.Abs(crt.lossyScale.x) > 0.0001f ? Math.Abs(crt.lossyScale.x) : 1f;
+				if (ovY > 1f)
+				{
+					float mid = (cx0 + cx1) * 0.5f;
+					if (sx0 >= mid)
+					{
+						// 滚动条在右侧：补重叠量 + 6 世界像素间隙
+						float over = cx1 - sx0 + 6f;
+						if (over > 0f)
+						{
+							rightInset += over / scale;
+						}
+					}
+					else if (sx1 <= mid)
+					{
+						float over = sx1 - cx0 + 6f;
+						if (over > 0f)
+						{
+							leftInset += over / scale;
+						}
+					}
+				}
+			}
+			// 安全阀：别把列表压成一条
+			if (rt.rect.width - leftInset - rightInset < 200f)
+			{
+				return;
+			}
+			float w = leftInset + rightInset;
+			float p = (leftInset - rightInset) * 0.5f;
+			if (Math.Abs(crt.sizeDelta.x + w) > 0.5f || Math.Abs(crt.anchoredPosition.x - p) > 0.5f)
+			{
+				crt.sizeDelta = new Vector2(-w, crt.sizeDelta.y);
+				crt.anchoredPosition = new Vector2(p, crt.anchoredPosition.y);
+				try
+				{
+					UnityEngine.UI.LayoutRebuilder.ForceRebuildLayoutImmediate(crt);
+				}
+				catch
+				{
+				}
+				Plugin.ModLog.LogInfo((object)("ModManager: row inset adjusted -> left=" + leftInset.ToString("F1")
+					+ " right=" + rightInset.ToString("F1") + " (row width " + (rt.rect.width - w).ToString("F0") + ")"));
+			}
+		}
+		catch
+		{
+		}
+	}
+
 	/// <summary>周期性重测容器高度并断言到滚动内容（防原生协程/转场把滚动范围写坏）。</summary>
 	internal static void SelfHealScroll(Transform contentPage, bool force = false)
 	{
@@ -1088,6 +1189,8 @@ public static class ModRegistry
 				return;
 			}
 			Canvas.ForceUpdateCanvases();
+			// v1.2.2：先按滚动条实际位置把行宽内缩（见 ApplyScrollbarInset 注释）
+			ApplyScrollbarInset(contentPage, cont, crt, rt);
 			float h = Math.Max(200f, crt.rect.height + 8f);
 			// 关键：滚动范围由 ScrollRect.content（不一定是 contentPage 本身，局内可能是父级 Content）决定
 			RectTransform target = rt;
@@ -1217,14 +1320,14 @@ public static class ModRegistry
 				{
 					stretched++;
 				}
-				if (prevName != null && bot < prevBot - 0.5f)
+				if (prevName != null && top > prevBot + 0.5f)
 				{
 					overlaps++;
 					if (overlaps <= 6)
 					{
 						Plugin.ModLog.LogInfo((object)("ModManager LAYOUT[" + tag + "] OVERLAP #" + overlaps + ": '" + prevName
 							+ "' bottom=" + prevBot.ToString("F1") + " vs '" + c.name + "' top=" + top.ToString("F1")
-							+ " (overlap " + (prevBot - top).ToString("F1") + "px)"));
+							+ " (overlap " + (top - prevBot).ToString("F1") + "px)"));
 					}
 				}
 				if (i < 10 || i >= cont.childCount - 2)

@@ -1,6 +1,6 @@
 ER2 Mod Manager - In-Game Mod Settings Manager
 ===============================================
-Version 1.2.1 | Easy Red 2 (BepInEx 6 / IL2CPP)
+Version 1.2.2 | Easy Red 2 (BepInEx 6 / IL2CPP)
 
 WHAT IT DOES
 ------------
@@ -45,6 +45,15 @@ FEATURES
   arrow on the MODS page returns to the first page. Native click sounds are kept.
 - Auto-save staged changes; per-mod master switches honored.
 - Compatible with the game 2.1.x settings rework (async page filling is handled).
+
+v1.2.2 changelog
+----------------
+- Fixed the scrollbar covering the right edge of the mod rows after re-entering the
+  settings. Measured with an in-game layout dump: some vanilla code paths reserve a
+  17px strip for the scrollbar (viewport 433 -> row right edge 7px clear of it) while the
+  "leave and re-enter settings" path does not (viewport 450 -> rows run 18px underneath
+  the visible scrollbar). The mod list now insets itself from the scrollbar's actual
+  on-screen rect, so rows never end up under it regardless of what vanilla does.
 
 v1.2.1 changelog
 ----------------

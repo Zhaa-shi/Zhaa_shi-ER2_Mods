@@ -1,4 +1,6 @@
-# ER2 Mod Manager v1.2.1
+# ER2 Mod Manager v1.2.2
+
+> **v1.2.2:** fixed the scrollbar overlapping the mod rows after leaving and re-entering the settings (the row list now keeps clear of the scrollbar by its real on-screen position).
 
 > **v1.2.1:** compatibility fix for the 2026-09-12 game update — right-arrow paging works again (the game changed a native settings method signature, which had silently broken the paging hook), plus hardened MODS page layout so rows/scrollbar no longer overlap after re-entering the settings.
 
