@@ -1,4 +1,6 @@
-# ER2 Mod Manager v1.3.1
+# ER2 Mod Manager v1.4.0
+
+> **v1.4.0:** minimalism pass — decoration removed (accent bars, count badges, per-row arrows and per-row Reset/Copy), palette reduced to two text tones plus one light value box, and tighter row spacing. Only elements that carry information remain.
 
 > **v1.3.1:** polish pass — no more permanent row tinting ("light pollution"), no flash when clicking a setting (expansion is in-place instead of a page rebuild), native click sounds on every control, and vanilla-style light value boxes with dark numbers.
 

@@ -1,6 +1,6 @@
 ER2 Mod Manager - In-Game Mod Settings Manager
 ===============================================
-Version 1.3.1 | Easy Red 2 (BepInEx 6 / IL2CPP)
+Version 1.4.0 | Easy Red 2 (BepInEx 6 / IL2CPP)
 
 WHAT IT DOES
 ------------
@@ -45,6 +45,22 @@ FEATURES
   arrow on the MODS page returns to the first page. Native click sounds are kept.
 - Auto-save staged changes; per-mod master switches honored.
 - Compatible with the game 2.1.x settings rework (async page filling is handled).
+
+v1.4.0 changelog
+----------------
+- Minimalism pass, driven by one rule: every element must do something.
+  * Removed pure decoration: the coloured accent bar on mod rows, the item-count badges, the
+    arrows on every setting row (a single chevron is kept only on expanded rows), the fading
+    rule on letter separators, and the per-setting Reset/Copy buttons (the per-mod
+    "Copy all"/"Reset all" already covers that use).
+  * The two per-mod actions became plain text buttons instead of grey filled blocks, and the
+    rebind control now uses the same light value-box style as numeric fields.
+  * Palette reduced to two text tones (primary 0.86 / secondary 0.52) plus one light value box
+    (0.74 fill, 0.10 text) - no accent colours, no permanent row backgrounds.
+  * Density: row height 38 -> 32, spacing 4 -> 2, indent 14 -> 10, control column 220x30 ->
+    200x28, section title 48 -> 30, letter row 28 -> 24.
+  * Kept because they carry information: the hairline under section titles (grouping), the
+    hover highlight (shows a row is clickable), the click sound, and click-to-read descriptions.
 
 v1.3.1 changelog
 ----------------
