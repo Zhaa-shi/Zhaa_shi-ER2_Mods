@@ -12,7 +12,7 @@
 | 2 | `WeatherControl` | `er2.weathercontrol` | ER2 Weather Control | **1.7.2** | `ER2_WeatherControl.dll` | 已部署 |
 | 3 | `AIFood` | `er2.aifood` | ER2 AI Food | **1.4.0** | `ER2_AIFood.dll` | 已部署 |
 | 4 | `NoInteractionHints` | `com.ryan.er2.nointeractionhints` | ER2 Hide Anything | **4.5.4** | `ER2_NoInteractionHints_DoneProMaxEnd.dll` | 已部署 |
-| 5 | `ModManager` | `er2.modmanager` | ER2 Mod Manager | **1.5.1** | `ER2_ModManager.dll` | 已部署 |
+| 5 | `ModManager` | `er2.modmanager` | ER2 Mod Manager | **1.5.2** | `ER2_ModManager.dll` | 已部署 |
 | 6 | `ThrowableWheel` | `er2.throwablewheel` | ER2 Throwable Wheel | **1.3.6** | `ER2_ThrowableWheel.dll` | 已部署 |
 | 7 | `CombatTweaks` | `er2.combattweaks` | ER2 Combat Tweaks | **1.2.2** | `ER2_CombatTweaks.dll` | 已部署 |
 | 8 | `ZoomAnywhere` | `er2.zoomanywhere` | ER2 Zoom Anywhere | **1.0.1** | `ER2_ZoomAnywhere.dll` | 已部署 |
@@ -49,7 +49,8 @@ AI 血量低于 `eatBelowHp`（默认 **40**）自动吃背包食物回血：`Fi
 **关键机制**：`UiGroups` 注册表（Register/IsHidden/ApplyAll/Enforce）；`UiHiders`（ElementHider 记忆式隐藏 + RefCache 5s 冷却）；所有节流用 `Time.unscaledTime`。
 **v4.5.3+ 游戏 2.1.x 兼容**：`FindGameType("PhaseBarGUI")` 运行时探测，类型缺失时该类别跳过（不再 TypeLoadException）。
 
-### 2.5 ModManager `er2.modmanager` v1.5.1
+### 2.5 ModManager `er2.modmanager` v1.5.2
+**v1.5.2（2026-09-18 发布：删掉最后一个开发开关 NativeFull —— 自锁陷阱）**：v1.5.1 把 `NativeFull` 判为"文案正常、功能可用"的**备案例外**保留了下来，**当天即被推翻**：用户"不小心把 NativeFull 打开了，现在 mod 管理器不能使用了"。根因是**自锁** —— `NativeFull` 是 `er2.modmanager` 自己的配置项，因此**会出现在 ModManager 自己的 MODS 页上**：打开它就把那一页弄坏，而关掉它**只能靠那一页** → 界面上无法自救，只能手改 cfg。**修法：删除 `NativeFull` 开关（字段 + `Config.Bind` + `FillContent` 分支 + 每帧清理里的 `nativeMode` 分支），并整文件删除 `NativePage.cs`**（它只被这条路径引用：`BuildAndRender` + `PruneExtras`），MODS 页从此只有一条建页路径。**教训（已写入 AGENTS.md §7.1 判定标准）：任何会改变"你用来操作它的那个界面"的开关，默认关是不够的 —— 它必须不存在。判定时多问一句"这个开关打开后，我还有办法关掉它吗？"答不上来就删。**
 **v1.5.1（2026-09-18 发布：删除遗留 PoC 测试页 + 接入 debugLog 开关）**：玩家反馈 "mod menu is broken. with 'poc'"，MODS 页只剩四行 —— `poc.header`（空白框）/ `poc.toggle`（拨不动）/ `poc.slider`（拖不动）/ `poc.button`（写着 click、点了没反应）。**根因不是第三方 mod 的新方法，而是 ModManager 自己的开发期脚手架 `NativePage.RenderPoc`**：硬编码上述四行，标签是没走 `HumanizeKey` 的生 key，三个回调只写 `LogInfo` 不干事；`AddHeaderRow` 又是用空 `content` 的 `SettingButton` 冒充标题 → 所以是"空白框"。它随发布版一起发了出去，cfg 里 `NativePoc=true` 即命中。**本机 cfg 为 `NativePoc=false`，所以复现不出**（这就是"我试了没问题"的原因）；报告里连按钮的 "click" 文案都逐字对上，可排除第三方 mod 巧合。**修法：删除 `RenderPoc` / `DumpStructure` / `CompSummary` 与 `NativePoc` 开关（字段 + `Config.Bind` + `FillContent` 分支 + `nativeMode` 引用），发布版不再可达 —— 不是靠"默认关"兜底。** 同时按新约定接入 `Debug`/`debugLog` 开关（默认 `false`）+ `Plugin.DebugOn` 属性，把建页/模板/取值/chainloader/native row 五处诊断 `LogInfo` 收进开关（`LogError`/`LogWarning` 不门控）。版本 1.5.0→1.5.1，四处同步（`BepInPlugin` + 启动日志 + README + Nexus）。**教训：开发脚手架用完即删，绝不能靠"默认关"兜底发版**（已写入 AGENTS.md §7.1 强制约定）。
 **v1.5.0 发布状态（2026-09-12 23:27 定稿）**：部署 = **英文构建**（`DefaultChinese=false`，玩家要求），`ER2_ModManager.dll` 与 `bin\Release\net6.0` sha256 一致（`980989EA…`）；两个发布包 `C:\Users\71011\Downloads\ER2_ModManager_v1.5.0.zip`（EN）/ `ER2_ModManager_CN_v1.5.0.zip`（CN，`DefaultChinese=true`），拆包核对均为 **DLL + README.txt + Nexus_description.md**。**注意：ModManager 没有 `README_CN.txt`/`Nexus_description_CN.md`，CN 包内的文档仍是英文**（build.ps1 缺文件时回退英文）——如需中文文档要另写。发布前**已清掉全部临时诊断**（LAYOUT/SCROLL dump），README/Nexus 的 v1.5.0 变更说明已覆盖全部修复项。
 **v1.5.0 追加修复（玩家实测反馈，按要求不升版本号）**：① **展开配置项后名字消失**——`ToggleEntry` 里把整行标签 text 直接**覆盖**成箭头（`ex.arrow.text = "▾  "`），名称与范围富文本全被抹掉，且因为原地切换不重建页面所以"重新打开也不显示"。修法：`StripArrowPrefix` 剥掉旧前缀再拼新前缀（名称保留）。**教训：原地切换行的"前缀指示"必须做前缀替换，绝不能覆盖整行文本。** ② **分区默认收起**（玩家要求；我上一版误改成默认展开，已改回 `expandedSections` 缺省收起，`NativePage` 同步）。③ **分区箭头不反映展开状态**——`ToggleSection` 只切了行的显隐、没更新标题箭头 → `AddSectionHeader` 改为返回标题 Text、存进 `SectionBody.title`，切换时用 `StripArrowPrefix` 重拼 ▸/▾。④ **分区与配置项只有颜色差异** → 分区标题加 ▸/▾ 箭头、分隔线加深（0.10→0.16）、行高 30→32，其下配置项**再缩进一级**（RowIndent +12）。
@@ -325,7 +326,8 @@ M0 侦察工具，同 `HvtTestDriver` 定位。**刻意不打任何 Harmony 补�
 |---|---|
 | `ER2_BattlefieldCommander_v1.1.0.zip` / `ER2_BattlefieldCommander_CN_v1.1.0.zip` | 09-06（**最新**） |
 | `ER2_UniversalGeneration_v1.0.0.zip` / `ER2_UniversalGeneration_CN_v1.0.0.zip` | 09-06 |
-| `ER2_ModManager_v1.5.1.zip` | 09-18（**最新**：删除遗留 PoC 测试页 + `NativePoc` 开关（玩家报 "mod menu is broken. with 'poc'" 的真凶）；新增 `Debug`/`debugLog` 开关（默认关）；拆包核对 = DLL + README.txt + Nexus_description.md） |
+| `ER2_ModManager_v1.5.2.zip` | 09-18（**最新**：删掉自锁的开发开关 `NativeFull` + 整文件删除 `NativePage.cs`，MODS 页只剩一条建页路径；拆包核对 = DLL + README.txt + Nexus_description.md） |
+| `ER2_ModManager_v1.5.1.zip` | 09-18（历史：删除遗留 PoC 测试页 + `NativePoc` 开关；新增 `Debug`/`debugLog` 开关，默认关） |
 | `ER2_ModManager_v1.5.0.zip` / `ER2_ModManager_CN_v1.5.0.zip` | 09-12（历史：点击不再白闪 / 三层可见性 / 分区默认收起+箭头 / 标签统一字号+纯文本 / 值框 130×24 / 行内缩按滚动条绝对目标） |
 | `ER2_ModManager_v1.2.0.zip` / `ER2_ModManager_CN_v1.2.0.zip` | 09-05（历史） |
 | `ER2_UnitInfoOverlay_v1.0.5.zip`、`ER2_HideAnything_v4.5.4.zip`、`ER2_WeatherControl_v1.7.2.zip`、`ER2_LimbTweaks_v2.13.101.zip` | 09-05 |

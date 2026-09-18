@@ -1,4 +1,6 @@
-# ER2 Mod Manager v1.5.1
+# ER2 Mod Manager v1.5.2
+
+> **v1.5.2:** removed the last leftover developer switch (NativeFull) together with the alternative page renderer behind it. It was self-locking - it is a setting of this mod, so it showed up as a toggle on the MODS page itself, and turning it on broke that page while turning it back off was only possible from that same page. The MODS page now has exactly one code path.
 
 > **v1.5.1:** removed a leftover developer-only test page that could leave the MODS page showing four dead rows (an empty box, a toggle and a slider that did nothing, and a box reading "click"). Added a "Debug" switch, off by default, so release builds stay quiet.
 

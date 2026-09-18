@@ -1,6 +1,6 @@
 ER2 Mod Manager - In-Game Mod Settings Manager
 ===============================================
-Version 1.5.1 | Easy Red 2 (BepInEx 6 / IL2CPP)
+Version 1.5.2 | Easy Red 2 (BepInEx 6 / IL2CPP)
 
 WHAT IT DOES
 ------------
@@ -45,6 +45,14 @@ FEATURES
   arrow on the MODS page returns to the first page. Native click sounds are kept.
 - Auto-save staged changes; per-mod master switches honored.
 - Compatible with the game 2.1.x settings rework (async page filling is handled).
+
+v1.5.2 changelog
+----------------
+- Removed the NativeFull developer switch and the whole native-row page renderer behind it. It
+  was the second leftover developer switch, and unlike the POC page it was self-locking: NativeFull
+  is a setting of this mod, so it appears as a toggle on the MODS page itself - turning it on broke
+  that page, and turning it back off was only possible from that same page. That is a trap, so the
+  switch and its renderer (NativePage.cs) are gone. The MODS page is now built by one code path only.
 
 v1.5.1 changelog
 ----------------

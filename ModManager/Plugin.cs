@@ -15,7 +15,7 @@ using UnityEngine.UI;
 
 namespace ER2ModManager;
 
-[BepInPlugin("er2.modmanager", "ER2 Mod Manager", "1.5.1")]
+[BepInPlugin("er2.modmanager", "ER2 Mod Manager", "1.5.2")]
 public class Plugin : BasePlugin
 {
 	/// <summary>构建语言：CN_BUILD 编译符号 = 中文版（标签中文、页标题"模组"）；否则英文版。</summary>
@@ -28,9 +28,6 @@ public class Plugin : BasePlugin
 	internal static ManualLogSource ModLog;
 
 	internal static ConfigEntry<bool> enabled;
-
-	/// <summary>原生 UI 完整页面开关（整页用原生 SettingSelectable 渲染）。</summary>
-	internal static ConfigEntry<bool> nativeFull;
 
 	/// <summary>调试日志开关（发布版保持关闭）。开启后输出建页/模板/取值等诊断日志，用于问题排查。</summary>
 	internal static ConfigEntry<bool> debugLog;
@@ -57,11 +54,10 @@ public class Plugin : BasePlugin
 	{
 		ModLog = Log;
 		enabled = Config.Bind("General", "enabled", true, "Master switch for the Mod Manager page (restart required).");
-		nativeFull = Config.Bind("General", "NativeFull", false, "DEV: render the whole MODS page via native SettingSelectable rows.");
 		debugLog = Config.Bind("Debug", "debugLog", false, "Debug logging (keep OFF in release). Prints page-build / template / value diagnostics.");
 		HarmonyInstance = new Harmony("er2.modmanager");
 		HarmonyInstance.PatchAll(GetType().Assembly);
-		ModLog.LogInfo((object)"ER2 Mod Manager 1.5.1 loaded.");
+		ModLog.LogInfo((object)"ER2 Mod Manager 1.5.2 loaded.");
 	}
 }
 
@@ -1142,11 +1138,6 @@ public static class ModRegistry
 	/// </summary>
 	internal static float FillContent(Transform contentPage)
 	{
-		// 原生 UI 完整页面：NativeFull=true 时整页用原生行渲染
-		if (Plugin.nativeFull != null && Plugin.nativeFull.Value)
-		{
-			return NativePage.BuildAndRender(contentPage);
-		}
 		float y = 0f;
 		List<PluginConfig> plugins = CollectPlugins();
 		if (contentPage == null)
@@ -4827,15 +4818,7 @@ public class InjectPollPatch
 				ModRegistry.RefreshRowInset(s.contentPage);
 				// 原生填充是异步协程：重开设置界面时协程可能晚到，把原生控件填进我们的页 → 每帧清理非我们容器的子物体
 				bool hasOurs = false;
-				bool nativeMode = (Plugin.nativeFull != null && Plugin.nativeFull.Value);
-				if (nativeMode)
-				{
-					// 原生行模式：整页由我们同步填充，不清除子物体（行就是我们的）；
-					// 但剪除原生填充协程可能追加的冗余行（超出我们渲染数量的子物体）
-					hasOurs = true;
-					NativePage.PruneExtras(s.contentPage);
-				}
-				else
+				// 只保留我们的容器，其余子物体每帧清掉（原生填充协程晚到时会把原生控件灌进我们的页）
 				{
 					try
 					{
