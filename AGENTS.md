@@ -185,6 +185,8 @@ if (ER2Shared.NoHintsHudLink.IsHidden("er2.你的modid", "显示名")) return; /
 - **`LogError` / `LogWarning` 不门控**——错误必须无条件可见；只门控 `LogInfo` 里的**高频/诊断**输出
 - **保留**低频功能日志（启动横幅、页面注入、自动保存、重置等），这些是排查问题的锚点
 - **发布版禁止**：`#if DEBUG` 之外仍可达的开发/测试页面、硬编码生 key 的临时行、只写日志不干事的空回调。**开发脚手架用完即删，不留"默认关"的开关**
+- **已备案例外（2026-09-18 定）**：ModManager 的 `NativeFull`（`[General]`，默认 `false`）—— 整页用原生 SettingSelectable 渲染的 v2 重写，是仍在开发的正式方向；它渲染的是 `HumanizeKey` 过的正常文案、控件可用，**不是** PoC 那种生 key + 空回调，故保留，以便在部署版里继续验证。
+- **判定标准（照这个判，别照"是不是开发开关"判）**：**「生 key / 空回调 / 点了没反应」= 必须从发布版删掉**；**「文案正常、功能可用、只是另一种实现」= 可保留，但必须默认关**。
 - 已接入：SquadCommand、UniversalGeneration、Conquest（节名 `Diagnostics`，历史遗留）、FleshWoundsFixed（键名 `Debug Logging`，历史遗留）、**ModManager（2026-09-18）**
 - **尚未接入（15 个）**：AIFood、CombatTweaks、ConquestRecon、HighValueTarget、HvtTestDriver、InventoryPause、LimbTweaks、MorePhysics、NoInteractionHints、ThrowableWheel、UnitCollision、UnitInfoOverlay、WeatherControl、ZoomAnywhere —— 后续改动这些 mod 时**顺手补上**
 
