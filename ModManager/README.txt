@@ -1,6 +1,6 @@
 ER2 Mod Manager - In-Game Mod Settings Manager
 ===============================================
-Version 1.5.0 | Easy Red 2 (BepInEx 6 / IL2CPP)
+Version 1.5.1 | Easy Red 2 (BepInEx 6 / IL2CPP)
 
 WHAT IT DOES
 ------------
@@ -45,6 +45,17 @@ FEATURES
   arrow on the MODS page returns to the first page. Native click sounds are kept.
 - Auto-save staged changes; per-mod master switches honored.
 - Compatible with the game 2.1.x settings rework (async page filling is handled).
+
+v1.5.1 changelog
+----------------
+- Removed the leftover POC test page. It was a developer-only switch (NativePoc in the config
+  file) that drew four hard-coded rows - poc.header, poc.toggle, poc.slider and poc.button - with
+  raw untranslated labels and callbacks that only wrote to the log. With that switch on, the MODS
+  page showed nothing but those four dead rows: an empty box, a toggle and a slider that did
+  nothing, and a box reading "click" that did nothing. That is exactly the "mod menu is broken"
+  report. The switch and the page are gone, so a release build can no longer reach them.
+- Added a "Debug" / debugLog switch (default off, keep it off in release). The noisy page-build,
+  template and value diagnostics now only print when it is on, so a release build stays quiet.
 
 v1.5.0 changelog
 ----------------

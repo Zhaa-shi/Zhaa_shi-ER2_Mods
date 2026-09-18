@@ -59,30 +59,6 @@ internal static class NativePage
 		}
 	}
 
-	// ── POC（NativePoc=true）：4 行原生行验证 ──────────────────
-	internal static float RenderPoc(Transform contentPage)
-	{
-		float y = 0f;
-		try
-		{
-			AddHeaderRow(contentPage, ref y, "poc.header");
-			System.Action<bool> toggleCb = delegate (bool v) { Plugin.ModLog.LogInfo("[MM] native toggle cb = " + v); };
-			AddToggleRow(contentPage, ref y, "poc.toggle", true, toggleCb, null, null);
-			System.Action<float> sliderCb = delegate (float v) { Plugin.ModLog.LogInfo("[MM] native slider cb = " + v); };
-			AddSliderRow(contentPage, ref y, "poc.slider", 0.5f, sliderCb, 0f, 1f, false, null, null);
-			System.Action buttonCb = delegate { Plugin.ModLog.LogInfo("[MM] native button cb"); };
-			AddButtonRow(contentPage, ref y, "poc.button", "click", buttonCb);
-			DumpStructure(contentPage);
-		}
-		catch (Exception e)
-		{
-			Plugin.ModLog.LogError("[MM] native poc error: " + e);
-		}
-		SetContentHeight(contentPage, y);
-		renderedCount = contentPage != null ? contentPage.childCount : 0;
-		return y;
-	}
-
 	// ── 完整原生页面（NativeFull=true）─────────────────────────
 	internal static float BuildAndRender(Transform contentPage)
 	{
@@ -321,7 +297,10 @@ internal static class NativePage
 			bind(nr);
 		}
 		rows.Add(nr);
-		Plugin.ModLog.LogInfo("[MM] native row " + row.GetType().Name + " h=" + h.ToString("F1"));
+		if (Plugin.DebugOn)
+		{
+			Plugin.ModLog.LogInfo("[MM] native row " + row.GetType().Name + " h=" + h.ToString("F1"));
+		}
 		return y + h;
 	}
 
@@ -555,69 +534,5 @@ internal static class NativePage
 		catch
 		{
 		}
-	}
-
-	/// <summary>记录原生 Create 产物的两级层级（名称 + 关键组件），供重写定位 label/值文本。</summary>
-	private static void DumpStructure(Transform cp)
-	{
-		try
-		{
-			for (int i = 0; i < cp.childCount; i++)
-			{
-				Transform child = cp.GetChild(i);
-				if (child == null)
-				{
-					continue;
-				}
-				Plugin.ModLog.LogInfo("[MM] row[" + i + "] name=\"" + child.name + "\" comps=" + CompSummary(child.gameObject));
-				for (int j = 0; j < child.childCount; j++)
-				{
-					Transform g = child.GetChild(j);
-					if (g != null)
-					{
-						Plugin.ModLog.LogInfo("[MM]   └ " + g.name + " comps=" + CompSummary(g.gameObject));
-					}
-				}
-			}
-		}
-		catch (Exception e)
-		{
-			Plugin.ModLog.LogError("[MM] dump structure error: " + e.Message);
-		}
-	}
-
-	private static string CompSummary(GameObject go)
-	{
-		string s = "";
-		Text t = go.GetComponent<Text>();
-		if (t != null)
-		{
-			s += "Text(\"" + t.text + "\") ";
-		}
-		Toggle tg = go.GetComponent<Toggle>();
-		if (tg != null)
-		{
-			s += "Toggle(" + tg.isOn + ") ";
-		}
-		Slider sl = go.GetComponent<Slider>();
-		if (sl != null)
-		{
-			s += "Slider(" + sl.value.ToString("F2") + ") ";
-		}
-		Dropdown dd = go.GetComponent<Dropdown>();
-		if (dd != null)
-		{
-			s += "Dropdown(" + dd.value + ") ";
-		}
-		Button bt = go.GetComponent<Button>();
-		if (bt != null)
-		{
-			s += "Button ";
-		}
-		if (s.Length == 0)
-		{
-			s = "(none)";
-		}
-		return s.Trim();
 	}
 }

@@ -53,8 +53,11 @@ ER2_Mods/
 ├── SquadCommand/         er2.squadcommand             Battlefield Commander：上帝视角 RTS 小队指挥（最大工程）
 ├── UniversalGeneration/  er2.universalgeneration      RTS 内自定义生成单位/载具（作弊向，SquadCommand 附属）
 ├── UnitCollision/        er2.morephysics.unitcollision 单位/尸体碰撞（MorePhysics 轻量保留版）
+├── MorePhysics/          er2.morephysics                 完整物理化（v0.1.48 复活：源码自反编译重建 + 单位碰撞对齐轻量版）
 ├── UnitInfoOverlay/      er2.unitinfooverlay          单位状态悬浮显示（开发者调试工具）
 ├── HvtTestDriver/        er2.hvt.testdriver           HVT 自测工具（内部，不发布）
+├── Conquest/             er2.conquest                 ER2 Conquest：地狱之门征服模式移植（开发中；Core 为纯 C#，可离线验证）
+├── ConquestRecon/        er2.conquest.recon           M0 侦察工具（内部，不发布）
 ├── FleshWoundsFixed/     ER2_FleshWounds              第三方 Flesh Wounds 重建修复（紫贴图 bug）
 ├── Shared/NoHintsHudLink.cs                           跨 mod F5 隐藏联动（反射，无编译期依赖）
 ├── scripts/build.ps1                                   一体化构建：编译+部署+清cfg+打包
@@ -62,7 +65,13 @@ ER2_Mods/
 └── *.md                                                知识文档（见 §1）
 ```
 
-**文档地图**：`ER2_mod_dev_guide.md`（工作流/机制/陷阱/各 mod 状态，102 KB）· `ER2_mod_经验.md`（陷阱全集 + 复盘，73 KB）· `ER2_mod_技能.md`（可复用技能）· `ER2_mod_工具.md`（工具速查）· `ER2_physics_system.md`（16 层碰撞矩阵解包）· `ER2_scene_objects_classification.md`（场景物分类体系）· `ER2_UI_design.md`（UI/IMGUI 机制）。
+**文档地图**：`ER2_mod_dev_guide.md`（工作流/机制/陷阱/各 mod 状态，102 KB）· `ER2_mod_经验.md`（陷阱全集 + 复盘，73 KB）· `ER2_mod_技能.md`（可复用技能）· `ER2_mod_工具.md`（工具速查）· `ER2_physics_system.md`（16 层碰撞矩阵解包）· `ER2_scene_objects_classification.md`（场景物分类体系）· `ER2_UI_design.md`（UI/IMGUI 机制）· `ER2_征服模式_设计方案.md`（征服模式方案 + 逐轮实测复盘）· **`ER2_征服模式_参考拆解.md`**（《地狱之门》征服模式 `.pak` 解包实证 + 《人间地狱》检索 + 机制映射表）。
+
+**第三方游戏解包（2026-09-13 新增能力）**：《Call to Arms - Gates of Hell》装在
+`E:\SteamLibrary\steamapps\common\Call to Arms - Gates of Hell`，其 `resource\*.pak`
+**就是标准 ZIP**（文件头 `PK\x03\x04`）→ 用 .NET `ZipFile` 直接读，**别用 WinRAR**（会卡死）。
+战略层数值全在 `resource\gamelogic.pak` 的 `set/dynamic_campaign/`；解包产物见
+`research_out/goh_unpack/`（163 文件），拆解结论见 `ER2_征服模式_参考拆解.md`。
 
 ## 3. 命令白名单
 
@@ -164,7 +173,20 @@ if (ER2Shared.NoHintsHudLink.IsHidden("er2.你的modid", "显示名")) return; /
 - 更新说明只讲**更新内容与达成效果**（简洁）；完整 README 按需
 - **发布前清理调试/诊断日志**（高频日志、限频诊断全清），保留低频功能日志
 - 发布包在 `C:\Users\71011\Downloads\<pkg>_v<版本>.zip`（zip 内 = DLL + README.txt + Nexus_description.md）
-- **双语发布**（2026-09-05 起）：默认包 EN，`-Cn` 出中文包 → `README_CN.txt` / `Nexus_description_CN.md` 按包语言取（build.ps1 自动）；仅 SquadCommand、UniversalGeneration 已做双语，其余 mod 只有 EN 文档
+- **双语发布**（2026-09-05 起）：默认包 EN，`-Cn` 出中文包 → `README_CN.txt` / `Nexus_description_CN.md` 按包语言取（build.ps1 自动）；已做双语：SquadCommand、UniversalGeneration、**HighValueTarget（2026-09-13 补）**，其余 mod 只有 EN 文档
+- **`-Cn` 会带 `CN_BUILD` 编译定义**（`DefaultChinese=true` → 游戏内提示为中文）→ **EN/CN 两个包的 DLL 内容不同**。决定最终部署语言靠构建顺序：惯例部署 **EN 构建**（ModManager 玩家要求，HVT 同此），故先跑 `-Cn`、最后跑默认包
+
+### 7.1 每个 mod 必须有调试日志开关（2026-09-18 起为强制约定）
+
+**背景**：ModManager 把开发期的 PoC 测试页（硬编码 `poc.header`/`poc.toggle`/`poc.slider`/`poc.button` 四行 + 只写日志的空回调）随发布版一起发了出去，玩家在 cfg 里开了 `NativePoc` 就看到「mod 菜单坏了」——满屏生 key + 点了没反应。**开发脚手架绝不能靠"默认关"来兜底，必须从发布版里删掉**；诊断日志则统一收进开关。
+
+- **统一约定**：`Config.Bind("Debug", "debugLog", false, ...)` —— 节名 `Debug`、键名 `debugLog`、**默认 `false`**，语义「true = 输出诊断日志」
+- **门控写法**：诊断日志一律 `if (Plugin.DebugOn) Plugin.ModLog.LogInfo(...)`（ModManager 用 `Plugin.DebugOn` 属性；其它 mod 用 `Plugin.debugLog.Value`）
+- **`LogError` / `LogWarning` 不门控**——错误必须无条件可见；只门控 `LogInfo` 里的**高频/诊断**输出
+- **保留**低频功能日志（启动横幅、页面注入、自动保存、重置等），这些是排查问题的锚点
+- **发布版禁止**：`#if DEBUG` 之外仍可达的开发/测试页面、硬编码生 key 的临时行、只写日志不干事的空回调。**开发脚手架用完即删，不留"默认关"的开关**
+- 已接入：SquadCommand、UniversalGeneration、Conquest（节名 `Diagnostics`，历史遗留）、FleshWoundsFixed（键名 `Debug Logging`，历史遗留）、**ModManager（2026-09-18）**
+- **尚未接入（15 个）**：AIFood、CombatTweaks、ConquestRecon、HighValueTarget、HvtTestDriver、InventoryPause、LimbTweaks、MorePhysics、NoInteractionHints、ThrowableWheel、UnitCollision、UnitInfoOverlay、WeatherControl、ZoomAnywhere —— 后续改动这些 mod 时**顺手补上**
 
 ## 8. 快速验证清单
 
@@ -178,7 +200,7 @@ if (ER2Shared.NoHintsHudLink.IsHidden("er2.你的modid", "显示名")) return; /
 
 ## 9. 历史教训（避免重走弯路）
 
-- **已删除并终止的项目**：`MorePhysics` 完整物理化（19 版迭代后废弃）、`DirectControl` 单位接管、`SuperSoldiers` 精英单位、`HealthBars` 血条、`BattlefieldHud` 命中标记 —— **复盘全部保留在 `ER2_mod_经验.md`**，再碰同类需求先读。
+- **已删除并终止的项目**：`MorePhysics` 完整物理化（19 版迭代后废弃；**2026-09-13 以 v0.1.48 复活**——源码从 v0.1.47 反编译重建，单位碰撞模块对齐轻量版，见台账 §2.17）、`DirectControl` 单位接管、`SuperSoldiers` 精英单位、`HealthBars` 血条、`BattlefieldHud` 命中标记 —— **复盘全部保留在 `ER2_mod_经验.md`**，再碰同类需求先读。
 - **BattleJournal（勋章/战报 mod）已放弃**：做完全流程后被用户发现 Nexus 有平替 → **提新 mod 方向前先确认生态里没有现成方案**（先搜 Nexus/问用户），别再主动提"勋章/战报/生涯统计"方向。
 - **需求理解偏差的代价**：`DirectControl` 在错误理解（"接管单单位" vs 用户要的"框选多单位 RTS 指挥"）上做了 3 个版本才对齐 → **指挥/控制类需求先问清是「接管单个」还是「RTS 框选指挥」**（两者技术跨度天差地别）。
 - **功能减法比加法更难也更重要**：Hide Anything 从"F5 热键+锁定+保存按钮"演化到"勾选制"，三个概念全被砍掉——每个存废都来自实际使用体验。

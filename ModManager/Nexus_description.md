@@ -1,4 +1,6 @@
-# ER2 Mod Manager v1.5.0
+# ER2 Mod Manager v1.5.1
+
+> **v1.5.1:** removed a leftover developer-only test page that could leave the MODS page showing four dead rows (an empty box, a toggle and a slider that did nothing, and a box reading "click"). Added a "Debug" switch, off by default, so release builds stay quiet.
 
 > **v1.5.0:** no page rebuilds on click (so no more white flash), always-visible fold chevrons on mods/sections/settings, sections collapsed by default with their settings indented one level deeper, per-setting state no longer leaks between mods, uniform label size with ellipsis instead of font shrinking, smaller value controls, and a hairline rule under mod names. The temporary diagnostics are gone from this build.
 

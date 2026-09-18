@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Reflection;
@@ -15,7 +15,7 @@ using UnityEngine.UI;
 
 namespace ER2ModManager;
 
-[BepInPlugin("er2.modmanager", "ER2 Mod Manager", "1.5.0")]
+[BepInPlugin("er2.modmanager", "ER2 Mod Manager", "1.5.1")]
 public class Plugin : BasePlugin
 {
 	/// <summary>构建语言：CN_BUILD 编译符号 = 中文版（标签中文、页标题"模组"）；否则英文版。</summary>
@@ -29,11 +29,27 @@ public class Plugin : BasePlugin
 
 	internal static ConfigEntry<bool> enabled;
 
-	/// <summary>原生 UI 重写 POC 开关（渲染 4 行原生 SettingSelectable 验证）。</summary>
-	internal static ConfigEntry<bool> nativePoc;
-
 	/// <summary>原生 UI 完整页面开关（整页用原生 SettingSelectable 渲染）。</summary>
 	internal static ConfigEntry<bool> nativeFull;
+
+	/// <summary>调试日志开关（发布版保持关闭）。开启后输出建页/模板/取值等诊断日志，用于问题排查。</summary>
+	internal static ConfigEntry<bool> debugLog;
+
+	/// <summary>调试日志是否开启。debugLog 未就绪时一律视为关闭 → 发布版默认静默。</summary>
+	internal static bool DebugOn
+	{
+		get
+		{
+			try
+			{
+				return debugLog != null && debugLog.Value;
+			}
+			catch
+			{
+				return false;
+			}
+		}
+	}
 
 	internal static Harmony HarmonyInstance;
 
@@ -41,11 +57,11 @@ public class Plugin : BasePlugin
 	{
 		ModLog = Log;
 		enabled = Config.Bind("General", "enabled", true, "Master switch for the Mod Manager page (restart required).");
-		nativePoc = Config.Bind("General", "NativePoc", false, "POC: render test rows via native SettingSelectable.Create (dev only).");
 		nativeFull = Config.Bind("General", "NativeFull", false, "DEV: render the whole MODS page via native SettingSelectable rows.");
+		debugLog = Config.Bind("Debug", "debugLog", false, "Debug logging (keep OFF in release). Prints page-build / template / value diagnostics.");
 		HarmonyInstance = new Harmony("er2.modmanager");
 		HarmonyInstance.PatchAll(GetType().Assembly);
-		ModLog.LogInfo((object)"ER2 Mod Manager 1.5.0 loaded.");
+		ModLog.LogInfo((object)"ER2 Mod Manager 1.5.1 loaded.");
 	}
 }
 
@@ -835,7 +851,7 @@ public static class ModRegistry
 			map[entry.Definition.Key] = v;
 			lastStageTime = Time.unscaledTime;
 			// 只记录非数值类型（按键/开关/下拉），滑条拖动不刷屏
-			if (entry.SettingType != typeof(float) && entry.SettingType != typeof(int))
+			if (entry.SettingType != typeof(float) && entry.SettingType != typeof(int) && Plugin.DebugOn)
 			{
 				Plugin.ModLog.LogInfo((object)("ModManager staged: " + entry.Definition.Key + " = " + v));
 			}
@@ -1126,11 +1142,6 @@ public static class ModRegistry
 	/// </summary>
 	internal static float FillContent(Transform contentPage)
 	{
-		// 原生 UI 重写 POC：NativePoc=true 时用原生 SettingSelectable.Create 渲染测试行
-		if (Plugin.nativePoc != null && Plugin.nativePoc.Value)
-		{
-			return NativePage.RenderPoc(contentPage);
-		}
 		// 原生 UI 完整页面：NativeFull=true 时整页用原生行渲染
 		if (Plugin.nativeFull != null && Plugin.nativeFull.Value)
 		{
@@ -1515,9 +1526,12 @@ public static class ModRegistry
 				catch
 				{
 				}
-				Plugin.ModLog.LogInfo((object)("ModManager: row inset applied -> left=" + leftInset.ToString("F1")
-					+ " right=" + rightInset.ToString("F1") + " (content " + rt.rect.width.ToString("F0")
-					+ " -> row width " + (rt.rect.width - w).ToString("F0") + ")"));
+				if (Plugin.DebugOn)
+				{
+					Plugin.ModLog.LogInfo((object)("ModManager: row inset applied -> left=" + leftInset.ToString("F1")
+						+ " right=" + rightInset.ToString("F1") + " (content " + rt.rect.width.ToString("F0")
+						+ " -> row width " + (rt.rect.width - w).ToString("F0") + ")"));
+				}
 			}
 		}
 		catch
@@ -4499,8 +4513,11 @@ public static class ModRegistry
 					rt.pivot = new Vector2(rt.pivot.x, 1f);
 				}
 				rt.sizeDelta = new Vector2(rt.sizeDelta.x, h);
-				Plugin.ModLog.LogInfo((object)("ModManager: normalized template row '" + go.name + "' -> h=" + h.ToString("F1")
-					+ (stretched ? " (was vertically stretched)" : " (sizeDelta.y was ~0)")));
+				if (Plugin.DebugOn)
+				{
+					Plugin.ModLog.LogInfo((object)("ModManager: normalized template row '" + go.name + "' -> h=" + h.ToString("F1")
+						+ (stretched ? " (was vertically stretched)" : " (sizeDelta.y was ~0)")));
+				}
 			}
 			catch
 			{
@@ -4611,13 +4628,19 @@ public static class ModRegistry
 			IL2CPPChainloader loader = IL2CPPChainloader.Instance;
 			if (loader == null)
 			{
-				Plugin.ModLog.LogInfo((object)"ModManager: IL2CPPChainloader.Instance is null.");
+				if (Plugin.DebugOn)
+				{
+					Plugin.ModLog.LogInfo((object)"ModManager: IL2CPPChainloader.Instance is null.");
+				}
 				return list;
 			}
 			Dictionary<string, PluginInfo> infos = loader.Plugins;
 			if (infos == null)
 			{
-				Plugin.ModLog.LogInfo((object)"ModManager: PluginInfos is null.");
+				if (Plugin.DebugOn)
+				{
+					Plugin.ModLog.LogInfo((object)"ModManager: PluginInfos is null.");
+				}
 				return list;
 			}
 			foreach (KeyValuePair<string, PluginInfo> kv in infos)
@@ -4804,8 +4827,7 @@ public class InjectPollPatch
 				ModRegistry.RefreshRowInset(s.contentPage);
 				// 原生填充是异步协程：重开设置界面时协程可能晚到，把原生控件填进我们的页 → 每帧清理非我们容器的子物体
 				bool hasOurs = false;
-				bool nativeMode = (Plugin.nativePoc != null && Plugin.nativePoc.Value) ||
-								  (Plugin.nativeFull != null && Plugin.nativeFull.Value);
+				bool nativeMode = (Plugin.nativeFull != null && Plugin.nativeFull.Value);
 				if (nativeMode)
 				{
 					// 原生行模式：整页由我们同步填充，不清除子物体（行就是我们的）；
