@@ -2,16 +2,13 @@
 <html lang="zh-CN">
 <head>
 <meta charset="utf-8">
-<title>ER2 Mods UI 重绘视觉稿</title>
+<title>ER2 Mods UI 重绘视觉稿 v2（灰黑单色系）</title>
 <style>
-  :root{
-    --bg:#141614; --card:#1C211C; --line:#3A463A;
-    --fg:#DCE6D6; --dim:#A8B5A3; --accent:#C8A03C;
-  }
+  :root{ --bg:#0E0E0E; --card:#171717; --line:#333; --fg:#E8E8E8; --dim:#A0A0A0; }
   *{box-sizing:border-box}
   body{margin:0;padding:28px 24px 48px;background:var(--bg);color:var(--fg);
        font-family:"Segoe UI","Microsoft YaHei",system-ui,sans-serif;line-height:1.6}
-  .wrap{max-width:1040px;margin:0 auto}
+  .wrap{max-width:1060px;margin:0 auto}
   h1{font-size:22px;font-weight:600;margin:0 0 6px}
   .sub{color:var(--dim);font-size:13px;margin:0 0 26px}
   h2{font-size:16px;font-weight:600;margin:0 0 4px}
@@ -20,279 +17,252 @@
         padding:18px 20px 20px;margin-bottom:22px}
   .note{color:var(--dim);font-size:12.5px;margin:2px 0 14px}
   .two{display:grid;grid-template-columns:1fr 1fr;gap:18px}
-  @media(max-width:820px){.two{grid-template-columns:1fr}}
+  @media(max-width:840px){.two{grid-template-columns:1fr}}
   svg{display:block;width:100%;height:auto}
-  .legend{margin-top:12px;font-size:12px;color:var(--dim)}
+  .legend{margin-top:12px;font-size:12px;color:var(--dim);line-height:1.75}
   .legend b{color:var(--fg);font-weight:600}
-  .sw{display:flex;flex-wrap:wrap;gap:10px 22px;margin-top:4px}
-  .sw div{display:flex;align-items:center;gap:8px;font-size:12px}
+  .sw{display:flex;flex-wrap:wrap;gap:10px 20px;margin-top:6px}
+  .sw div{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--dim)}
   .sw i{width:22px;height:14px;border:1px solid var(--line);border-radius:3px;display:block}
-  code{background:#0E120E;padding:1px 5px;border-radius:4px;font-size:12px}
+  code{background:#000;padding:1px 5px;border-radius:4px;font-size:12px;color:#C8C8C8}
+  .fix{color:#8FBF8F}
 </style>
 </head>
 <body>
 <div class="wrap">
 
-<h1>ER2 Mods UI 重绘视觉稿</h1>
-<p class="sub">战场指挥官 + 通用生成 · 2026-09-24 · 配套文档 <code>ER2_UI_redesign.md</code></p>
+<h1>ER2 Mods UI 重绘视觉稿 v2</h1>
+<p class="sub">灰黑单色系 · 世界空间标记形状已修正 · 2026-09-24 · 配套 <code>ER2_UI_redesign.md</code></p>
 
 <div class="card">
-  <h2>A. 通用生成面板（重绘后）</h2>
-  <p class="note">320px 宽，1080p 实测高度约 462px（预算 560）。三级页签压成两级、星标悬停才显、最近使用置顶。</p>
-  <svg viewBox="0 0 680 560" role="img" xmlns="http://www.w3.org/2000/svg">
-    <rect x="180" y="40" width="320" height="462" fill="#0A0F0A" stroke="#7E9A7E" stroke-width="0.5"/>
-    <rect x="190" y="48" width="300" height="24" fill="#101C10"/>
-    <rect x="190" y="71" width="300" height="1" fill="#3A4E3A"/>
-    <text x="198" y="60" font-family="Segoe UI,sans-serif" font-size="15" font-weight="600" fill="#DCE6D6" dominant-baseline="central">通用生成</text>
-    <text x="480" y="60" font-family="Segoe UI,sans-serif" font-size="11" fill="#A8B5A3" text-anchor="middle" dominant-baseline="central">✕</text>
-    <rect x="190" y="76" width="97" height="24" fill="#2E5A2A"/>
-    <text x="238" y="88" font-family="Segoe UI,sans-serif" font-size="11" fill="#EAF0E2" text-anchor="middle" dominant-baseline="central">美军</text>
-    <rect x="291" y="76" width="97" height="24" fill="#182618"/>
-    <text x="339" y="88" font-family="Segoe UI,sans-serif" font-size="11" fill="#DCE6D6" text-anchor="middle" dominant-baseline="central">德军</text>
-    <rect x="392" y="76" width="97" height="24" fill="#182618"/>
-    <text x="440" y="88" font-family="Segoe UI,sans-serif" font-size="11" fill="#DCE6D6" text-anchor="middle" dominant-baseline="central">英军</text>
-    <rect x="190" y="104" width="72" height="24" fill="#182618"/>
-    <text x="226" y="116" font-family="Segoe UI,sans-serif" font-size="11" fill="#DCE6D6" text-anchor="middle" dominant-baseline="central">收藏</text>
-    <rect x="266" y="104" width="72" height="24" fill="#2E5A2A"/>
-    <rect x="266" y="126" width="72" height="2" fill="#C8A03C"/>
-    <text x="302" y="115" font-family="Segoe UI,sans-serif" font-size="11" fill="#EAF0E2" text-anchor="middle" dominant-baseline="central">步兵</text>
-    <rect x="342" y="104" width="72" height="24" fill="#182618"/>
-    <text x="378" y="116" font-family="Segoe UI,sans-serif" font-size="11" fill="#DCE6D6" text-anchor="middle" dominant-baseline="central">机枪</text>
-    <rect x="418" y="104" width="72" height="24" fill="#182618"/>
-    <text x="454" y="116" font-family="Segoe UI,sans-serif" font-size="11" fill="#DCE6D6" text-anchor="middle" dominant-baseline="central">坦克</text>
-    <rect x="190" y="132" width="72" height="24" fill="#182618"/>
-    <text x="226" y="144" font-family="Segoe UI,sans-serif" font-size="11" fill="#DCE6D6" text-anchor="middle" dominant-baseline="central">轮式</text>
-    <rect x="266" y="132" width="72" height="24" fill="#182618"/>
-    <text x="302" y="144" font-family="Segoe UI,sans-serif" font-size="11" fill="#DCE6D6" text-anchor="middle" dominant-baseline="central">飞机</text>
-    <rect x="342" y="132" width="72" height="24" fill="#182618"/>
-    <text x="378" y="144" font-family="Segoe UI,sans-serif" font-size="11" fill="#DCE6D6" text-anchor="middle" dominant-baseline="central">火炮</text>
-    <rect x="418" y="132" width="72" height="24" fill="#182618"/>
-    <text x="454" y="144" font-family="Segoe UI,sans-serif" font-size="11" fill="#DCE6D6" text-anchor="middle" dominant-baseline="central">Mod载具</text>
-    <rect x="190" y="160" width="72" height="24" fill="#2E5A2A"/>
-    <rect x="190" y="160" width="3" height="24" fill="#C8A03C"/>
-    <text x="228" y="172" font-family="Segoe UI,sans-serif" font-size="11" fill="#EAF0E2" text-anchor="middle" dominant-baseline="central">步枪</text>
-    <rect x="266" y="160" width="72" height="24" fill="#182618"/>
-    <text x="302" y="172" font-family="Segoe UI,sans-serif" font-size="11" fill="#DCE6D6" text-anchor="middle" dominant-baseline="central">冲锋枪</text>
-    <rect x="342" y="160" width="72" height="24" fill="#182618"/>
-    <text x="378" y="172" font-family="Segoe UI,sans-serif" font-size="11" fill="#DCE6D6" text-anchor="middle" dominant-baseline="central">手枪</text>
-    <rect x="418" y="160" width="72" height="24" fill="#182618"/>
-    <text x="454" y="172" font-family="Segoe UI,sans-serif" font-size="11" fill="#DCE6D6" text-anchor="middle" dominant-baseline="central">轻机枪</text>
-    <rect x="190" y="188" width="300" height="280" fill="#080C08"/>
-    <rect x="190" y="188" width="300" height="28" fill="#2E5A2A"/>
-    <rect x="190" y="188" width="3" height="28" fill="#C8A03C"/>
-    <text x="200" y="202" font-family="Segoe UI,sans-serif" font-size="12" fill="#EAF0E2" dominant-baseline="central">M1 Garand</text>
-    <text x="452" y="202" font-family="Segoe UI,sans-serif" font-size="11" fill="#EAF0E2" text-anchor="end" dominant-baseline="central">最近</text>
-    <text x="477" y="202" font-family="Segoe UI,sans-serif" font-size="12" fill="#FFD45E" text-anchor="middle" dominant-baseline="central">★</text>
-    <rect x="190" y="216" width="300" height="28" fill="#0E160E"/>
-    <text x="200" y="230" font-family="Segoe UI,sans-serif" font-size="12" fill="#DCE6D6" dominant-baseline="central">M1903 Springfield</text>
-    <rect x="190" y="244" width="300" height="28" fill="#0E160E"/>
-    <text x="200" y="258" font-family="Segoe UI,sans-serif" font-size="12" fill="#DCE6D6" dominant-baseline="central">M1917 Enfield</text>
-    <rect x="190" y="272" width="300" height="28" fill="#1E2A1E"/>
-    <text x="200" y="286" font-family="Segoe UI,sans-serif" font-size="12" fill="#DCE6D6" dominant-baseline="central">M1 Carbine</text>
-    <text x="452" y="286" font-family="Segoe UI,sans-serif" font-size="11" fill="#A8B5A3" text-anchor="end" dominant-baseline="central">半自动</text>
-    <text x="477" y="286" font-family="Segoe UI,sans-serif" font-size="12" fill="#A8B5A3" text-anchor="middle" dominant-baseline="central">☆</text>
-    <rect x="190" y="300" width="300" height="28" fill="#0E160E"/>
-    <text x="200" y="314" font-family="Segoe UI,sans-serif" font-size="12" fill="#DCE6D6" dominant-baseline="central">Springfield M1903A4</text>
-    <rect x="190" y="328" width="300" height="28" fill="#0E160E"/>
-    <text x="200" y="342" font-family="Segoe UI,sans-serif" font-size="12" fill="#DCE6D6" dominant-baseline="central">Lee-Enfield No.4</text>
-    <rect x="190" y="356" width="300" height="28" fill="#0E160E"/>
-    <text x="200" y="370" font-family="Segoe UI,sans-serif" font-size="12" fill="#DCE6D6" dominant-baseline="central">Karabiner 98k</text>
-    <rect x="190" y="384" width="300" height="28" fill="#0E160E"/>
-    <text x="200" y="398" font-family="Segoe UI,sans-serif" font-size="12" fill="#DCE6D6" dominant-baseline="central">Mosin-Nagant M91/30</text>
-    <rect x="190" y="412" width="300" height="28" fill="#0E160E"/>
-    <text x="200" y="426" font-family="Segoe UI,sans-serif" font-size="12" fill="#DCE6D6" dominant-baseline="central">Type 99 Arisaka</text>
-    <rect x="190" y="440" width="300" height="28" fill="#0E160E"/>
-    <text x="200" y="454" font-family="Segoe UI,sans-serif" font-size="12" fill="#DCE6D6" dominant-baseline="central">Ross Rifle Mk III</text>
-    <rect x="190" y="472" width="30" height="22" fill="#182618"/>
-    <text x="205" y="483" font-family="Segoe UI,sans-serif" font-size="11" fill="#DCE6D6" text-anchor="middle" dominant-baseline="central">◀</text>
-    <text x="340" y="483" font-family="Segoe UI,sans-serif" font-size="11" fill="#A8B5A3" text-anchor="middle" dominant-baseline="central">3 / 12</text>
-    <rect x="460" y="472" width="30" height="22" fill="#182618"/>
-    <text x="475" y="483" font-family="Segoe UI,sans-serif" font-size="11" fill="#DCE6D6" text-anchor="middle" dominant-baseline="central">▶</text>
-    <path d="M500 60 L508 60" fill="none" stroke="#8A9A8A" stroke-width="0.5"/>
-    <text x="512" y="60" font-family="Segoe UI,sans-serif" font-size="11" fill="#A8B5A3" dominant-baseline="central">①标题+✕</text>
-    <path d="M500 88 L508 88" fill="none" stroke="#8A9A8A" stroke-width="0.5"/>
-    <text x="512" y="88" font-family="Segoe UI,sans-serif" font-size="11" fill="#A8B5A3" dominant-baseline="central">②阵营3段</text>
-    <path d="M500 116 L508 116" fill="none" stroke="#8A9A8A" stroke-width="0.5"/>
-    <text x="512" y="116" font-family="Segoe UI,sans-serif" font-size="11" fill="#A8B5A3" dominant-baseline="central">③底边条</text>
-    <path d="M500 172 L508 172" fill="none" stroke="#8A9A8A" stroke-width="0.5"/>
-    <text x="512" y="172" font-family="Segoe UI,sans-serif" font-size="11" fill="#A8B5A3" dominant-baseline="central">④左竖条</text>
-    <path d="M500 202 L508 202" fill="none" stroke="#8A9A8A" stroke-width="0.5"/>
-    <text x="512" y="202" font-family="Segoe UI,sans-serif" font-size="11" fill="#A8B5A3" dominant-baseline="central">⑤最近置顶</text>
-    <path d="M500 286 L508 286" fill="none" stroke="#8A9A8A" stroke-width="0.5"/>
-    <text x="512" y="286" font-family="Segoe UI,sans-serif" font-size="11" fill="#A8B5A3" dominant-baseline="central">⑥悬停才显☆</text>
-    <path d="M500 483 L508 483" fill="none" stroke="#8A9A8A" stroke-width="0.5"/>
-    <text x="512" y="483" font-family="Segoe UI,sans-serif" font-size="11" fill="#A8B5A3" dominant-baseline="central">⑦分页Shift</text>
-    <text x="180" y="514" font-family="Segoe UI,sans-serif" font-size="11" fill="#A8B5A3" dominant-baseline="central">色板</text>
-    <rect x="180" y="524" width="16" height="16" fill="#0A0F0A" stroke="#7E9A7E" stroke-width="0.5"/>
-    <text x="200" y="532" font-family="Segoe UI,sans-serif" font-size="11" fill="#DCE6D6" dominant-baseline="central">面板</text>
-    <rect x="233" y="524" width="16" height="16" fill="#182618" stroke="#7E9A7E" stroke-width="0.5"/>
-    <text x="253" y="532" font-family="Segoe UI,sans-serif" font-size="11" fill="#DCE6D6" dominant-baseline="central">控件</text>
-    <rect x="286" y="524" width="16" height="16" fill="#2E5A2A" stroke="#7E9A7E" stroke-width="0.5"/>
-    <text x="306" y="532" font-family="Segoe UI,sans-serif" font-size="11" fill="#DCE6D6" dominant-baseline="central">选中</text>
-    <rect x="339" y="524" width="16" height="16" fill="#C8A03C" stroke="#7E9A7E" stroke-width="0.5"/>
-    <text x="359" y="532" font-family="Segoe UI,sans-serif" font-size="11" fill="#DCE6D6" dominant-baseline="central">强调</text>
-    <rect x="392" y="524" width="16" height="16" fill="#DCE6D6"/>
-    <text x="412" y="532" font-family="Segoe UI,sans-serif" font-size="11" fill="#DCE6D6" dominant-baseline="central">正文</text>
-    <rect x="445" y="524" width="16" height="16" fill="#FFD45E"/>
-    <text x="465" y="532" font-family="Segoe UI,sans-serif" font-size="11" fill="#DCE6D6" dominant-baseline="central">收藏</text>
-  </svg>
-</div>
-
-<div class="card">
-  <h2>B. 指挥官 HUD（重绘后）</h2>
-  <p class="note">核心变化：底部 1400px 长提示条拆掉 → 常显 3 个 chip + <code>?</code> 帮助卡；状态、反馈、进度各归其位。</p>
-  <svg viewBox="0 0 680 430" role="img" xmlns="http://www.w3.org/2000/svg">
-    <rect x="40" y="40" width="600" height="230" fill="#1B241B"/>
-    <rect x="40" y="270" width="600" height="108" fill="#232A20"/>
-    <path d="M40 270 L640 270" fill="none" stroke="#3A4636" stroke-width="0.5"/>
-    <rect x="40" y="40" width="600" height="338" fill="none" stroke="#7E9A7E" stroke-width="0.5"/>
-    <rect x="54" y="54" width="240" height="72" fill="#0C120C" stroke="#7E9A7E" stroke-width="0.5"/>
-    <text x="66" y="74" font-family="Segoe UI,sans-serif" font-size="12" fill="#DCE6D6" dominant-baseline="central">已选 步兵 8 + 载具 2</text>
-    <text x="66" y="94" font-family="Segoe UI,sans-serif" font-size="11" fill="#C8A03C" dominant-baseline="central">⏸ 已暂停（空格继续）</text>
-    <rect x="66" y="110" width="216" height="6" fill="#000000" fill-opacity="0.5"/>
-    <rect x="66" y="110" width="180" height="6" fill="#C8A03C"/>
-    <rect x="310" y="54" width="96" height="26" fill="#182618"/>
-    <path d="M310 54 L406 54 M310 80 L406 80 M310 54 L310 80 M406 54 L406 80" fill="none" stroke="#7E9A7E" stroke-width="1"/>
-    <text x="358" y="68" font-family="Segoe UI,sans-serif" font-size="11" fill="#DCE6D6" text-anchor="middle" dominant-baseline="central">控制该小队</text>
-    <rect x="414" y="54" width="72" height="26" fill="#182618"/>
-    <path d="M414 54 L486 54 M414 80 L486 80 M414 54 L414 80 M486 54 L486 80" fill="none" stroke="#7E9A7E" stroke-width="1"/>
-    <text x="450" y="68" font-family="Segoe UI,sans-serif" font-size="11" fill="#DCE6D6" text-anchor="middle" dominant-baseline="central">分队</text>
-    <rect x="396" y="94" width="240" height="150" fill="#0C120C" stroke="#7E9A7E" stroke-width="0.5"/>
-    <text x="406" y="106" font-family="Segoe UI,sans-serif" font-size="11" font-weight="600" fill="#A8B5A3" dominant-baseline="central">小队</text>
-    <rect x="396" y="118" width="240" height="22" fill="#2E5A2A"/>
-    <rect x="396" y="118" width="3" height="22" fill="#C8A03C"/>
-    <text x="408" y="129" font-family="Segoe UI,sans-serif" font-size="11" fill="#EAF0E2" dominant-baseline="central">1 排 ●●●●○○○○  8/8</text>
-    <rect x="396" y="142" width="240" height="22" fill="#0E160E"/>
-    <text x="408" y="153" font-family="Segoe UI,sans-serif" font-size="11" fill="#DCE6D6" dominant-baseline="central">2 排 ●●●●●●○○  6/8</text>
-    <rect x="396" y="166" width="240" height="22" fill="#0E160E"/>
-    <text x="408" y="177" font-family="Segoe UI,sans-serif" font-size="11" fill="#DCE6D6" dominant-baseline="central">3 排 ●●●○○○○○  3/8</text>
-    <rect x="396" y="190" width="240" height="22" fill="#0E160E"/>
-    <text x="408" y="201" font-family="Segoe UI,sans-serif" font-size="11" fill="#A8B5A3" dominant-baseline="central">4 排 ○○○○○○○○  0/8</text>
-    <rect x="396" y="214" width="240" height="22" fill="#0E160E"/>
-    <text x="408" y="225" font-family="Segoe UI,sans-serif" font-size="11" fill="#DCE6D6" dominant-baseline="central">载具 ▣▣▢  2/3</text>
-    <rect x="190" y="290" width="300" height="22" fill="#182618"/>
-    <rect x="190" y="290" width="3" height="22" fill="#6FA860"/>
-    <text x="202" y="301" font-family="Segoe UI,sans-serif" font-size="11" fill="#DCE6D6" dominant-baseline="central">已下达：移动到集结点</text>
-    <rect x="54" y="344" width="120" height="20" fill="#182618"/>
-    <text x="62" y="354" font-family="Segoe UI,sans-serif" font-size="11" font-weight="600" fill="#C8A03C" dominant-baseline="central">WASD</text>
-    <text x="98" y="354" font-family="Segoe UI,sans-serif" font-size="11" fill="#DCE6D6" dominant-baseline="central">移动</text>
-    <rect x="182" y="344" width="120" height="20" fill="#182618"/>
-    <text x="190" y="354" font-family="Segoe UI,sans-serif" font-size="11" font-weight="600" fill="#C8A03C" dominant-baseline="central">左键</text>
-    <text x="218" y="354" font-family="Segoe UI,sans-serif" font-size="11" fill="#DCE6D6" dominant-baseline="central">选择/框选</text>
-    <rect x="310" y="344" width="120" height="20" fill="#182618"/>
-    <text x="318" y="354" font-family="Segoe UI,sans-serif" font-size="11" font-weight="600" fill="#C8A03C" dominant-baseline="central">右键</text>
-    <text x="346" y="354" font-family="Segoe UI,sans-serif" font-size="11" fill="#DCE6D6" dominant-baseline="central">命令/阵型</text>
-    <rect x="612" y="342" width="24" height="24" fill="#182618" stroke="#7E9A7E" stroke-width="0.5"/>
-    <text x="624" y="354" font-family="Segoe UI,sans-serif" font-size="12" fill="#C8A03C" text-anchor="middle" dominant-baseline="central">?</text>
-    <text x="40" y="396" font-family="Segoe UI,sans-serif" font-size="11" fill="#A8B5A3" dominant-baseline="central">① 状态合成块 240×72（不再散画）</text>
-    <text x="245" y="396" font-family="Segoe UI,sans-serif" font-size="11" fill="#A8B5A3" dominant-baseline="central">② 按钮走统一 1px Frame()</text>
-    <text x="440" y="396" font-family="Segoe UI,sans-serif" font-size="11" fill="#A8B5A3" dominant-baseline="central">③ 小队缩进树，&gt;8 行折叠</text>
-    <text x="40" y="414" font-family="Segoe UI,sans-serif" font-size="11" fill="#A8B5A3" dominant-baseline="central">④ 反馈条居中 + 3px 状态竖条</text>
-    <text x="245" y="414" font-family="Segoe UI,sans-serif" font-size="11" fill="#A8B5A3" dominant-baseline="central">⑤ 常显仅 3 chip</text>
-    <text x="440" y="414" font-family="Segoe UI,sans-serif" font-size="11" fill="#A8B5A3" dominant-baseline="central">⑥ ? 帮助卡默认关闭</text>
-  </svg>
-</div>
-
-<div class="card">
-  <h2>C. 世界空间标记 / 箭头（俯视示意）</h2>
-  <p class="note">同一片战场、同样数量的标记。左＝现状（<code>GodViewController.cs</code> 3595/3655/3672/3686/3707 + <code>Formation.cs</code> 827），右＝重绘后。</p>
+  <h2>C. 世界空间标记（俯视示意）— <span class="fix">已按实际源码修正</span></h2>
+  <p class="note">真实情况：选中标记 = 4 段 45° 弧 + 中心点（用户形容"跟台风一样"）→ 改为 <b>直角角标</b>。全部标记改白/半透灰。</p>
   <div class="two">
     <div>
-      <h3>现状</h3>
-      <svg viewBox="0 0 460 320" role="img" xmlns="http://www.w3.org/2000/svg">
-        <rect x="0" y="0" width="460" height="320" fill="#2A3326"/>
-        <g fill="none" stroke="#9E9E9E" stroke-width="1.6" opacity="0.75">
-          <circle cx="95" cy="140" r="13"/><circle cx="150" cy="168" r="13"/><circle cx="78" cy="196" r="13"/>
+      <h3>现状（核对源码后重画）</h3>
+      <svg viewBox="0 0 460 300" role="img" xmlns="http://www.w3.org/2000/svg">
+        <rect x="0" y="0" width="460" height="300" fill="#2A3326"/>
+        <g fill="none" stroke="#9E9E9E" stroke-width="1.6" opacity="0.72">
+          <circle cx="90" cy="130" r="13"/><circle cx="145" cy="158" r="13"/><circle cx="74" cy="186" r="13"/>
         </g>
-        <g fill="none" stroke="#9E9E9E" stroke-width="0.9" opacity="0.55">
-          <circle cx="410" cy="252" r="6"/><circle cx="432" cy="270" r="5"/>
+        <g fill="none" stroke="#9E9E9E" stroke-width="0.9" opacity="0.5">
+          <circle cx="404" cy="236" r="6"/><circle cx="426" cy="254" r="5"/>
         </g>
         <g fill="none" stroke="#EDEDED" stroke-width="2" opacity="0.95">
-          <path d="M188 106 A19 19 0 0 1 207 99"/>
-          <path d="M213 111 A19 19 0 0 1 224 128"/>
-          <path d="M212 137 A19 19 0 0 1 195 148"/>
-          <path d="M186 132 A19 19 0 0 1 179 112"/>
+          <path d="M183 96 A19 19 0 0 1 202 89"/>
+          <path d="M208 101 A19 19 0 0 1 219 118"/>
+          <path d="M207 127 A19 19 0 0 1 190 138"/>
+          <path d="M181 122 A19 19 0 0 1 174 102"/>
         </g>
-        <circle cx="205" cy="118" r="4" fill="#EDEDED"/>
-        <path d="M205 118 L300 165" fill="none" stroke="#B3B3B3" stroke-width="1.4" stroke-dasharray="7 5" opacity="0.5"/>
-        <path d="M150 168 L262 232" fill="none" stroke="#B3B3B3" stroke-width="1.4" stroke-dasharray="7 5" opacity="0.5"/>
-        <circle cx="300" cy="165" r="11" fill="none" stroke="#FFD95A" stroke-width="1.8"/>
-        <circle cx="300" cy="165" r="3.5" fill="#FFD95A"/>
-        <circle cx="350" cy="78" r="22" fill="none" stroke="#F2473B" stroke-width="2.6" opacity="0.95"/>
-        <circle cx="350" cy="78" r="6" fill="#F2473B" opacity="0.5"/>
-        <text x="350" y="42" font-family="Segoe UI,sans-serif" font-size="12" fill="#F2473B" text-anchor="middle" dominant-baseline="central">⚔ 敌机枪组</text>
+        <circle cx="200" cy="108" r="4" fill="#EDEDED"/>
+        <path d="M200 108 L296 155" fill="none" stroke="#B3B3B3" stroke-width="1.4" stroke-dasharray="7 5" opacity="0.45"/>
+        <path d="M145 158 L258 222" fill="none" stroke="#B3B3B3" stroke-width="1.4" stroke-dasharray="7 5" opacity="0.45"/>
+        <circle cx="296" cy="155" r="11" fill="none" stroke="#FFD95A" stroke-width="1.8"/>
+        <circle cx="296" cy="155" r="3.5" fill="#FFD95A"/>
+        <circle cx="344" cy="68" r="22" fill="none" stroke="#F2473B" stroke-width="2.6"/>
+        <circle cx="344" cy="68" r="6" fill="#F2473B" opacity="0.5"/>
+        <text x="344" y="32" font-family="Segoe UI,sans-serif" font-size="12" fill="#F2473B" text-anchor="middle" dominant-baseline="central">⚔ 敌机枪组</text>
         <g fill="none" stroke="#EDEDED" stroke-width="1.8" opacity="0.9">
-          <path d="M246 222 A16 16 0 0 1 262 216"/>
-          <path d="M270 230 A16 16 0 0 1 272 246"/>
-          <path d="M264 250 A16 16 0 0 1 248 252"/>
-          <path d="M242 240 A16 16 0 0 1 242 224"/>
+          <path d="M241 212 A16 16 0 0 1 257 206"/>
+          <path d="M265 220 A16 16 0 0 1 267 236"/>
+          <path d="M259 240 A16 16 0 0 1 243 242"/>
+          <path d="M237 230 A16 16 0 0 1 237 214"/>
         </g>
-        <path d="M72 272 L176 272" fill="none" stroke="#FFE066" stroke-width="2.4"/>
-        <path d="M170 265 L176 272 L170 279" fill="none" stroke="#FFE066" stroke-width="2"/>
-        <circle cx="72" cy="272" r="7" fill="#FFE066"/>
-        <g fill="#FFE066"><circle cx="94" cy="286" r="3"/><circle cx="124" cy="286" r="3"/><circle cx="154" cy="286" r="3"/></g>
-        <text x="12" y="304" font-family="Segoe UI,sans-serif" font-size="11" fill="#C9C9C9">灰脚环 · 灰白括号 · 路线=登车同色 · 名签无底板 · 远处细到看不见</text>
+        <path d="M68 262 L172 262" fill="none" stroke="#FFE066" stroke-width="2.4"/>
+        <path d="M166 255 L172 262 L166 269" fill="none" stroke="#FFE066" stroke-width="2"/>
+        <circle cx="68" cy="262" r="7" fill="#FFE066"/>
+        <g fill="#FFE066"><circle cx="90" cy="276" r="3"/><circle cx="120" cy="276" r="3"/><circle cx="150" cy="276" r="3"/></g>
+        <text x="12" y="292" font-family="Segoe UI,sans-serif" font-size="11" fill="#C9C9C9">选中=4段弧(台风) · 五彩标记 · 路线/登车同色 · 名签无底板</text>
       </svg>
-      <div class="legend"><b>问题：</b>① 灰在草/雪/沙上全低对比 ② 路线与登车<b>完全同色</b> ③ 线宽是世界单位、不随距离补偿 ④ 脉动改半径→抖 ⑤ 名签裸字 ⑥ 颜色硬编码散在 6 处</div>
+      <div class="legend">
+        <b>逐条核实后的真实问题：</b>
+        ① 选中是 <b>4 段 45° 弧 + 中心点</b> → 台风形状<br>
+        ② 标记点用绿/红/青/黄/橙（非灰黑）<br>
+        ③ <code>pathC</code> 与 <code>boardC</code> <b>字面量完全相同</b><br>
+        ④ 线宽是世界单位，不随距离补偿<br>
+        ⑤ 名签裸字无底板<br>
+        ⑥ <span class="fix">❌ 我上轮说"穿墙混用无规则"——错。实际 <code>LineMatNoDepth()</code> <b>从未被调用</b>，全部标记都参与深度测试</span>
+      </div>
     </div>
     <div>
       <h3>重绘后</h3>
-      <svg viewBox="0 0 460 320" role="img" xmlns="http://www.w3.org/2000/svg">
-        <rect x="0" y="0" width="460" height="320" fill="#2A3326"/>
-        <g fill="none" stroke="#8FA88F" stroke-width="2">
-          <circle cx="95" cy="140" r="13"/><circle cx="150" cy="168" r="13"/><circle cx="78" cy="196" r="13"/>
+      <svg viewBox="0 0 460 300" role="img" xmlns="http://www.w3.org/2000/svg">
+        <rect x="0" y="0" width="460" height="300" fill="#2A3326"/>
+        <g fill="none" stroke="#FFFFFF" stroke-width="2" opacity="0.28">
+          <circle cx="90" cy="130" r="13"/><circle cx="145" cy="158" r="13"/><circle cx="74" cy="186" r="13"/>
         </g>
-        <g fill="none" stroke="#8FA88F" stroke-width="1.9">
-          <circle cx="410" cy="252" r="6"/><circle cx="432" cy="270" r="5"/>
+        <g fill="none" stroke="#FFFFFF" stroke-width="2" opacity="0.34">
+          <circle cx="404" cy="236" r="6"/><circle cx="426" cy="254" r="5"/>
         </g>
-        <g fill="none" stroke="#EAF0E2" stroke-width="2.6">
-          <path d="M188 106 A19 19 0 0 1 207 99"/>
-          <path d="M213 111 A19 19 0 0 1 224 128"/>
-          <path d="M212 137 A19 19 0 0 1 195 148"/>
-          <path d="M186 132 A19 19 0 0 1 179 112"/>
+        <g fill="none" stroke="#FFFFFF" stroke-width="2.6" opacity="0.92">
+          <path d="M180 88 L180 100 L192 100"/>
+          <path d="M208 100 L220 100 L220 88"/>
+          <path d="M220 116 L220 128 L208 128"/>
+          <path d="M192 128 L180 128 L180 116"/>
         </g>
-        <circle cx="205" cy="118" r="4.5" fill="#EAF0E2"/>
-        <path d="M205 118 L300 165" fill="none" stroke="#A8B5A3" stroke-width="2" stroke-dasharray="8 5"/>
-        <path d="M150 168 L262 232" fill="none" stroke="#5DCAA5" stroke-width="2" stroke-dasharray="4 4"/>
-        <circle cx="300" cy="165" r="11" fill="none" stroke="#C8A03C" stroke-width="2.6"/>
-        <circle cx="300" cy="165" r="4" fill="#C8A03C"/>
-        <circle cx="350" cy="78" r="22" fill="none" stroke="#C4453C" stroke-width="3"/>
-        <circle cx="350" cy="78" r="6" fill="#C4453C" opacity="0.35"/>
-        <rect x="286" y="32" width="128" height="20" fill="#060A06" fill-opacity="0.9" stroke="#8FB08F" stroke-opacity="0.4"/>
-        <text x="350" y="42" font-family="Segoe UI,sans-serif" font-size="12" fill="#DCE6D6" text-anchor="middle" dominant-baseline="central">⚔ 敌机枪组</text>
-        <g fill="none" stroke="#EAF0E2" stroke-width="2.4">
-          <path d="M246 222 A16 16 0 0 1 262 216"/>
-          <path d="M270 230 A16 16 0 0 1 272 246"/>
-          <path d="M264 250 A16 16 0 0 1 248 252"/>
-          <path d="M242 240 A16 16 0 0 1 242 224"/>
+        <circle cx="200" cy="108" r="3.6" fill="#FFFFFF" opacity="0.95"/>
+        <path d="M200 108 L296 155" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-dasharray="9 5" opacity="0.26"/>
+        <path d="M145 158 L258 222" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-dasharray="4 4" opacity="0.48"/>
+        <circle cx="296" cy="155" r="11" fill="none" stroke="#FFFFFF" stroke-width="2.6" opacity="0.85"/>
+        <circle cx="296" cy="155" r="4" fill="#FFFFFF" opacity="0.85"/>
+        <circle cx="344" cy="68" r="22" fill="none" stroke="#C4453C" stroke-width="3"/>
+        <circle cx="344" cy="68" r="6" fill="#C4453C" opacity="0.35"/>
+        <rect x="281" y="22" width="126" height="20" fill="#0C0C0C" fill-opacity="0.9" stroke="#FFFFFF" stroke-opacity="0.18"/>
+        <text x="344" y="32" font-family="Segoe UI,sans-serif" font-size="12" fill="#F2F2F2" text-anchor="middle" dominant-baseline="central">⚔ 敌机枪组</text>
+        <g fill="none" stroke="#FFFFFF" stroke-width="2.4" opacity="0.8">
+          <path d="M238 206 L238 218 L250 218"/>
+          <path d="M266 218 L278 218 L278 206"/>
+          <path d="M278 234 L278 246 L266 246"/>
+          <path d="M250 246 L238 246 L238 234"/>
         </g>
-        <path d="M72 272 L176 272" fill="none" stroke="#C8A03C" stroke-width="2.8"/>
-        <path d="M168 264 L176 272 L168 280" fill="none" stroke="#C8A03C" stroke-width="2.4"/>
-        <circle cx="72" cy="272" r="7.5" fill="#C8A03C"/>
-        <g fill="#C8A03C"><circle cx="94" cy="286" r="3.4"/><circle cx="124" cy="286" r="3.4"/><circle cx="154" cy="286" r="3.4"/></g>
-        <text x="12" y="304" font-family="Segoe UI,sans-serif" font-size="11" fill="#A8B5A3">军绿脚环 · 亮度括号 · 登车改青绿 · 名签带底板 · 远处线宽已补偿</text>
+        <path d="M68 262 L172 262" fill="none" stroke="#FFFFFF" stroke-width="2.8" opacity="0.8"/>
+        <path d="M164 254 L172 262 L164 270" fill="none" stroke="#FFFFFF" stroke-width="2.4" opacity="0.8"/>
+        <circle cx="68" cy="262" r="7.5" fill="#FFFFFF" opacity="0.8"/>
+        <g fill="#FFFFFF" opacity="0.55"><circle cx="90" cy="276" r="3.4"/><circle cx="120" cy="276" r="3.4"/><circle cx="150" cy="276" r="3.4"/></g>
+        <text x="12" y="292" font-family="Segoe UI,sans-serif" font-size="11" fill="#A0A0A0">选中=直角角标 · 全白/半透灰 · 登车亮短虚线 · 名签带底板</text>
       </svg>
-      <div class="legend"><b>改动：</b>① 语义色全部来自同一套令牌 ② 登车改青绿与路线区分 ③ <code>width × clamp(dist/30, 0.6, 2.5)</code> ④ 脉动改<b>透明度</b>、相位按 key 错开 ⑤ 名签加深色底板 ⑥ 穿墙只给命令反馈类</div>
+      <div class="legend">
+        <b>改动：</b>
+        ① <b>选中改直角角标</b>（不再是弧，任意视角都稳定）<br>
+        ② 全部标记点 <b>白 / 半透灰</b>，靠明度档区分（脚环 .28 / 路线 .26 / 登车 .48 / 选中 .92）<br>
+        ③ 路线 <b>长虚线 9-5 暗</b>；登车 <b>短虚线 4-4 亮</b>（不再同色）<br>
+        ④ 线宽 <code>× clamp(dist/30, 0.6, 2.5)</code><br>
+        ⑤ 名签加深色底板 + 1px 描边<br>
+        ⑥ 集火是<b>唯一保留的彩色</b>（可 cfg 关）
+      </div>
     </div>
   </div>
 </div>
 
 <div class="card">
-  <h2>统一色板（屏幕 UI 与世界空间同源）</h2>
+  <h2>C-2. 选中标记形状对比（放大）</h2>
+  <p class="note">左：现状 <code>GetBracket</code> 的 4 段 45° 弧（<code>start=q*90+22.5</code>，<code>45*i/8</code>）。右：改为直角角标，<code>positionCount 9→3</code>，只改几何、调用点不动。</p>
+  <svg viewBox="0 0 680 220" role="img" xmlns="http://www.w3.org/2000/svg">
+    <rect x="40" y="30" width="270" height="160" fill="#2A3326"/>
+    <g fill="none" stroke="#EDEDED" stroke-width="3">
+      <path d="M105 70 A34 34 0 0 1 139 55"/>
+      <path d="M149 70 A34 34 0 0 1 164 104"/>
+      <path d="M149 126 A34 34 0 0 1 115 141"/>
+      <path d="M101 126 A34 34 0 0 1 86 92"/>
+    </g>
+    <circle cx="125" cy="98" r="7" fill="#EDEDED"/>
+    <text x="175" y="76" font-family="Segoe UI,sans-serif" font-size="13" fill="#EDEDED" dominant-baseline="central">现状：4 段 45° 弧</text>
+    <text x="175" y="98" font-family="Segoe UI,sans-serif" font-size="12" fill="#C9C9C9" dominant-baseline="central">= 台风 🌀 形状</text>
+    <text x="175" y="120" font-family="Segoe UI,sans-serif" font-size="12" fill="#C9C9C9" dominant-baseline="central">斜视下弧会退化成椭圆</text>
+    <path d="M330 110 L370 110" fill="none" stroke="#8A9A8A" stroke-width="1.4" marker-end="url(#ah)"/>
+    <defs><marker id="ah" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M2 1L8 5L2 9" fill="none" stroke="#8A9A8A" stroke-width="1.5" stroke-linecap="round"/></marker></defs>
+    <rect x="390" y="30" width="250" height="160" fill="#2A3326"/>
+    <g fill="none" stroke="#FFFFFF" stroke-width="3" opacity="0.92">
+      <path d="M455 62 L455 84 L477 84"/>
+      <path d="M503 84 L525 84 L525 62"/>
+      <path d="M525 116 L525 138 L503 138"/>
+      <path d="M477 138 L455 138 L455 116"/>
+    </g>
+    <circle cx="490" cy="100" r="6.5" fill="#FFFFFF" opacity="0.95"/>
+    <text x="490" y="176" font-family="Segoe UI,sans-serif" font-size="12" fill="#A0A0A0" text-anchor="middle" dominant-baseline="central">重绘后：直角角标 + 中心点</text>
+  </svg>
+</div>
+
+<div class="card">
+  <h2>A/B. 面板与 HUD（灰黑单色系）</h2>
+  <p class="note">沿用 v1 的布局，配色换成灰黑：面板底 <code>#0C0C0C</code>、控件 <code>#1E1E1E</code>、选中 <code>#3A3A3A</code>、强调=纯白。</p>
+  <svg viewBox="0 0 680 300" role="img" xmlns="http://www.w3.org/2000/svg">
+    <rect x="40" y="30" width="300" height="240" fill="#0C0C0C" stroke="#FFFFFF" stroke-opacity="0.18"/>
+    <rect x="50" y="38" width="280" height="22" fill="#141414"/>
+    <rect x="50" y="59" width="280" height="1" fill="#FFFFFF" fill-opacity="0.14"/>
+    <text x="58" y="49" font-family="Segoe UI,sans-serif" font-size="14" font-weight="600" fill="#E8E8E8" dominant-baseline="central">通用生成</text>
+    <text x="318" y="49" font-family="Segoe UI,sans-serif" font-size="11" fill="#A0A0A0" text-anchor="middle" dominant-baseline="central">✕</text>
+    <rect x="50" y="66" width="90" height="22" fill="#3A3A3A"/>
+    <text x="95" y="77" font-family="Segoe UI,sans-serif" font-size="11" fill="#FFFFFF" text-anchor="middle" dominant-baseline="central">美军</text>
+    <rect x="145" y="66" width="90" height="22" fill="#1E1E1E"/>
+    <text x="190" y="77" font-family="Segoe UI,sans-serif" font-size="11" fill="#E8E8E8" text-anchor="middle" dominant-baseline="central">德军</text>
+    <rect x="240" y="66" width="90" height="22" fill="#1E1E1E"/>
+    <text x="285" y="77" font-family="Segoe UI,sans-serif" font-size="11" fill="#E8E8E8" text-anchor="middle" dominant-baseline="central">英军</text>
+    <rect x="50" y="93" width="67" height="22" fill="#1E1E1E"/>
+    <text x="83" y="104" font-family="Segoe UI,sans-serif" font-size="11" fill="#E8E8E8" text-anchor="middle" dominant-baseline="central">收藏</text>
+    <rect x="121" y="93" width="67" height="22" fill="#3A3A3A"/>
+    <rect x="121" y="113" width="67" height="2" fill="#FFFFFF"/>
+    <text x="154" y="103" font-family="Segoe UI,sans-serif" font-size="11" fill="#FFFFFF" text-anchor="middle" dominant-baseline="central">步兵</text>
+    <rect x="192" y="93" width="67" height="22" fill="#1E1E1E"/>
+    <text x="225" y="104" font-family="Segoe UI,sans-serif" font-size="11" fill="#E8E8E8" text-anchor="middle" dominant-baseline="central">机枪</text>
+    <rect x="263" y="93" width="67" height="22" fill="#1E1E1E"/>
+    <text x="296" y="104" font-family="Segoe UI,sans-serif" font-size="11" fill="#E8E8E8" text-anchor="middle" dominant-baseline="central">坦克</text>
+    <rect x="50" y="119" width="67" height="22" fill="#3A3A3A"/>
+    <rect x="50" y="119" width="3" height="22" fill="#FFFFFF"/>
+    <text x="85" y="130" font-family="Segoe UI,sans-serif" font-size="11" fill="#FFFFFF" text-anchor="middle" dominant-baseline="central">步枪</text>
+    <rect x="121" y="119" width="67" height="22" fill="#1E1E1E"/>
+    <text x="154" y="130" font-family="Segoe UI,sans-serif" font-size="11" fill="#E8E8E8" text-anchor="middle" dominant-baseline="central">冲锋枪</text>
+    <rect x="192" y="119" width="67" height="22" fill="#1E1E1E"/>
+    <text x="225" y="130" font-family="Segoe UI,sans-serif" font-size="11" fill="#E8E8E8" text-anchor="middle" dominant-baseline="central">手枪</text>
+    <rect x="263" y="119" width="67" height="22" fill="#1E1E1E"/>
+    <text x="296" y="130" font-family="Segoe UI,sans-serif" font-size="11" fill="#E8E8E8" text-anchor="middle" dominant-baseline="central">轻机枪</text>
+    <rect x="50" y="145" width="280" height="112" fill="#000000" fill-opacity="0.4"/>
+    <rect x="50" y="145" width="280" height="28" fill="#3A3A3A"/>
+    <rect x="50" y="145" width="3" height="28" fill="#FFFFFF"/>
+    <text x="60" y="159" font-family="Segoe UI,sans-serif" font-size="12" fill="#FFFFFF" dominant-baseline="central">M1 Garand</text>
+    <text x="424" y="159" font-family="Segoe UI,sans-serif" font-size="11" fill="#FFFFFF" text-anchor="end" dominant-baseline="central">最近</text>
+    <rect x="50" y="173" width="280" height="28" fill="#121212"/>
+    <text x="60" y="187" font-family="Segoe UI,sans-serif" font-size="12" fill="#E8E8E8" dominant-baseline="central">M1903 Springfield</text>
+    <rect x="50" y="201" width="280" height="28" fill="#121212"/>
+    <text x="60" y="215" font-family="Segoe UI,sans-serif" font-size="12" fill="#E8E8E8" dominant-baseline="central">M1917 Enfield</text>
+    <rect x="50" y="229" width="280" height="28" fill="#1E1E1E"/>
+    <text x="60" y="243" font-family="Segoe UI,sans-serif" font-size="12" fill="#E8E8E8" dominant-baseline="central">M1 Carbine</text>
+    <text x="304" y="243" font-family="Segoe UI,sans-serif" font-size="11" fill="#A0A0A0" text-anchor="end" dominant-baseline="central">半自动</text>
+    <rect x="50" y="264" width="30" height="20" fill="#1E1E1E"/>
+    <text x="65" y="274" font-family="Segoe UI,sans-serif" font-size="11" fill="#E8E8E8" text-anchor="middle" dominant-baseline="central">◀</text>
+    <text x="190" y="274" font-family="Segoe UI,sans-serif" font-size="11" fill="#A0A0A0" text-anchor="middle" dominant-baseline="central">3 / 12</text>
+    <rect x="300" y="264" width="30" height="20" fill="#1E1E1E"/>
+    <text x="315" y="274" font-family="Segoe UI,sans-serif" font-size="11" fill="#E8E8E8" text-anchor="middle" dominant-baseline="central">▶</text>
+    <rect x="380" y="30" width="260" height="130" fill="#1B241B"/>
+    <rect x="380" y="160" width="260" height="46" fill="#232A20"/>
+    <rect x="380" y="30" width="260" height="176" fill="none" stroke="#FFFFFF" stroke-opacity="0.18"/>
+    <rect x="392" y="42" width="180" height="52" fill="#0C0C0C" stroke="#FFFFFF" stroke-opacity="0.18"/>
+    <text x="402" y="58" font-family="Segoe UI,sans-serif" font-size="12" fill="#E8E8E8" dominant-baseline="central">已选 步兵 8 + 载具 2</text>
+    <text x="402" y="76" font-family="Segoe UI,sans-serif" font-size="11" fill="#A0A0A0" dominant-baseline="central">⏸ 已暂停（空格继续）</text>
+    <rect x="402" y="86" width="160" height="5" fill="#000000" fill-opacity="0.5"/>
+    <rect x="402" y="86" width="130" height="5" fill="#FFFFFF" opacity="0.75"/>
+    <rect x="578" y="42" width="50" height="24" fill="#1E1E1E"/>
+    <path d="M578 42 L628 42 M578 66 L628 66 M578 42 L578 66 M628 42 L628 66" fill="none" stroke="#FFFFFF" stroke-opacity="0.28" stroke-width="1"/>
+    <text x="603" y="54" font-family="Segoe UI,sans-serif" font-size="11" fill="#E8E8E8" text-anchor="middle" dominant-baseline="central">分队</text>
+    <rect x="392" y="104" width="236" height="88" fill="#0C0C0C" stroke="#FFFFFF" stroke-opacity="0.18"/>
+    <rect x="392" y="108" width="236" height="20" fill="#3A3A3A"/>
+    <rect x="392" y="108" width="3" height="20" fill="#FFFFFF"/>
+    <text x="404" y="118" font-family="Segoe UI,sans-serif" font-size="11" fill="#FFFFFF" dominant-baseline="central">1 排 ●●●●○○○○  8/8</text>
+    <rect x="392" y="130" width="236" height="20" fill="#121212"/>
+    <text x="404" y="140" font-family="Segoe UI,sans-serif" font-size="11" fill="#E8E8E8" dominant-baseline="central">2 排 ●●●●●●○○  6/8</text>
+    <rect x="392" y="152" width="236" height="20" fill="#121212"/>
+    <text x="404" y="162" font-family="Segoe UI,sans-serif" font-size="11" fill="#E8E8E8" dominant-baseline="central">3 排 ●●●○○○○○  3/8</text>
+    <rect x="392" y="174" width="236" height="20" fill="#121212"/>
+    <text x="404" y="184" font-family="Segoe UI,sans-serif" font-size="11" fill="#A0A0A0" dominant-baseline="central">4 排 ○○○○○○○○  0/8</text>
+    <rect x="470" y="204" width="150" height="20" fill="#1E1E1E"/>
+    <rect x="470" y="204" width="3" height="20" fill="#FFFFFF" opacity="0.6"/>
+    <text x="480" y="214" font-family="Segoe UI,sans-serif" font-size="11" fill="#E8E8E8" dominant-baseline="central">已下达：移动</text>
+    <rect x="392" y="234" width="104" height="18" fill="#1E1E1E"/>
+    <text x="398" y="243" font-family="Segoe UI,sans-serif" font-size="11" font-weight="600" fill="#FFFFFF" dominant-baseline="central">WASD</text>
+    <text x="430" y="243" font-family="Segoe UI,sans-serif" font-size="11" fill="#E8E8E8" dominant-baseline="central">移动</text>
+    <rect x="502" y="234" width="104" height="18" fill="#1E1E1E"/>
+    <text x="508" y="243" font-family="Segoe UI,sans-serif" font-size="11" font-weight="600" fill="#FFFFFF" dominant-baseline="central">左键</text>
+    <text x="536" y="243" font-family="Segoe UI,sans-serif" font-size="11" fill="#E8E8E8" dominant-baseline="central">选择</text>
+    <rect x="612" y="234" width="22" height="22" fill="#1E1E1E" stroke="#FFFFFF" stroke-opacity="0.28"/>
+    <text x="623" y="245" font-family="Segoe UI,sans-serif" font-size="12" fill="#FFFFFF" text-anchor="middle" dominant-baseline="central">?</text>
+  </svg>
+</div>
+
+<div class="card">
+  <h2>灰黑色板</h2>
   <div class="sw">
-    <div><i style="background:#0A0F0A"></i>面板 #060A06</div>
-    <div><i style="background:#182618"></i>控件 #182618</div>
-    <div><i style="background:#2E5A2A"></i>选中 #2E5A2A</div>
-    <div><i style="background:#C8A03C"></i>强调 #C8A03C</div>
-    <div><i style="background:#DCE6D6"></i>正文 #DCE6D6</div>
-    <div><i style="background:#A8B5A3"></i>次要 #A8B5A3</div>
-    <div><i style="background:#6FA860"></i>成功 #6FA860</div>
-    <div><i style="background:#E0A33A"></i>警告 #E0A33A</div>
-    <div><i style="background:#C4453C"></i>危险 #C4453C</div>
-    <div><i style="background:#5DCAA5"></i>登车 #5DCAA5</div>
-    <div><i style="background:#85B7EB"></i>载具 #85B7EB</div>
-    <div><i style="background:#8FA88F"></i>友军脚环 #8FA88F</div>
+    <div><i style="background:#0C0C0C"></i>面板 #0C0C0C</div>
+    <div><i style="background:#141414"></i>标题 #141414</div>
+    <div><i style="background:#1E1E1E"></i>控件 #1E1E1E</div>
+    <div><i style="background:#2A2A2A"></i>悬停 #2A2A2A</div>
+    <div><i style="background:#3A3A3A"></i>选中 #3A3A3A</div>
+    <div><i style="background:#121212"></i>行 #121212</div>
+    <div><i style="background:#E8E8E8"></i>正文 #E8E8E8</div>
+    <div><i style="background:#A0A0A0"></i>次要 #A0A0A0</div>
+    <div><i style="background:#5A5A5A"></i>禁用 #5A5A5A</div>
+    <div><i style="background:#FFFFFF"></i>强调=纯白</div>
   </div>
+  <p class="note" style="margin-top:14px">唯一保留的彩色例外（可 cfg 关）：<b style="color:#C4453C">集火/危险 #C4453C</b> · <b style="color:#E0A33A">警告/火力点 #E0A33A</b> · <b style="color:#FFD45E">收藏★ #FFD45E</b></p>
 </div>
 
 </div>
