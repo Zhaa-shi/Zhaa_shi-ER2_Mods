@@ -1160,10 +1160,14 @@ internal static class BackpackPanel
         float k = Er2Ui.Scale;
 
         // 底板 + 描边（InfoPanel 同款：不透明底防透字）
-        GUI.color = new Color(baseC.r * 0.5f, baseC.g * 0.5f, baseC.b * 0.5f, 0.97f);
+        // 2.5.2：底板不再把玩家色"折半"——×0.5 后默认只有 0.06 灰，这是"整个 UI 太黑"的主要来源；
+        // 描边改共享令牌 `PanelBorder`，让它成为真正的设计元素而非"底色的半透明版"。
+        GUI.color = new Color(baseC.r, baseC.g, baseC.b, 0.95f);
         GUI.DrawTexture(r, Texture2D.whiteTexture);
-        GUI.color = new Color(hoverC.r, hoverC.g, hoverC.b, 0.5f);
-        float bd = 1f * k;
+        // 2.5.2：标题条独立底色——把"标题/关闭/翻页"从格子区里分出来（设计感）
+        Er2Ui.Fill(new Rect(r.x, r.y, r.width, TitleH), Er2Ui.TitleBar);
+        GUI.color = Er2Ui.PanelBorder;
+        float bd = Mathf.Max(1f, 1f * k);
         GUI.DrawTexture(new Rect(r.x, r.y, r.width, bd), Texture2D.whiteTexture);
         GUI.DrawTexture(new Rect(r.x, r.yMax - bd, r.width, bd), Texture2D.whiteTexture);
         GUI.DrawTexture(new Rect(r.x, r.y, bd, r.height), Texture2D.whiteTexture);
@@ -1219,8 +1223,8 @@ internal static class BackpackPanel
             if (GhostBtn(new Rect(r.xMax - 46f * k, r.y + 3f * k, 20f * k, 20f * k), "▶", textC, hoverC)) w.page = (w.page + 1) % pages;
         }
         if (GhostBtn(new Rect(r.xMax - 24f * k, r.y + 3f * k, 20f * k, 20f * k), "✕", textC, hoverC)) { CloseAt(windows.IndexOf(w)); return; }
-        // 1.4.2：标题栏分隔线（UI 打磨）
-        GUI.color = new Color(hoverC.r, hoverC.g, hoverC.b, 0.28f);
+        // 1.4.2：标题栏分隔线（UI 打磨）；2.5.2：改共享令牌 Edge（原 hoverC@0.28 随玩家配色漂移）
+        GUI.color = Er2Ui.Edge;
         GUI.DrawTexture(new Rect(r.x + 1f * k, r.y + TitleH, r.width - 2f * k, 1f * k), Texture2D.whiteTexture);
         GUI.color = Color.white;
 
@@ -1248,7 +1252,8 @@ internal static class BackpackPanel
         float k = Er2Ui.Scale;
 
         // 格底 + 细描边
-        GUI.color = hover ? new Color(1f, 1f, 1f, 0.10f) : new Color(0f, 0f, 0f, 0.35f);
+        // 2.5.2：格底由纯黑@0.35 改共享的列表底色（黑格是背包观感"太黑、没层次"的另一半原因）
+        GUI.color = hover ? Er2Ui.RowHover : Er2Ui.ListBg;
         GUI.DrawTexture(cr, Texture2D.whiteTexture);
         GUI.color = new Color(1f, 1f, 1f, 0.08f);
         float ce = 1f * k;

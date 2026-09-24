@@ -18,8 +18,8 @@
 | 8 | `ZoomAnywhere` | `er2.zoomanywhere` | ER2 Zoom Anywhere | **1.0.1** | `ER2_ZoomAnywhere.dll` | 已部署 |
 | 9 | `HighValueTarget` | `er2.highvaluetarget` | ER2 Veteran HVT | **1.2.2** | `ER2_VeteranHVT.dll` | 已部署（+ Assets 目录） |
 | 10 | `InventoryPause` | `er2.inventorypause` | ER2 Inventory Pause | **1.0.5** | `ER2_InventoryPause.dll` | 已部署 |
-| 11 | `SquadCommand` | `er2.squadcommand` | ER2 Battlefield Commander | **1.4.20** | `ER2_BattlefieldCommander.dll` | 已发布 |
-| 12 | `UniversalGeneration` | `er2.universalgeneration` | ER2 Universal Generation | **2.5.1** | `ER2_UniversalGeneration.dll` | 已发布 |
+| 11 | `SquadCommand` | `er2.squadcommand` | ER2 Battlefield Commander | **1.4.21** | `ER2_BattlefieldCommander.dll` | 已发布 |
+| 12 | `UniversalGeneration` | `er2.universalgeneration` | ER2 Universal Generation | **2.5.2** | `ER2_UniversalGeneration.dll` | 已发布 |
 | 13 | `UnitCollision` | `er2.morephysics.unitcollision` | ER2 More Physics - Unit Collision | **1.0.8** | `ER2_MorePhysics_UnitCollision.dll` | 已部署 |
 | 14 | `UnitInfoOverlay` | `er2.unitinfooverlay` | ER2 Unit Inspector | **1.0.5** | `ER2_UnitInfoOverlay.dll` | 已部署 |
 | 15 | `FleshWoundsFixed` | `ER2_FleshWounds` | ER2 Flesh Wounds | **1.0.1** | （需手动构建部署，build.ps1 无条目） | 第三方修复版 |
@@ -116,7 +116,18 @@ AI 血量低于 `eatBelowHp`（默认 **40**）自动吃背包食物回血：`Fi
 打开背包（自己/尸体）时**真暂停**（延迟 timeScale 冻结，等打开动画完成）；暂停期间丢弃道具自动落地（扫描 `ItemObject.spawnedItems`）。
 **ER2 暂停机制图谱（全部实测定案，做任何暂停功能前必读）**：原生 `Pause.SetPause` = timeScale=0 + 弹菜单 + `disableOnPause`（藏菜单 = 死锁）；手动 `Pause.isPaused=true` 禁用输入但**不冻结世界**；`timeScale=0` 真暂停但**卡 UI 协程动画** + 丢弃武器浮空（解法：延迟冻结等动画完成 + 扫描 `spawnedItems` 拉下道具）；`enableAiBehaviour(false)` **无效**（true 才有效）；背包开关读 `InventoryPanel.isOpen`。
 
-### 2.11 SquadCommand（Battlefield Commander）`er2.squadcommand` v1.4.20
+### 2.11 SquadCommand（Battlefield Commander）`er2.squadcommand` v1.4.21
+**1.4.21（2026-09-25，用户第 22 轮："1.绘制的线条都太粗了 2.颜色浅了，而且只有单一的色块没有设计感 3.选中单位后的标记怎么变成箭头了 4.半透明灰色质感不好"）**：
+- **线宽改「像素」语义（"线太粗"）**：`LineRenderer.widthMultiplier` 是世界单位，屏幕像素宽 = `width_m × screenH / (2·dist·tan(fov/2))`。写死世界单位近粗远细；用经验倍率（`dist/30`）补偿则与分辨率强耦合（1440p 粗 1.33×、4K 粗 2×）。**第一轮曾把"改除数 30→60"与"基准值砍 55%"叠加，实际落到 ~0.6px（细到看不见）**——量纲算清后改为：调用点只写 1080p 目标像素宽，`Er2Ui.LineWidth(px, dist) = px × 2 × dist × tan(fov/2) / 1080`（screenH 约掉 → 占屏比例与分辨率无关）。层次：步兵脚环 1.1 / 虚线 1.2~1.3 / 载具脚环 1.4 / 选中角标 1.6~1.9 / 阵型 1.7~1.8 / 集火环 2.2。FOV 由 `Er2Ui.SetCamFov(cam.fieldOfView)` 从 `MarkerCamDist()` 与 `MarkerCamDistForFormation()` 注入，取不到按 60° 兜底。旧 `WidthScale` 经验倍率删除。
+- **选中角标不再是"箭头"（根因回源码核实，非照截图猜）**：角标根对象 `localScale = (radius,1,radius)`，而线宽被父 `lossyScale` 连带放大 → 载具上（radius ≤ 4.2）0.1 m 变 ~0.5~1.0 m，折角臂长仅 0.34×radius ≈ 1 m → 两条粗臂糊成实心三角块。**这也是"线太粗"的同一个根因。** 修法：父 scale 恒 `Vector3.one`、半径写进顶点（`Mark.bracketPts` 缓冲复用，零分配），臂长 0.34 → 0.42；顺带把每帧 `new float[4]` 提为 `static readonly BracketSX/SZ`。
+- **世界标记从半透明改灰阶实色（"半透明灰色质感不好"）**：α 0.26~0.48 会被草地/雪地/沙地吃掉（颜色随背景漂移、边界发虚）。改 α ≥ 0.80 的灰阶实色，层次靠灰度值：`WPath #9AA1A8` → `WFriendly #8E959C` → `WBoard #C6CBD0` → `WVehicle #CBCFD0` → `WFormation #E2E6EA` → `WMove #F2F5F7` → `WSelected 纯白`；仅 `WGhost #B8BCC0@0.32` 保留半透（预览语义）。
+- **面板补结构线（"只有单一色块没设计感"）**：新增 `Frame`（矩形描边）/ `HLine`（分隔线）/ `AccentBar`（左竖条）三个原语 + `Edge`/`EdgeSoft` 令牌；`GenPanel` 加标题条独立底色 + 标题下分隔线 + 面板外框 + 两个列表内凹边框 + 收藏行左竖条；`BackpackPanel` 底板不再 ×0.5、加标题条、描边/分隔线走共享令牌、格底改 `Er2Ui.ListBg`。层次 = 面（明度档）+ 线（边框/分隔）+ 条（选中）。
+- **配色压回中深灰（"颜色浅了"）**：1.4.20 提亮过头。`PanelBg #14181D@0.95` / `TitleBar #1F252C@0.97` / `Surface #262D35@0.95` / `SurfaceHover #333B45@0.97` / `SurfaceActive #46505C` / `RowBg #1B2027@0.92` / `ListBg #050708@0.42`；文字 `#E9EDF1` / `#B2BAC3@0.92` / `#7B838C@0.80`。HUD cfg `colorBase #1E1E1EE6 → #262A30F0`、`colorHover #3A3A3AF2 → #454E59F5`。
+- **顺带**：`GenPanel.BuildRows` 6 处固定行高漏乘 `Scale` 修掉；清掉 `SquadCmdLogic.resMultCache/resMultNext` 两个死字段（陷阱 81）；补 EN 表缺失的 12 条 Markers cfg 描述。
+- **新陷阱入指南**：89（线宽应为像素语义）/ 90（父 lossyScale 放大线宽，别用缩放传参）/ 91（半透明在 3D 差，层次移到灰度值）/ 92（缺结构线 = 没设计感）。
+- 验证：编译 0 error（SC + UG）；部署 DLL 222,720 B，sha256 `3CFA3DDCF6B2BA51BAAD239A6BCD49EDD91618470E8D8C98AAC0C3DF7B86D1D3`，与构建产物逐字节一致；`ER2_BattlefieldCommander_v1.4.21.zip`。
+  反编译复核：版本双写 1.4.21 ✓；`LineWidth` 像素模型（`pxAt1080 * 2f * d * tanHalf / 1080f`）✓；`SetCamFov` 注入 2 处 ✓；旧 `WidthScale` 0 处 ✓；`localScale = Vector3.one` ✓；臂长内联 `0.58`（=1−0.42）✓；`bracketPts` 复用 ✓；`BracketSX/SZ` 静态 ✓；13 处像素线宽（1.1 / 1.2×2 / 1.3×2 / 1.4 / 1.6×2 / 1.7×2 / 1.8 / 1.9 / 2.2）✓；`Frame/HLine/AccentBar` 在位 ✓；`colorBase #262A30F0` / `colorHover #454E59F5` ✓。
+
 **1.4.20（2026-09-25，用户第 21 轮："UI 不能是死的，要是可以动态调整的。不要加多余的数值显示等。现在的UI太黑了。全部都要改，不要漏，用游戏原生方式实现" + 澄清"动态调整指自适应"）**：
 - **UI 自适应（本轮主题）**：
   - **跟随游戏原生倍率**：`Er2Ui.NativeResMult()` 读 `ResourcesManager.ResolutionMult`（就是玩家在游戏设置里调的 UI 大小，原生 HUD 全部按它缩放），取不到才按 `min(Screen.w/1920, Screen.h/1080)` 兜底；0.5s 缓存；clamp `[0.75, 1.6]`。原 `SquadCmdLogic.ResMult()` 改为转发，实现下沉到共享层（两 mod 共用一份缓存，算法不再漂移）。
@@ -327,7 +338,14 @@ AI 血量低于 `eatBelowHp`（默认 **40**）自动吃背包食物回血：`Fi
   2. 枚举型工具函数（`CollectSquads` 这类"遍历全局静态表"的）一律加短缓存，否则被连续调用时浏览器级开销；
   3. OnGUI 路径里 `new List<>`/`new Dictionary<>`/`ToArray()` 逐个清掉，复用静态缓冲区；
   4. 缓存失效点要显式（`InvalidatePlayerSoldier`/`InvalidateMainCam`），并让"拿不到值的缓存"不写入（避免把 null 缓存成半秒的真相）。
-### 2.12 UniversalGeneration `er2.universalgeneration` v2.5.1
+### 2.12 UniversalGeneration `er2.universalgeneration` v2.5.2
+**2.5.2（2026-09-25，用户第 22 轮视觉反馈，与 SquadCommand 1.4.21 同批）**：
+- **面板补结构线（"只有单一色块没设计感"）**：共享层新增 `Frame`/`HLine`/`AccentBar` + `Edge`/`EdgeSoft`；`GenPanel.Draw()` 改为：铺 `PanelBg` → 画**标题条独立底色** → 标题条下 `HLine` 分隔 → 画行 → 最后 `Frame` 外框；两个列表（单位/物品）加内凹边框；收藏行加左竖条 `AccentBar`。层次从"只有面"变"面 + 线 + 条"。
+- **配色压回中深灰（"颜色浅了"）**：随共享令牌一并压回（面板 `#14181D` / 标题条 `#1F252C` / 控件 `#262D35` / 悬停 `#333B45` / 选中 `#46505C`），与宿主完全同一套。
+- **修掉漏乘倍率的固定行高**：`BuildRows` 的 Title 26 / Faction 36 / Pager 26 / ItemHelp 34 / Crew 32 / Preview 24 与 List 内 8px 内缩此前是常量，自适应下不跟随 → 全部 × `Er2Ui.Scale`。
+- 验证：编译 0 error；部署 DLL 118,272 B，sha256 `B157D4F27084B7E1C183EE7390B8B136DE49FBAC0359DA3F83630E7FF97BC85D`，与构建产物逐字节一致；`ER2_UniversalGeneration_v2.5.2.zip`。
+  反编译复核：版本双写 2.5.2 ✓；`Frame/HLine/AccentBar` 成员在位 ✓；`Er2Ui.Frame/HLine/AccentBar` 调用点 6 处 ✓；`LineWidth` 像素模型在位（共享源码同步）✓。
+
 **2.5.1（2026-09-25，用户第 21 轮：UI 自适应 + 提亮，与 SquadCommand 1.4.20 同批）**：
 - **自适应**：`GenPanel` 的 `PanelW/RowH/TabH` 由 `const` → 随 `Er2Ui.Scale` 的属性（原本 `const float PanelW = Er2Ui.PanelW` 编译期钉死）；字母行尺寸收成单一定义（`LetterBtnW/LetterGap/LetterRowH/LetterBtnH`）；`flash/star` 字号 × Scale；`BadgeRect` 走 `ScreenFit(430)`、`ToggleButtonRect` × Scale。
 - **入口挂在总入口**：`GenRunner.Draw()` 开头 `AutoScale()`——"携带"与"放置"两支不经过 `GenPanel.Draw()`，只放那里会一直用旧倍率。
@@ -786,9 +804,9 @@ M0 侦察工具，同 `HvtTestDriver` 定位。**刻意不打任何 Harmony 补�
 
 | 包 | 时间 |
 |---|---|
-| `ER2_UniversalGeneration_v2.5.1.zip`（EN，**当前部署**） | 09-25（**最新**：UI 自适应——跟随游戏原生 `ResourcesManager.ResolutionMult`，令牌 `const`→属性（`const` 是"UI 是死的"根因）、入口挂 `GenRunner.Draw()` 总入口、携带徽标 560px 走 `ScreenFit`、样式各判各的重建；配色提亮；携带徽标底/拖拽目标环/生成反馈文字的残留绿色清零。DLL 117,248 B，sha256 `17BACD4266FE…76F4`，与构建产物逐字节一致；反编译复核版本双写 2.5.1 + 自适应成员在位 + 旧亮绿/淡绿 0 处 ✓） |
+| `ER2_UniversalGeneration_v2.5.2.zip`（EN，**当前部署**） | 09-25（**最新**：与宿主同批视觉打磨——面板补结构线（标题条独立底色 + 标题下分隔线 + 外框 + 两个列表内凹边框 + 收藏行左竖条）；配色压回中深灰与宿主完全同一套；修掉 `BuildRows` 6 处漏乘 `Scale` 的固定行高。DLL 118,272 B，sha256 `B157D4F27084…85D`，与构建产物逐字节一致；反编译复核版本双写 2.5.2 + `Frame/HLine/AccentBar` 成员与 6 处调用点 ✓） | 09-25（**最新**：UI 自适应——跟随游戏原生 `ResourcesManager.ResolutionMult`，令牌 `const`→属性（`const` 是"UI 是死的"根因）、入口挂 `GenRunner.Draw()` 总入口、携带徽标 560px 走 `ScreenFit`、样式各判各的重建；配色提亮；携带徽标底/拖拽目标环/生成反馈文字的残留绿色清零。DLL 117,248 B，sha256 `17BACD4266FE…76F4`，与构建产物逐字节一致；反编译复核版本双写 2.5.1 + 自适应成员在位 + 旧亮绿/淡绿 0 处 ✓） |
 | `ER2_UniversalGeneration_v2.4.2.zip`（EN，历史） | 09-24（**最新**：无可见改动，为 UI 重绘打底——布局改**行计划单一数据源**（高度 = 行计划求和，绘制遍历同一列表，结构性消灭"画到面板外"复发）；新增 `Shared/Er2Ui.cs` 共享令牌/原语层，两个 csproj 源码级链接；页签适配改 `CalcSize` 精确测量 + 缓存。DLL 110,592 B，sha256 `F6C37E8260F2…A431A`，与构建产物逐字节一致；反编译复核版本双写 2.4.2 + `Er2Ui.*` 成员 + `BuildRows`/`DrawRows` ✓） |
-| `ER2_BattlefieldCommander_v1.4.20.zip`（EN，**当前部署**） | 09-25（**最新**：UI 自适应 + 提亮——跟随游戏原生 UI 倍率、令牌属性化、底部提示条 1400px 走 `ScreenFit`、HUD/背包/信息面板/菜单全量接入、倍率变化时背包保留拖动位置重排；灰黑配色提亮并拉开层次差。DLL 219,648 B，sha256 `8EC63CEBF9A7…28C0`，与构建产物逐字节一致；反编译复核版本双写 1.4.20 + 自适应成员在位 + `positionCount=3` + 旧弧公式 0 处 + `new GUIStyle(带参)` 0 处 ✓） |
+| `ER2_BattlefieldCommander_v1.4.21.zip`（EN，**当前部署**） | 09-25（**最新**：视觉打磨——线宽改「1080p 目标像素」语义（旧经验倍率与分辨率强耦合，1440p 粗 1.33×/4K 粗 2×），`Er2Ui.LineWidth(px,dist)=px×2×dist×tan(fov/2)/1080`，FOV 从相机注入；选中角标根因修复——父 `lossyScale` 放大线宽导致载具上两条粗臂糊成三角块（"变成箭头"），改为父 scale 恒 1、半径写进顶点、臂长 0.34→0.42；世界标记 α 0.26~0.48 半透明 → α≥0.80 灰阶实色（层次从 α 移到灰度值）；面板补 `Frame`/`HLine`/`AccentBar` 结构线 + 标题条独立底色 + 列表内凹边框 + 收藏行竖条；配色压回中深灰（1.4.20 提亮过头）。DLL 222,720 B，sha256 `3CFA3DDCF6B2…D1D3`，与构建产物逐字节一致；反编译复核版本双写 1.4.21 + 像素线宽模型 + `SetCamFov` 2 处 + 旧 `WidthScale` 0 处 + `localScale=Vector3.one` + 臂长内联 0.58 + `Frame/HLine/AccentBar` 在位 ✓） | 09-25（**最新**：UI 自适应 + 提亮——跟随游戏原生 UI 倍率、令牌属性化、底部提示条 1400px 走 `ScreenFit`、HUD/背包/信息面板/菜单全量接入、倍率变化时背包保留拖动位置重排；灰黑配色提亮并拉开层次差。DLL 219,648 B，sha256 `8EC63CEBF9A7…28C0`，与构建产物逐字节一致；反编译复核版本双写 1.4.20 + 自适应成员在位 + `positionCount=3` + 旧弧公式 0 处 + `new GUIStyle(带参)` 0 处 ✓） |
 | `ER2_BattlefieldCommander_v1.4.18.zip`（EN，历史） | 09-24（**最新**：内部调整，四处手写 `GUIStyle` 改走共享层 `Er2Ui.MakeLabel`，语义不变。DLL 206,336 B，sha256 `3E306522BDAA…DE9DD2`，与构建产物逐字节一致；反编译复核版本双写 1.4.18 + `Er2Ui.MakeLabel` ✓） |
 | `ER2_UniversalGeneration_v1.3.2.zip` / `ER2_UniversalGeneration_CN_v1.3.2.zip` | 09-19（**待发 Nexus**：火力点页签 + 小队库 466 变体 + 敌方原生 AI + 启动时零卡顿探测；1.3.1 砍自定义班生成——运行时空壳，1.3.2 按用户决定砍全部第三方生成；拆包核对 = DLL + README.txt + Nexus_description.md ✓ 双语双包 ✓） |
 | `ER2_BattlefieldCommander_v1.4.15.zip` / `ER2_BattlefieldCommander_CN_v1.4.15.zip` | 09-24（**最新**：上帝视角打开设置后相机输入不再穿透菜单（滚轮/WASD/中键）；兼容 Advanced Combat Movement 吞掉"恢复开火"调用 → 改「调用→回读→直写 holdFire 字段」。EN 构建 = **当前部署**（sha256 `f474a84f…`，与 EN 包内 DLL 一致；CN 包 `f9600279…` 更小，仅打包不部署）；拆包核对均 = DLL + README.txt + Nexus_description.md（build.ps1 按包语言取文档，双语包各 3 文件）） |

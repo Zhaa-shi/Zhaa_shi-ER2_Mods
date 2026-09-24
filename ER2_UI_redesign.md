@@ -438,7 +438,7 @@ Scale = clamp(ResourcesManager.ResolutionMult, 0.75, 1.6)   // 游戏原生 UI �
 
 ---
 
-## 6.1 实施状态（v4 · SquadCommand 1.4.20 / UniGen 2.5.1）
+## 6.1 实施状态（v5 · SquadCommand 1.4.21 / UniGen 2.5.2）
 
 | 项 | 内容 | 状态 |
 |---|---|---|
@@ -448,14 +448,22 @@ Scale = clamp(ResourcesManager.ResolutionMult, 0.75, 1.6)   // 游戏原生 UI �
 | 背包窗口 | Cell/Gap/Margin/TitleH/WinW/WinH 属性化；倍率变化时保留拖动位置重排尺寸 | ✅ 已实施 |
 | 背包菜单 | `MenuW/MenuRow` 与命中判定共用同一份（防"画的行"与"判的行"错位） | ✅ 已实施 |
 | 定宽收敛 | 提示条 1400px / 携带徽标 560px → `ScreenFit` | ✅ 已实施 |
-| 配色提亮 | Mono 预设整体上调 + 层次差拉开 | ✅ 已实施 |
+| 配色提亮 ~~→ 压回~~ | 1.4.20 提亮过头（用户："颜色浅了"）→ **1.4.21 压回中深灰**：`PanelBg #14181D` / `TitleBar #1F252C` / `Surface #262D35` / `SurfaceHover #333B45` / `SurfaceActive #46505C` | ✅ 已实施（含回调） |
 | UniGen 去绿 | 携带徽标底、拖拽目标环（亮绿→白）、生成反馈文字色 | ✅ 已实施 |
-| 新陷阱 | 84（const 令牌）/ 85（跟随原生倍率）/ 86（入口挂总入口）/ 87（各判各的重建）/ 88（定宽溢出） | ✅ 已入指南 |
+| **线宽像素语义** | 调用点写 1080p 目标像素宽，`LineWidth(px,dist)=px×2×dist×tan(fov/2)/1080`（与分辨率无关）；FOV 由相机注入 | ✅ 已实施（1.4.21） |
+| **角标不再变箭头** | 父 `lossyScale` 放大线宽是根因 → 父 scale 恒 1、半径写进顶点、臂长 0.34→0.42 | ✅ 已实施（1.4.21） |
+| **世界标记灰阶实色** | α 0.26~0.48 → α ≥ 0.80，层次从 α 移到灰度值；仅 `WGhost` 保留半透 | ✅ 已实施（1.4.21） |
+| **结构线（设计感）** | `Frame` / `HLine` / `AccentBar` 三原语 + `Edge`/`EdgeSoft`；标题条独立底色 + 分隔线 + 外框 + 列表内凹边框 + 收藏行竖条 | ✅ 已实施（1.4.21 / 2.5.2） |
+| 新陷阱 | 84–88（自适应五条）+ **89（线宽像素语义）/ 90（别用 localScale 传参）/ 91（半透明在 3D 差）/ 92（缺结构线 = 没设计感）** | ✅ 已入指南 |
 
-**复核（ilspycmd 反编译部署 DLL）**：版本双写 ✓（`1.4.20` / `2.5.1` 各 1 处 + 启动日志）；
+**复核（ilspycmd 反编译部署 DLL）**：版本双写 ✓（`1.4.21` / `2.5.2` 各 1 处 + 启动日志）；
 `SetScale/ScaleChangedSince/NativeResMult/AutoScale/ScreenFit` 两个 DLL 均在位 ✓；
 `ResourcesManager.ResolutionMult` 各 1 处 ✓；`positionCount = 3`（直角角标）✓；旧弧公式 `22.5` 0 处 ✓；
 `new GUIStyle(带参)` 0 处（陷阱 5 干净）✓；14 项 cfg 键 ✓；军绿字面量仅剩 `LegacyPanelBg`（uiMono=false 回退预设，有意保留）✓。
+**1.4.21 追加复核**：`LineWidth` 像素模型（`pxAt1080 * 2f * d * tanHalf / 1080f`）✓；`SetCamFov` 注入 2 处 ✓；
+旧 `WidthScale` **0 处** ✓；`localScale = Vector3.one` ✓；臂长内联 `0.58`（=1−0.42）✓；`bracketPts` 复用 ✓；
+`BracketSX/SZ` 静态 ✓；13 处像素线宽 ✓；`Frame/HLine/AccentBar` 在位 + UG 6 处调用点 ✓；
+`colorBase #262A30F0` / `colorHover #454E59F5` ✓。
 
 ---
 

@@ -6,7 +6,7 @@ Adds an "RTS god-view squad command" layer to Easy Red 2, with mouse operations 
 ## Installation instructions
 1. Install BepInEx (IL2CPP build) into the game root folder.
 2. Put `ER2_BattlefieldCommander.dll` into `Easy Red 2\BepInEx\plugins\`.
-3. Launch the game — `Loading [ER2 Battlefield Commander 1.4.20]` in the BepInEx log means success.
+3. Launch the game — `Loading [ER2 Battlefield Commander 1.4.21]` in the BepInEx log means success.
 
 ## Main features
 - **God-view command**: F9 to enter free camera, WASD move, wheel zoom, MMB rotate, Q/E height, Space to pause/resume the world.
@@ -38,6 +38,13 @@ Adds an "RTS god-view squad command" layer to Easy Red 2, with mouse operations 
 Thanks to the Easy Red 2 community and the BepInEx / Harmony ecosystem, and to all authors whose IL2CPP modding work paved the way.
 
 ## Recent changes
+**1.4.21**
+- **Line width is defined in pixels now.** `LineRenderer.widthMultiplier` is world-space, so a fixed number is fat up close and hair-thin at range, and any distance-multiplier fudge silently got 1.33x fatter at 1440p / 2x at 4K. Call sites now state a 1080p target pixel width (1.1 thin ... 2.2 emphasis) and the shared toolkit converts it from the real camera distance and FOV. Constant on-screen thickness at any distance and resolution.
+- **Selection brackets no longer read as arrowheads.** Real cause: the bracket root was scaled to `radius` and `LineRenderer` width is multiplied by the parent `lossyScale`, so on a vehicle a 0.1 m line became ~0.5-1.0 m thick against ~1 m corner arms - two fat arms merged into a solid triangle. The root now stays at scale 1 with the radius baked into the vertices; corner arms lengthened 0.34 -> 0.42 of the radius.
+- **World markers moved from transparency to greyscale.** Semi-transparent grey (alpha 0.26-0.48) gets eaten by grass, snow and sand. All world markers are now near-opaque greyscale (alpha >= 0.80) with hierarchy carried by lightness (#9AA1A8 -> #C6CBD0 -> #E2E6EA -> white). Only the ghost preview stays translucent.
+- **Panels got structure instead of flat colour blocks.** New `Frame` (outline), `HLine` (divider) and `AccentBar` (selection stripe) primitives, a separate title-bar fill, inset list borders and a left stripe on favourite rows. Hierarchy is now face + line + bar.
+- **Palette pulled back to mid-dark grey** (1.4.20 lift went too far): panel #14181D, title bar #1F252C, control #262D35, hover #333B45, selected #46505C.
+
 **1.4.20**
 - **Adaptive UI.** Panels, HUD text, the bottom hint bar, backpack grids, tooltips and the context menu now follow the **game's own UI size setting** (`ResourcesManager.ResolutionMult`, with a screen-resolution fallback). Change UI size in the game options and both this mod and Universal Generation rescale together. No dragging, no number fields, no config entry. Clamped to 0.75x – 1.6x.
 - Long-standing cause of the UI being "frozen" fixed: size and font tokens in the shared toolkit were compile-time constants, so a resolution change could never move them. They are now scale-driven properties, and styles rebuild automatically when the scale shifts.

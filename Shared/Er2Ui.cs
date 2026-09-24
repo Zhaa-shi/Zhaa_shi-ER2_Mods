@@ -159,27 +159,32 @@ internal static class Er2Ui
 	public static bool Mono = true;
 
 	// 结构色的两套预设（Mono / Legacy），下面用属性按 Mono 分派。
-	// 2.5.1 提亮：用户反馈"现在的 UI 太黑了"——原 #0C/#1E/#12 在战场亮背景下压成一坨，
-	// 且深色面之间几乎没有层次差（#0C→#1E 只差 18 级）。现在整体抬到中深灰，
-	// 并把**面与面的明度差拉开**（面板→标题条→控件→行→选中，逐级 +8~14 级），
-	// 保持"灰黑"基调不变（仍是无彩色的中性灰，不回到军绿）。
-	private static readonly Color MonoPanelBg = new Color(0x1C / 255f, 0x20 / 255f, 0x24 / 255f, 0.93f);
-	private static readonly Color MonoPanelBorder = new Color(1f, 1f, 1f, 0.30f);
-	private static readonly Color MonoTitleBar = new Color(0x2C / 255f, 0x31 / 255f, 0x37 / 255f, 0.96f);
-	private static readonly Color MonoSurface = new Color(0x36 / 255f, 0x3C / 255f, 0x43 / 255f, 0.93f);
-	private static readonly Color MonoSurfaceHover = new Color(0x45 / 255f, 0x4C / 255f, 0x55 / 255f, 0.96f);
-	private static readonly Color MonoSurfaceActive = new Color(0x5A / 255f, 0x63 / 255f, 0x6E / 255f, 1f);
-	private static readonly Color MonoRowBg = new Color(0x2A / 255f, 0x2F / 255f, 0x35 / 255f, 0.90f);
-	private static readonly Color MonoFavRow = new Color(1f, 1f, 1f, 0.14f);
-	private static readonly Color MonoText = new Color(0xF2 / 255f, 0xF4 / 255f, 0xF6 / 255f, 1f);
-	private static readonly Color MonoTextDim = new Color(0xC2 / 255f, 0xC8 / 255f, 0xCE / 255f, 0.92f);
-	private static readonly Color MonoTextDisabled = new Color(0x8A / 255f, 0x91 / 255f, 0x99 / 255f, 0.80f);
+	// 2.5.2 回调：1.4.20 那次提亮过头（用户："颜色浅了"）。整体压回**中深灰**，
+	// 并补上真正的设计元素——此前"只有单一色块、没有设计感"的病根是：
+	// 所有面都是纯色填充，**没有任何边框 / 分隔线 / 强调条**，靠明度差硬撑层次，
+	// 在亮背景战场上一压就糊成一片。现在补三组结构线令牌：
+	//   `PanelBorder` 面板外框、`Edge` 分隔线、`AccentBar` 选中竖条（见下面 Frame/AccentBar 原语）。
+	// 层次 = 面（明度档）+ 线（边框/分隔）+ 条（选中/激活），三维而不是只靠面。
+	private static readonly Color MonoPanelBg = new Color(0x14 / 255f, 0x18 / 255f, 0x1D / 255f, 0.95f);
+	private static readonly Color MonoPanelBorder = new Color(0x3C / 255f, 0x46 / 255f, 0x52 / 255f, 0.95f);
+	private static readonly Color MonoTitleBar = new Color(0x1F / 255f, 0x25 / 255f, 0x2C / 255f, 0.97f);
+	private static readonly Color MonoSurface = new Color(0x26 / 255f, 0x2D / 255f, 0x35 / 255f, 0.95f);
+	private static readonly Color MonoSurfaceHover = new Color(0x33 / 255f, 0x3B / 255f, 0x45 / 255f, 0.97f);
+	private static readonly Color MonoSurfaceActive = new Color(0x46 / 255f, 0x50 / 255f, 0x5C / 255f, 1f);
+	private static readonly Color MonoRowBg = new Color(0x1B / 255f, 0x20 / 255f, 0x27 / 255f, 0.92f);
+	private static readonly Color MonoFavRow = new Color(1f, 1f, 1f, 0.10f);
+	private static readonly Color MonoText = new Color(0xE9 / 255f, 0xED / 255f, 0xF1 / 255f, 1f);
+	private static readonly Color MonoTextDim = new Color(0xB2 / 255f, 0xBA / 255f, 0xC3 / 255f, 0.92f);
+	private static readonly Color MonoTextDisabled = new Color(0x7B / 255f, 0x83 / 255f, 0x8C / 255f, 0.80f);
 	private static readonly Color MonoTextOnActive = new Color(1f, 1f, 1f, 1f);
-	private static readonly Color MonoTextOnPlate = new Color(0xFA / 255f, 0xFB / 255f, 0xFC / 255f, 1f);
+	private static readonly Color MonoTextOnPlate = new Color(0xF5 / 255f, 0xF7 / 255f, 0xF9 / 255f, 1f);
 	private static readonly Color MonoStarHot = new Color(0.88f, 0.90f, 0.92f, 0.95f);
-	private static readonly Color MonoSurfaceDisabled = new Color(0x10 / 255f, 0x12 / 255f, 0x14 / 255f, 0.62f);
-	private static readonly Color MonoRowHover = new Color(1f, 1f, 1f, 0.12f);
-	private static readonly Color MonoListBg = new Color(0x08 / 255f, 0x0A / 255f, 0x0C / 255f, 0.32f);
+	private static readonly Color MonoSurfaceDisabled = new Color(0x17 / 255f, 0x1A / 255f, 0x1E / 255f, 0.62f);
+	private static readonly Color MonoRowHover = new Color(1f, 1f, 1f, 0.08f);
+	private static readonly Color MonoListBg = new Color(0x05 / 255f, 0x07 / 255f, 0x08 / 255f, 0.42f);
+	// 2.5.2 新增：结构线（设计感的主要来源）
+	private static readonly Color MonoEdge = new Color(0x31 / 255f, 0x39 / 255f, 0x41 / 255f, 0.92f);   // 分隔线
+	private static readonly Color MonoEdgeSoft = new Color(1f, 1f, 1f, 0.10f);                          // 极淡分隔（行间）
 
 	// —— A 面板结构 ——
 	public static Color PanelBg => Mono ? MonoPanelBg : LegacyPanelBg;                        // 面板底
@@ -194,6 +199,12 @@ internal static class Er2Ui
 	public static Color RowHover => Mono ? MonoRowHover : new Color(0.5f, 0.7f, 0.5f, 0.12f); // 行悬停覆盖
 	public static Color SurfaceRow => Surface;                                                // 兼容旧名（列表行底）
 	public static Color FavRow => Mono ? MonoFavRow : LegacyFavRow;                           // 收藏行底
+
+	// —— A2 结构线（2.5.2 新增：设计感靠"面 + 线 + 条"三维，不再只靠明度差）——
+	/// <summary>分隔线（标题条下、列表上下、面板内分区）。</summary>
+	public static Color Edge => Mono ? MonoEdge : new Color(0.35f, 0.5f, 0.35f, 0.55f);
+	/// <summary>极淡分隔（列表行之间）——只在需要"分而不抢"时用。</summary>
+	public static Color EdgeSoft => Mono ? MonoEdgeSoft : new Color(0.5f, 0.7f, 0.5f, 0.10f);
 
 	// —— B 文字 ——
 	public static Color Text => Mono ? MonoText : LegacyText;                                 // 正文
@@ -216,19 +227,26 @@ internal static class Er2Ui
 	//   友军脚环最淡(.28/.34) → 路线(.26) → 登车线(.48) → 阵型/载具(.60/.80)
 	//   → 选中(.92) → 移动目标(.85) —— 越"当前正在操作"的越亮。
 	// 集火(Focus)保留红，仅在 markerColorMode=Semantic 时生效；Mono 模式下也走白灰。
-	public static Color WFriendly => new Color(1f, 1f, 1f, 0.28f);        // 友军脚环（步兵）
-	public static Color WFriendlyVeh => new Color(1f, 1f, 1f, 0.34f);     // 友军脚环（载具）
-	public static Color WSelected => new Color(1f, 1f, 1f, 0.92f);        // 选中角标
-	public static Color WSelectedDot => new Color(1f, 1f, 1f, 0.95f);     // 选中中心点
-	public static Color WFocus => new Color(0xC4 / 255f, 0x45 / 255f, 0x3C / 255f, 0.92f);  // 集火（红）
-	public static Color WFocusDown => new Color(0xE0 / 255f, 0xA3 / 255f, 0x3A / 255f, 0.80f); // 集火·降级（橙）
-	public static Color WMove => new Color(1f, 1f, 1f, 0.85f);            // 移动目标点
-	public static Color WPath => new Color(1f, 1f, 1f, 0.26f);            // 行进路线（长虚线 8-5，暗）
-	public static Color WBoard => new Color(1f, 1f, 1f, 0.48f);           // 登车线（短虚线 4-4，亮）
-	public static Color WFormation => new Color(1f, 1f, 1f, 0.80f);       // 阵型拖动标记
-	public static Color WVehicle => new Color(1f, 1f, 1f, 0.60f);         // 载具专用标记
-	public static Color WGhost => new Color(0xC8 / 255f, 0xC8 / 255f, 0xC8 / 255f, 0.35f);  // 幽灵预览
-	public static Color WLabelPlate => new Color(0x0C / 255f, 0x0C / 255f, 0x0C / 255f, 0.90f); // 名签底板
+	// 2.5.2：**半透明灰换成实色灰阶**（用户："半透明灰色质感不好"）。
+	// 原因：α 0.26~0.48 的线叠在草地/雪地/沙地上会被背景"吃掉"，颜色随地面漂移，
+	// 看起来发灰发脏、边界发虚——这是半透明在 3D 场景里的通病，不是配色问题。
+	// 改法：**把层次从 α 移到灰度值**（灰阶实色，α ≥ 0.80），线是实打实的，质感立刻变硬：
+	//   中灰 #8E/9A（背景信息：友军/路线）→ 亮灰 #C6（登车/载具）→ 近白 #E2/#F2（阵型/移动）
+	//   → 纯白 #FFF（选中）。仍是"白/灰"体系，不回彩色。
+	// 唯一保留半透明的是**幽灵预览**（那是模型本体，需要透出地面）。
+	public static Color WFriendly => new Color(0x8E / 255f, 0x95 / 255f, 0x9C / 255f, 0.85f);  // 友军脚环（步兵）
+	public static Color WFriendlyVeh => new Color(0xA2 / 255f, 0xA9 / 255f, 0xB0 / 255f, 0.88f); // 友军脚环（载具）
+	public static Color WSelected => new Color(1f, 1f, 1f, 0.95f);                              // 选中角标
+	public static Color WSelectedDot => new Color(1f, 1f, 1f, 1f);                              // 选中中心点
+	public static Color WFocus => new Color(0xC4 / 255f, 0x45 / 255f, 0x3C / 255f, 0.95f);      // 集火（红）
+	public static Color WFocusDown => new Color(0xE0 / 255f, 0xA3 / 255f, 0x3A / 255f, 0.90f);  // 集火·降级（橙）
+	public static Color WMove => new Color(0xF2 / 255f, 0xF5 / 255f, 0xF7 / 255f, 0.92f);       // 移动目标点
+	public static Color WPath => new Color(0x9A / 255f, 0xA1 / 255f, 0xA8 / 255f, 0.80f);       // 行进路线（长虚线，暗）
+	public static Color WBoard => new Color(0xC6 / 255f, 0xCB / 255f, 0xD0 / 255f, 0.88f);      // 登车线（短虚线，亮）
+	public static Color WFormation => new Color(0xE2 / 255f, 0xE6 / 255f, 0xEA / 255f, 0.90f);  // 阵型拖动标记
+	public static Color WVehicle => new Color(0xCB / 255f, 0xCF / 255f, 0xD4 / 255f, 0.85f);    // 载具专用标记
+	public static Color WGhost => new Color(0xB8 / 255f, 0xBC / 255f, 0xC0 / 255f, 0.32f);      // 幽灵预览（保留半透）
+	public static Color WLabelPlate => new Color(0x0A / 255f, 0x0C / 255f, 0x0E / 255f, 0.92f); // 名签底板
 
 	/// <summary>
 	/// 2.5.0：世界空间标记的颜色来源。默认 = 上面的灰黑令牌；
@@ -237,7 +255,7 @@ internal static class Er2Ui
 	public static bool MarkerSemantic = false;
 
 	public static Color MarkerFocus => MarkerSemantic ? WFocus : WSelected;
-	public static Color MarkerFocusDown => MarkerSemantic ? WFocusDown : new Color(0.82f, 0.82f, 0.82f, 0.85f);
+	public static Color MarkerFocusDown => MarkerSemantic ? WFocusDown : new Color(0xB4 / 255f, 0xB9 / 255f, 0xBE / 255f, 0.92f);
 
 	// ══════════ ① 令牌：旧军绿预设（cfg uiMono=false 回退用）══════════
 	public static Color LegacyPanelBg => new Color(0.02f, 0.05f, 0.02f, 0.88f);
@@ -273,15 +291,53 @@ internal static class Er2Ui
 		}
 	}
 
+	// ══════════ 线宽：目标像素宽模型（1.4.21）══════════
+	// LineRenderer.widthMultiplier 是**世界单位**，不是像素。屏幕上的像素宽满足：
+	//     px = width_m × screenH / (2 × dist × tan(fov/2))
+	// 所以：
+	//   ① 直接写死世界单位 → 近粗远细（同一个环在脚下和 200m 外完全两种粗细）；
+	//   ② 用"经验倍率"补偿（如 dist/30）→ 与分辨率强耦合：1080p 调好的值，
+	//      1440p 下粗 1.33 倍、4K 下粗 2 倍（用户"线太粗"投诉的一大来源）。
+	// 现在调用点只写 **1080p 下的目标像素宽**，由 LineWidth 反算世界单位：
+	//     px1080 → px = px1080 × screenH / 1080
+	//     width_m = px × 2 × dist × tan(fov/2) / screenH = px1080 × 2 × dist × tan(fov/2) / 1080
+	// screenH 约掉 → 结果与分辨率无关（占屏比例恒定），且屏幕像素宽不随视距变化。
+	// 参考：60° 垂直 FOV 时 2 × tan(30°) / 1080 ≈ 0.001069 ⇒ width_m ≈ px × dist × 0.001069
+	//（dist=60m、px=1.6 ⇒ 0.103m；屏幕上看就是 1.6px/1080p。）
+
+	/// <summary>目标像素宽的参考分辨率。调用点写的像素值都以 1080p 为基准。</summary>
+	private const float RefScreenH = 1080f;
+
 	/// <summary>
-	/// 线宽的世界单位补偿：LineRenderer.widthMultiplier 是**世界单位**（C11），
-	/// 远距离会细成一丝。按相机距离放大，夹在 [0.6, 2.5] 倍（近处不糊、远处可见）。
-	/// dist/30 的 30 是经验值：ER2 战场常见接敌距离 ~30m 时为 1.0 倍基准。
+	/// 垂直 FOV（度）。GodView / Formation 取到相机时会顺手注入真实值；
+	/// 取不到时按 60° 走（不静默失效——失败可观测原则）。
 	/// </summary>
-	public static float WidthScale(float camDist)
+	private static float camFovDeg = 60f;
+
+	/// <summary>当前用于线宽换算的垂直 FOV（度）。</summary>
+	public static float CamFovDeg => camFovDeg;
+
+	/// <summary>
+	/// 相机 FOV 注入点。传 0 / NaN / 越界值表示"这次没拿到"，保留上次的值（不打断渲染）。
+	/// </summary>
+	public static void SetCamFov(float deg)
 	{
-		if (camDist <= 0f) return 1f;
-		return Mathf.Clamp(camDist / 30f, 0.6f, 2.5f);
+		if (float.IsNaN(deg) || deg < 15f || deg > 120f) return;
+		camFovDeg = deg;
+	}
+
+	/// <summary>
+	/// 线宽总入口：<paramref name="pxAt1080"/> = 1080p 下的目标像素宽 →
+	/// LineRenderer 要的世界单位。层次建议：背景脚环 1.1 / 虚线 1.2~1.3 /
+	/// 选中角标 1.6~1.9 / 强调环 2.2。
+	/// </summary>
+	public static float LineWidth(float pxAt1080, float camDist)
+	{
+		float d = (camDist > 0f && !float.IsNaN(camDist)) ? camDist : 60f;
+		float tanHalf = Mathf.Tan(camFovDeg * 0.5f * Mathf.Deg2Rad);
+		if (tanHalf <= 0.001f) tanHalf = 0.5773503f;   // 兜底 = tan(30°)
+		float wm = pxAt1080 * 2f * d * tanHalf / RefScreenH;
+		return Mathf.Clamp(wm, 0.003f, 3f);
 	}
 
 	/// <summary>cfg UI/uiMono → Mono。启动与 <c>SettingChanged</c> 时各调一次。</summary>
@@ -297,11 +353,6 @@ internal static class Er2Ui
 			mode.Trim().Equals("Semantic", System.StringComparison.OrdinalIgnoreCase);
 	}
 
-	/// <summary>线宽补偿总入口：把调用点的原始线宽 + 相机距离揉成最终 widthMultiplier。</summary>
-	public static float LineWidth(float baseWidth, float camDist)
-	{
-		return baseWidth * WidthScale(camDist);
-	}
 
 	// ══════════ ② 资源：按色缓存的纯色贴图 ══════════
 	// 单槽缓存会把别的样式一起换掉（17g3），故按颜色建字典；
@@ -332,6 +383,28 @@ internal static class Er2Ui
 		GUI.DrawTexture(r, Texture2D.whiteTexture);
 		GUI.color = keep;
 	}
+
+	/// <summary>
+	/// 2.5.2：**矩形描边**（四边）。IMGUI 没有边框 API，只能四条 Fill 拼。
+	/// 这是"设计感"的主要来源——此前所有面都是纯色块、没有任何边框，
+	/// 在亮背景战场上一压就糊成一片（用户："只有单一的色块没有设计感"）。
+	/// </summary>
+	public static void Frame(Rect r, Color c, float t)
+	{
+		Fill(new Rect(r.x, r.y, r.width, t), c);
+		Fill(new Rect(r.x, r.yMax - t, r.width, t), c);
+		Fill(new Rect(r.x, r.y, t, r.height), c);
+		Fill(new Rect(r.xMax - t, r.y, t, r.height), c);
+	}
+
+	/// <summary>水平分隔线（标题条下、分区之间）。</summary>
+	public static void HLine(Rect r, Color c) => Fill(r, c);
+
+	/// <summary>
+	/// 左侧（或指定边）强调竖条——选中行的"激活"指示。
+	/// 比"整行换底色"更像设计：底色只轻微提亮，靠这条竖线点名当前项。
+	/// </summary>
+	public static void AccentBar(Rect r, Color c, float w) => Fill(new Rect(r.x, r.y, w, r.height), c);
 
 	// ══════════ ③ 样式工厂 ══════════
 

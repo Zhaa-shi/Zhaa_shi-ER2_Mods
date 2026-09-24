@@ -113,8 +113,9 @@ internal static class GenPanel
 	private static void BuildRows()
 	{
 		rows.Clear();
-		rows.Add(new Row { Kind = RowKind.Title, H = 26f });
-		rows.Add(new Row { Kind = RowKind.Faction, H = 36f });
+		// 2.5.2：固定行高也要乘 Scale（此前漏了 → 自适应下标题/阵营/分页/预览行不跟着缩放）
+		rows.Add(new Row { Kind = RowKind.Title, H = 26f * Er2Ui.Scale });
+		rows.Add(new Row { Kind = RowKind.Faction, H = 36f * Er2Ui.Scale });
 		rows.Add(new Row { Kind = RowKind.UnitTabs, H = Er2Ui.TabGridH(UnitCats.Length, TabsPerRow, TabH) });
 		if (itemCats.Count > 0)
 			rows.Add(new Row { Kind = RowKind.ItemTabs, H = Er2Ui.TabGridH(itemCats.Count, ItemTabsPerRow, TabH) });
@@ -138,16 +139,16 @@ internal static class GenPanel
 				letterFilter = "";   // 字母行消失时（如子分类变了）自动复位，避免空列表
 			}
 
-			rows.Add(new Row { Kind = RowKind.List, H = VisibleRows * RowH + 8f + Er2Ui.Gap });
-			rows.Add(new Row { Kind = RowKind.Pager, H = 26f });
-			rows.Add(new Row { Kind = RowKind.ItemHelp, H = 34f });
+			rows.Add(new Row { Kind = RowKind.List, H = VisibleRows * RowH + 8f * Er2Ui.Scale + Er2Ui.Gap });
+			rows.Add(new Row { Kind = RowKind.Pager, H = 26f * Er2Ui.Scale });
+			rows.Add(new Row { Kind = RowKind.ItemHelp, H = 34f * Er2Ui.Scale });
 		}
 		else
 		{
-			rows.Add(new Row { Kind = RowKind.List, H = VisibleRows * RowH + 8f + Er2Ui.Gap });
-			rows.Add(new Row { Kind = RowKind.Pager, H = 26f });
-			rows.Add(new Row { Kind = RowKind.Crew, H = 32f });
-			rows.Add(new Row { Kind = RowKind.Preview, H = 24f });
+			rows.Add(new Row { Kind = RowKind.List, H = VisibleRows * RowH + 8f * Er2Ui.Scale + Er2Ui.Gap });
+			rows.Add(new Row { Kind = RowKind.Pager, H = 26f * Er2Ui.Scale });
+			rows.Add(new Row { Kind = RowKind.Crew, H = 32f * Er2Ui.Scale });
+			rows.Add(new Row { Kind = RowKind.Preview, H = 24f * Er2Ui.Scale });
 		}
 	}
 
@@ -304,8 +305,19 @@ internal static class GenPanel
 
 		Er2Ui.Fill(r, Er2Ui.PanelBg);
 
+		// 2.5.2 **设计感三件套**（用户："只有单一的色块没有设计感"）：
+		// ① 标题条独立底色，把"标题"从内容里分出来；② 标题条下分隔线；③ 面板外框。
+		// 此前整块面板只有一种底色，全靠明度差撑层次 → 在亮背景战场上一压就糊。
+		float s = Er2Ui.Scale;
+		BuildRows();
+		float titleH = rows.Count > 0 ? rows[0].H : 26f * s;
+		Er2Ui.Fill(new Rect(r.x, r.y, r.width, titleH), Er2Ui.TitleBar);
+		Er2Ui.HLine(new Rect(r.x, r.y + titleH, r.width, Mathf.Max(1f, s)), Er2Ui.Edge);
+
 		// 2.4.2：绘制**只消费行计划**——高度与绘制同源（见 BuildRows），加行只需改一处
 		DrawRows(r);
+
+		Er2Ui.Frame(r, Er2Ui.PanelBorder, Mathf.Max(1f, s));   // 最后画，不被内容覆盖
 	}
 
 	/// <summary>按行计划逐行取 Rect 绘制（每行只拿到自己的 Rect，不再自行累加 y）。</summary>
@@ -468,6 +480,7 @@ internal static class GenPanel
 
 		float listH = rect.height - Er2Ui.Gap;
 		Er2Ui.Fill(new Rect(rect.x, rect.y, rect.width, listH), Er2Ui.ListBg);
+		Er2Ui.Frame(new Rect(rect.x, rect.y, rect.width, listH), Er2Ui.Edge, Mathf.Max(1f, Er2Ui.Scale)); // 2.5.2：列表内凹边框
 
 		if (bucket.Count == 0)
 		{
@@ -485,8 +498,11 @@ internal static class GenPanel
 			bool fav = GenCatalog.IsFav(e.Id);
 			Color keep = GUI.backgroundColor;
 			GUI.backgroundColor = fav ? Er2Ui.FavRow : Er2Ui.RowBg;
-			if (GUI.Button(new Rect(rect.x + 6f, rowY, rect.width - 38f, RowH - 2f), e.Title, rowStyle)) clicked = e;
+			Rect rowRect = new Rect(rect.x + 6f, rowY, rect.width - 38f, RowH - 2f);
+			if (GUI.Button(rowRect, e.Title, rowStyle)) clicked = e;
 			GUI.backgroundColor = keep;
+			// 2.5.2：收藏行左侧强调竖条——比"整行换底色"更像设计（底色只轻微提亮，靠竖条点名）
+			if (fav) Er2Ui.AccentBar(rowRect, Er2Ui.Accent, Mathf.Max(2f, 3f * Er2Ui.Scale));
 			if (StarButton(new Rect(rect.x + rect.width - 30f, rowY + 1f, 26f, RowH - 4f), fav))
 			{
 				GenCatalog.ToggleFav(e);
@@ -516,6 +532,7 @@ internal static class GenPanel
 
 		float listH = rect.height - Er2Ui.Gap;
 		Er2Ui.Fill(new Rect(rect.x, rect.y, rect.width, listH), Er2Ui.ListBg);
+		Er2Ui.Frame(new Rect(rect.x, rect.y, rect.width, listH), Er2Ui.Edge, Mathf.Max(1f, Er2Ui.Scale)); // 2.5.2：列表内凹边框
 
 		if (snap.Length == 0)
 		{
@@ -538,8 +555,11 @@ internal static class GenPanel
 			bool fav = ItemCatalog.IsFav(e.Id);
 			Color keep = GUI.backgroundColor;
 			GUI.backgroundColor = fav ? Er2Ui.FavRow : Er2Ui.RowBg;
-			if (GUI.Button(new Rect(tx, rowY, tw, RowH - 2f), e.Title, rowStyle)) clicked = e;
+			Rect itemRowRect = new Rect(tx, rowY, tw, RowH - 2f);
+			if (GUI.Button(itemRowRect, e.Title, rowStyle)) clicked = e;
 			GUI.backgroundColor = keep;
+			// 2.5.2：收藏行左侧强调竖条（与单位列表同款）
+			if (fav) Er2Ui.AccentBar(itemRowRect, Er2Ui.Accent, Mathf.Max(2f, 3f * Er2Ui.Scale));
 			if (StarButton(new Rect(rect.x + rect.width - 28f, rowY + 1f, 26f, RowH - 4f), fav))
 			{
 				ItemCatalog.ToggleFav(e);

@@ -9,7 +9,7 @@ using UnityEngine;
 
 namespace ER2SquadCommand;
 
-[BepInPlugin("er2.squadcommand", "ER2 Battlefield Commander", "1.4.20")]
+[BepInPlugin("er2.squadcommand", "ER2 Battlefield Commander", "1.4.21")]
 public class Plugin : BasePlugin
 {
 	internal static ManualLogSource ModLog;
@@ -78,8 +78,9 @@ public class Plugin : BasePlugin
 
 		// 2.5.0：默认值改中性灰（原来深绿/中绿/淡绿是军绿主题）。uiMono 只管 Er2Ui 的面板令牌，
 		// 这三个是**世界空间与 HUD 按钮**的色源，必须同步换灰，否则"面板灰黑、按钮军绿"。
-		uiColorBase = Config.Bind("UI", "colorBase", "#1E1E1EE6", new ConfigDescription(Ui.Tr("HUD 按钮底板 / 小队列表行颜色（#RRGGBB 或 #RRGGBBAA）。默认中性深灰。")));
-		uiColorHover = Config.Bind("UI", "colorHover", "#3A3A3AF2", Ui.Tr("HUD 按钮悬停/选中颜色。默认中性亮灰。"));
+		// 2.5.2：#1E1E1E 太黑（背包底板还要再折半 → 实际 0.06 灰）。提亮到与 Surface 同档。
+		uiColorBase = Config.Bind("UI", "colorBase", "#262A30F0", new ConfigDescription(Ui.Tr("HUD 按钮底板 / 小队列表行颜色（#RRGGBB 或 #RRGGBBAA）。默认中性深灰。")));
+		uiColorHover = Config.Bind("UI", "colorHover", "#454E59F5", Ui.Tr("HUD 按钮悬停/选中颜色。默认中性亮灰。"));
 		uiColorText = Config.Bind("UI", "colorText", "#E8E8E8", Ui.Tr("HUD 文字/描边颜色。默认近白灰。"));
 		uiColorBase.SettingChanged += (s, e) => GodViewController.ApplyUiTheme();
 		uiColorHover.SettingChanged += (s, e) => GodViewController.ApplyUiTheme();
@@ -101,9 +102,10 @@ public class Plugin : BasePlugin
 		showNamePlates = Config.Bind("Markers", "showNamePlates", true, Ui.Tr("世界空间名签（集火目标名称，带深色底板）。"));
 		markerPulse = Config.Bind("Markers", "markerPulse", true, Ui.Tr("选中/目标指示的呼吸脉动效果。关掉为静态（性能略好，画面更稳）。"));
 		markerScale = Config.Bind("Markers", "markerScale", 1f, new ConfigDescription(Ui.Tr("标记整体尺寸倍率（角标/环/目标点半径同乘）。"), new AcceptableValueRange<float>(0.5f, 2f)));
-		markerLineWidth = Config.Bind("Markers", "markerLineWidth", 1f, new ConfigDescription(Ui.Tr("标记线宽倍率（在距离补偿之上再乘）。调粗看远处更清楚。"), new AcceptableValueRange<float>(0.5f, 3f)));
+		// 1.4.21：线宽语义改为"1080p 基准像素宽"（见 Er2Ui.LineWidth），这里只是再乘的倍数
+		markerLineWidth = Config.Bind("Markers", "markerLineWidth", 1f, new ConfigDescription(Ui.Tr("标记线宽倍率（在 1080p 基准像素宽之上再乘）。1 = 细（约 1.1~2.2 像素），调大更醒目。"), new AcceptableValueRange<float>(0.5f, 3f)));
 		markerThroughWall = Config.Bind("Markers", "markerThroughWall", false, Ui.Tr("标记穿墙显示（不做深度测试）。开启后单位进建筑也能看到标记，但会糊在墙面上。"));
-		markerColorMode = Config.Bind("Markers", "markerColorMode", "Mono", new ConfigDescription(Ui.Tr("标记配色：Mono=白/半透灰单色（默认，配灰黑 UI）/ Semantic=集火红、降级橙（保留语义色）。"), new AcceptableValueList<string>("Mono", "Semantic")));
+		markerColorMode = Config.Bind("Markers", "markerColorMode", "Mono", new ConfigDescription(Ui.Tr("标记配色：Mono=灰阶单色（默认，配灰黑 UI；层次靠灰度值而非透明度）/ Semantic=集火红、降级橙（保留语义色）。"), new AcceptableValueList<string>("Mono", "Semantic")));
 		markersEnabled.SettingChanged += (s, e) => GodViewController.ApplyMarkerConfig();
 		showFriendlyRing.SettingChanged += (s, e) => GodViewController.ApplyMarkerConfig();
 		showSelectedBracket.SettingChanged += (s, e) => GodViewController.ApplyMarkerConfig();
@@ -122,7 +124,7 @@ public class Plugin : BasePlugin
 
 		new Harmony("er2.squadcommand").PatchAll(typeof(Plugin).Assembly);
 		FrameEndRunner.Ensure();
-		ModLog.LogInfo("ER2 Battlefield Commander 1.4.20 loaded. godKey=" + godKey.Value);
+		ModLog.LogInfo("ER2 Battlefield Commander 1.4.21 loaded. godKey=" + godKey.Value);
 		ThirdPartyCompat.LogCoexistenceHint(ModLog); // 1.4.15：第三方 mod 共存提示
 	}
 }

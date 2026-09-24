@@ -24,6 +24,8 @@ internal static class SceneMarkers
 		public Material mat;         // Line 专用（虚线纹理实例）
 		public TextMesh text;
 		public MeshRenderer plate;   // 2.5.0：名签底板（Label 专用）
+		/// <summary>2.5.2：Bracket 专用——四段折线的顶点缓冲（复用，避免每帧分配）。</summary>
+		public Il2CppStructArray<Vector3>[] bracketPts;
 	}
 
 	private static readonly Dictionary<string, Mark> pool = new Dictionary<string, Mark>();
@@ -132,22 +134,27 @@ internal static class SceneMarkers
 	/// 只剩"围绕中心的四个弧块"这一模糊意象。**直角折角在任意视角下都保持 L 形可辨识**，
 	/// 是 RTS（星际/红警/全面战争）通用的选中语言。
 	///
-	/// 几何：每个角一段折线，positionCount 9→3，坐标固定为
-	///   [角内-edge 端点, 角顶点, 角内-另一edge 端点]
-	/// loop=false（三段是一条开口折线，不能闭合）。父对象缩放 = 半径，4 段随父缩放。
-	/// **4 个调用点（GVC 3633/3643、Formation 851/858）签名不变**——只换几何，不动接口。
+	/// 几何：每个角一段折线，positionCount = 3，坐标（**单位半径空间**，实际半径在 Bracket() 里乘进去）
+	///   [横边端点, 角顶点, 竖边端点]
+	/// loop=false（三段是一条开口折线，不能闭合）。
+	///
+	/// 2.5.2 **关键修正：不再用父对象缩放来放大标记**。
+	/// 原实现 `parent.localScale = radius`，而 `LineRenderer` 的线宽会被 `lossyScale` 连带放大
+	/// → 选中载具时实际线宽 ≈ 0.1 × 旧经验倍率(≤2.5) × radius(≤4.2) ≈ **0.5~1.0m**，
+	/// 而折角臂长只有 0.34 × radius ≈ 1.0m —— 两条粗臂直接糊成一个实心三角块，
+	/// 用户看到的就是"选中标记变成了箭头"（用户原话）。这正是"线太粗"的根因。
+	/// 改法：父 scale 恒为 1，半径**写进顶点**（每帧重写 12 个点，缓冲复用零分配），
+	/// 线宽因此是纯世界单位、可预测、不再随半径放大。臂长同时 0.34 → 0.42（L 形更明确）。
+	/// **4 个调用点（GVC 3652/3664、Formation 851/858）签名不变**——只换几何，不动接口。
 	/// </summary>
 	private static Mark GetBracket(string key)
 	{
 		if (TryGet(key, out Mark m)) return m;
 		GameObject parent = NewRoot(key, "SCMB_");
 		LineRenderer[] lrs = new LineRenderer[4];
-		// 折角臂长（单位半径上的占比）：0.34 ≈ 视觉上"框角"而不连成整圈；
-		// 留出的 0.66 缺口让四角明确分离，不像台风弧。
-		const float arm = 0.34f;
-		// 四角：(signX, signZ) = (-1,-1) (-1,+1) (+1,+1) (+1,-1)，逆时针对应 GVC 的四个象限
-		float[] sx = { -1f, -1f, 1f, 1f };
-		float[] sz = { -1f, 1f, 1f, -1f };
+		// 顶点在 Bracket() 里按当前半径每帧重写（半径写进顶点，父缩放恒为 1），
+		// 这里只建 4 个空缓冲，之后一直复用（零分配）。
+		Il2CppStructArray<Vector3>[] buf = new Il2CppStructArray<Vector3>[4];
 		for (int q = 0; q < 4; q++)
 		{
 			GameObject seg = new GameObject("c" + q);
@@ -159,16 +166,10 @@ internal static class SceneMarkers
 			lr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
 			lr.receiveShadows = false;
 			lr.sharedMaterial = LineMat();
-			Il2CppStructArray<Vector3> pts = new Il2CppStructArray<Vector3>(3);
-			float px = sx[q], pz = sz[q];
-			// 沿 -Z 方向伸出的臂（在角顶的"横边"上）与沿 -X 方向伸出的臂（"竖边"上）
-			pts[0] = new Vector3(px * 1f, 0f, pz * (1f - arm));
-			pts[1] = new Vector3(px * 1f, 0f, pz * 1f);
-			pts[2] = new Vector3(px * (1f - arm), 0f, pz * 1f);
-			lr.SetPositions(pts);
+			buf[q] = new Il2CppStructArray<Vector3>(3);
 			lrs[q] = lr;
 		}
-		m = new Mark { go = parent, lrs = lrs };
+		m = new Mark { go = parent, lrs = lrs, bracketPts = buf };
 		pool[key] = m;
 		return m;
 	}
@@ -466,14 +467,22 @@ internal static class SceneMarkers
 	/// （见 GetBracket 注释——原弧形状被用户判为"跟台风一样"）。
 	/// 比整圈圆环更有 RTS 辨识度，选中变化一目了然。
 	/// </summary>
+	/// 四角的象限符号：(signX, signZ) = (-1,-1) (-1,+1) (+1,+1) (+1,-1)。
+	/// 提为静态：Bracket() 每帧对每个选中单位都要跑一次，栈上 new float[4] 是纯浪费。
+	private static readonly float[] BracketSX = { -1f, -1f, 1f, 1f };
+	private static readonly float[] BracketSZ = { -1f, 1f, 1f, -1f };
+
 	public static void Bracket(string key, Vector3 groundPos, float radius, Color c, float width, bool visible)
 	{
 		if (!visible || radius <= 0f) return;
 		used.Add(key);
 		Mark m = GetBracket(key);
 		m.go.SetActive(true);
-		m.go.transform.localScale = new Vector3(radius, 1f, radius);
+		// 2.5.2：**父缩放恒为 1**——半径写进顶点（见 GetBracket 注释）。
+		// 用缩放的话线宽会被 lossyScale 连带放大，载具上会糊成"箭头"。
+		m.go.transform.localScale = Vector3.one;
 		m.go.transform.position = groundPos;
+		const float arm = 0.42f;   // 折角臂长（占半径的比例）；0.58 的缺口让四角分离
 		for (int i = 0; i < m.lrs.Length; i++)
 		{
 			LineRenderer lr = m.lrs[i];
@@ -481,6 +490,15 @@ internal static class SceneMarkers
 			lr.startColor = c;
 			lr.endColor = c;
 			lr.widthMultiplier = width;
+
+			Il2CppStructArray<Vector3> pts = m.bracketPts != null && i < m.bracketPts.Length
+				? m.bracketPts[i] : null;
+			if (pts == null) continue;   // 兜底：老缓存没有缓冲时不画顶点（不该发生）
+			float px = BracketSX[i], pz = BracketSZ[i];
+			pts[0] = new Vector3(px * radius, 0f, pz * (1f - arm) * radius);
+			pts[1] = new Vector3(px * radius, 0f, pz * radius);
+			pts[2] = new Vector3(px * (1f - arm) * radius, 0f, pz * radius);
+			lr.SetPositions(pts);
 		}
 	}
 }

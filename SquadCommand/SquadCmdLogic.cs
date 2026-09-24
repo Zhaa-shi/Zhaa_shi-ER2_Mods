@@ -454,11 +454,10 @@ internal static class SquadCmdLogic
 	/// <summary>1.4.14 性能：分辨率倍率缓存（0.5s）。
 	/// 原实现每次 HudStyle/HudStyleSmall/ButtonStyle/InfoPanel/BackpackPanel 调用都读一次 interop 属性——
 	/// 而 OnGUI 一帧有多次事件、每帧又有十几处取样式 → 每秒上千次 interop 读。
-	/// 分辨率倍率在运行中几乎不变，0.5s 粒度完全够用（窗口尺寸变化最多晚半秒生效）。</summary>
-	private static float resMultCache = -1f;
-	private static float resMultNext = -10f;
-
-	private static float ResMult()
+/// 2.5.2：缓存字段已随实现一起下沉到 Er2Ui.NativeResMult()（两个 mod 共用一份，
+/// 缓存只有一处）。这里只保留同名转发，避免调用点全改；**不要再在此处加缓存字段**
+///（1.4.21 清理：曾残留 resMultCache/resMultNext 两个死字段，属于"代码里有 ≠ 在生效"）。
+private static float ResMult()
 	{
 		// 2.5.1：实现下沉到 Er2Ui（两个 mod 共用一份，缓存只有一处）——
 		// 这里保留同名转发，避免调用点全改。

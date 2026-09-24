@@ -1,7 +1,36 @@
-ER2 Battlefield Commander v1.4.20
+ER2 Battlefield Commander v1.4.21
 =================================
 
 A BepInEx plugin for Easy Red 2 that adds an "RTS god-view squad command" layer — mouse operations inspired by Gates of Hell: Ostfront.
+
+[1.4.21 Visual polish]
+* **Line width is now defined in pixels, not world units.** `LineRenderer.widthMultiplier` is a
+  world-space value, so a fixed number looked fat up close and hair-thin at range - and any
+  "distance multiplier" fudge factor silently got 1.33x fatter at 1440p and 2x at 4K. Call sites
+  now state a target width in 1080p pixels (1.1 thin ... 2.2 emphasis) and `Er2Ui.LineWidth`
+  converts it to world units from the actual camera distance and FOV. Result: constant on-screen
+  thickness at any distance **and** any resolution.
+* **Selection brackets no longer read as arrowheads.** Root cause found in code, not guessed from a
+  screenshot: the bracket root object was scaled to `radius`, and `LineRenderer` width is
+  multiplied by the parent's `lossyScale` - so on a vehicle (radius up to 4.2) a 0.1 m line became
+  ~0.5-1.0 m thick while the corner arms are only ~1 m long. Two fat arms merged into a solid
+  triangle. The bracket root now stays at scale 1 and the radius is baked into the vertices.
+  Corner arms also lengthened (0.34 -> 0.42 of the radius) so the L shape stays legible.
+* **World markers moved from transparency to greyscale.** Semi-transparent grey (alpha 0.26-0.48)
+  gets eaten by grass, snow and sand - the colour drifts with whatever is behind it and edges go
+  soft. All world markers are now near-opaque greyscale (alpha >= 0.80); hierarchy comes from
+  lightness (#9AA1A8 -> #C6CBD0 -> #E2E6EA -> white) instead of alpha. Only the ghost preview
+  keeps its translucency, which is what makes it read as a preview.
+* **Panels got actual structure, not just colour blocks.** Every surface used to be a flat fill, so
+  "hierarchy" was carried by brightness alone and collapsed on a bright battlefield. Added three
+  primitives - `Frame` (outline), `HLine` (divider) and `AccentBar` (selection stripe) - plus a
+  separate title-bar fill, inset list borders and a left stripe on favourite rows. Hierarchy is now
+  face + line + bar instead of face only.
+* **Palette pulled back to mid-dark grey.** The 1.4.20 lift went too far (feedback: "too light").
+  Panel #14181D, title bar #1F252C, control #262D35, hover #333B45, selected #46505C - stepped
+  8-14 levels apart, which is what makes the new outlines read.
+* **Dead code removed:** the old `WidthScale` heuristic, an unused per-frame `float[4]` allocation
+  in the bracket path, and two orphaned resolution-cache fields.
 
 [1.4.20 UI]
 * **Adaptive UI (no manual scaling).** Every panel, HUD line, hint bar, backpack grid, tooltip

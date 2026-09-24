@@ -1,4 +1,4 @@
-ER2 Universal Generation v2.5.1
+ER2 Universal Generation v2.5.2
 ================================
 
 Spawn any unit, vehicle, or item anywhere, right from Battlefield Commander's RTS god view.
@@ -41,6 +41,11 @@ How to use
 
 Changelog
 --------------------------------
+2.5.2
+- **Panels got structure instead of flat colour blocks.** Every surface used to be a flat fill, so hierarchy rested on brightness alone and collapsed against a bright battlefield. Shared toolkit gained three primitives - `Frame` (outline), `HLine` (divider) and `AccentBar` (selection stripe) - and the panel now draws a separate title-bar fill, a divider under the title, an outer frame, inset borders around both lists and a left stripe on favourite rows. Hierarchy is now face + line + bar.
+- **Palette pulled back to mid-dark grey.** The 2.5.1 lift went too far (feedback: "too light"). Panel #14181D, title bar #1F252C, control #262D35, hover #333B45, selected #46505C - stepped 8-14 brightness levels apart, which is what makes the new outlines read.
+- Fixed row heights that were never multiplied by the adaptive scale (title / faction / pager / item-help / crew / preview), so those rows stayed at their design size while everything else grew.
+
 2.5.1
 - **Adaptive UI.** The panel, the placing badge and the carry badge now follow the **game's own UI size setting** (`ResourcesManager.ResolutionMult`, with a screen-resolution fallback). Change UI size in the game options and the panel rescales with it — no dragging, no number fields, no extra config. Clamped to 0.75x – 1.6x.
 - **The layout is no longer frozen:** size and font tokens in the shared toolkit were compile-time constants, so nothing could ever move. They are now scale-driven properties, and styles rebuild automatically when the scale changes.
