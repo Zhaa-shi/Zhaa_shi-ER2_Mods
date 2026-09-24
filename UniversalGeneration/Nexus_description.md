@@ -51,6 +51,10 @@ Items go into backpacks as their **proper subclass** — magazines hold the righ
 
 ## Changelog
 
+**2.4.2**
+- **No user-visible change — a code-quality release preparing the UI for a full redraw.** The panel now builds a **row plan** first (one entry per row: title / faction / tabs / list / pager / preview) and derives its height by summing that plan, while drawing walks the same list — so a row can no longer be drawn outside the panel (the class of bug fixed in 2.4.0). Both mods now share one UI toolkit (`Shared/Er2Ui.cs`): design tokens (spacing, font sizes, colours) and drawing primitives live in a single place, so a visual change lands in both mods at once.
+- Tab text fitting now measures properly (`GUIStyle.CalcSize`) with caching, instead of estimating per-character widths.
+
 **2.4.1**
 - **The "Mod Vehicles" tab no longer overlaps its neighbours.** Tabs are a fixed-width grid with a fixed font, so long labels ("Mod Vehicles", "Medical/Food") spilled past their button onto the next tab. Every tab now auto-shrinks to the largest font size that fits its cell.
 - **"Mod Vehicles" / "Mod Items" tabs are no longer permanently empty.** Discovery used `ModsLoader.mods_installed`, which is empty on the main menu; the probe saw zero mods, flagged itself ready and never retried — so mod content (which only loads in battle) never showed up. Content is now discovered by scanning each mod's `index.xml` on disk (workshop + local mod folders), with the runtime validation deferred until the item database is ready, and periodic re-scans so newly subscribed mods appear without a restart.

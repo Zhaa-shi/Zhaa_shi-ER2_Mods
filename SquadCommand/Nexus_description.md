@@ -6,7 +6,7 @@ Adds an "RTS god-view squad command" layer to Easy Red 2, with mouse operations 
 ## Installation instructions
 1. Install BepInEx (IL2CPP build) into the game root folder.
 2. Put `ER2_BattlefieldCommander.dll` into `Easy Red 2\BepInEx\plugins\`.
-3. Launch the game — `Loading [ER2 Battlefield Commander 1.4.17]` in the BepInEx log means success.
+3. Launch the game — `Loading [ER2 Battlefield Commander 1.4.18]` in the BepInEx log means success.
 
 ## Main features
 - **God-view command**: F9 to enter free camera, WASD move, wheel zoom, MMB rotate, Q/E height, Space to pause/resume the world.
@@ -38,6 +38,9 @@ Adds an "RTS god-view squad command" layer to Easy Red 2, with mouse operations 
 Thanks to the Easy Red 2 community and the BepInEx / Harmony ecosystem, and to all authors whose IL2CPP modding work paved the way.
 
 ## Recent changes
+**1.4.18**
+- Internal only, no gameplay or visual change: the HUD, info panel and backpack now build their text styles through the shared UI toolkit (`Shared/Er2Ui.cs`) that Universal Generation also uses, instead of hand-rolling a `GUIStyle` in each file. Same fonts, alignment and colours — groundwork for redrawing both mods into one coherent look.
+
 **1.4.17**
 - Picking up **weapons** from the ground no longer teleports them into a soldier's inventory. Ground weapons are multi-interaction items, so right-clicking opens the native interaction menu — and a pickup entry there executed at **any** distance. Menu pickup entries now join the same flow as plain items: instant within the link radius, otherwise the nearest selected soldier walks there and picks the weapon up on arrival. Other interactions (ammo refill etc.) unchanged.
 

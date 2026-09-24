@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using ER2Shared;
 using Il2CppInterop.Runtime;
 using UnityEngine;
 
@@ -36,18 +37,23 @@ internal static class GenPanel
 	private static int crewMode;
 	private static GenEntry infantrySel; // "所选步兵"模式的来源（最近点过的步兵条目）
 
-	// ── 布局常量 ──
-	private const float PanelW = 320f;
-	private const float RowH = 28f;      // 1.2.0：26→28（用户反馈"太密"）
+	// ── 布局常量（2.4.2：数值统一取自 ER2Shared.Er2Ui 令牌——重绘时改一处，两个 mod 同时生效）──
+	private const float PanelW = Er2Ui.PanelW;   // 320
+	private const float RowH = Er2Ui.RowH;       // 28（1.2.0：26→28，用户反馈"太密"）
+	private const float TabH = Er2Ui.TabH;       // 24
 	private const int VisibleRows = 10;
 	private const int TabsPerRow = 4;    // 1.2.0：8 个页签两行排（一行塞 7 个太挤）
 	private const int ItemTabsPerRow = 4; // 2.0.0：物品页签族同样两行排
 	private const int FavTabsPerRow = 4;  // 2.1.0：收藏分类子页签（最多 6 单位 + 6 物品 = 3 行）
-	private const float TabH = 24f;
+
+	// 单位类别页签：显示名在 EnsureStyles 里过一次 Ui.Tr（避免每帧翻译 + 每帧分配数组）
+	private static readonly string[] UnitCats = { "favorites", "infantry", "mgs", "tanks", "wheeled", "planes", "artillery", "modveh" };
+	private static readonly string[] UnitCatRaw = { "收藏", "步兵", "机枪", "坦克", "轮式", "飞机", "火炮", "Mod载具" };
+	private static readonly string[] UnitCatNames = new string[UnitCats.Length];
 
 	private static GUIStyle titleStyle, textStyle, buttonStyle, activeButtonStyle, rowStyle, flashStyle, starStyle;
 
-	// 2.4.1：页签专用样式（**只给 DrawTabButton 用**，字号会被逐次改写以适配定宽按钮；
+	// 2.4.2：页签专用样式（**只给页签用**，字号会被逐次改写以适配定宽按钮；
 	// 不能复用 buttonStyle/activeButtonStyle——它们被别处以固定 12 号使用）
 	private static GUIStyle tabStyle, tabActiveStyle;
 
@@ -65,6 +71,76 @@ internal static class GenPanel
 
 	// 2.1.1：物品首字母索引（不用 GUI.TextField——IL2CPP 下被裁剪，见陷阱）
 	private static string letterFilter = "";
+
+	// 2.4.2：行计划（布局单一数据源）+ 分页上下文（List 行写、Pager 行读——两者必定相邻）
+	private static readonly List<Row> rows = new();
+	private static int curPages = 1, curTotal;
+
+	// ══════════ 2.4.2：布局单一数据源（行计划）══════════
+	//
+	// 陷阱 75 的**结构性**修法：高度不再另算一遍。
+	// 2.4.0 曾把"高度公式"与"绘制的 y 累加"逐项对齐——但那是靠人记住两处同步，
+	// 加一行 UI 就再踩一次。现在：**先排这一帧要画哪些行（BuildRows），高度 = 各行高之和**，
+	// 绘制只按计划逐行取 Rect —— 二者消费同一份列表，漂移在结构上不可能发生。
+	private enum RowKind { Title, Faction, UnitTabs, ItemTabs, FavTabs, SubTabs, Letters, List, Pager, Crew, Preview, ItemHelp }
+
+	private struct Row
+	{
+		public RowKind Kind;
+		public float H;
+	}
+
+	/// <summary>当前是否物品分支；是则给出桶名与"只要收藏"。</summary>
+	private static bool ItemBranch(out string bucket, out bool favOnly)
+	{
+		bucket = null; favOnly = false;
+		if (category == "favorites" && !string.IsNullOrEmpty(favCat) && favCat.StartsWith("item:", StringComparison.Ordinal))
+		{ bucket = favCat.Substring(5); favOnly = true; return true; }
+		if (IsItemCategory) { bucket = category.Substring(5); favOnly = false; return true; }
+		return false;
+	}
+
+	private static void BuildRows()
+	{
+		rows.Clear();
+		rows.Add(new Row { Kind = RowKind.Title, H = 26f });
+		rows.Add(new Row { Kind = RowKind.Faction, H = 36f });
+		rows.Add(new Row { Kind = RowKind.UnitTabs, H = Er2Ui.TabGridH(UnitCats.Length, TabsPerRow, TabH) });
+		if (itemCats.Count > 0)
+			rows.Add(new Row { Kind = RowKind.ItemTabs, H = Er2Ui.TabGridH(itemCats.Count, ItemTabsPerRow, TabH) });
+		if (category == "favorites" && favCats.Count > 0)
+			rows.Add(new Row { Kind = RowKind.FavTabs, H = Er2Ui.TabGridH(favCats.Count, FavTabsPerRow, TabH) });
+
+		if (ItemBranch(out string bucket, out bool favOnly))
+		{
+			if (ItemCatalog.SubsOf(bucket, favOnly).Count > 0)
+				rows.Add(new Row { Kind = RowKind.SubTabs, H = TabH + Er2Ui.Gap });
+
+			List<string> letters = ItemCatalog.LettersOf(bucket, itemSub, favOnly);
+			if (letters.Count > 2)
+			{
+				const float LBW = 24f, LGap = 3f;
+				int per = Mathf.Max(3, Mathf.FloorToInt(((PanelW - 20f) + LGap) / (LBW + LGap)));
+				int lr = (letters.Count + 2 + per - 1) / per;   // +2：「全部」占两格
+				rows.Add(new Row { Kind = RowKind.Letters, H = lr * 22f + 2f });
+			}
+			else if (!string.IsNullOrEmpty(letterFilter))
+			{
+				letterFilter = "";   // 字母行消失时（如子分类变了）自动复位，避免空列表
+			}
+
+			rows.Add(new Row { Kind = RowKind.List, H = VisibleRows * RowH + 8f + Er2Ui.Gap });
+			rows.Add(new Row { Kind = RowKind.Pager, H = 26f });
+			rows.Add(new Row { Kind = RowKind.ItemHelp, H = 34f });
+		}
+		else
+		{
+			rows.Add(new Row { Kind = RowKind.List, H = VisibleRows * RowH + 8f + Er2Ui.Gap });
+			rows.Add(new Row { Kind = RowKind.Pager, H = 26f });
+			rows.Add(new Row { Kind = RowKind.Crew, H = 32f });
+			rows.Add(new Row { Kind = RowKind.Preview, H = 24f });
+		}
+	}
 
 	public static bool IsOpen => open;
 
@@ -215,182 +291,302 @@ internal static class GenPanel
 			Event.current.Use();
 		}
 
-		GUI.color = new Color(0.02f, 0.05f, 0.02f, 0.88f);
-		GUI.DrawTexture(r, Texture2D.whiteTexture);
-		GUI.color = Color.white;
+		Er2Ui.Fill(r, Er2Ui.PanelBg);
 
-		float x = r.x + 10f, w = r.width - 20f;
+		// 2.4.2：绘制**只消费行计划**——高度与绘制同源（见 BuildRows），加行只需改一处
+		DrawRows(r);
+	}
+
+	/// <summary>按行计划逐行取 Rect 绘制（每行只拿到自己的 Rect，不再自行累加 y）。</summary>
+	private static void DrawRows(Rect r)
+	{
+		BuildRows();
+		float x = r.x + Er2Ui.Pad, w = r.width - Er2Ui.Pad * 2f;
 		float y = r.y + 8f;
+		bool item = ItemBranch(out string bucket, out bool favOnly);
 
-		// 标题行（含一键清除）
-		GUI.Label(new Rect(x, y, w - 100f, 24f), Ui.Tr("通用生成"), titleStyle);
-		Rect clearBtn = new Rect(r.xMax - 96f, y, 62f, 22f);
-		if (DrawButton(clearBtn, Ui.Tr("清除"), buttonStyle))
+		for (int i = 0; i < rows.Count; i++)
+		{
+			Row row = rows[i];
+			Rect rect = new Rect(x, y, w, row.H);
+			bool stop = false;
+			switch (row.Kind)
+			{
+				case RowKind.Title: stop = DrawTitleRow(rect, r); break;
+				case RowKind.Faction: DrawFactionRow(rect); break;
+				case RowKind.UnitTabs: DrawUnitTabs(rect); break;
+				case RowKind.ItemTabs: DrawItemTabs(rect); break;
+				case RowKind.FavTabs: DrawFavTabs(rect); break;
+				case RowKind.SubTabs: DrawSubTabs(rect, bucket, favOnly); break;
+				case RowKind.Letters: DrawLetters(rect, bucket, favOnly); break;
+				case RowKind.List: stop = item ? DrawItemListBody(rect, bucket, favOnly) : DrawUnitListBody(rect); break;
+				case RowKind.Pager: DrawPager(rect, item); break;
+				case RowKind.Crew: DrawCrewRow(rect); break;
+				case RowKind.Preview: DrawPreviewRow(rect); break;
+				case RowKind.ItemHelp:
+					GUI.Label(rect, Ui.Tr("点击条目拿起 → 拖到单位身上放入背包，拖到地上则生成实体"), textStyle);
+					break;
+			}
+			if (stop) return;      // 点条目进入放置/携带 → 本帧到此为止（原 return 语义）
+			y += row.H;
+		}
+	}
+
+	// ── 逐行绘制 ──
+
+	private static bool DrawTitleRow(Rect rect, Rect panel)
+	{
+		GUI.Label(new Rect(rect.x, rect.y, rect.width - 100f, 24f), Ui.Tr("通用生成"), titleStyle);
+		if (GUI.Button(new Rect(panel.xMax - 96f, rect.y, 62f, 22f), Ui.Tr("清除"), buttonStyle))
 		{
 			int n = GenRunner.ClearAllSpawned();
 			Flash(Ui.Tr("已清除 ") + n + Ui.Tr(" 个生成物"));
 		}
-		Rect closeBtn = new Rect(r.xMax - 30f, y, 22f, 22f);
-		if (DrawButton(closeBtn, "×", buttonStyle)) { SetOpen(false); return; }
-		y += 26f;
-
-		// 阵营切换（我方 / 敌方 / 中立）
-		float third = (w - 16f) / 3f;
-		if (DrawButton(new Rect(x, y, third, 30f), Ui.Tr("我方"), faction == "mine" ? activeButtonStyle : buttonStyle)) faction = "mine";
-		if (DrawButton(new Rect(x + third + 8f, y, third, 30f), Ui.Tr("敌方"), faction == "enemy" ? activeButtonStyle : buttonStyle)) faction = "enemy";
-		if (DrawButton(new Rect(x + (third + 8f) * 2f, y, third, 30f), Ui.Tr("中立"), faction == "neutral" ? activeButtonStyle : buttonStyle)) faction = "neutral";
-		y += 36f;
-
-		// 类别页签（两行排布：收藏 + 步兵/机枪/坦克/轮式/飞机/火炮 + 物品页签族；
-		// 1.2.0 用户反馈单行太挤；2.0.0 新增物品族，故改为"单位页签 + 物品页签"两段）
-		string[] cats = { "favorites", "infantry", "mgs", "tanks", "wheeled", "planes", "artillery", "modveh" };
-		string[] catNames = { Ui.Tr("收藏"), Ui.Tr("步兵"), Ui.Tr("机枪"), Ui.Tr("坦克"), Ui.Tr("轮式"), Ui.Tr("飞机"), Ui.Tr("火炮"), Ui.Tr("Mod载具") };
-		float cw = (w - (TabsPerRow - 1f) * 4f) / TabsPerRow;
-		for (int i = 0; i < cats.Length; i++)
+		if (GUI.Button(new Rect(panel.xMax - 30f, rect.y, 22f, 22f), "×", buttonStyle))
 		{
-			int row = i / TabsPerRow, col = i % TabsPerRow;
-			bool sel = category == cats[i];
-			// 2.4.1：走自适应字号（"Mod Vehicles" 之类的长标签不再溢出压住邻居）
-			if (DrawTabButton(new Rect(x + col * (cw + 4f), y + row * (TabH + 4f), cw, TabH), catNames[i], sel))
+			SetOpen(false);
+			return true;
+		}
+		return false;
+	}
+
+	private static void DrawFactionRow(Rect rect)
+	{
+		float third = (rect.width - 16f) / 3f;
+		if (GUI.Button(new Rect(rect.x, rect.y, third, 30f), Ui.Tr("我方"), faction == "mine" ? activeButtonStyle : buttonStyle)) faction = "mine";
+		if (GUI.Button(new Rect(rect.x + third + 8f, rect.y, third, 30f), Ui.Tr("敌方"), faction == "enemy" ? activeButtonStyle : buttonStyle)) faction = "enemy";
+		if (GUI.Button(new Rect(rect.x + (third + 8f) * 2f, rect.y, third, 30f), Ui.Tr("中立"), faction == "neutral" ? activeButtonStyle : buttonStyle)) faction = "neutral";
+	}
+
+	private static void DrawUnitTabs(Rect rect)
+	{
+		int hit = Er2Ui.TabGrid(rect.x, rect.y, rect.width, UnitCatNames, IndexOfUnitCat(category),
+			TabsPerRow, TabH, tabStyle, tabActiveStyle);
+		if (hit < 0 || hit >= UnitCats.Length) return;
+		category = UnitCats[hit];
+		page = 0;
+		itemSub = ""; letterFilter = "";   // 2.1.0：换类即复位子分类与过滤，避免"切过去是空列表"
+		if (category == "favorites") RebuildFavTabs();
+	}
+
+	private static void DrawItemTabs(Rect rect)
+	{
+		int hit = Er2Ui.TabGrid(rect.x, rect.y, rect.width, itemCatNames, itemCats.IndexOf(category),
+			ItemTabsPerRow, TabH, tabStyle, tabActiveStyle);
+		if (hit < 0 || hit >= itemCats.Count) return;
+		category = itemCats[hit];
+		page = 0;
+		itemSub = ""; letterFilter = "";   // 2.1.0：同上
+	}
+
+	private static void DrawFavTabs(Rect rect)
+	{
+		int hit = Er2Ui.TabGrid(rect.x, rect.y, rect.width, favCatNames, favCats.IndexOf(favCat),
+			FavTabsPerRow, TabH, tabStyle, tabActiveStyle);
+		if (hit < 0 || hit >= favCats.Count) return;
+		favCat = favCats[hit];
+		page = 0;
+		itemSub = "";
+	}
+
+	private static int IndexOfUnitCat(string cat)
+	{
+		for (int i = 0; i < UnitCats.Length; i++) if (UnitCats[i] == cat) return i;
+		return -1;
+	}
+
+	/// <summary>物品子分类行：「全部」+ 该桶实际存在的子分类（判定来自游戏官方字段，不猜名字）。</summary>
+	private static void DrawSubTabs(Rect rect, string bucket, bool favOnly)
+	{
+		List<string> subs = ItemCatalog.SubsOf(bucket, favOnly);
+		int n = subs.Count + 1;                       // +「全部」
+		var labels = new List<string>(n);
+		labels.Add(Ui.Tr("全部"));
+		foreach (string s in subs) labels.Add(Ui.Tr(SubLabel(s)));   // 2.3.0：SubLabel 返回中文原串，**必须过 Ui.Tr**
+
+		int sel = string.IsNullOrEmpty(itemSub) ? 0 : subs.IndexOf(itemSub) + 1;
+		int hit = Er2Ui.TabGrid(rect.x, rect.y, rect.width, labels, sel, n, TabH, tabStyle, tabActiveStyle);
+		if (hit < 0) return;
+		itemSub = hit == 0 ? "" : subs[hit - 1];
+		page = 0;
+	}
+
+	/// <summary>
+	/// 首字母索引行（**替代 GUI.TextField**——它在 IL2CPP 下"Method unstripping failed"，
+	/// 一抛异常整帧 OnGUI 中断 = 用户看到的"列表全空"。字母行纯点击，零键盘依赖）。
+	/// ⚠️ 2.2.0 把「全部」做成占两格、字母从**第 3 格（i>=2）**起排——
+	/// 2.2.0 首发写成 i==1 就取 letters[i-2] → letters[-1] 抛异常 → 整帧中断（2.2.1 修复）。
+	/// </summary>
+	private static void DrawLetters(Rect rect, string bucket, bool favOnly)
+	{
+		List<string> letters = ItemCatalog.LettersOf(bucket, itemSub, favOnly);
+		if (letters.Count <= 2) return;
+
+		const float LBW = 24f, LGap = 3f;
+		int per = Mathf.Max(3, Mathf.FloorToInt((rect.width + LGap) / (LBW + LGap)));
+		int cells = letters.Count + 2;   // +「全部」占两格
+		for (int i = 0; i < cells; i++)
+		{
+			int row = i / per, col = i % per;
+			float bx = rect.x + col * (LBW + LGap);
+			float by = rect.y + row * 22f;
+			if (i == 0)
 			{
-				category = cats[i];
-				page = 0;
-				itemSub = ""; letterFilter = "";   // 2.1.0：换类即复位子分类与过滤，避免"切过去是空列表"
-				if (category == "favorites") RebuildFavTabs();
+				bool allSel = string.IsNullOrEmpty(letterFilter);
+				if (GUI.Button(new Rect(bx, by, LBW * 2f + LGap, 20f), Ui.Tr("全部"), allSel ? activeButtonStyle : buttonStyle))
+				{ letterFilter = ""; page = 0; }
+			}
+			else if (i >= 2)
+			{
+				string lt = letters[i - 2];
+				bool sel = string.Equals(letterFilter, lt, StringComparison.OrdinalIgnoreCase);
+				if (GUI.Button(new Rect(bx, by, LBW, 20f), lt, sel ? activeButtonStyle : buttonStyle))
+				{ letterFilter = lt; page = 0; }
 			}
 		}
-		y += 2f * (TabH + 4f);
+	}
 
-		// 2.0.0：物品页签族（只列有内容的桶；桶为空则此段不出现）
-		if (itemCats.Count > 0)
-		{
-			float iw = (w - (ItemTabsPerRow - 1f) * 4f) / ItemTabsPerRow;
-			int irows = (itemCats.Count + ItemTabsPerRow - 1) / ItemTabsPerRow;
-			for (int i = 0; i < itemCats.Count; i++)
-			{
-				int row = i / ItemTabsPerRow, col = i % ItemTabsPerRow;
-				bool sel = category == itemCats[i];
-				if (DrawTabButton(new Rect(x + col * (iw + 4f), y + row * (TabH + 4f), iw, TabH), itemCatNames[i], sel))
-				{
-					category = itemCats[i];
-					page = 0;
-					itemSub = ""; letterFilter = "";   // 2.1.0：同上
-				}
-			}
-			y += irows * (TabH + 4f);
-		}
-
-		// 2.1.0：选中「收藏」时，再列一行**收藏分类**子页签（单位类 + 物品类）
-		if (category == "favorites" && favCats.Count > 0)
-		{
-			float fw = (w - (FavTabsPerRow - 1f) * 4f) / FavTabsPerRow;
-			int frows = (favCats.Count + FavTabsPerRow - 1) / FavTabsPerRow;
-			for (int i = 0; i < favCats.Count; i++)
-			{
-				int row = i / FavTabsPerRow, col = i % FavTabsPerRow;
-				bool sel = favCat == favCats[i];
-				if (DrawTabButton(new Rect(x + col * (fw + 4f), y + row * (TabH + 4f), fw, TabH), favCatNames[i], sel))
-				{
-					favCat = favCats[i];
-					page = 0;
-					itemSub = "";
-				}
-			}
-			y += frows * (TabH + 4f);
-		}
-
-		// 条目列表（分页制：GUI.BeginScrollView 被游戏裁剪，禁用滚动区；只用 Label/Button/DrawTexture）
-		// 2.1.0：收藏分类选中物品类 → 走物品列表（桶名来自 favCat）
-		if (category == "favorites" && favCat.StartsWith("item:", StringComparison.Ordinal))
-		{
-			DrawItemList(x, y, w, favCat.Substring(5), true);   // 收藏分类 → 只要收藏项
-			return;
-		}
-		if (IsItemCategory) { DrawItemList(x, y, w, category.Substring(5), false); return; }
-
+	/// <summary>单位列表（点击=放置）。返回 true = 已开始放置，本帧停止继续绘制。</summary>
+	private static bool DrawUnitListBody(Rect rect)
+	{
 		List<GenEntry> bucket = FilteredBucket();
-		int pages = Mathf.Max(1, Mathf.CeilToInt(bucket.Count / (float)VisibleRows));
-		if (page >= pages) page = pages - 1;
-		float listH = VisibleRows * RowH + 8f;
-		Rect listOuter = new Rect(x, y, w, listH);
-		GUI.color = new Color(0f, 0f, 0f, 0.35f);
-		GUI.DrawTexture(listOuter, Texture2D.whiteTexture);
-		GUI.color = Color.white;
+		curPages = Mathf.Max(1, Mathf.CeilToInt(bucket.Count / (float)VisibleRows));
+		curTotal = bucket.Count;
+		page = Mathf.Clamp(page, 0, curPages - 1);
+
+		float listH = rect.height - Er2Ui.Gap;
+		Er2Ui.Fill(new Rect(rect.x, rect.y, rect.width, listH), Er2Ui.ListBg);
+
 		if (bucket.Count == 0)
 		{
-			GUI.Label(new Rect(x + 8f, y + 6f, w - 16f, 22f), Ui.Tr("（无匹配条目）"), textStyle);
+			GUI.Label(new Rect(rect.x + 8f, rect.y + 6f, rect.width - 16f, 22f), Ui.Tr("（无匹配条目）"), textStyle);
+			return false;
 		}
-		else
+
+		int from = page * VisibleRows;
+		int to = Mathf.Min(from + VisibleRows, bucket.Count);
+		GenEntry clicked = null;
+		for (int i = from; i < to; i++)
 		{
-			int from = page * VisibleRows;
-			int to = Mathf.Min(from + VisibleRows, bucket.Count);
-			GenEntry clicked = null;
-			for (int i = from; i < to; i++)
+			GenEntry e = bucket[i];
+			float rowY = rect.y + 4f + (i - from) * RowH;
+			bool fav = GenCatalog.IsFav(e.Id);
+			Color keep = GUI.backgroundColor;
+			GUI.backgroundColor = fav ? Er2Ui.FavRow : Er2Ui.RowBg;
+			if (GUI.Button(new Rect(rect.x + 6f, rowY, rect.width - 38f, RowH - 2f), e.Title, rowStyle)) clicked = e;
+			GUI.backgroundColor = keep;
+			if (StarButton(new Rect(rect.x + rect.width - 30f, rowY + 1f, 26f, RowH - 4f), fav))
 			{
-				GenEntry e = bucket[i];
-				float rowY = y + 4f + (i - from) * RowH;
-				Color keep = GUI.backgroundColor;
-				string label = e.Title;
-				bool fav = GenCatalog.IsFav(e.Id);
-				// 名称按钮（点=放置）
-				Rect nameBtn = new Rect(x + 6f, rowY, w - 38f, RowH - 2f);
-				GUI.backgroundColor = fav ? new Color(0.4f, 0.58f, 0.4f, 0.95f) : new Color(0.12f, 0.2f, 0.12f, 0.85f);
-				if (GUI.Button(nameBtn, label, rowStyle)) clicked = e;
-				// 收藏星标（点=切换收藏；透明底，仅星形变色）
-				GUI.backgroundColor = keep;
-				string star = fav ? "★" : "☆";
-				Rect starBtn = new Rect(x + w - 30f, rowY + 1f, 26f, RowH - 4f);
-				bool starHover = starBtn.Contains(Event.current.mousePosition);
-				Color keepTxt = GUI.contentColor;
-				GUI.contentColor = fav ? new Color(1f, 0.85f, 0.3f, 1f) : (starHover ? new Color(0.8f, 0.9f, 0.8f, 0.95f) : new Color(0.55f, 0.65f, 0.55f, 0.75f));
-				if (GUI.Button(starBtn, star, starStyle)) { GenCatalog.ToggleFav(e); RebuildFavTabs(); }
-				GUI.contentColor = keepTxt;
-			}
-			if (clicked != null)
-			{
-				Event.current.Use();
-				BeginPlacement(clicked);
-				return;
+				GenCatalog.ToggleFav(e);
+				RebuildFavTabs();   // 收藏分类页签随之增减
 			}
 		}
-		y += listH + 4f;
-
-		// 分页行（1.2.1：步兵页可达 50+ 页，Shift+点击一次跳 10 页）
-		if (pages > 1)
+		if (clicked != null)
 		{
-			bool shiftPg = Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift);
-			int step = shiftPg ? 10 : 1;
-			if (DrawButton(new Rect(x, y, 30f, 22f), "◀", buttonStyle)) page = Mathf.Max(0, page - step);
-			GUI.Label(new Rect(x + 38f, y + 2f, 60f, 20f), (page + 1) + "/" + pages, textStyle);
-			if (DrawButton(new Rect(x + w - 30f, y, 30f, 22f), "▶", buttonStyle)) page = Mathf.Min(pages - 1, page + step);
+			Event.current.Use();
+			BeginPlacement(clicked);
+			return true;
 		}
-		y += 26f;
+		return false;
+	}
 
-		// 乘员行（步兵无乘员选项）。开关都用按钮（GUI.Toggle 有裁剪风险）
-		if (category != "infantry")
+	/// <summary>物品列表（点击=拿起 → 携带模式）。行左侧画小图标（有则画，取不到不阻塞）。</summary>
+	private static bool DrawItemListBody(Rect rect, string bucket, bool favOnly)
+	{
+		List<ItemEntry> all = ItemCatalog.Query(bucket, itemSub, letterFilter, favOnly);
+		ItemEntry[] snap;
+		try { snap = all.ToArray(); }
+		catch { snap = Array.Empty<ItemEntry>(); }
+
+		curPages = Mathf.Max(1, Mathf.CeilToInt(snap.Length / (float)VisibleRows));
+		curTotal = snap.Length;
+		page = Mathf.Clamp(page, 0, curPages - 1);
+
+		float listH = rect.height - Er2Ui.Gap;
+		Er2Ui.Fill(new Rect(rect.x, rect.y, rect.width, listH), Er2Ui.ListBg);
+
+		if (snap.Length == 0)
 		{
-			string crewLabel = crewMode == 0 ? Ui.Tr("乘员:专用") : crewMode == 1 ? Ui.Tr("乘员:兵班") : Ui.Tr("乘员:无");
-			if (DrawButton(new Rect(x, y, 90f, 24f), crewLabel, crewMode != 2 ? activeButtonStyle : buttonStyle))
-				crewMode = (crewMode + 1) % 3;
-			if (crewMode == 1 && GenCatalog.crewPool.Count > 0)
+			GUI.Label(new Rect(rect.x + 8f, rect.y + 6f, rect.width - 16f, 22f), Ui.Tr("（无匹配条目）"), textStyle);
+			return false;
+		}
+
+		int from = page * VisibleRows;
+		int to = Mathf.Min(from + VisibleRows, snap.Length);
+		ItemEntry clicked = null;
+		for (int i = from; i < to; i++)
+		{
+			ItemEntry e = snap[i];
+			float rowY = rect.y + 4f + (i - from) * RowH;
+			Texture2D tex = IconTexFor(e.Id);
+			if (tex != null) DrawTexFit(tex, new Rect(rect.x + 6f, rowY + 1f, RowH - 4f, RowH - 4f), 0.95f);
+			float tx = rect.x + 6f + (tex != null ? RowH : 0f);
+			float tw = rect.width - 12f - (tx - rect.x) - 30f;   // 2.1.0：右侧让出星标位
+
+			bool fav = ItemCatalog.IsFav(e.Id);
+			Color keep = GUI.backgroundColor;
+			GUI.backgroundColor = fav ? Er2Ui.FavRow : Er2Ui.RowBg;
+			if (GUI.Button(new Rect(tx, rowY, tw, RowH - 2f), e.Title, rowStyle)) clicked = e;
+			GUI.backgroundColor = keep;
+			if (StarButton(new Rect(rect.x + rect.width - 28f, rowY + 1f, 26f, RowH - 4f), fav))
 			{
-				// 兵班选择器：‹ 类型 ›（在官方步兵类型池里循环；自定义班不作乘员来源）
-				if (infantrySel == null || infantrySel.SpawnByKey) infantrySel = GenCatalog.crewPool[0];
-				int idx = GenCatalog.crewPool.FindIndex(e => e.Id == infantrySel.Id);
-				if (idx < 0) idx = 0;
-				if (DrawButton(new Rect(x + 94f, y, 22f, 24f), "‹", buttonStyle))
-					infantrySel = GenCatalog.crewPool[(idx - 1 + GenCatalog.crewPool.Count) % GenCatalog.crewPool.Count];
-				GUI.Label(new Rect(x + 118f, y + 3f, 110f, 20f), infantrySel.Title, textStyle);
-				if (DrawButton(new Rect(x + 230f, y, 22f, 24f), "›", buttonStyle))
-					infantrySel = GenCatalog.crewPool[(idx + 1) % GenCatalog.crewPool.Count];
+				ItemCatalog.ToggleFav(e);
+				RebuildFavTabs();
 			}
 		}
-		y += 32f;
+		if (clicked != null)
+		{
+			Event.current.Use();
+			BeginCarry(clicked);
+			return true;
+		}
+		return false;
+	}
 
-		// 提示行（显示将生成的真实阵营 id）
+	/// <summary>收藏星标（透明底，仅星形变色）。</summary>
+	private static bool StarButton(Rect r, bool fav)
+	{
+		bool hover = r.Contains(Event.current.mousePosition);
+		Color keepTxt = GUI.contentColor;
+		GUI.contentColor = fav ? Er2Ui.StarOn : (hover ? Er2Ui.StarHot : Er2Ui.TextDim);
+		bool hit = GUI.Button(r, fav ? "★" : "☆", starStyle);
+		GUI.contentColor = keepTxt;
+		return hit;
+	}
+
+	private static void DrawPager(Rect rect, bool item)
+	{
+		string mid = item ? (page + 1) + "/" + curPages + "  (" + curTotal + ")" : (page + 1) + "/" + curPages;
+		int delta = Er2Ui.Pager(rect.x, rect.y, rect.width, curPages, mid, buttonStyle, textStyle);
+		if (delta != 0) page = Mathf.Clamp(page + delta, 0, curPages - 1);
+	}
+
+	/// <summary>乘员行（步兵无乘员选项）。开关都用按钮（GUI.Toggle 有裁剪风险）。</summary>
+	private static void DrawCrewRow(Rect rect)
+	{
+		if (category == "infantry") return;
+		string crewLabel = crewMode == 0 ? Ui.Tr("乘员:专用") : crewMode == 1 ? Ui.Tr("乘员:兵班") : Ui.Tr("乘员:无");
+		if (GUI.Button(new Rect(rect.x, rect.y, 90f, 24f), crewLabel, crewMode != 2 ? activeButtonStyle : buttonStyle))
+			crewMode = (crewMode + 1) % 3;
+		if (crewMode == 1 && GenCatalog.crewPool.Count > 0)
+		{
+			// 兵班选择器：‹ 类型 ›（在官方步兵类型池里循环；自定义班不作乘员来源）
+			if (infantrySel == null || infantrySel.SpawnByKey) infantrySel = GenCatalog.crewPool[0];
+			int idx = GenCatalog.crewPool.FindIndex(e => e.Id == infantrySel.Id);
+			if (idx < 0) idx = 0;
+			if (GUI.Button(new Rect(rect.x + 94f, rect.y, 22f, 24f), "‹", buttonStyle))
+				infantrySel = GenCatalog.crewPool[(idx - 1 + GenCatalog.crewPool.Count) % GenCatalog.crewPool.Count];
+			GUI.Label(new Rect(rect.x + 118f, rect.y + 3f, 110f, 20f), infantrySel.Title, textStyle);
+			if (GUI.Button(new Rect(rect.x + 230f, rect.y, 22f, 24f), "›", buttonStyle))
+				infantrySel = GenCatalog.crewPool[(idx + 1) % GenCatalog.crewPool.Count];
+		}
+	}
+
+	/// <summary>提示行（显示将生成的真实阵营 id）。</summary>
+	private static void DrawPreviewRow(Rect rect)
+	{
 		string myFac = GenRunner.MyFaction();
-		string previewFac;
-		string sideTag;
+		string previewFac, sideTag;
 		if (faction == "neutral")
 		{
 			previewFac = "Civilian";
@@ -404,156 +600,9 @@ internal static class GenPanel
 					? FactionData.OppositeOf(myFac) : GenRunner.EnemyFaction());
 			sideTag = FactionData.IsFriendly(previewFac, myFac) ? Ui.Tr("我方") : Ui.Tr("敌方");
 		}
-		GUI.Label(new Rect(x, y, w, 20f), Ui.Tr("→ 生成 ") + previewFac + "（" + sideTag + "）", textStyle);
-		y += 24f;
+		GUI.Label(new Rect(rect.x, rect.y, rect.width, 20f), Ui.Tr("→ 生成 ") + previewFac + "（" + sideTag + "）", textStyle);
 	}
 
-	// ══════════════════ 2.0.0：物品页签 ══════════════════
-
-	/// <summary>
-	/// 物品列表：与单位列表同布局，但条目**点击即拿起**（进入携带模式），
-	/// 之后拖到单位身上进背包、拖到地上生成实体（ItemDragger）。
-	/// 行左侧画小图标（有则画，取不到不阻塞——图标是异步链，先出名字）。
-	/// </summary>
-	private static void DrawItemList(float x, float y, float w, string bucket, bool favOnly)
-	{
-		// 2.1.0：子分类页签（只列该桶实际存在的子分类；判定来自游戏官方字段，不猜名字）
-		List<string> subs = ItemCatalog.SubsOf(bucket, favOnly);
-		if (subs.Count > 0)
-		{
-			int n = subs.Count + 1; // +「全部」
-			float sw = (w - (n - 1f) * 4f) / n;
-			if (DrawTabButton(new Rect(x, y, sw, TabH), Ui.Tr("全部"), itemSub == ""))
-			{ itemSub = ""; page = 0; }
-			for (int i = 0; i < subs.Count; i++)
-			{
-				bool sel = itemSub == subs[i];
-				// 2.3.0：SubLabel 返回中文原串，**必须过 Ui.Tr**——2.2.0 加「可穿戴」子分类时
-				// 这里漏了包装 → 英文版按钮直接显示中文（用户实测截图实锤）。BucketLabel 的教训同款。
-				if (DrawTabButton(new Rect(x + (i + 1) * (sw + 4f), y, sw, TabH), Ui.Tr(SubLabel(subs[i])), sel))
-				{ itemSub = subs[i]; page = 0; }
-			}
-			y += TabH + 4f;
-		}
-
-		// 2.1.1：首字母索引行（**替代 GUI.TextField**——它在 IL2CPP 下"Method unstripping failed"，
-		// 一抛异常整帧 OnGUI 中断 = 用户看到的"列表全空"。字母行纯点击，零键盘依赖）
-		List<string> letters = ItemCatalog.LettersOf(bucket, itemSub, favOnly);
-		if (letters.Count > 2)
-		{
-			// 固定按钮宽 + 自动换行：字母最多 30+ 个，挤单行会窄到不可点。
-			// 2.2.0：**「全部」占两格**（2.1.1 让它宽 34px 越过 27px 网格间距 → 压住相邻按钮，
-			// 用户实测"菜单按钮有重叠"）；字母从**第 3 格（i>=2）**起排——
-			// ⚠️ 2.2.0 首发把 else 写成从 i==1 就取 letters[i-2] → i=1 时 letters[-1] 抛
-			// ArgumentOutOfRangeException → 整帧 OnGUI 中断 → 字母与物品列表全消失
-			//（用户实测截图：子分类页签 + 孤零零一个「全部」，其余全空）。2.2.1 修复。
-			const float LBW = 24f, LGap = 3f;
-			int per = Mathf.Max(3, Mathf.FloorToInt((w + LGap) / (LBW + LGap)));
-			int cells = letters.Count + 2; // +「全部」占两格
-			for (int i = 0; i < cells; i++)
-			{
-				int row = i / per, col = i % per;
-				float bx = x + col * (LBW + LGap);
-				float by = y + row * 22f;
-				if (i == 0)
-				{
-					bool allSel = string.IsNullOrEmpty(letterFilter);
-					if (DrawButton(new Rect(bx, by, LBW * 2f + LGap, 20f), Ui.Tr("全部"), allSel ? activeButtonStyle : buttonStyle))
-					{ letterFilter = ""; page = 0; }
-				}
-				else if (i >= 2)
-				{
-					string lt = letters[i - 2];
-					bool sel = string.Equals(letterFilter, lt, StringComparison.OrdinalIgnoreCase);
-					if (DrawButton(new Rect(bx, by, LBW, 20f), lt, sel ? activeButtonStyle : buttonStyle))
-					{ letterFilter = lt; page = 0; }
-				}
-			}
-			int rows = (cells + per - 1) / per;
-			y += rows * 22f + 2f;
-		}
-		else if (!string.IsNullOrEmpty(letterFilter))
-		{
-			letterFilter = ""; // 字母行消失时（如子分类变了）自动复位，避免空列表
-		}
-
-		List<ItemEntry> all = ItemCatalog.Query(bucket, itemSub, letterFilter, favOnly);
-
-		ItemEntry[] snap;
-		try { snap = all.ToArray(); }
-		catch { snap = Array.Empty<ItemEntry>(); }
-
-		int pages = Mathf.Max(1, Mathf.CeilToInt(snap.Length / (float)VisibleRows));
-		if (page >= pages) page = pages - 1;
-		if (page < 0) page = 0;
-		float listH = VisibleRows * RowH + 8f;
-
-		GUI.color = new Color(0f, 0f, 0f, 0.35f);
-		GUI.DrawTexture(new Rect(x, y, w, listH), Texture2D.whiteTexture);
-		GUI.color = Color.white;
-
-		if (snap.Length == 0)
-		{
-			GUI.Label(new Rect(x + 8f, y + 6f, w - 16f, 22f), Ui.Tr("（无匹配条目）"), textStyle);
-		}
-		else
-		{
-			int from = page * VisibleRows;
-			int to = Mathf.Min(from + VisibleRows, snap.Length);
-			ItemEntry clicked = null;
-			for (int i = from; i < to; i++)
-			{
-				ItemEntry e = snap[i];
-				float rowY = y + 4f + (i - from) * RowH;
-				// 图标（36px 见方，行左侧；图标缺失时该位置空着，不影响点击）
-				Texture2D tex = IconTexFor(e.Id);
-				if (tex != null)
-				{
-					DrawTexFit(tex, new Rect(x + 6f, rowY + 1f, RowH - 4f, RowH - 4f), 0.95f);
-				}
-				float tx = tex != null ? x + 6f + RowH : x + 6f;
-				float tw = w - 12f - (tx - x) - 30f;   // 2.1.0：右侧让出星标位
-				Color keep = GUI.backgroundColor;
-				bool fav = ItemCatalog.IsFav(e.Id);
-				GUI.backgroundColor = fav ? new Color(0.4f, 0.58f, 0.4f, 0.95f) : new Color(0.12f, 0.2f, 0.12f, 0.85f);
-				if (GUI.Button(new Rect(tx, rowY, tw, RowH - 2f), e.Title, rowStyle)) clicked = e;
-				GUI.backgroundColor = keep;
-
-				// 2.1.0：收藏星标（与单位行一致：透明底，仅星形变色）
-				Rect starBtn = new Rect(x + w - 28f, rowY + 1f, 26f, RowH - 4f);
-				bool starHover = starBtn.Contains(Event.current.mousePosition);
-				Color keepTxt = GUI.contentColor;
-				GUI.contentColor = fav ? new Color(1f, 0.85f, 0.3f, 1f)
-					: (starHover ? new Color(0.8f, 0.9f, 0.8f, 0.95f) : new Color(0.55f, 0.65f, 0.55f, 0.75f));
-				if (GUI.Button(starBtn, fav ? "★" : "☆", starStyle))
-				{
-					ItemCatalog.ToggleFav(e);
-					RebuildFavTabs();   // 收藏分类页签随之增减
-				}
-				GUI.contentColor = keepTxt;
-			}
-			if (clicked != null)
-			{
-				Event.current.Use();
-				BeginCarry(clicked);
-				return;
-			}
-		}
-		y += listH + 4f;
-
-		if (pages > 1)
-		{
-			bool shiftPg = Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift);
-			int step = shiftPg ? 10 : 1;
-			if (DrawButton(new Rect(x, y, 30f, 22f), "◀", buttonStyle)) page = Mathf.Max(0, page - step);
-			GUI.Label(new Rect(x + 38f, y + 2f, 90f, 20f), (page + 1) + "/" + pages + "  (" + snap.Length + ")", textStyle);
-			if (DrawButton(new Rect(x + w - 30f, y, 30f, 22f), "▶", buttonStyle)) page = Mathf.Min(pages - 1, page + step);
-		}
-		y += 26f;
-
-		GUI.Label(new Rect(x, y, w, 34f),
-			Ui.Tr("点击条目拿起 → 拖到单位身上放入背包，拖到地上则生成实体"), textStyle);
-	}
 
 	/// <summary>2.1.0：子分类的 UI 名（中文原串，交给 Ui.Tr 翻译）。</summary>
 	private static string SubLabel(string sub)
@@ -773,61 +822,16 @@ internal static class GenPanel
 	}
 
 	// ── 私有 ──
+	/// <summary>
+	/// 2.4.2：**高度 = 行计划之和**（此前是另一套固定公式，靠人工与绘制对齐——陷阱 75 的病根）。
+	/// 本函数可以每帧被多次调用（ExternalGuiBlockRect / Draw 各调一次），BuildRows 是幂等的。
+	/// </summary>
 	private static Rect PanelRect()
 	{
-		// 2.4.0：高度**按内容实算**——旧版固定公式只算了"单位类别"的布局，
-		// 物品页签族 / 收藏子页签 / 物品子分类行 / 字母索引行 / 物品帮助行全都没计入 →
-		// 物品页的列表下半段、分页行与帮助行画到面板背景外（用户实测截图实锤）。
-		// ⚠️ 本函数 + ItemListHeight 必须与 OnGUI / DrawItemList 的 y 累加**逐项对齐**：
-		// 任何一处加行，另一处必须同步（与 GUI 布局镜像修改是同一纪律）。
-		float h = 8f                              // 顶部留白（OnGUI: y = r.y + 8f）
-				+ 26f                             // 标题行
-				+ 36f                             // 阵营行
-				+ 2f * (TabH + 4f);               // 单位页签固定两行
-		if (itemCats.Count > 0)
-			h += Mathf.CeilToInt(itemCats.Count / (float)ItemTabsPerRow) * (TabH + 4f);
-		if (category == "favorites" && favCats.Count > 0)
-			h += Mathf.CeilToInt(favCats.Count / (float)FavTabsPerRow) * (TabH + 4f);
-
-		if (category == "favorites" && favCat.StartsWith("item:", StringComparison.Ordinal))
-			h += ItemListHeight(favCat.Substring(5), true);
-		else if (IsItemCategory)
-			h += ItemListHeight(category.Substring(5), false);
-		else
-			h += (VisibleRows * RowH + 8f)        // 列表区
-			   + 4f + 26f                         // 列表下间隙 + 分页行（OnGUI 恒累计，与是否绘制无关）
-			   + 32f                              // 乘员行（步兵不绘制但 y 照样累计）
-			   + 24f                              // 阵营预览行
-			   + 8f;                              // 底部留白
+		BuildRows();
+		float h = 8f + 8f;                 // 顶部 + 底部留白
+		for (int i = 0; i < rows.Count; i++) h += rows[i].H;
 		return new Rect(panelPos.x, panelPos.y, PanelW, h);
-	}
-
-	/// <summary>
-	/// 2.4.0：DrawItemList 的高度镜像。w 取 PanelW - 20f（OnGUI 里 x = r.x + 10f）。
-	/// 子分类行/字母索引行的有无由 SubsOf / LettersOf 的真实结果决定——与绘制逻辑同一判据，
-	/// 不重复猜。每帧两次线性扫描的成本可忽略（DrawItemList 本身每帧还在做 Query）。
-	/// </summary>
-	private static float ItemListHeight(string bucket, bool favOnly)
-	{
-		float h = 0f;
-
-		List<string> subs = ItemCatalog.SubsOf(bucket, favOnly);
-		if (subs.Count > 0) h += TabH + 4f;
-
-		List<string> letters = ItemCatalog.LettersOf(bucket, itemSub, favOnly);
-		if (letters.Count > 2)
-		{
-			const float LBW = 24f, LGap = 3f;   // 与 DrawItemList 字母行同一常量
-			int per = Mathf.Max(3, Mathf.FloorToInt(((PanelW - 20f) + LGap) / (LBW + LGap)));
-			int cells = letters.Count + 2;      // +「全部」占两格
-			h += Mathf.CeilToInt(cells / (float)per) * 22f + 2f;
-		}
-
-		h += VisibleRows * RowH + 8f            // 列表区
-		   + 4f + 26f                           // 列表下间隙 + 分页行（恒累计）
-		   + 34f                                // 帮助行
-		   + 8f;                                // 底部留白
-		return h;
 	}
 
 	private static List<GenEntry> FilteredBucket()
@@ -844,41 +848,8 @@ internal static class GenPanel
 		return GenCatalog.GetBucket(category);
 	}
 
-	private static bool DrawButton(Rect r, string label, GUIStyle style)
-	{
-		bool clicked = GUI.Button(r, label, style);
-		return clicked;
-	}
-
-	// ══════════ 2.4.1：定宽页签的自适应字号（陷阱 76）══════════
-	//
-	// 病灶：页签是**定宽网格**（PanelW=320 → 每格 ≈72px），而字号固定 12。
-	// 英文 "Mod Vehicles"（12 个拉丁字符）在 12 号下约 78~84px > 72px →
-	// IMGUI 的文字按居中绘制、不会被按钮矩形裁掉 → 直接压到相邻页签上，
-	// 用户看到的就是"页签有重叠、显示不完整"。中文 "Mod载具" 反而放得下，
-	// 所以这个问题只在英文版暴露（与 2.3.0 的"英文版有中文"同一类：只测了一种语言）。
-	//
-	// 定案：**逐格算字号**——按字符宽度系数估宽（CJK≈1.0em，拉丁≈0.56em），
-	// 取能塞进按钮的最大字号（下限 8）。
-	// ⚠️ 不能用 `GUIStyle.CalcSize` 之外的方案都行，但**绝不能 `new GUIStyle(style)`**
-	// （陷阱 5：拷贝构造被 IL2CPP 裁剪）→ 只能用专用样式实例改写 fontSize。
-	private static int TabFontSize(string text, float w)
-	{
-		if (string.IsNullOrEmpty(text)) return 12;
-		float unit = 0f;
-		for (int i = 0; i < text.Length; i++)
-			unit += text[i] > (char)0x2E80 ? 1f : 0.56f;   // CJK/全角 vs 拉丁
-		if (unit <= 0f) return 12;
-		return Mathf.Clamp(Mathf.FloorToInt((w - 6f) / unit), 8, 12);   // -6 = 左右内边距
-	}
-
-	private static bool DrawTabButton(Rect r, string text, bool active)
-	{
-		GUIStyle st = active ? tabActiveStyle : tabStyle;
-		if (st == null) return DrawButton(r, text, active ? activeButtonStyle : buttonStyle);
-		st.fontSize = TabFontSize(text, r.width);
-		return DrawButton(r, text, st);
-	}
+	// 2.4.2：页签自适应字号（陷阱 76）已上移到 `Er2Ui.TabGrid` + `Er2Ui.FitSize`
+	//（用 CalcSize 精确测量代替 2.4.1 的字符系数估算，并带结果缓存；两个 mod 共用）。
 
 	public static void DrawPlacingBadge()
 	{
@@ -930,39 +901,8 @@ internal static class GenPanel
 		return ToggleButtonRect();
 	}
 
-	/// <summary>自建纯色按钮样式（normal/hover/active 同底色，文字色一致）。</summary>
-	private static GUIStyle MakeSolidButton(int fontSize, Color bg, Color fg, FontStyle fs)
-	{
-		GUIStyle s = new GUIStyle();
-		s.fontSize = fontSize;
-		s.fontStyle = fs;
-		s.alignment = TextAnchor.MiddleCenter;
-		s.normal.textColor = fg;
-		s.hover.textColor = fg;
-		s.active.textColor = fg;
-		s.focused.textColor = fg;
-		Texture2D tex = SolidTexture(bg);
-		s.normal.background = tex;
-		s.hover.background = tex;
-		s.active.background = tex;
-		s.focused.background = tex;
-		return s;
-	}
-
-	private static Texture2D solidTex;
-	private static Color solidTexColor;
-	private static Texture2D SolidTexture(Color c)
-	{
-		if (solidTex != null && solidTexColor == c) return solidTex;
-		Texture2D t = new Texture2D(4, 4, TextureFormat.RGBA32, false);
-		Color[] px = new Color[16];
-		for (int i = 0; i < px.Length; i++) px[i] = c;
-		t.SetPixels(px);
-		t.Apply();
-		solidTex = t;
-		solidTexColor = c;
-		return t;
-	}
+	// 2.4.2：样式工厂与纯色贴图缓存已上移到 ER2Shared.Er2Ui（两个 mod 共用一份令牌，
+	// 且 Er2Ui.Solid 是按颜色建缓存 + 带 hideFlags=61，修掉了这里"单槽缓存 + 无 hideFlags"的隐患）。
 
 	/// <summary>2.0.0：供 ItemDragger 复用的样式访问（携带徽标/光标名签）。</summary>
 	internal static void EnsureStylesPublic() => EnsureStyles();
@@ -973,40 +913,24 @@ internal static class GenPanel
 	private static void EnsureStyles()
 	{
 		if (titleStyle != null) return;		// 陷阱 5：GUIStyle 拷贝构造被 IL2CPP 裁剪——全部 new GUIStyle() + 显式字段；normal.textColor 必须显式
-		titleStyle = new GUIStyle();
-		titleStyle.fontSize = 15;
-		titleStyle.fontStyle = FontStyle.Bold;
-		titleStyle.normal.textColor = new Color(0.87f, 0.94f, 0.87f, 1f);
-		titleStyle.alignment = TextAnchor.MiddleLeft;
+		// 2.4.2：全部走 ER2Shared.Er2Ui 的令牌与工厂（配色/字号在两个 mod 里只有一个定义处）
+		for (int i = 0; i < UnitCats.Length; i++) UnitCatNames[i] = Ui.Tr(UnitCatRaw[i]);
+		titleStyle = Er2Ui.MakeLabel(Er2Ui.FontTitle, TextAnchor.MiddleLeft, Er2Ui.Text, FontStyle.Bold);
+		textStyle = Er2Ui.MakeLabel(Er2Ui.FontBody, TextAnchor.MiddleLeft, Er2Ui.Text);
 
-		textStyle = new GUIStyle();
-		textStyle.fontSize = 12;
-		textStyle.normal.textColor = new Color(0.87f, 0.94f, 0.87f, 1f);
-		textStyle.alignment = TextAnchor.MiddleLeft;
+		// 宿主同款主题：#0E1C0EB4 底 / #3E703EE0 选中 / #DFF0DF 文字
+		buttonStyle = Er2Ui.MakeButton(Er2Ui.FontBody, Er2Ui.Surface, Er2Ui.Text);
+		activeButtonStyle = Er2Ui.MakeButton(Er2Ui.FontBody, Er2Ui.SurfaceActive, Er2Ui.TextOnActive, FontStyle.Bold);
+		rowStyle = Er2Ui.MakeButton(Er2Ui.FontBody, Er2Ui.SurfaceRow, Er2Ui.Text, FontStyle.Normal, TextAnchor.MiddleLeft);
 
-		// 按钮样式：宿主同款主题（默认 #0E1C0EB4 底 / #3E703EE0 选中 / #DFF0DF 文字）
-		Color baseBg = new Color(0x0E / 255f, 0x1C / 255f, 0x0E / 255f, 0xB4 / 255f);
-		Color hoverBg = new Color(0x3E / 255f, 0x70 / 255f, 0x3E / 255f, 0xE0 / 255f);
-		Color text = new Color(0xDF / 255f, 0xF0 / 255f, 0xDF / 255f, 1f);
-		buttonStyle = MakeSolidButton(12, baseBg, text, FontStyle.Normal);
-		activeButtonStyle = MakeSolidButton(12, hoverBg, new Color(0.04f, 0.09f, 0.04f, 1f), FontStyle.Bold);
-		rowStyle = MakeSolidButton(12, new Color(baseBg.r, baseBg.g, baseBg.b, 0.82f), text, FontStyle.Normal);
-		rowStyle.alignment = TextAnchor.MiddleLeft;
+		// 页签样式（字号由页签原语逐次改写，故必须单独一份——不能与 buttonStyle 共用）
+		tabStyle = Er2Ui.MakeButton(Er2Ui.FontTabMax, Er2Ui.Surface, Er2Ui.Text);
+		tabActiveStyle = Er2Ui.MakeButton(Er2Ui.FontTabMax, Er2Ui.SurfaceActive, Er2Ui.TextOnActive, FontStyle.Bold);
 
-		// 2.4.1：页签样式（字号由 DrawTabButton 逐次改写，故必须单独一份）
-		tabStyle = MakeSolidButton(12, baseBg, text, FontStyle.Normal);
-		tabActiveStyle = MakeSolidButton(12, hoverBg, new Color(0.04f, 0.09f, 0.04f, 1f), FontStyle.Bold);
-
-		flashStyle = new GUIStyle();
-		flashStyle.fontSize = 13;
-		flashStyle.fontStyle = FontStyle.Bold;
-		flashStyle.normal.textColor = new Color(0.85f, 1f, 0.85f, 0.98f);
+		flashStyle = Er2Ui.MakeLabel(13, TextAnchor.MiddleLeft, new Color(0.85f, 1f, 0.85f, 0.98f), FontStyle.Bold);
 
 		// 收藏星标：透明底（无底色贴图），仅文字颜色随状态
-		starStyle = new GUIStyle();
-		starStyle.fontSize = 14;
-		starStyle.alignment = TextAnchor.MiddleCenter;
-		starStyle.normal.textColor = new Color(0.55f, 0.65f, 0.55f, 0.75f);
+		starStyle = Er2Ui.MakeLabel(14, TextAnchor.MiddleCenter, Er2Ui.TextDim);
 		starStyle.hover.textColor = Color.white;
 		starStyle.active.textColor = Color.white;
 		starStyle.focused.textColor = Color.white;

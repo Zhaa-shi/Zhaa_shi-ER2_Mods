@@ -18,8 +18,8 @@
 | 8 | `ZoomAnywhere` | `er2.zoomanywhere` | ER2 Zoom Anywhere | **1.0.1** | `ER2_ZoomAnywhere.dll` | 已部署 |
 | 9 | `HighValueTarget` | `er2.highvaluetarget` | ER2 Veteran HVT | **1.2.2** | `ER2_VeteranHVT.dll` | 已部署（+ Assets 目录） |
 | 10 | `InventoryPause` | `er2.inventorypause` | ER2 Inventory Pause | **1.0.5** | `ER2_InventoryPause.dll` | 已部署 |
-| 11 | `SquadCommand` | `er2.squadcommand` | ER2 Battlefield Commander | **1.4.17** | `ER2_BattlefieldCommander.dll` | 已发布 |
-| 12 | `UniversalGeneration` | `er2.universalgeneration` | ER2 Universal Generation | **2.4.1** | `ER2_UniversalGeneration.dll` | 已发布 |
+| 11 | `SquadCommand` | `er2.squadcommand` | ER2 Battlefield Commander | **1.4.18** | `ER2_BattlefieldCommander.dll` | 已发布 |
+| 12 | `UniversalGeneration` | `er2.universalgeneration` | ER2 Universal Generation | **2.4.2** | `ER2_UniversalGeneration.dll` | 已发布 |
 | 13 | `UnitCollision` | `er2.morephysics.unitcollision` | ER2 More Physics - Unit Collision | **1.0.8** | `ER2_MorePhysics_UnitCollision.dll` | 已部署 |
 | 14 | `UnitInfoOverlay` | `er2.unitinfooverlay` | ER2 Unit Inspector | **1.0.5** | `ER2_UnitInfoOverlay.dll` | 已部署 |
 | 15 | `FleshWoundsFixed` | `ER2_FleshWounds` | ER2 Flesh Wounds | **1.0.1** | （需手动构建部署，build.ps1 无条目） | 第三方修复版 |
@@ -116,7 +116,12 @@ AI 血量低于 `eatBelowHp`（默认 **40**）自动吃背包食物回血：`Fi
 打开背包（自己/尸体）时**真暂停**（延迟 timeScale 冻结，等打开动画完成）；暂停期间丢弃道具自动落地（扫描 `ItemObject.spawnedItems`）。
 **ER2 暂停机制图谱（全部实测定案，做任何暂停功能前必读）**：原生 `Pause.SetPause` = timeScale=0 + 弹菜单 + `disableOnPause`（藏菜单 = 死锁）；手动 `Pause.isPaused=true` 禁用输入但**不冻结世界**；`timeScale=0` 真暂停但**卡 UI 协程动画** + 丢弃武器浮空（解法：延迟冻结等动画完成 + 扫描 `spawnedItems` 拉下道具）；`enableAiBehaviour(false)` **无效**（true 才有效）；背包开关读 `InventoryPanel.isOpen`。
 
-### 2.11 SquadCommand（Battlefield Commander）`er2.squadcommand` v1.4.17
+### 2.11 SquadCommand（Battlefield Commander）`er2.squadcommand` v1.4.18
+**1.4.18（2026-09-24，用户第 19 轮：2.4.1 运行良好，要求优化代码 + 为两个 mod 的 UI 重绘做准备）**：
+- **无玩法/视觉变化，纯地基**：`SquadCmdLogic.HudStyle/HudStyleSmall/ButtonStyle`、`InfoPanel.MakeSmall`、`BackpackPanel.MakeStyle` 四处手写 `GUIStyle` 全部改为转发共享层 `Er2Ui.MakeLabel`（`using ER2Shared;`），字号/对齐/配色/粗体语义逐项不变；csproj 加 `<Compile Include="..\Shared\Er2Ui.cs" Link="Shared\Er2Ui.cs" />`。
+- 验证：编译 0 error；部署 DLL 206,336 B，sha256 `3E306522BDAA185AD6036397AFB7B78FD47EFBD6C41727BA53491A15DFDE9DD2`，与构建产物逐字节一致；`ER2_BattlefieldCommander_v1.4.18.zip`；反编译复核：`[BepInPlugin]`+启动日志双 1.4.18、`Er2Ui.MakeLabel` 5 处调用在位 ✓。
+
+**（以下为历史版本条目，标题保持 1.4.17）**
 **1.4.17（2026-09-24，用户第 17 轮：让单位拾取枪械时可以隔空拾取）**：
 - **根因（结构定案）**：地面物品右键按交互数分流——单交互 → `RequestItemPickup`（联动半径内即时 / 超出派兵走过去，正确）；多交互 → `OpenGroundMenu`，点条目 = **原样 `Interaction.Call()`**。**`HandheldItem`（`Weapon` 父类）覆写了 `GetInteractions`**（普通 `ItemObject` 不覆写，已反编译证实）→ 地面枪械天生多交互（"拾起置于右手"等，Ui 词典既有条目可证）→ **永远走菜单路径**；而原生拾起交互是为 FPS 玩家设计的，距离由玩家自身保证，`Call()` **无距离检查** → 隔空吸进交互者背包。普通物品不受影响，所以用户观察到"只有枪械隔空"。
 - **修法**：`BackpackPanel` 菜单增 `menuRaw`（与 `menuLabels` 严格等长的**未翻译原文**平行列表——剪枝与三处合成"穿上"条目同步增删）；`ExecuteInteraction` 里 `menuGroundItem != null` 且原文以 **"拾起"** 开头 → 改调 `RequestItemPickup(item, item.transform.position)`（联动半径内即时 / 超出派最近选中士兵走过去到达再捡，与单交互物品**同一条链路**），`LogAlways` 记录改道；其余交互（弹药箱"补充弹药"等）保持 `Call()`。格子物品菜单（`menuWin != null`）不受影响。新增 Ui 词条 `["物品已失效"] = "That item is no longer there"`。
@@ -291,7 +296,19 @@ AI 血量低于 `eatBelowHp`（默认 **40**）自动吃背包食物回血：`Fi
   2. 枚举型工具函数（`CollectSquads` 这类"遍历全局静态表"的）一律加短缓存，否则被连续调用时浏览器级开销；
   3. OnGUI 路径里 `new List<>`/`new Dictionary<>`/`ToArray()` 逐个清掉，复用静态缓冲区；
   4. 缓存失效点要显式（`InvalidatePlayerSoldier`/`InvalidateMainCam`），并让"拿不到值的缓存"不写入（避免把 null 缓存成半秒的真相）。
-### 2.12 UniversalGeneration `er2.universalgeneration` v2.4.1
+### 2.12 UniversalGeneration `er2.universalgeneration` v2.4.2
+
+**2.4.2（2026-09-24，用户第 19 轮："它运行的不错，优化一下代码，总结经验。为之后指挥官mod和通用生成mod的ui重绘做准备，现在太丑了"）**：
+- **① 布局单一数据源（结构性消灭陷阱 75 复发）**：2.4.0 修的是"高度公式漏算动态行"，但**修法是镜像**——`PanelRect()` 里重新算一遍 y 累加，绘制里再算一遍，两边任何一处改动都会再次脱节。
+  **改法**：先建**行计划**再画——`enum RowKind { Title, Faction, UnitTabs, ItemTabs, FavTabs, SubTabs, Letters, List, Pager, Crew, Preview, ItemHelp }` + `struct Row { RowKind Kind; float H; }` + `static List<Row> rows`；`BuildRows()` 按当前状态排这一帧要画哪些行；`PanelRect()` = `8 + Σrows[i].H + 8`；`DrawRows(r)` 遍历同一份 `rows`，每行只拿自己的 Rect，**不再自行累加 y**。**加/删行的动作收敛为三步**：加枚举 → `BuildRows` 里排一行 → 写一个 `DrawXxxRow`，高度自动正确。
+  分页上下文改为字段 `curPages/curTotal`（`List` 行写、`Pager` 行读，行计划里两者必定相邻），不再靠全局变量隐式传参。
+- **② 共享 UI 工具层（重绘的地基）**：新增 `Shared/Er2Ui.cs`，两个 csproj 以 `<Compile Include="..\Shared\Er2Ui.cs" Link="Shared\Er2Ui.cs" />` **源码级链接**（两程序集互不引用，只能源码共享；各自 internal，互不影响）。内容：① 设计令牌（`Pad/Gap/RowH/TabH/BtnH/PanelW`；`FontTitle/Body/Small/TabMax/TabMin`；配色）② 按**颜色**建字典的纯色贴图缓存（修掉单槽缓存换掉别的样式的隐患 17g3，`hideFlags=(HideFlags)61` 防陷阱 12）③ 样式工厂 `MakeLabel/MakeButton`（显式 `normal.textColor`——默认黑）④ 控件原语 `Fill/TabGrid/TabGridH/Pager` ⑤ `FitSize`（`CalcSize` 精确测量 + 按 `(宽|max|min|文本)` 缓存，正数=放得下/负数=放不下）。
+  `GenPanel` 删除 `MakeSolidButton/SolidTexture/ItemListHeight/DrawItemList/DrawButton/TabFontSize/DrawTabButton` 七个本地实现，全部上移；`EnsureStyles()` 全走 `Er2Ui` 工厂；类别名改静态数组 `UnitCats/UnitCatRaw/UnitCatNames`（避免每帧翻译与分配）。
+- **③ 页签适配改为精确测量**：2.4.1 的字符系数估宽（CJK 1.0em / 拉丁 0.56em）不准 → 改用 `GUIStyle.CalcSize` 实测（设字号→测量→`finally` 还原），结果缓存（每帧每控件调 `CalcSize` 太贵且有 `GUIContent` 分配；>4000 条清空）。
+- **交付**：`build.ps1 -Mod UniversalGeneration`（EN）0 error；部署 DLL 110,592 B，sha256 `F6C37E8260F222B621AFF7A2E629BFDDF5679544D565DB62183920E9463A431A`，与构建产物逐字节一致；`ER2_UniversalGeneration_v2.4.2.zip`。
+  反编译复核：`[BepInPlugin]`+启动日志双 2.4.2 ✓；`Er2Ui.*` 成员（Fill/TabGrid/TabGridH/Pager/MakeLabel/MakeButton + 全部配色令牌）✓；`BuildRows`/`DrawRows` ✓；全仓 `new GUIStyle(` 无参外调用 0 处（陷阱 5 无违规）✓。
+- **④ UI 重绘方案**：新增 `ER2_UI_redesign.md`——设计系统（配色 19 令牌 hex + 对比度验算 / 排版 4 档 / 间距 4-8-12-16 / 缩放）、组件规范、两个 mod 的信息架构重组、三期落地路线、IMGUI 做不到项的替代做法。
+- **本轮教训（guide 陷阱 78/79、AGENTS 17g14/17g15 已记）**：① "高度与绘制对齐"这种**靠纪律维持的一致性**迟早复发，必须改成**单一数据源**；② 两个不互相引用的程序集要统一观感，**共享源码 + 源码级链接**是唯一可行路径（不能用共享程序集，addon 与宿主只按反射联动）。
 
 **2.4.1（2026-09-24，用户第 18 轮：同轮授权提交 git；报"这个标签页有重叠，显示不完整。同时是空的"）**：
 - **① 页签重叠/显示不完整（截图：`Mod Vehicles` 选中态文字压出按钮框）** → **根因 = 定宽页签 + 固定字号**：类别页签 4 列网格每格 ≈72px（`PanelW=320` → `w=300` → `(300-12)/4`），字号固定 12；英文 "Mod Vehicles"（12 拉丁字符）≈78~84px 超宽——`GUI.Button` 文字 MiddleCenter 且**不按矩形裁剪** → 溢出压到相邻页签。中文 "Mod载具" 放得下 → **只在英文版暴露**。物品页签 "Medical/Food" 同病。
@@ -721,6 +738,8 @@ M0 侦察工具，同 `HvtTestDriver` 定位。**刻意不打任何 Harmony 补�
 
 | 包 | 时间 |
 |---|---|
+| `ER2_UniversalGeneration_v2.4.2.zip`（EN，**当前部署**） | 09-24（**最新**：无可见改动，为 UI 重绘打底——布局改**行计划单一数据源**（高度 = 行计划求和，绘制遍历同一列表，结构性消灭"画到面板外"复发）；新增 `Shared/Er2Ui.cs` 共享令牌/原语层，两个 csproj 源码级链接；页签适配改 `CalcSize` 精确测量 + 缓存。DLL 110,592 B，sha256 `F6C37E8260F2…A431A`，与构建产物逐字节一致；反编译复核版本双写 2.4.2 + `Er2Ui.*` 成员 + `BuildRows`/`DrawRows` ✓） |
+| `ER2_BattlefieldCommander_v1.4.18.zip`（EN，**当前部署**） | 09-24（**最新**：内部调整，四处手写 `GUIStyle` 改走共享层 `Er2Ui.MakeLabel`，语义不变。DLL 206,336 B，sha256 `3E306522BDAA…DE9DD2`，与构建产物逐字节一致；反编译复核版本双写 1.4.18 + `Er2Ui.MakeLabel` ✓） |
 | `ER2_UniversalGeneration_v1.3.2.zip` / `ER2_UniversalGeneration_CN_v1.3.2.zip` | 09-19（**待发 Nexus**：火力点页签 + 小队库 466 变体 + 敌方原生 AI + 启动时零卡顿探测；1.3.1 砍自定义班生成——运行时空壳，1.3.2 按用户决定砍全部第三方生成；拆包核对 = DLL + README.txt + Nexus_description.md ✓ 双语双包 ✓） |
 | `ER2_BattlefieldCommander_v1.4.15.zip` / `ER2_BattlefieldCommander_CN_v1.4.15.zip` | 09-24（**最新**：上帝视角打开设置后相机输入不再穿透菜单（滚轮/WASD/中键）；兼容 Advanced Combat Movement 吞掉"恢复开火"调用 → 改「调用→回读→直写 holdFire 字段」。EN 构建 = **当前部署**（sha256 `f474a84f…`，与 EN 包内 DLL 一致；CN 包 `f9600279…` 更小，仅打包不部署）；拆包核对均 = DLL + README.txt + Nexus_description.md（build.ps1 按包语言取文档，双语包各 3 文件）） |
 | `ER2_ModManager_v1.5.4.zip` / `ER2_ModManager_CN_v1.5.4.zip` | 09-24（**最新**：翻页音效兜底 —— 第三方假页吞掉原生 Tab 方法时由我们补 `ClickSound()`，并打印翻页分支追踪日志；拆包核对 = DLL + README.txt + Nexus_description.md（ModManager 无中文文档，CN 包文档仍为英文）） |

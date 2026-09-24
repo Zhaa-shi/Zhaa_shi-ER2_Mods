@@ -1,7 +1,11 @@
-ER2 Battlefield Commander v1.4.17
+ER2 Battlefield Commander v1.4.18
 ================================
 
 一款给 Easy Red 2 增加「RTS 上帝视角小队指挥」的 BepInEx 插件，鼠标操作逻辑参照《地狱之门：东部前线》。
+
+【1.4.18 内部调整】
+· 无玩法与视觉变化。HUD、信息面板、背包的文字样式改为统一走共享 UI 工具层（`Shared/Er2Ui.cs`），
+  不再各自手写 `GUIStyle`。字号、对齐、配色与此前完全一致——这是为两个 mod 重绘成统一观感做的地基。
 
 【1.4.17 修复】
 · 拾取地面**枪械**不再隔空吸进背包。地面枪械是多交互物品（原生菜单有"拾起置于右手"等条目），
@@ -130,7 +134,7 @@ ER2 Battlefield Commander v1.4.17
 【安装】
 1. 确保已安装 BepInEx（IL2CPP 版）到游戏根目录。
 2. 把 ER2_BattlefieldCommander.dll 放进 游戏根目录\BepInEx\plugins\。
-3. 启动游戏，日志出现 "Loading [ER2 Battlefield Commander 1.4.15]" 即成功。
+3. 启动游戏，日志出现 "Loading [ER2 Battlefield Commander 1.4.18]" 即成功。
 
 【与 Advanced Combat Movement（Responsive Orders）共存】
 · 已内置兼容：恢复开火走「调用 → 回读校验 → 直写 holdFire 字段」，不会被它的 Prefix 吞掉（见 1.4.15）。

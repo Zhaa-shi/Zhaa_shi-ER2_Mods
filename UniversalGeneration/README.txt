@@ -1,4 +1,4 @@
-ER2 Universal Generation v2.4.1
+ER2 Universal Generation v2.4.2
 ================================
 
 Spawn any unit, vehicle, or item anywhere, right from Battlefield Commander's RTS god view.
@@ -41,6 +41,11 @@ How to use
 
 Changelog
 --------------------------------
+2.4.2
+- **No user-visible change — this is a code-quality release that prepares the UI for a full redraw.** The panel's drawing code was restructured so that bugs like the 2.4.0 "list drawn past the bottom of the panel" cannot come back: the panel height is no longer a separate formula that has to be kept in sync with the drawing code. Both mods now build a **row plan** first (one entry per row: title / faction / tabs / list / pager / preview…), and the height is simply the sum of that plan, while drawing walks the very same list. Adding or removing a row can no longer desynchronise the height from what is drawn.
+- **Both mods now share one UI toolkit.** A new shared source file (`Shared/Er2Ui.cs`) holds the design tokens (spacing, font sizes, colours) and the drawing primitives (solid fills, style factories, adaptive tabs, pager, text fitting). The two assemblies do not reference each other, so each compiles the same file into itself. This means a visual change is made once and lands in both mods — the prerequisite for redrawing them into a single coherent look.
+- Tab text fitting now measures text properly (`GUIStyle.CalcSize`) instead of estimating per-character widths, and caches the result, so tabs land on the correct font size without a measurement cost every frame.
+
 2.4.1
 - **The "Mod Vehicles" tab no longer overlaps its neighbours.** Category tabs are a fixed-width grid (~72 px per cell) with a fixed 12 px font, so a long label such as "Mod Vehicles" (or the "Medical/Food" item tab) was wider than its button — IMGUI does not clip button text, so it spilled over the adjacent tabs. Every tab now picks the largest font size (12 down to 8) that actually fits its cell, using a per-character width estimate (CJK ≈ 1.0 em, Latin ≈ 0.56 em).
 - **The "Mod Vehicles" / "Mod Items" tabs are no longer permanently empty.** Third-party content was discovered through `ModsLoader.mods_installed`, which is still empty on the main menu; the probe waited 30 s, saw zero mods, then flagged itself "ready" forever — so mod vehicles/items never appeared even after entering a battle (where the game actually loads mod content). Discovery now scans the disk directly (`<SteamLibrary>/steamapps/workshop/content/<appid>/*/index.xml`, plus `<game>/Mods` and the runtime mod list as fallback), caches the parsed candidates, and only defers the runtime validation until the item database is ready — re-scanning periodically (15 s while there is pending work, 60 s idle) so newly subscribed mods appear without a restart. No more terminal "ready with zero mods" state.

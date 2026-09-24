@@ -1,7 +1,13 @@
-ER2 Battlefield Commander v1.4.17
+ER2 Battlefield Commander v1.4.18
 =================================
 
 A BepInEx plugin for Easy Red 2 that adds an "RTS god-view squad command" layer — mouse operations inspired by Gates of Hell: Ostfront.
+
+[1.4.18 internal]
+* No gameplay or visual change. The HUD, info panel and backpack now build their text styles through
+  the shared UI toolkit (`Shared/Er2Ui.cs`) that Universal Generation also uses, instead of each file
+  hand-rolling a `GUIStyle`. Same fonts, alignment and colours as before — this is groundwork so both
+  mods can be redrawn into one coherent look.
 
 [1.4.17 fix]
 * Picking up **weapons** from the ground no longer teleports them into a soldier's inventory.
@@ -156,7 +162,7 @@ A BepInEx plugin for Easy Red 2 that adds an "RTS god-view squad command" layer 
 [Install]
 1. Install BepInEx (IL2CPP version) into the game root folder.
 2. Drop ER2_BattlefieldCommander.dll into <game root>\BepInEx\plugins\.
-3. Launch the game — "Loading [ER2 Battlefield Commander 1.4.15]" in the log means success.
+3. Launch the game — "Loading [ER2 Battlefield Commander 1.4.18]" in the log means success.
 
 [Coexisting with Advanced Combat Movement (Responsive Orders)]
 * Built-in compatibility: restoring fire is now "call -> read back -> write the native holdFire field

@@ -498,6 +498,54 @@
    - **通用律**："探测→就绪"的闸门必须区分**"扫完了"**和**"扫到了东西"**；扫完但为空不是终态，是"下一轮再扫"。
      凡依赖游戏运行时状态的数据源，先在**最早期场景（主菜单）**验证它是否已填充。
 
+78. **⚠️ 靠"记得同步改两处"维持的一致性迟早复发——同一个量的两个消费者必须读同一份数据**（UniGen 2.4.2 定案；
+     2.4.0 溢出与 2.4.1 重叠本质是同一类）：
+   - **机制**：IMGUI 没有布局引擎，`PanelRect()`（算面板高度）与 `Draw()`（逐段累加 y 去画）是**同一份布局信息的
+     两个消费者**。2.4.0 的修法是"高度镜像绘制"——把绘制里的每一段累加在 `PanelRect()` 里**再写一遍**。
+     这不是修复，是**延期复发**：下次加一行 UI，只要忘了改另一处，同样的溢出就再犯一次。
+   - **修法（单一数据源）**：先建**行计划**再画。
+     ```csharp
+     private enum RowKind { Title, Faction, UnitTabs, ItemTabs, FavTabs, SubTabs, Letters, List, Pager, Crew, Preview, ItemHelp }
+     private struct Row { public RowKind Kind; public float H; }
+     private static readonly List<Row> rows = new();
+     private static void BuildRows() { rows.Clear(); /* 按当前状态排这一帧要画哪些行 */ }
+     private static Rect PanelRect() { BuildRows(); float h = 8f + 8f; for (...) h += rows[i].H; return new Rect(x, y, PanelW, h); }
+     // DrawRows(r) 遍历同一份 rows，每行只拿自己的 Rect，不再自行累加 y
+     ```
+     **加/删行的动作收敛为三步**：加枚举 → `BuildRows` 里排一行 → 写一个 `DrawXxxRow`，高度自动正确。
+     跨行传参（如"列表总页数"给分页行用）改字段（`curPages/curTotal`），由行计划保证两者相邻。
+   - **通用律**：凡"两处必须保持一致"的结构，先问能不能合成一处数据；合成不了就说明抽象错了。
+     "记得同步改两处"永远不算修复。
+
+79. **⚠️ 两个互不引用的程序集要统一观感 → 共享源码 + `<Compile Include>` 源码级链接，不要复制粘贴**
+     （UniGen 2.4.2 / SquadCommand 1.4.18 定案）：
+   - **机制**：宿主（Battlefield Commander）与 addon（Universal Generation）**只按反射联动、互不引用**（`HostLink`），
+     所以不能用"抽一个共享 DLL"（会引入加载顺序与缺失依赖问题）。但两者要重绘成同一套观感，
+     设计令牌（间距/字号/配色）与绘制原语**必须只有一处定义**——两边各写一份必然变成"两个面板长得不一样"。
+   - **修法**：把 `Shared/Er2Ui.cs` 在每个 csproj 里源码级链接，各编各的：
+     ```xml
+     <Compile Include="..\Shared\Er2Ui.cs" Link="Shared\Er2Ui.cs" />
+     ```
+     类声明为 `internal` → 两个 DLL 各持一份、互不影响。**副作用正好是想要的**：指挥官侧玩家改了主题色 cfg，
+     只影响它自己那一份 `Er2Ui`，不会污染生成面板。
+   - **纪律**：令牌与原语进 `Shared/`，业务绘制留在各自 mod；重绘时只改令牌与样式工厂，控件原语行为不变。
+   - **通用律**：共享代码前先问"两边能不能互相引用"；不能引用就用**源码链接**，绝不复制粘贴第二份。
+
+80. **⚠️ 文本自适应：能测量就别估算，`CalcSize` 可用但必须"设→测→还原"并缓存**（UniGen 2.4.2 改进 2.4.1）：
+   - **机制**：2.4.1 用字符系数估宽（CJK≈1.0em、拉丁≈0.56em）决定页签字号——不准，长标签仍会落错字号。
+     `GUIStyle.CalcSize` 在 IL2CPP 下**可用**（BackpackPanel 1.4.9 起长期验证），但每次调用有 `GUIContent` 分配，
+     且要临时改样式的 `fontSize`（样式是**共享实例**，改了不还原会污染别处）。
+   - **修法**：
+     ```csharp
+     int keep = st.fontSize;
+     try { for (int sz = max; sz >= min; sz--) { st.fontSize = sz; if (st.CalcSize(new GUIContent(text)).x <= maxW) { ok = true; break; } } }
+     catch { ok = true; }
+     finally { st.fontSize = keep; }          // 还原：测量不能留下副作用
+     fitCache[key] = ok ? size : -size;       // 正数 = 放得下（值即字号），负数 = 放不下
+     ```
+     缓存 key = `(宽度档位|max|min|文本)`，>4000 条清空（物品名上千条）。
+   - **通用律**：能测量的别估算；测量有副作用的必须 `finally` 还原 + 缓存结果。
+
 ## 3.5 UI / IMGUI 设计（原生观感）
 
 > 详细文档见 `ER2_UI_design.md`（含 API 清单、改造记录、踩坑）。要点速查：

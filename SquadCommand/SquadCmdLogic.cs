@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using ER2Shared;
 using UnityEngine;
 
 namespace ER2SquadCommand;
@@ -406,17 +407,9 @@ internal static class SquadCmdLogic
 		{
 			return hudStyle;
 		}
+		// 2.4.2（宿主 1.4.18）：样式工厂统一走 Er2Ui（两 mod 同一份定义；font/color/align 语义不变）
 		hudFontSize = fs;
-		Font f = GetFont();
-		hudStyle = new GUIStyle();
-		if (f != null)
-		{
-			hudStyle.font = f;
-		}
-		hudStyle.fontSize = fs;
-		hudStyle.fontStyle = FontStyle.Bold;
-		hudStyle.alignment = TextAnchor.MiddleLeft;
-		hudStyle.normal.textColor = Color.white; // 陷阱：new GUIStyle() 默认黑色
+		hudStyle = Er2Ui.MakeLabel(fs, TextAnchor.MiddleLeft, Color.white, FontStyle.Bold, GetFont());
 		return hudStyle;
 	}
 
@@ -429,15 +422,7 @@ internal static class SquadCmdLogic
 			return smallStyle;
 		}
 		smallFontSize = fs;
-		Font f = GetFont();
-		smallStyle = new GUIStyle();
-		if (f != null)
-		{
-			smallStyle.font = f;
-		}
-		smallStyle.fontSize = fs;
-		smallStyle.alignment = TextAnchor.MiddleCenter;
-		smallStyle.normal.textColor = new Color(0.85f, 0.9f, 0.85f, 0.95f);
+		smallStyle = Er2Ui.MakeLabel(fs, TextAnchor.MiddleCenter, new Color(0.85f, 0.9f, 0.85f, 0.95f), FontStyle.Normal, GetFont());
 		return smallStyle;
 	}
 
@@ -453,16 +438,7 @@ internal static class SquadCmdLogic
 			return btnStyle;
 		}
 		btnFontSize = fs;
-		btnStyle = new GUIStyle();
-		Font f = GetFont();
-		if (f != null)
-		{
-			btnStyle.font = f;
-		}
-		btnStyle.fontSize = fs;
-		btnStyle.fontStyle = FontStyle.Bold;
-		btnStyle.alignment = TextAnchor.MiddleCenter;
-		btnStyle.normal.textColor = Color.white;
+		btnStyle = Er2Ui.MakeLabel(fs, TextAnchor.MiddleCenter, Color.white, FontStyle.Bold, GetFont());
 		return btnStyle;
 	}
 

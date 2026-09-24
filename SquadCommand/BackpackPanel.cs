@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Il2CppInterop.Runtime;
+using ER2Shared;
 using UnityEngine;
 
 namespace ER2SquadCommand;
@@ -1879,16 +1880,11 @@ internal static class BackpackPanel
         badgeStyle = MakeStyle(f, 10, TextAnchor.MiddleCenter, Color.white, true);
     }
 
-    private static GUIStyle MakeStyle(Font f, int size, TextAnchor align, Color color, bool bold)
-    {
-        GUIStyle s = new GUIStyle(); // 陷阱：拷贝构造被 IL2CPP 裁剪，只能无参构造逐属性赋值
-        if (f != null) s.font = f;
-        s.fontSize = size;
-        s.alignment = align;
-        s.normal.textColor = color; // 陷阱：new GUIStyle() 默认黑
-        if (bold) s.fontStyle = FontStyle.Bold;
-        return s;
-    }
+	/// <summary>2.4.2：样式工厂已上移到 ER2Shared.Er2Ui（两个 mod 同一份实现）。</summary>
+	private static GUIStyle MakeStyle(Font f, int size, TextAnchor align, Color color, bool bold)
+	{
+		return Er2Ui.MakeLabel(size, align, color, bold ? FontStyle.Bold : FontStyle.Normal, f);
+	}
 
     /// <summary>1.4.9：标题适配可用宽度——GUI.Label **不裁剪**，长名字会直接压在负重数字上
     /// （实测「Backpack · Melvin McCampbell」盖住 44.2/60）。策略：先缩字号（12→9），仍放不下再

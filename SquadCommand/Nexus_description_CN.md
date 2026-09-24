@@ -6,7 +6,7 @@
 ## Installation instructions
 1. 安装 BepInEx（IL2CPP 版）到游戏根目录。
 2. 将 `ER2_BattlefieldCommander.dll` 放入 `Easy Red 2\BepInEx\plugins\`。
-3. 启动游戏，BepInEx 日志出现 `Loading [ER2 Battlefield Commander 1.4.17]` 表示加载成功。
+3. 启动游戏，BepInEx 日志出现 `Loading [ER2 Battlefield Commander 1.4.18]` 表示加载成功。
 
 ## Main features
 - **上帝视角指挥**：F9 进入自由视角，WASD 移动、滚轮缩放、中键旋转、Q/E 升降，空格暂停/继续世界。
@@ -38,6 +38,11 @@
 感谢 Easy Red 2 社区与 BepInEx / Harmony 生态，以及所有为 IL2CPP modding 提供思路的作者。
 
 ## 近期更新
+**1.4.18**
+- 仅内部调整，无玩法与视觉变化：HUD、信息面板、背包的文字样式改为统一走共享 UI 工具层
+  （`Shared/Er2Ui.cs`，通用生成 mod 也用同一份），不再各自手写 `GUIStyle`。
+  字号、对齐、配色与此前一致——为两个 mod 重绘成统一观感打地基。
+
 **1.4.17**
 - 拾取地面**枪械**不再隔空吸进背包。地面枪械是多交互物品，右键会弹原生交互菜单——
   此前点菜单里的拾起条目会无视距离原样执行。现菜单拾起汇入与普通物品相同的链路：

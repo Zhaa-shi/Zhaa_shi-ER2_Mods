@@ -30,6 +30,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- 1.4.18：与通用生成共享同一份 UI 令牌/原语源码（两个程序集互不引用，故源码级链接） -->
+    <Compile Include="..\Shared\Er2Ui.cs" Link="Shared\Er2Ui.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Reference Include="Assembly-CSharp">
       <HintPath>E:\SteamLibrary\steamapps\common\Easy Red 2\BepInEx\interop\Assembly-CSharp.dll</HintPath>
       <Private>false</Private>

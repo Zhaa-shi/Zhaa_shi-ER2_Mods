@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using ER2Shared;
 using UnityEngine;
 
 namespace ER2SquadCommand;
@@ -344,11 +345,9 @@ internal static class InfoPanel
 
 	private static GUIStyle MakeSmall()
 	{
-		GUIStyle s = new GUIStyle();
-		try { s.font = SquadCmdLogic.HudStyleSmall().font; } catch { }
-		s.fontSize = 12;
-		s.alignment = TextAnchor.MiddleLeft;
-		s.normal.textColor = Color.white; // 陷阱：new GUIStyle() 默认黑
-		return s;
+		Font f = null;
+		try { f = SquadCmdLogic.HudStyleSmall().font; } catch { }
+		// 2.4.2：走 Er2Ui 工厂（normal.textColor 默认黑的陷阱由工厂统一兜住）
+		return Er2Ui.MakeLabel(12, TextAnchor.MiddleLeft, Color.white, FontStyle.Normal, f);
 	}
 }
