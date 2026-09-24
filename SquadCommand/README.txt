@@ -1,7 +1,26 @@
-ER2 Battlefield Commander v1.4.19
+ER2 Battlefield Commander v1.4.20
 =================================
 
 A BepInEx plugin for Easy Red 2 that adds an "RTS god-view squad command" layer — mouse operations inspired by Gates of Hell: Ostfront.
+
+[1.4.20 UI]
+* **Adaptive UI (no manual scaling).** Every panel, HUD line, hint bar, backpack grid, tooltip
+  and context menu now follows the **game's own UI size setting** (`ResourcesManager.ResolutionMult`),
+  with a screen-resolution fallback when that cannot be read. Change the UI size in the game
+  options and both this mod and Universal Generation rescale together — nothing to drag, no extra
+  number fields, no config entry to fiddle with. Range is clamped to 0.75x – 1.6x.
+* **The panels are no longer "dead":** size and font tokens in `Shared/Er2Ui.cs` were compile-time
+  constants, so a resolution change could never move them. They are now scale-driven properties.
+  Styles rebuild automatically when the scale shifts (each panel checks its own last scale, so
+  panels can no longer cancel each other's rebuild).
+* **Screen-fit for wide fixed-width elements.** The bottom hint bar (previously a hard-coded
+  1400 px) now converges into the available screen width, so it no longer spills off a 1366-wide
+  display.
+* **Grey-black palette lifted.** The previous step was too dark — dark surfaces compressed into one
+  another against a bright battlefield. Panel / title bar / control / row / selected now step
+  +8 to +14 brightness levels apart, so the hierarchy reads without going back to military green.
+* **Universal Generation's leftovers de-greened:** carry badge background, drag target ring
+  (was bright green, now white) and the flash text colour are on the shared palette too.
 
 [1.4.19 UI]
 * **Grey-black mono UI.** Every panel, list and button now uses a neutral grey-black palette

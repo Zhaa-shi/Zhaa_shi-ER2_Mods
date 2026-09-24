@@ -6,7 +6,7 @@ Adds an "RTS god-view squad command" layer to Easy Red 2, with mouse operations 
 ## Installation instructions
 1. Install BepInEx (IL2CPP build) into the game root folder.
 2. Put `ER2_BattlefieldCommander.dll` into `Easy Red 2\BepInEx\plugins\`.
-3. Launch the game — `Loading [ER2 Battlefield Commander 1.4.19]` in the BepInEx log means success.
+3. Launch the game — `Loading [ER2 Battlefield Commander 1.4.20]` in the BepInEx log means success.
 
 ## Main features
 - **God-view command**: F9 to enter free camera, WASD move, wheel zoom, MMB rotate, Q/E height, Space to pause/resume the world.
@@ -38,6 +38,12 @@ Adds an "RTS god-view squad command" layer to Easy Red 2, with mouse operations 
 Thanks to the Easy Red 2 community and the BepInEx / Harmony ecosystem, and to all authors whose IL2CPP modding work paved the way.
 
 ## Recent changes
+**1.4.20**
+- **Adaptive UI.** Panels, HUD text, the bottom hint bar, backpack grids, tooltips and the context menu now follow the **game's own UI size setting** (`ResourcesManager.ResolutionMult`, with a screen-resolution fallback). Change UI size in the game options and both this mod and Universal Generation rescale together. No dragging, no number fields, no config entry. Clamped to 0.75x – 1.6x.
+- Long-standing cause of the UI being "frozen" fixed: size and font tokens in the shared toolkit were compile-time constants, so a resolution change could never move them. They are now scale-driven properties, and styles rebuild automatically when the scale shifts.
+- The bottom hint bar (previously a hard-coded 1400 px) now converges into the available screen width instead of spilling off narrow displays.
+- **Grey-black palette lifted.** The previous step read too dark — dark surfaces compressed into each other. Panel / title bar / control / row / selected now step +8 to +14 brightness levels apart.
+
 **1.4.19**
 - **Grey-black mono UI.** Panels, lists and buttons now use a neutral grey-black palette (`Shared/Er2Ui.cs`) instead of the old military green — hierarchy comes from brightness, not hue. `UI/uiMono=false` restores the old green preset.
 - **World-space markers redrawn.** The selected-unit marker changed from four 45-degree arcs (which read like a weather symbol) to **right-angle corner brackets** — the standard RTS language. Friendly rings, focus ring, move target, route/boarding lines and formation markers are now white / semi-transparent grey, separated by **opacity tier + dash rhythm + shape**.

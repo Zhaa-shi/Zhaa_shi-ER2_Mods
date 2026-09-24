@@ -24,11 +24,20 @@ namespace ER2SquadCommand;
 internal static class BackpackPanel
 {
     // ── 布局常量 ──
+    // 2.5.1：**下面这些原是 const → 自适应钉死（"UI 是死的"）。改为随 Er2Ui.Scale 的属性。**
+    // 只有"格子数"是纯逻辑量，不参与缩放，保持 const。
     private const int Cols = 6, Rows = 4, PerPage = Cols * Rows;   // 24 格/页（1.2.4 布局惯例）
-    private const float Cell = 46f, Gap = 3f, Margin = 8f, TitleH = 26f;
-    private const float WinW = Margin * 2f + Cols * Cell + (Cols - 1) * Gap;
-    private const float WinH = TitleH + 4f + Rows * Cell + (Rows - 1) * Gap + Margin;
+    private const float CellBase = 46f, GapBase = 3f, MarginBase = 8f, TitleHBase = 26f;
+    private static float Cell => CellBase * Er2Ui.Scale;
+    private static float Gap => GapBase * Er2Ui.Scale;
+    private static float Margin => MarginBase * Er2Ui.Scale;
+    private static float TitleH => TitleHBase * Er2Ui.Scale;
+    private static float WinW => Margin * 2f + Cols * Cell + (Cols - 1) * Gap;
+    private static float WinH => TitleH + 4f * Er2Ui.Scale + Rows * Cell + (Rows - 1) * Gap + Margin;
     private const int MaxWindows = 8;
+
+    /// <summary>2.5.1：建样式/排窗口时记下的 Scale，本帧比一下就知道要不要重来。</summary>
+    private static float layoutScale = 1f;
 
     private sealed class PackWindow
     {
@@ -127,6 +136,22 @@ internal static class BackpackPanel
     internal static void Draw()
     {
         if (!GodViewController.Active || GodViewController.EscMenuOpen) return;
+        // 2.5.1：自适应入口（背包是独立 OnGUI 入口，不能只靠 DrawHud 里那次）。
+        Er2Ui.AutoScale();
+        // 倍率变了 → 已开窗口的尺寸得跟着变，否则格子画到窗口外面去。
+        // 保留玩家拖过的位置（只改宽高 + clamp 回屏幕内），不强行归位槽位。
+        if (Er2Ui.ScaleChangedSince(layoutScale))
+        {
+            layoutScale = Er2Ui.Scale;
+            for (int i = 0; i < windows.Count; i++)
+            {
+                PackWindow w = windows[i];
+                float x = Mathf.Clamp(w.rect.x, 4f, Mathf.Max(4f, Screen.width - WinW - 4f));
+                float y = Mathf.Clamp(w.rect.y, 4f, Mathf.Max(4f, Screen.height - WinH - 4f));
+                w.rect = new Rect(x, y, WinW, WinH);
+                w.titleFitW = -1f;   // 标题适配结果作废（宽度变了）
+            }
+        }
         LootTick(); // 1.4.9：**双路驱动**——Tick 侧调用实测存在静默失效（到达检测全程无日志），OnGUI 渲染循环
                     // 是本 mod 全程验证存活的主循环（图标在画）；LootTick 自带 0.25s 节流，双调幂等
         Validate();
@@ -457,18 +482,25 @@ internal static class BackpackPanel
         }
     }
 
+    // 2.5.1：菜单尺寸随倍率。**LayoutMenu 与 MenuIndexAt 必须共用同一份**——
+    // 行高写两处的话，倍率一变"命中判定"和"画出来的行"就错位（陷阱 78 同款隐患）。
+    private const float MenuWBase = 168f, MenuRowBase = 20f;
+    private static float MenuW => MenuWBase * Er2Ui.Scale;
+    private static float MenuRow => MenuRowBase * Er2Ui.Scale;
+
     private static void LayoutMenu(Vector2 mousePos)
     {
-        float mw = 168f, mh = menuExec.Count * 20f + 8f;
-        float mx = Mathf.Clamp(mousePos.x + 6f, 2f, Mathf.Max(2f, Screen.width - mw - 2f));
-        float my = Mathf.Clamp(mousePos.y + 6f, 2f, Mathf.Max(2f, Screen.height - mh - 2f));
+        float k = Er2Ui.Scale;
+        float mw = MenuW, mh = menuExec.Count * MenuRow + 8f * k;
+        float mx = Mathf.Clamp(mousePos.x + 6f * k, 2f, Mathf.Max(2f, Screen.width - mw - 2f));
+        float my = Mathf.Clamp(mousePos.y + 6f * k, 2f, Mathf.Max(2f, Screen.height - mh - 2f));
         menuRect = new Rect(mx, my, mw, mh);
     }
 
     private static int MenuIndexAt(Vector2 p)
     {
         if (!menuRect.Contains(p)) return -1;
-        int i = Mathf.FloorToInt((p.y - menuRect.y - 4f) / 20f);
+        int i = Mathf.FloorToInt((p.y - menuRect.y - 4f * Er2Ui.Scale) / MenuRow);
         if (i < 0 || i >= menuExec.Count) return -1;
         return i;
     }
@@ -480,16 +512,18 @@ internal static class BackpackPanel
         Rect r = menuRect;
         GUI.color = new Color(0f, 0f, 0f, 0.94f);
         GUI.DrawTexture(r, Texture2D.whiteTexture);
+        float k = Er2Ui.Scale;   // 2.5.1：菜单随倍率
         GUI.color = new Color(GodViewController.UiHover.r, GodViewController.UiHover.g, GodViewController.UiHover.b, 0.6f);
-        GUI.DrawTexture(new Rect(r.x, r.y, r.width, 1f), Texture2D.whiteTexture);
-        GUI.DrawTexture(new Rect(r.x, r.yMax - 1f, r.width, 1f), Texture2D.whiteTexture);
-        GUI.DrawTexture(new Rect(r.x, r.y, 1f, r.height), Texture2D.whiteTexture);
-        GUI.DrawTexture(new Rect(r.xMax - 1f, r.y, 1f, r.height), Texture2D.whiteTexture);
+        float me = 1f * k;
+        GUI.DrawTexture(new Rect(r.x, r.y, r.width, me), Texture2D.whiteTexture);
+        GUI.DrawTexture(new Rect(r.x, r.yMax - me, r.width, me), Texture2D.whiteTexture);
+        GUI.DrawTexture(new Rect(r.x, r.y, me, r.height), Texture2D.whiteTexture);
+        GUI.DrawTexture(new Rect(r.xMax - me, r.y, me, r.height), Texture2D.whiteTexture);
         GUI.color = Color.white;
 
         for (int i = 0; i < menuExec.Count; i++)
         {
-            Rect ir = new Rect(r.x + 2f, r.y + 4f + i * 20f, r.width - 4f, 20f);
+            Rect ir = new Rect(r.x + 2f * k, r.y + 4f * k + i * MenuRow, r.width - 4f * k, MenuRow);
             bool hover = ir.Contains(e.mousePosition);
             if (hover)
             {
@@ -499,7 +533,7 @@ internal static class BackpackPanel
             }
             Color keep = GUI.color;
             GUI.color = hover ? Color.white : new Color(1f, 1f, 1f, 0.85f);
-            GUI.Label(new Rect(ir.x + 8f, ir.y, ir.width - 10f, ir.height), menuLabels[i], textStyle);
+            GUI.Label(new Rect(ir.x + 8f * k, ir.y, ir.width - 10f * k, ir.height), menuLabels[i], textStyle);
             GUI.color = keep;
         }
         // 点击不在条目循环里处理——菜单是模态的，Draw() 早在进格子前就裁决过（1.4.1）
@@ -692,10 +726,12 @@ internal static class BackpackPanel
     /// <summary>1.4.3：槽位平铺（列×行，屏幕内换列）——新窗永不压在旧窗上。</summary>
     private static Rect SlotRect(int slot)
     {
-        int perCol = Mathf.Max(1, Mathf.FloorToInt((Screen.height - 150f) / (WinH + 10f)));
+        // 2.5.1：槽位间距也随倍率（原来 150/10/14/96 写死）
+        float s = Er2Ui.Scale;
+        int perCol = Mathf.Max(1, Mathf.FloorToInt((Screen.height - 150f * s) / (WinH + 10f * s)));
         int col = slot / perCol, row = slot % perCol;
-        float x = Mathf.Clamp(Screen.width * 0.5f - WinW * 0.5f + col * (WinW + 14f), 4f, Mathf.Max(4f, Screen.width - WinW - 4f));
-        float y = 96f + row * (WinH + 10f);
+        float x = Mathf.Clamp(Screen.width * 0.5f - WinW * 0.5f + col * (WinW + 14f * s), 4f, Mathf.Max(4f, Screen.width - WinW - 4f));
+        float y = 96f * s + row * (WinH + 10f * s);
         y = Mathf.Clamp(y, 4f, Mathf.Max(4f, Screen.height - WinH - 4f));
         return new Rect(x, y, WinW, WinH);
     }
@@ -1120,18 +1156,22 @@ internal static class BackpackPanel
         Color hoverC = GodViewController.UiHover;
         Color textC = GodViewController.UiText;
 
+        // 2.5.1：标题栏/角标这一层的像素量全部随倍率（原来写死，高倍率下会和格子尺寸脱节）
+        float k = Er2Ui.Scale;
+
         // 底板 + 描边（InfoPanel 同款：不透明底防透字）
         GUI.color = new Color(baseC.r * 0.5f, baseC.g * 0.5f, baseC.b * 0.5f, 0.97f);
         GUI.DrawTexture(r, Texture2D.whiteTexture);
         GUI.color = new Color(hoverC.r, hoverC.g, hoverC.b, 0.5f);
-        GUI.DrawTexture(new Rect(r.x, r.y, r.width, 1f), Texture2D.whiteTexture);
-        GUI.DrawTexture(new Rect(r.x, r.yMax - 1f, r.width, 1f), Texture2D.whiteTexture);
-        GUI.DrawTexture(new Rect(r.x, r.y, 1f, r.height), Texture2D.whiteTexture);
-        GUI.DrawTexture(new Rect(r.xMax - 1f, r.y, 1f, r.height), Texture2D.whiteTexture);
+        float bd = 1f * k;
+        GUI.DrawTexture(new Rect(r.x, r.y, r.width, bd), Texture2D.whiteTexture);
+        GUI.DrawTexture(new Rect(r.x, r.yMax - bd, r.width, bd), Texture2D.whiteTexture);
+        GUI.DrawTexture(new Rect(r.x, r.y, bd, r.height), Texture2D.whiteTexture);
+        GUI.DrawTexture(new Rect(r.xMax - bd, r.y, bd, r.height), Texture2D.whiteTexture);
         GUI.color = Color.white;
 
         // ── 标题栏：拖动 + 标题 + 负重 + 翻页 + 关闭 ──
-        Rect titleBar = new Rect(r.x, r.y, r.width - 24f, TitleH);
+        Rect titleBar = new Rect(r.x, r.y, r.width - 24f * k, TitleH);
         if (titleBar.Contains(e.mousePosition) && e.type == EventType.MouseDown && e.button == 0 && !dragActive)
         {
             w.titleDrag = true;
@@ -1143,11 +1183,11 @@ internal static class BackpackPanel
             else if (e.type == EventType.MouseUp) { w.titleDrag = false; e.Use(); }
         }
         // 1.4.9：标题可用宽度 = 窗口宽 - 左内边距 - 右侧留给「负重(64)+翻页(70)+关闭(20)」
-        float titleW = r.width - 182f;
-        FitTitle(w, titleW - 2f);
+        float titleW = r.width - 182f * k;
+        FitTitle(w, titleW - 2f * k);
         int keepSize = textStyle.fontSize;
         textStyle.fontSize = w.titleSize;
-        BackpackLabel(new Rect(r.x + 8f, r.y + 4f, titleW, 20f), w.titleDisplay, textC, textStyle);
+        BackpackLabel(new Rect(r.x + 8f * k, r.y + 4f * k, titleW, 20f * k), w.titleDisplay, textC, textStyle);
         textStyle.fontSize = keepSize;
 
         // 负重（GetWeightAndMaxWeight 取不到就不显示）
@@ -1156,14 +1196,14 @@ internal static class BackpackPanel
             Color wc = cw >= mw ? new Color(0.95f, 0.3f, 0.25f, 1f)
                 : cw >= mw * 0.8f ? new Color(0.95f, 0.75f, 0.25f, 1f)
                 : new Color(0.4f, 0.85f, 0.4f, 1f);
-            Rect wr = new Rect(r.xMax - 166f, r.y + 4f, 64f, 18f);
+            Rect wr = new Rect(r.xMax - 166f * k, r.y + 4f * k, 64f * k, 18f * k);
             TextAnchor keepAlign = textStyle.alignment;
             textStyle.alignment = TextAnchor.MiddleRight;
             BackpackLabel(wr, cw.ToString("0.#") + "/" + mw.ToString("0.#"), wc, textStyle);
             textStyle.alignment = keepAlign;
             // 迷你负重条
             float frac = Mathf.Clamp01(cw / mw);
-            Rect bar = new Rect(r.xMax - 166f, r.y + TitleH - 4f, 64f, 2.5f);
+            Rect bar = new Rect(r.xMax - 166f * k, r.y + TitleH - 4f * k, 64f * k, 2.5f * k);
             GUI.color = new Color(0f, 0f, 0f, 0.6f);
             GUI.DrawTexture(bar, Texture2D.whiteTexture);
             GUI.color = wc;
@@ -1174,19 +1214,19 @@ internal static class BackpackPanel
         int pages = PageCount(w);
         if (pages > 1)
         {
-            if (GhostBtn(new Rect(r.xMax - 96f, r.y + 3f, 20f, 20f), "◀", textC, hoverC)) w.page = (w.page - 1 + pages) % pages;
-            BackpackLabel(new Rect(r.xMax - 74f, r.y + 4f, 28f, 18f), (w.page + 1) + "/" + pages, textC, tipStyle);
-            if (GhostBtn(new Rect(r.xMax - 46f, r.y + 3f, 20f, 20f), "▶", textC, hoverC)) w.page = (w.page + 1) % pages;
+            if (GhostBtn(new Rect(r.xMax - 96f * k, r.y + 3f * k, 20f * k, 20f * k), "◀", textC, hoverC)) w.page = (w.page - 1 + pages) % pages;
+            BackpackLabel(new Rect(r.xMax - 74f * k, r.y + 4f * k, 28f * k, 18f * k), (w.page + 1) + "/" + pages, textC, tipStyle);
+            if (GhostBtn(new Rect(r.xMax - 46f * k, r.y + 3f * k, 20f * k, 20f * k), "▶", textC, hoverC)) w.page = (w.page + 1) % pages;
         }
-        if (GhostBtn(new Rect(r.xMax - 24f, r.y + 3f, 20f, 20f), "✕", textC, hoverC)) { CloseAt(windows.IndexOf(w)); return; }
+        if (GhostBtn(new Rect(r.xMax - 24f * k, r.y + 3f * k, 20f * k, 20f * k), "✕", textC, hoverC)) { CloseAt(windows.IndexOf(w)); return; }
         // 1.4.2：标题栏分隔线（UI 打磨）
         GUI.color = new Color(hoverC.r, hoverC.g, hoverC.b, 0.28f);
-        GUI.DrawTexture(new Rect(r.x + 1f, r.y + TitleH, r.width - 2f, 1f), Texture2D.whiteTexture);
+        GUI.DrawTexture(new Rect(r.x + 1f * k, r.y + TitleH, r.width - 2f * k, 1f * k), Texture2D.whiteTexture);
         GUI.color = Color.white;
 
         // ── 格子 ──
         float gx = r.x + Margin;
-        float gy = r.y + TitleH + 4f;
+        float gy = r.y + TitleH + 4f * Er2Ui.Scale;
         for (int row = 0; row < Rows; row++)
         {
             for (int col = 0; col < Cols; col++)
@@ -1204,14 +1244,18 @@ internal static class BackpackPanel
         PackCell c = has ? w.cells[idx] : null;
         bool hover = cr.Contains(e.mousePosition);
 
+        // 2.5.1：格子内的像素量随倍率（格底尺寸已随 Cell，但描边/内缩/角标这些仍写死）
+        float k = Er2Ui.Scale;
+
         // 格底 + 细描边
         GUI.color = hover ? new Color(1f, 1f, 1f, 0.10f) : new Color(0f, 0f, 0f, 0.35f);
         GUI.DrawTexture(cr, Texture2D.whiteTexture);
         GUI.color = new Color(1f, 1f, 1f, 0.08f);
-        GUI.DrawTexture(new Rect(cr.x, cr.y, cr.width, 1f), Texture2D.whiteTexture);
-        GUI.DrawTexture(new Rect(cr.x, cr.yMax - 1f, cr.width, 1f), Texture2D.whiteTexture);
-        GUI.DrawTexture(new Rect(cr.x, cr.y, 1f, cr.height), Texture2D.whiteTexture);
-        GUI.DrawTexture(new Rect(cr.xMax - 1f, cr.y, 1f, cr.height), Texture2D.whiteTexture);
+        float ce = 1f * k;
+        GUI.DrawTexture(new Rect(cr.x, cr.y, cr.width, ce), Texture2D.whiteTexture);
+        GUI.DrawTexture(new Rect(cr.x, cr.yMax - ce, cr.width, ce), Texture2D.whiteTexture);
+        GUI.DrawTexture(new Rect(cr.x, cr.y, ce, cr.height), Texture2D.whiteTexture);
+        GUI.DrawTexture(new Rect(cr.xMax - ce, cr.y, ce, cr.height), Texture2D.whiteTexture);
 
         bool isDragSrc = dragActive && c != null && string.Equals(c.id, dragId, StringComparison.Ordinal);
 
@@ -1221,17 +1265,18 @@ internal static class BackpackPanel
             {
                 // 穿戴/手持：灰描边（可拿起，但只能丢地上）
                 GUI.color = new Color(0.75f, 0.78f, 0.75f, 0.85f);
-                GUI.DrawTexture(new Rect(cr.x, cr.y, cr.width, 1.5f), Texture2D.whiteTexture);
-                GUI.DrawTexture(new Rect(cr.x, cr.yMax - 1.5f, cr.width, 1.5f), Texture2D.whiteTexture);
-                GUI.DrawTexture(new Rect(cr.x, cr.y, 1.5f, cr.height), Texture2D.whiteTexture);
-                GUI.DrawTexture(new Rect(cr.xMax - 1.5f, cr.y, 1.5f, cr.height), Texture2D.whiteTexture);
+                float we = 1.5f * k;
+                GUI.DrawTexture(new Rect(cr.x, cr.y, cr.width, we), Texture2D.whiteTexture);
+                GUI.DrawTexture(new Rect(cr.x, cr.yMax - we, cr.width, we), Texture2D.whiteTexture);
+                GUI.DrawTexture(new Rect(cr.x, cr.y, we, cr.height), Texture2D.whiteTexture);
+                GUI.DrawTexture(new Rect(cr.xMax - we, cr.y, we, cr.height), Texture2D.whiteTexture);
             }
             Texture2D iconTex = GetIconTex(c.first, c.id);
             if (iconTex != null)
-                DrawIconTex(iconTex, new Rect(cr.x + 4f, cr.y + 4f, cr.width - 8f, cr.height - 8f), isDragSrc ? 0.25f : 1f);
+                DrawIconTex(iconTex, new Rect(cr.x + 4f * k, cr.y + 4f * k, cr.width - 8f * k, cr.height - 8f * k), isDragSrc ? 0.25f : 1f);
             if (c.total > 1 || c.isMag || c.units > 1)
             {
-                Rect br = new Rect(cr.xMax - 30f, cr.yMax - 15f, 28f, 13f);
+                Rect br = new Rect(cr.xMax - 30f * k, cr.yMax - 15f * k, 28f * k, 13f * k);
                 GUI.color = new Color(0f, 0f, 0f, 0.78f);
                 GUI.DrawTexture(br, Texture2D.whiteTexture);
                 GUI.color = Color.white;
@@ -1834,33 +1879,36 @@ internal static class BackpackPanel
 
         Vector2 s1 = textStyle.CalcSize(new GUIContent(name));
         Vector2 s2 = tipStyle.CalcSize(new GUIContent(line2));
-        float bw = Mathf.Max(110f, Mathf.Max(s1.x, s2.x) + 16f);
-        float bh = 18f + (line2 != "" ? 14f : 6f);
-        float bx = Mathf.Clamp(m.x + 14f, 2f, Screen.width - bw - 2f);
-        float by = Mathf.Clamp(m.y + 14f, 2f, Screen.height - bh - 2f);
+        // 2.5.1：提示框尺寸随倍率（字变大时框也得跟着，否则字溢出黑框）
+        float k = Er2Ui.Scale;
+        float bw = Mathf.Max(110f * k, Mathf.Max(s1.x, s2.x) + 16f * k);
+        float bh = 18f * k + (line2 != "" ? 14f * k : 6f * k);
+        float bx = Mathf.Clamp(m.x + 14f * k, 2f, Screen.width - bw - 2f);
+        float by = Mathf.Clamp(m.y + 14f * k, 2f, Screen.height - bh - 2f);
         Rect tr = new Rect(bx, by, bw, bh);
 
         GUI.color = new Color(0f, 0f, 0f, 0.88f);
         GUI.DrawTexture(tr, Texture2D.whiteTexture);
         GUI.color = new Color(1f, 1f, 1f, 0.25f);
-        GUI.DrawTexture(new Rect(tr.x, tr.y, tr.width, 1f), Texture2D.whiteTexture);
+        GUI.DrawTexture(new Rect(tr.x, tr.y, tr.width, 1f * k), Texture2D.whiteTexture);
         GUI.color = Color.white;
-        BackpackLabel(new Rect(tr.x + 8f, tr.y + 2f, bw - 16f, 16f), name, Color.white, textStyle);
+        BackpackLabel(new Rect(tr.x + 8f * k, tr.y + 2f * k, bw - 16f * k, 16f * k), name, Color.white, textStyle);
         if (line2 != "")
-            BackpackLabel(new Rect(tr.x + 8f, tr.y + 18f, bw - 16f, 14f), line2, new Color(0.8f, 0.85f, 0.8f, 0.95f), tipStyle);
+            BackpackLabel(new Rect(tr.x + 8f * k, tr.y + 18f * k, bw - 16f * k, 14f * k), line2, new Color(0.8f, 0.85f, 0.8f, 0.95f), tipStyle);
     }
 
     private static void DrawDragGhost(Vector2 m)
     {
-        Rect gr = new Rect(m.x + 10f, m.y + 10f, 40f, 40f);
+        float k = Er2Ui.Scale;   // 2.5.1：拖拽幽灵随倍率
+        Rect gr = new Rect(m.x + 10f * k, m.y + 10f * k, 40f * k, 40f * k);
         GUI.color = new Color(0f, 0f, 0f, 0.55f);
-        GUI.DrawTexture(new Rect(gr.x - 2f, gr.y - 2f, gr.width + 4f, gr.height + 4f), Texture2D.whiteTexture);
+        GUI.DrawTexture(new Rect(gr.x - 2f * k, gr.y - 2f * k, gr.width + 4f * k, gr.height + 4f * k), Texture2D.whiteTexture);
         GUI.color = Color.white;
         if (!string.IsNullOrEmpty(dragId) && iconTexCache.TryGetValue(dragId, out Texture2D sp))
             DrawIconTex(sp, gr, 0.85f);
         if (dragTotal > 1 || dragUnits > 1)
         {
-            Rect br = new Rect(gr.xMax - 28f, gr.yMax - 15f, 30f, 13f);
+            Rect br = new Rect(gr.xMax - 28f * k, gr.yMax - 15f * k, 30f * k, 13f * k);
             GUI.color = new Color(0f, 0f, 0f, 0.78f);
             GUI.DrawTexture(br, Texture2D.whiteTexture);
             GUI.color = Color.white;
@@ -1870,14 +1918,18 @@ internal static class BackpackPanel
 
     // ── 绘制小工具 ──
 
+    private static float styleScale = 1f;
+
     private static void EnsureStyles()
     {
-        if (textStyle != null) return;
+        // 2.5.1：字号随 Er2Ui.Scale 走 → 倍率一变就得重建（原来是"建过就不再建"，缩放后字不跟着变）
+        if (textStyle != null && !Er2Ui.ScaleChangedSince(styleScale)) return;
+        styleScale = Er2Ui.Scale;
         Font f = null;
         try { f = SquadCmdLogic.HudStyleSmall().font; } catch { }
-        textStyle = MakeStyle(f, 12, TextAnchor.MiddleLeft, Color.white, false);
-        tipStyle = MakeStyle(f, 10, TextAnchor.MiddleCenter, new Color(0.85f, 0.9f, 0.85f, 0.95f), false);
-        badgeStyle = MakeStyle(f, 10, TextAnchor.MiddleCenter, Color.white, true);
+        textStyle = MakeStyle(f, Er2Ui.FontBody, TextAnchor.MiddleLeft, Color.white, false);
+        tipStyle = MakeStyle(f, Er2Ui.FontSmall, TextAnchor.MiddleCenter, new Color(0.85f, 0.9f, 0.85f, 0.95f), false);
+        badgeStyle = MakeStyle(f, Er2Ui.FontSmall, TextAnchor.MiddleCenter, Color.white, true);
     }
 
 	/// <summary>2.4.2：样式工厂已上移到 ER2Shared.Er2Ui（两个 mod 同一份实现）。</summary>
@@ -1899,12 +1951,12 @@ internal static class BackpackPanel
         string prefix = "";
         try { prefix = Ui.Tr("背包 · "); } catch { }
         string noPrefix = (prefix.Length > 0 && full.StartsWith(prefix)) ? full.Substring(prefix.Length) : full;
-        int size = 12;
+        int size = Er2Ui.FontBody;   // 2.5.1：基准字号随倍率（原写死 12）
         string disp = null;
         try
         {
             // 第一轮：完整标题缩字号
-            for (int sz = 12; sz >= 9 && disp == null; sz--)
+            for (int sz = Er2Ui.FontBody; sz >= Er2Ui.FontSmall && disp == null; sz--)
             {
                 textStyle.fontSize = sz;
                 if (textStyle.CalcSize(new GUIContent(full)).x <= maxW) { disp = full; size = sz; }
@@ -1912,17 +1964,17 @@ internal static class BackpackPanel
             // 第二轮：去掉「背包 · 」前缀后再缩字号（名字本身最长，去掉前缀通常就够）
             if (disp == null && noPrefix != full)
             {
-                for (int sz = 12; sz >= 9 && disp == null; sz--)
+                for (int sz = Er2Ui.FontBody; sz >= Er2Ui.FontSmall && disp == null; sz--)
                 {
                     textStyle.fontSize = sz;
                     if (textStyle.CalcSize(new GUIContent(noPrefix)).x <= maxW) { disp = noPrefix; size = sz; }
                 }
             }
-            // 第三轮：9 号字省略号截断
+            // 第三轮：最小号省略号截断
             if (disp == null)
             {
-                size = 9;
-                textStyle.fontSize = 9;
+                size = Er2Ui.FontSmall;
+                textStyle.fontSize = Er2Ui.FontSmall;
                 string b = noPrefix;
                 for (int n = b.Length - 1; n > 1; n--)
                 {
@@ -1932,8 +1984,8 @@ internal static class BackpackPanel
                 disp = b;
             }
         }
-        catch { size = 12; disp = full; }
-        finally { textStyle.fontSize = 12; }
+        catch { size = Er2Ui.FontBody; disp = full; }
+        finally { textStyle.fontSize = Er2Ui.FontBody; }
         w.titleDisplay = string.IsNullOrEmpty(disp) ? full : disp;
         w.titleSize = size;
     }
@@ -1941,8 +1993,9 @@ internal static class BackpackPanel
     private static void BackpackLabel(Rect r, string text, Color c, GUIStyle st)
     {
         Color keep = GUI.color;
+        float off = 1.5f * Er2Ui.Scale;   // 2.5.1：阴影偏移随倍率
         GUI.color = new Color(0f, 0f, 0f, 0.85f);
-        GUI.Label(new Rect(r.x + 1.5f, r.y + 1.5f, r.width, r.height), text, st);
+        GUI.Label(new Rect(r.x + off, r.y + off, r.width, r.height), text, st);
         GUI.color = c;
         GUI.Label(r, text, st);
         GUI.color = keep;

@@ -51,6 +51,13 @@ Items go into backpacks as their **proper subclass** — magazines hold the righ
 
 ## Changelog
 
+**2.5.1**
+- **Adaptive UI.** The panel, placing badge and carry badge now follow the **game's own UI size setting** (`ResourcesManager.ResolutionMult`, with a screen-resolution fallback). Change UI size in the game options and the panel rescales with it — no dragging, no number fields, no config. Clamped to 0.75x – 1.6x.
+- The layout is no longer frozen: size and font tokens in the shared toolkit were compile-time constants; they are now scale-driven properties and styles rebuild automatically when the scale changes.
+- The carry badge (previously a hard-coded 560 px) now converges into the screen instead of spilling off narrow displays.
+- **Grey-black palette lifted.** 2.5.0 read too dark. Panel / title bar / control / row / selected now step +8 to +14 brightness levels apart.
+- Last green leftovers removed: the carry badge background and the drag-target ring (was bright green) are on the shared grey/white palette now.
+
 **2.5.0**
 - **Grey-black mono UI.** The panel now uses the neutral grey-black palette from the shared toolkit (`Shared/Er2Ui.cs`) instead of the old military green — list rows, tabs, buttons and the preview area read as one flat dark surface, with hierarchy carried by brightness rather than hue. Set `UI/uiMono=false` to restore the previous green preset.
 

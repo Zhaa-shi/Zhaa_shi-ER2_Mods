@@ -460,19 +460,9 @@ internal static class SquadCmdLogic
 
 	private static float ResMult()
 	{
-		float now = Time.unscaledTime;
-		if (resMultCache > 0f && now < resMultNext) return resMultCache;
-		resMultNext = now + 0.5f;
-		try
-		{
-			float m = ResourcesManager.ResolutionMult;
-			if (m > 0f && !float.IsNaN(m)) { resMultCache = m; return m; }
-		}
-		catch
-		{
-		}
-		resMultCache = 1f;
-		return 1f;
+		// 2.5.1：实现下沉到 Er2Ui（两个 mod 共用一份，缓存只有一处）——
+		// 这里保留同名转发，避免调用点全改。
+		try { return ER2Shared.Er2Ui.NativeResMult(); } catch { return 1f; }
 	}
 
 	private static Font GetFont()

@@ -873,6 +873,9 @@ internal static class GenDriver
 		{
 			if (!Plugin.enabled.Value) return;
 			if (HostLink.EscMenuOpen) return; // 宿主设置菜单打开时隐藏全部本 mod UI（跟随宿主行为）
+			// 2.5.1：**自适应入口放在总入口**——下面三个分支（携带/放置/面板）不一定都经过
+			// GenPanel.Draw()，只在那里刷新的话"携带"和"放置"两条分支会一直用旧倍率。
+			ER2Shared.Er2Ui.AutoScale();
 			// 携带物品优先：全屏拖放态只画拖放 UI（与放置模式同款，画面不叠）
 			if (ItemDragger.Carrying)
 			{

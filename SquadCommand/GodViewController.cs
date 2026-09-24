@@ -3027,21 +3027,25 @@ internal static class GodViewController
 
 	private static Rect ControlButtonRect()
 	{
-		return new Rect((Screen.width - 300f) * 0.5f, 12f, 300f, 36f);
+		// 2.5.1：宽高/间距随 Er2Ui.Scale 自适应（原 300/36/12 写死，倍率一变就不跟手）
+		float s = ER2Shared.Er2Ui.Scale;
+		return new Rect((Screen.width - 300f * s) * 0.5f, 12f * s, 300f * s, 36f * s);
 	}
 
 	/// <summary>0.7.46：【分队】按钮（控制按钮右侧）。</summary>
 	private static Rect SplitButtonRect()
 	{
 		Rect b = ControlButtonRect();
-		return new Rect(b.xMax + 8f, 12f, 120f, 36f);
+		float s = ER2Shared.Er2Ui.Scale;   // 2.5.1：自适应
+		return new Rect(b.xMax + 8f * s, 12f * s, 120f * s, 36f * s);
 	}
 
 	/// <summary>0.7.58：【合并】按钮（控制按钮左侧）——把选中单位并入当前激活 RTS 组。</summary>
 	private static Rect MergeButtonRect()
 	{
 		Rect b = ControlButtonRect();
-		return new Rect(b.x - 8f - 120f, 12f, 120f, 36f);
+		float s = ER2Shared.Er2Ui.Scale;   // 2.5.1：自适应
+		return new Rect(b.x - (8f + 120f) * s, 12f * s, 120f * s, 36f * s);
 	}
 	// 0.9.0：【分散】已移入命令环（槽 7），顶栏不再单独设按钮
 
@@ -3908,6 +3912,11 @@ internal static class GodViewController
 		if (escMenuOpen) return; // 0.9.7：ESC 菜单打开期间隐藏全部我方 IMGUI，不遮挡原生设置界面
 		try
 		{
+			// 2.5.1：**每帧唯一的自适应入口**——跟游戏原生 UI 倍率（ResourcesManager.ResolutionMult）。
+			// 必须放在最前面：下面所有尺寸都读 Er2Ui.Scale，先刷新再画，否则会慢一帧且首帧用 1.0。
+			ER2Shared.Er2Ui.AutoScale();
+			float s = ER2Shared.Er2Ui.Scale;
+
 			GUIStyle st = SquadCmdLogic.HudStyle();
 			if (st == null) return;
 			Camera cam = MainCam();
@@ -3917,10 +3926,15 @@ internal static class GodViewController
 			string hint = Ui.Tr("WASD 移动    滚轮 缩放    中键 旋转    Q/E 升降    │    左键 选择/框选    右键 指令    长按拖动 阵型    │    Z/X/C 站/蹲/趴    V 停止    B 停火    N 掩体    M 集合    F 分散    │    空格 暂停    ESC 设置") + info;
 			GUIStyle hs = SquadCmdLogic.HudStyleSmall();
 			// 2.5.0：底部提示条底色去掉绿色调（原来 0.03,0.06,0.03 是军绿 UI 的一部分）
+			// 2.5.1：宽度走 ScreenFit（原来硬编码 1400px，在 1366 宽的屏上直接溢出到屏幕外）
+			float hintW = ER2Shared.Er2Ui.ScreenFit(1400f);
+			float hintH = 22f * s;
+			float hintX = (Screen.width - hintW) * 0.5f;
+			float hintY = Screen.height - 30f * s;
 			GUI.color = ER2Shared.Er2Ui.Scrim;
-			GUI.DrawTexture(new Rect((Screen.width - 1400f) * 0.5f, Screen.height - 30f, 1400f, 22f), Texture2D.whiteTexture);
+			GUI.DrawTexture(new Rect(hintX, hintY, hintW, hintH), Texture2D.whiteTexture);
 			GUI.color = Color.white;
-			GUI.Label(new Rect((Screen.width - 1400f) * 0.5f, Screen.height - 31f, 1400f, 22f), hint, hs);
+			GUI.Label(new Rect(hintX, hintY - 1f * s, hintW, hintH), hint, hs);
 
 			// 左上角：暂停 + 选择信息
 			// 1.2.10 性能：此处原每帧调 PruneSelection()，但 OnGUI 每帧有多次事件（Layout/Repaint），
@@ -3934,21 +3948,21 @@ internal static class GodViewController
 			}
 			if (status != "")
 			{
-				DrawShadowLabel(new Rect(14f, 9f, 400f, 22f), status, st, Paused ? ER2Shared.Er2Ui.Warn : uiText);
+				DrawShadowLabel(new Rect(14f * s, 9f * s, 400f * s, 22f * s), status, st, Paused ? ER2Shared.Er2Ui.Warn : uiText);
 			}
 
 			// 命令反馈
 			if (cmdFlash != "" && Time.unscaledTime < cmdFlashUntil)
 			{
-				DrawShadowLabel(new Rect(14f, 37f, 700f, 22f), cmdFlash, st, uiText);
+				DrawShadowLabel(new Rect(14f * s, 37f * s, 700f * s, 22f * s), cmdFlash, st, uiText);
 			}
 
 			// 0.7.99：移动完成度进度行（纯观察统计，ObsMoveTick 维护）
-			float hudY = 65f;
+			float hudY = 65f * s;
 			if (ObsTotal > 0)
 			{
-				DrawShadowLabel(new Rect(14f, hudY, 320f, 22f), Ui.Tr("移动 → ") + ObsArrived + "/" + ObsTotal + Ui.Tr(" 已到位"), st, uiHover);
-				hudY += 24f;
+				DrawShadowLabel(new Rect(14f * s, hudY, 320f * s, 22f * s), Ui.Tr("移动 → ") + ObsArrived + "/" + ObsTotal + Ui.Tr(" 已到位"), st, uiHover);
+				hudY += 24f * s;
 			}
 
 
@@ -3994,10 +4008,11 @@ internal static class GodViewController
 				GUI.color = new Color(uiBase.r, uiBase.g, uiBase.b, 0.22f);
 				GUI.DrawTexture(sel, Texture2D.whiteTexture);
 				GUI.color = new Color(uiHover.r, uiHover.g, uiHover.b, 0.9f);
-				GUI.DrawTexture(new Rect(sel.x, sel.y, sel.width, 1.5f), Texture2D.whiteTexture);
-				GUI.DrawTexture(new Rect(sel.x, sel.yMax, sel.width, 1.5f), Texture2D.whiteTexture);
-				GUI.DrawTexture(new Rect(sel.x, sel.y, 1.5f, sel.height), Texture2D.whiteTexture);
-				GUI.DrawTexture(new Rect(sel.xMax, sel.y, 1.5f, sel.height), Texture2D.whiteTexture);
+				float e = 1.5f * s;   // 2.5.1：描边随倍率（高倍率下 1px 边会细得看不见）
+				GUI.DrawTexture(new Rect(sel.x, sel.y, sel.width, e), Texture2D.whiteTexture);
+				GUI.DrawTexture(new Rect(sel.x, sel.yMax, sel.width, e), Texture2D.whiteTexture);
+				GUI.DrawTexture(new Rect(sel.x, sel.y, e, sel.height), Texture2D.whiteTexture);
+				GUI.DrawTexture(new Rect(sel.xMax, sel.y, e, sel.height), Texture2D.whiteTexture);
 				GUI.color = Color.white;
 			}
 
@@ -4015,7 +4030,10 @@ internal static class GodViewController
 
 	// ===== 小队列表（右下角，编号 + 符号） =====
 
-	private const float PanelW = 190f, PanelH = 22f, PanelGap = 2f;
+	// 2.5.1：改为属性，随 Er2Ui.Scale 自适应（原本 const → 分辨率变化时 UI 尺寸钉死）
+	private static float PanelW => 190f * ER2Shared.Er2Ui.Scale;
+	private static float PanelH => 22f * ER2Shared.Er2Ui.Scale;
+	private static float PanelGap => 2f * ER2Shared.Er2Ui.Scale;
 
 	/// <summary>小队符号串：装甲单位 □ 在前，步兵单位 ○ 在后（用户要求：正方形总是在圆形前面）。</summary>
 	// 1.2.10 性能：符号串缓存。原实现每次 OnGUI 事件、每行都重算 SquadSymbols，
@@ -4102,8 +4120,8 @@ internal static class GodViewController
 		// 行数（0.9.1：去掉标题行，纯小队行）
 		int rows = cachedFriendlySquads.Count;
 		float totalH = rows * (PanelH + PanelGap);
-		float startX = Screen.width - PanelW - 10f;
-		float y = Mathf.Max(8f, Screen.height - 14f - totalH);
+		float startX = Screen.width - PanelW - 10f * ER2Shared.Er2Ui.Scale;
+		float y = Mathf.Max(8f * ER2Shared.Er2Ui.Scale, Screen.height - 14f * ER2Shared.Er2Ui.Scale - totalH);
 		squadPanelHit = new Rect(startX, y, PanelW, totalH);
 
 		int idx = 1;
@@ -4115,7 +4133,7 @@ internal static class GodViewController
 			// 0.9.3：行=编号单元格 + 符号区（符号在剩余宽度内居中，随数量动态调整）
 			GUI.color = isSel ? uiHover : new Color(uiBase.r, uiBase.g, uiBase.b, 0.82f);
 			GUI.DrawTexture(r, Texture2D.whiteTexture);
-			Rect numR = new Rect(r.x, r.y, 26f, r.height);
+			Rect numR = new Rect(r.x, r.y, 26f * ER2Shared.Er2Ui.Scale, r.height);
 			GUI.color = isSel ? new Color(1f, 1f, 1f, 0.55f) : new Color(uiHover.r, uiHover.g, uiHover.b, 0.4f);
 			GUI.DrawTexture(numR, Texture2D.whiteTexture);
 			GUI.color = uiText;

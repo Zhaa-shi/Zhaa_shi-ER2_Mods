@@ -244,7 +244,6 @@ internal static class ItemDragger
 
 		DrawCarryBadge();
 	}
-
 	/// <summary>目标单位脚下的高亮环（世界空间 4 角投影，绕开 GetWorldCorners 全零陷阱 14）。</summary>
 	private static void DrawTargetRing(Soldier s)
 	{
@@ -253,7 +252,8 @@ internal static class ItemDragger
 			Camera cam = ItemSpawner.CurrentCamera();
 			if (cam == null || s.transform == null) return;
 			Vector3 c = s.transform.position;
-			Color col = new Color(0.45f, 1f, 0.5f, 0.95f);
+			// 2.5.1：亮绿 → 白（Er2Ui.WSelected）。用户要求"标记点等都用白色或半透明的灰色"。
+			Color col = ER2Shared.Er2Ui.WSelected;
 			DrawWorldRing(cam, c + Vector3.up * 0.05f, 0.85f, col);
 		}
 		catch { }
@@ -288,7 +288,7 @@ internal static class ItemDragger
 		float len = Vector2.Distance(a, b);
 		Matrix4x4 keep = GUI.matrix;
 		GUIUtility.RotateAroundPivot(ang, a);
-		GUI.DrawTexture(new Rect(a.x, a.y, len, 1.6f), Texture2D.whiteTexture);
+		GUI.DrawTexture(new Rect(a.x, a.y, len, 1.6f * ER2Shared.Er2Ui.Scale), Texture2D.whiteTexture);
 		GUI.matrix = keep;
 	}
 
@@ -297,7 +297,7 @@ internal static class ItemDragger
 	{
 		GenPanel.EnsureStylesPublic();
 		Rect r = BadgeRect();
-		GUI.color = new Color(0.02f, 0.05f, 0.02f, 0.8f);
+		GUI.color = ER2Shared.Er2Ui.Scrim;   // 2.5.1：军绿底 → 中性遮罩
 		GUI.DrawTexture(r, Texture2D.whiteTexture);
 		GUI.color = Color.white;
 
@@ -306,12 +306,16 @@ internal static class ItemDragger
 		else if (ghostValid) target = Ui.Tr("松手 → 丢到地上");
 		else target = Ui.Tr("对准单位或地面");
 		string txt = Ui.Tr("携带: ") + itemTitle + "    " + target + Ui.Tr("    右键 取消");
-		GUI.Label(new Rect(r.x + 8f, r.y + 4f, r.width - 16f, 22f), txt, GenPanel.FlashStylePublic());
+		float m = 8f * ER2Shared.Er2Ui.Scale;   // 2.5.1：内缩随倍率
+		GUI.Label(new Rect(r.x + m, r.y + m * 0.5f, r.width - m * 2f, 22f * ER2Shared.Er2Ui.Scale), txt, GenPanel.FlashStylePublic());
 	}
 
 	public static Rect BadgeRect()
 	{
-		return new Rect((Screen.width - 560f) * 0.5f, Screen.height - 62f, 560f, 28f);
+		// 2.5.1：宽度自适应 + 收敛进屏幕（原来硬编码 560px，小屏会溢出）
+		float w = ER2Shared.Er2Ui.ScreenFit(560f);
+		float h = 28f * ER2Shared.Er2Ui.Scale;
+		return new Rect((Screen.width - w) * 0.5f, Screen.height - 62f * ER2Shared.Er2Ui.Scale, w, h);
 	}
 
 	internal static bool IsMouseOverBadge()

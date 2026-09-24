@@ -16,15 +16,17 @@ namespace ER2SquadCommand;
 /// </summary>
 internal static class InfoPanel
 {
-	private const float W = 352f;
-	private const float H = 190f;
-	private const float BottomGap = 34f;
-	private const float LeftX = 12f;
+	// 2.5.1：改为属性，随 Er2Ui.Scale 自适应（原本 const → 分辨率变化时 UI 尺寸钉死）
+	private static float W => 352f * ER2Shared.Er2Ui.Scale;
+	private static float H => 190f * ER2Shared.Er2Ui.Scale;
+	private static float BottomGap => 34f * ER2Shared.Er2Ui.Scale;
+	private static float LeftX => 12f * ER2Shared.Er2Ui.Scale;
 
 	// 背包列表（1.2.5：分类列表，非网格）
 	private static int unitCycle;
 	private static readonly Dictionary<long, float> maxHpSeen = new Dictionary<long, float>();
 	private static GUIStyle smallStyle;
+	private static float styleScale = 1f;   // 2.5.1：建样式时的 Scale（变了就重建）
 
 
 	internal static Rect PanelRect() => new Rect(0f, Screen.height - H - BottomGap, W, H);
@@ -49,12 +51,17 @@ internal static class InfoPanel
 		if (GodViewController.EscMenuOpen) return;
 		try
 		{
+			// 2.5.1：先按屏幕分辨率刷新自适应倍率；scale 变了就重建样式（字号随分辨率走）
+			ER2Shared.Er2Ui.AutoScale();
+			if (smallStyle != null && ER2Shared.Er2Ui.ScaleChangedSince(styleScale))
+				smallStyle = null;
 			Color textC = GodViewController.UiText;
 			Color hoverC = GodViewController.UiHover;
 			smallStyle = smallStyle ?? MakeSmall();
+			if (smallStyle != null) styleScale = ER2Shared.Er2Ui.Scale;
 			float x = LeftX;
-			float y = Screen.height - H - BottomGap + 4f;
-			float w = W - 8f;
+			float y = Screen.height - H - BottomGap + 4f * ER2Shared.Er2Ui.Scale;
+			float w = W - 8f * ER2Shared.Er2Ui.Scale;
 
 			// ── 行1：选择统计 + 焦点切换 ──
 			string title = Ui.Tr("已选 步兵 ") + GodViewController.SelInfantryCountPublic()
@@ -348,6 +355,16 @@ internal static class InfoPanel
 		Font f = null;
 		try { f = SquadCmdLogic.HudStyleSmall().font; } catch { }
 		// 2.4.2：走 Er2Ui 工厂（normal.textColor 默认黑的陷阱由工厂统一兜住）
-		return Er2Ui.MakeLabel(12, TextAnchor.MiddleLeft, Color.white, FontStyle.Normal, f);
+		// 2.5.1：字号由写死 12 改为 Er2Ui 令牌（随分辨率自适应）
+		return Er2Ui.MakeLabel(Er2Ui.FontBody, TextAnchor.MiddleLeft, Color.white, FontStyle.Normal, f);
+	}
+
+	/// <summary>
+	/// 2.5.1：样式缓存失效入口——Scale 变化（分辨率切换/自适应重算）后字号已变，
+	/// 缓存的 smallStyle 必须重建，否则界面还是旧字号。
+	/// </summary>
+	internal static void InvalidateStyles()
+	{
+		smallStyle = null;
 	}
 }

@@ -37,14 +37,24 @@ internal static class GenPanel
 	private static int crewMode;
 	private static GenEntry infantrySel; // "所选步兵"模式的来源（最近点过的步兵条目）
 
-	// ── 布局常量（2.4.2：数值统一取自 ER2Shared.Er2Ui 令牌——重绘时改一处，两个 mod 同时生效）──
-	private const float PanelW = Er2Ui.PanelW;   // 320
-	private const float RowH = Er2Ui.RowH;       // 28（1.2.0：26→28，用户反馈"太密"）
-	private const float TabH = Er2Ui.TabH;       // 24
+	// ── 布局常量 ──
+	// 2.5.1：**改成属性**——原本是 `const float PanelW = Er2Ui.PanelW`，而 Er2Ui 的令牌
+	// 已随 Scale 联动（自适应屏幕分辨率），const 在编译期就把值钉死，自适应会失效。
+	// （const 也不能引用属性，所以这里必须是 static 属性。）
+	private static float PanelW => Er2Ui.PanelW;  // 随分辨率自适应（1.0 倍下 = 320）
+	private static float RowH => Er2Ui.RowH;       // 28（1.2.0：26→28，用户反馈"太密"）
+	private static float TabH => Er2Ui.TabH;       // 24
 	private const int VisibleRows = 10;
 	private const int TabsPerRow = 4;    // 1.2.0：8 个页签两行排（一行塞 7 个太挤）
 	private const int ItemTabsPerRow = 4; // 2.0.0：物品页签族同样两行排
 	private const int FavTabsPerRow = 4;  // 2.1.0：收藏分类子页签（最多 6 单位 + 6 物品 = 3 行）
+
+	// 2.5.1：字母索引行的尺寸原本在**两处各写一遍**（BuildRows 算高度 / DrawLetters 去画），
+	// 是陷阱 78 典型的"两处必须一致"——现在收成一份，自适应时也只改这里。
+	private static float LetterBtnW => 24f * Er2Ui.Scale;
+	private static float LetterGap => 3f * Er2Ui.Scale;
+	private static float LetterRowH => 22f * Er2Ui.Scale;
+	private static float LetterBtnH => 20f * Er2Ui.Scale;
 
 	// 单位类别页签：显示名在 EnsureStyles 里过一次 Ui.Tr（避免每帧翻译 + 每帧分配数组）
 	private static readonly string[] UnitCats = { "favorites", "infantry", "mgs", "tanks", "wheeled", "planes", "artillery", "modveh" };
@@ -119,10 +129,9 @@ internal static class GenPanel
 			List<string> letters = ItemCatalog.LettersOf(bucket, itemSub, favOnly);
 			if (letters.Count > 2)
 			{
-				const float LBW = 24f, LGap = 3f;
-				int per = Mathf.Max(3, Mathf.FloorToInt(((PanelW - 20f) + LGap) / (LBW + LGap)));
+				int per = Mathf.Max(3, Mathf.FloorToInt(((PanelW - 20f * Er2Ui.Scale) + LetterGap) / (LetterBtnW + LetterGap)));
 				int lr = (letters.Count + 2 + per - 1) / per;   // +2：「全部」占两格
-				rows.Add(new Row { Kind = RowKind.Letters, H = lr * 22f + 2f });
+				rows.Add(new Row { Kind = RowKind.Letters, H = lr * LetterRowH + 2f * Er2Ui.Scale });
 			}
 			else if (!string.IsNullOrEmpty(letterFilter))
 			{
@@ -264,6 +273,8 @@ internal static class GenPanel
 	public static void Draw()
 	{
 		if (!open || !RtsActive) return;
+		// 2.5.1：先按屏幕分辨率刷新自适应倍率，再建样式（顺序反了会用旧字号建样式）
+		Er2Ui.AutoScale();
 		EnsureStyles();
 
 		// 落点模式时面板缩成提示徽标
@@ -422,25 +433,26 @@ internal static class GenPanel
 		List<string> letters = ItemCatalog.LettersOf(bucket, itemSub, favOnly);
 		if (letters.Count <= 2) return;
 
-		const float LBW = 24f, LGap = 3f;
+		// 2.5.1：尺寸取自上面的单一定义（原来这里 const 又写了一遍，与 BuildRows 的算式重复）
+		float LBW = LetterBtnW, LGap = LetterGap;
 		int per = Mathf.Max(3, Mathf.FloorToInt((rect.width + LGap) / (LBW + LGap)));
 		int cells = letters.Count + 2;   // +「全部」占两格
 		for (int i = 0; i < cells; i++)
 		{
 			int row = i / per, col = i % per;
 			float bx = rect.x + col * (LBW + LGap);
-			float by = rect.y + row * 22f;
+			float by = rect.y + row * LetterRowH;
 			if (i == 0)
 			{
 				bool allSel = string.IsNullOrEmpty(letterFilter);
-				if (GUI.Button(new Rect(bx, by, LBW * 2f + LGap, 20f), Ui.Tr("全部"), allSel ? activeButtonStyle : buttonStyle))
+				if (GUI.Button(new Rect(bx, by, LBW * 2f + LGap, LetterBtnH), Ui.Tr("全部"), allSel ? activeButtonStyle : buttonStyle))
 				{ letterFilter = ""; page = 0; }
 			}
 			else if (i >= 2)
 			{
 				string lt = letters[i - 2];
 				bool sel = string.Equals(letterFilter, lt, StringComparison.OrdinalIgnoreCase);
-				if (GUI.Button(new Rect(bx, by, LBW, 20f), lt, sel ? activeButtonStyle : buttonStyle))
+				if (GUI.Button(new Rect(bx, by, LBW, LetterBtnH), lt, sel ? activeButtonStyle : buttonStyle))
 				{ letterFilter = lt; page = 0; }
 			}
 		}
@@ -811,7 +823,10 @@ internal static class GenPanel
 	/// <summary>放置徽标（屏幕底部居中，不挡视野）。</summary>
 	public static Rect BadgeRect()
 	{
-		return new Rect((Screen.width - 430f) * 0.5f, Screen.height - 62f, 430f, 28f);
+		// 2.5.1：宽高随分辨率自适应；宽度再收敛进屏幕（小屏不会溢出）
+		float w = Er2Ui.ScreenFit(430f);
+		float h = 28f * Er2Ui.Scale;
+		return new Rect((Screen.width - w) * 0.5f, Screen.height - 62f * Er2Ui.Scale, w, h);
 	}
 
 	/// <summary>鼠标是否悬停在放置徽标上（GUI 坐标系：y 向下）。</summary>
@@ -855,12 +870,14 @@ internal static class GenPanel
 	{
 		// 底部居中窄条（宿主提示条上方），不遮战场
 		Rect r = BadgeRect();
-		GUI.color = new Color(0.02f, 0.05f, 0.02f, 0.78f);
+		// 2.5.1：军绿底 → 中性遮罩（Er2Ui.Scrim），与宿主提示条同款
+		GUI.color = Er2Ui.Scrim;
 		GUI.DrawTexture(r, Texture2D.whiteTexture);
 		GUI.color = Color.white;
 		string txt = Ui.Tr("放置: ") + (Placer.PendingEntry()?.Title ?? "?")
 			+ Ui.Tr("    左键 放置 · 左键长按拖动 旋转朝向 · Shift 连续 · 右键 取消");
-		GUI.Label(new Rect(r.x + 8f, r.y + 4f, r.width - 16f, 22f), txt, flashStyle);
+		float m = 8f * Er2Ui.Scale;   // 2.5.1：内缩随倍率
+		GUI.Label(new Rect(r.x + m, r.y + m * 0.5f, r.width - m * 2f, 22f * Er2Ui.Scale), txt, flashStyle);
 	}
 
 	/// <summary>生成反馈（跟随面板，面板关闭时跟随左下角按钮位置）。</summary>
@@ -870,15 +887,17 @@ internal static class GenPanel
 		if (!RtsActive) return;
 		EnsureStyles();
 		GUIStyle st = flashStyle;
-		st.normal.textColor = flashIsError ? new Color(1f, 0.45f, 0.4f, 0.98f) : new Color(0.85f, 1f, 0.85f, 0.98f);
-		GUI.Label(new Rect(panelPos.x, panelPos.y - 24f, 700f, 22f), flash, st);
+		// 2.5.1：淡绿正常色 → Er2Ui.Text；错误色 → Er2Ui.Danger（与宿主同一套语义色）
+		st.normal.textColor = flashIsError ? Er2Ui.Danger : Er2Ui.Text;
+		GUI.Label(new Rect(panelPos.x, panelPos.y - 24f * Er2Ui.Scale, Er2Ui.ScreenFit(700f), 22f * Er2Ui.Scale), flash, st);
 	}
 
 	/// <summary>RTS 的"生成"开关按钮（仅面板关闭时显示；点击=G）。
 	/// 1.1.1：从左下角移到左缘中段（用户要求：左下角让位给战场指挥官的选中单位信息面板）。</summary>
 	private static Rect ToggleButtonRect()
 	{
-		return new Rect(12f, Screen.height * 0.42f, 120f, 26f);
+		return new Rect(12f * Er2Ui.Scale, Screen.height * 0.42f,
+			120f * Er2Ui.Scale, 26f * Er2Ui.Scale);
 	}
 
 	public static void DrawToggleButton()
@@ -912,7 +931,11 @@ internal static class GenPanel
 
 	private static void EnsureStyles()
 	{
-		if (titleStyle != null) return;		// 陷阱 5：GUIStyle 拷贝构造被 IL2CPP 裁剪——全部 new GUIStyle() + 显式字段；normal.textColor 必须显式
+		// 陷阱 5：GUIStyle 拷贝构造被 IL2CPP 裁剪——全部 new GUIStyle() + 显式字段；normal.textColor 必须显式
+		// 2.5.1：scale 变化（分辨率切换 / 自适应重算）后字号已变，缓存的样式必须重建。
+		// 各判各的（Er2Ui.ScaleChangedSince）——不用全局 dirty 标志，避免多面板互相抢清。
+		if (titleStyle != null && !Er2Ui.ScaleChangedSince(styleScale)) return;
+		styleScale = Er2Ui.Scale;
 		// 2.4.2：全部走 ER2Shared.Er2Ui 的令牌与工厂（配色/字号在两个 mod 里只有一个定义处）
 		for (int i = 0; i < UnitCats.Length; i++) UnitCatNames[i] = Ui.Tr(UnitCatRaw[i]);
 		titleStyle = Er2Ui.MakeLabel(Er2Ui.FontTitle, TextAnchor.MiddleLeft, Er2Ui.Text, FontStyle.Bold);
@@ -927,12 +950,18 @@ internal static class GenPanel
 		tabStyle = Er2Ui.MakeButton(Er2Ui.FontTabMax, Er2Ui.Surface, Er2Ui.Text);
 		tabActiveStyle = Er2Ui.MakeButton(Er2Ui.FontTabMax, Er2Ui.SurfaceActive, Er2Ui.TextOnActive, FontStyle.Bold);
 
-		flashStyle = Er2Ui.MakeLabel(13, TextAnchor.MiddleLeft, new Color(0.85f, 1f, 0.85f, 0.98f), FontStyle.Bold);
+		// 2.5.1：这两个字号原本写死 13/14，自适应下不跟随 → 改乘 Scale
+		int flashSize = Mathf.Max(8, Mathf.RoundToInt(13 * Er2Ui.Scale));
+		flashStyle = Er2Ui.MakeLabel(flashSize, TextAnchor.MiddleLeft, Er2Ui.Text, FontStyle.Bold);
 
 		// 收藏星标：透明底（无底色贴图），仅文字颜色随状态
-		starStyle = Er2Ui.MakeLabel(14, TextAnchor.MiddleCenter, Er2Ui.TextDim);
+		int starSize = Mathf.Max(8, Mathf.RoundToInt(14 * Er2Ui.Scale));
+		starStyle = Er2Ui.MakeLabel(starSize, TextAnchor.MiddleCenter, Er2Ui.TextDim);
 		starStyle.hover.textColor = Color.white;
 		starStyle.active.textColor = Color.white;
 		starStyle.focused.textColor = Color.white;
 	}
+
+	// 建样式时的 Scale（变了就重建，见 EnsureStyles）
+	private static float styleScale = 1f;
 }

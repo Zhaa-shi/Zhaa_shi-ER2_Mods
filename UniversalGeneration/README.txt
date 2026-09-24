@@ -1,4 +1,4 @@
-ER2 Universal Generation v2.5.0
+ER2 Universal Generation v2.5.1
 ================================
 
 Spawn any unit, vehicle, or item anywhere, right from Battlefield Commander's RTS god view.
@@ -41,6 +41,13 @@ How to use
 
 Changelog
 --------------------------------
+2.5.1
+- **Adaptive UI.** The panel, the placing badge and the carry badge now follow the **game's own UI size setting** (`ResourcesManager.ResolutionMult`, with a screen-resolution fallback). Change UI size in the game options and the panel rescales with it — no dragging, no number fields, no extra config. Clamped to 0.75x – 1.6x.
+- **The layout is no longer frozen:** size and font tokens in the shared toolkit were compile-time constants, so nothing could ever move. They are now scale-driven properties, and styles rebuild automatically when the scale changes.
+- **Fixed-width elements converge into the screen:** the carry badge (previously a hard-coded 560 px) no longer spills off a narrow display.
+- **Grey-black palette lifted.** The 2.5.0 step came out too dark: dark surfaces compressed into each other. Panel / title bar / control / row / selected now step +8 to +14 brightness levels apart.
+- **Last green leftovers removed:** the carry badge background (old military green) and the drag-target ring (was bright green) are on the shared grey/white palette now.
+
 2.5.0
 - **Grey-black mono UI.** The panel now uses the neutral grey-black palette from the shared toolkit (`Shared/Er2Ui.cs`) instead of the old military green — list rows, tabs, buttons and the preview area all read as one flat dark-grey surface, with hierarchy carried by brightness rather than hue. Set `UI/uiMono=false` to fall back to the previous green preset.
 - Internal: the shared toolkit gained a `Mono` switch, so both this mod and Battlefield Commander change appearance from the same single place.
