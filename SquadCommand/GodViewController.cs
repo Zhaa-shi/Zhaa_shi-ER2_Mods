@@ -3505,10 +3505,10 @@ internal static class GodViewController
 
 	// ===== HUD =====
 
-	// ===== 0.9.0：统一 UI 主题（cfg "UI" 节可自定义，默认灰） =====
-	private static Color uiBase = new Color(0.55f, 0.55f, 0.55f, 0.92f);      // 按钮底板/友军脚环
-	private static Color uiHover = new Color(0.78f, 0.78f, 0.78f, 0.97f);     // 悬停/选中环
-	private static Color uiText = new Color(0.94f, 0.94f, 0.94f, 1f);         // 文字/描边/移动目标环
+	// ===== 0.9.0：统一 UI 主题（cfg "UI" 节可自定义）2.5.0 默认改中性灰 =====
+	private static Color uiBase = new Color(0.12f, 0.12f, 0.12f, 0.90f);      // HUD 按钮底板
+	private static Color uiHover = new Color(0.23f, 0.23f, 0.23f, 0.95f);     // 悬停/选中
+	private static Color uiText = new Color(0.91f, 0.91f, 0.91f, 1f);         // 文字/描边
 
 	internal static void ApplyUiTheme()
 	{
@@ -3533,8 +3533,8 @@ internal static class GodViewController
 	/// <summary>0.9.0：统一按钮绘制——主题色底板+描边+居中文字。0.9.4：禁用态高对比（近黑底+暗淡文字）。</summary>
 	private static void DrawUiButton(Rect r, string label, bool enabled, bool hover)
 	{
-		Color fill = enabled ? (hover ? uiHover : uiBase) : new Color(0f, 0f, 0f, 0.55f);
-		Color txt = enabled ? uiText : new Color(0.7f, 0.7f, 0.7f, 0.4f);
+		Color fill = enabled ? (hover ? uiHover : uiBase) : ER2Shared.Er2Ui.SurfaceDisabled;
+		Color txt = enabled ? uiText : ER2Shared.Er2Ui.TextDisabled;
 		GUI.color = fill;
 		GUI.DrawTexture(r, Texture2D.whiteTexture);
 		GUI.color = txt;
@@ -3560,7 +3560,10 @@ internal static class GodViewController
 	private static void SceneMarkersFrame()
 	{
 		float t = Time.unscaledTime;
-		float pulse = 1f + 0.07f * Mathf.Sin(t * 5f); // 0.9.1：选中/目标指示呼吸脉动
+		// 2.5.0：原来这里只有一个全局 pulse 供所有标记共用 → 同频同相一起呼吸（机械感）。
+		// 现在改为按 key 哈希错相，见 PulseOf(key, t)。t 仍传入，避免每个调用点重复取时间。
+		// 2.5.0：本帧相机距离——供所有标记做线宽补偿（每帧只算一次）。
+		float camDist = MarkerCamDist();
 		// 选中集（0.2s 缓存，含车内乘员——车组成员由载具环覆盖，不单独画）
 		// 1.4.14 性能：smSelected 与 markerCache 同步刷新（原每帧 Clear + 逐单位 Add，
 		// 且 GetComponentInParent 判定也每帧做）——两者生命周期完全一致，没必要分开算。
@@ -3585,76 +3588,100 @@ internal static class GodViewController
 		}
 
 		// 友军脚环 + 选中角括号：仅 RTS 显示（FPS 第一人称满屏脚环会干扰视野）
-		if (Active)
+		if (Active && MarkersAllEnabled)
 		{
 			if (t > smFriendlyNext)
 			{
 				smFriendlyNext = t + 1f;
 				RebuildFriendlyCache();
 			}
-			Color dim = new Color(0.62f, 0.62f, 0.62f, 0.55f); // 0.9.4：半透明灰
-			Color selWhite = new Color(0.93f, 0.93f, 0.93f, 0.95f); // 0.9.4：选中=灰白
+			Color dim = ER2Shared.Er2Ui.WFriendly;      // 2.5.0：白 @0.28（原 0.62 灰 @0.55）
+			Color dimVeh = ER2Shared.Er2Ui.WFriendlyVeh; // 2.5.0：白 @0.34（载具比步兵略亮）
+			Color selWhite = ER2Shared.Er2Ui.WSelected;  // 2.5.0：白 @0.92
 			int drawn = 0;
-			foreach (Soldier s in smFriendly)
+			// cfg showFriendlyRing：关掉则整块友军脚环不画（选中角标仍可单独开）
+			if (ShowFriendlyRing)
 			{
-				if (drawn >= SceneMarkerCap) break;
-				try
+				foreach (Soldier s in smFriendly)
 				{
-					if (s == null || !s.IsAlive || s.transform == null) continue;
-					long k = (long)s.Pointer;
-					if (smSelected.Contains(k)) continue; // 选中角括号更醒目，不叠画
-					SceneMarkers.Ring("F" + k, s.transform.position + Vector3.up * 0.15f, UnitRingRadius(s), dim, 0.05f, true);
-					drawn++;
+					if (drawn >= SceneMarkerCap) break;
+					try
+					{
+						if (s == null || !s.IsAlive || s.transform == null) continue;
+						long k = (long)s.Pointer;
+						if (smSelected.Contains(k)) continue; // 选中角括号更醒目，不叠画
+						SceneMarkers.Ring("F" + k, s.transform.position + Vector3.up * 0.15f, UnitRingRadius(s) * MarkerScaleMul, dim,
+							ER2Shared.Er2Ui.LineWidth(0.05f, camDist) * MarkerWidthMul, true);
+						drawn++;
+					}
+					catch { }
 				}
-				catch { }
-			}
-			foreach (Vehicle v in smFriendlyVeh)
-			{
-				if (drawn >= SceneMarkerCap) break;
-				try
+				foreach (Vehicle v in smFriendlyVeh)
 				{
-					if (v == null || v.transform == null) continue;
-					long k = (long)v.Pointer;
-					if (smSelected.Contains(k)) continue;
-					SceneMarkers.Ring("FV" + k, v.transform.position + Vector3.up * 0.15f, VehicleRingRadius(v), dim, 0.07f, true);
-					drawn++;
+					if (drawn >= SceneMarkerCap) break;
+					try
+					{
+						if (v == null || v.transform == null) continue;
+						long k = (long)v.Pointer;
+						if (smSelected.Contains(k)) continue;
+						SceneMarkers.Ring("FV" + k, v.transform.position + Vector3.up * 0.15f, VehicleRingRadius(v) * MarkerScaleMul, dimVeh,
+							ER2Shared.Er2Ui.LineWidth(0.07f, camDist) * MarkerWidthMul, true);
+						drawn++;
+					}
+					catch { }
 				}
-				catch { }
 			}
 			// 选中步兵：灰白角括号 + 呼吸脉动（载具上面已画）
 			// 1.4.14 性能：车内乘员判定用 smSelected 同批算好的 smSelectedFoot 集合
 			//（原每帧对每个选中兵做一次 GetComponentInParent<Vehicle> interop 调用）。
-			foreach (Soldier s in markerCache)
+			if (ShowSelectedBracket)
 			{
-				try
+				foreach (Soldier s in markerCache)
 				{
-					if (s == null || !s.IsAlive || s.transform == null) continue;
-					if (smSelectedInVehicle.Contains((long)s.Pointer)) continue;
-					SceneMarkers.Bracket("S" + (long)s.Pointer, s.transform.position + Vector3.up * 0.15f, UnitRingRadius(s) * 1.3f * pulse, selWhite, 0.08f, true);
+					try
+					{
+						if (s == null || !s.IsAlive || s.transform == null) continue;
+						if (smSelectedInVehicle.Contains((long)s.Pointer)) continue;
+						string key = "S" + (long)s.Pointer;
+						// 2.5.0：脉动相位按 key 错开（原来所有标记共用同一全局 pulse，同频同相）
+						float pl = PulseOf(key, t);
+						SceneMarkers.Bracket(key, s.transform.position + Vector3.up * 0.15f, UnitRingRadius(s) * 1.3f * pl, selWhite,
+							ER2Shared.Er2Ui.LineWidth(0.08f, camDist) * MarkerWidthMul, true);
+					}
+					catch { }
 				}
-				catch { }
-			}
-			for (int vi = 0; vi < selVehicleRefs.Count; vi++)
-			{
-				Vehicle v = selVehicleRefs[vi]; // 1.4.14 性能：原 new List<Vehicle>(selVehicleRefs) 每帧分配
-				try
+				for (int vi = 0; vi < selVehicleRefs.Count; vi++)
 				{
-					if (v == null || v.transform == null) continue;
-					SceneMarkers.Bracket("SV" + (long)v.Pointer, v.transform.position + Vector3.up * 0.15f, VehicleRingRadius(v) * pulse, selWhite, 0.1f, true);
+					Vehicle v = selVehicleRefs[vi]; // 1.4.14 性能：原 new List<Vehicle>(selVehicleRefs) 每帧分配
+					try
+					{
+						if (v == null || v.transform == null) continue;
+						string vkey = "SV" + (long)v.Pointer;
+						SceneMarkers.Bracket(vkey, v.transform.position + Vector3.up * 0.15f, VehicleRingRadius(v) * PulseOf(vkey, t), selWhite,
+							ER2Shared.Er2Ui.LineWidth(0.1f, camDist) * MarkerWidthMul, true);
+					}
+					catch { }
 				}
-				catch { }
 			}
+		}
+		else if (MarkersAllEnabled)
+		{
+			RebuildFriendlyCacheIfStale(t); // 非 RTS 也要维持缓存新鲜，切回 RTS 时不闪
 		}
 
 		// 集火环 + 名签：RTS/FPS 都显示（任务跨视角持续）
 		try
 		{
 			var m = mark;
-			if (m != null && m.Active)
+			if (m != null && m.Active && MarkersAllEnabled && ShowFocusRing)
 			{
-				Color mc = m.Downgraded ? new Color(0.8f, 0.45f, 0.25f, 0.8f) : new Color(0.95f, 0.28f, 0.22f, 0.95f);
-				SceneMarkers.Ring("MK", m.Position + Vector3.up * 0.12f, 1.5f * pulse, mc, 0.12f, true);
-				SceneMarkers.Label("MKN", m.Position + Vector3.up * 2.6f, "⚔ " + (m.Downgraded ? Ui.Tr("[降级] ") : "") + m.Name, mc, true);
+				// 2.5.0：默认灰黑（白 @0.92）；cfg markerColorMode=Semantic 时回红/橙
+				Color mc = m.Downgraded ? ER2Shared.Er2Ui.MarkerFocusDown : ER2Shared.Er2Ui.MarkerFocus;
+				string mkey = "MK";
+				SceneMarkers.Ring(mkey, m.Position + Vector3.up * 0.12f, 1.5f * PulseOf(mkey, t) * MarkerScaleMul, mc,
+					ER2Shared.Er2Ui.LineWidth(0.12f, camDist) * MarkerWidthMul, true, MarkerThroughWall);
+				if (MarkerNamePlates)
+					SceneMarkers.Label("MKN", m.Position + Vector3.up * 2.6f, "⚔ " + (m.Downgraded ? Ui.Tr("[降级] ") : "") + m.Name, mc, true);
 			}
 		}
 		catch { }
@@ -3667,11 +3694,14 @@ internal static class GodViewController
 		// 移动目标点：RTS/FPS 都显示——0.9.2 黄色小圈 + 中心圆点（不再是孤零零的大圈）
 		try
 		{
-			if (moveViz)
+			if (moveViz && ShowMoveTarget && MarkersAllEnabled)
 			{
-				Color yellow = new Color(1f, 0.85f, 0.35f, 0.95f);
-				SceneMarkers.Ring("MT", cmdTarget + Vector3.up * 0.1f, 0.45f * pulse, yellow, 0.07f, true);
-				SceneMarkers.Dot("MTD", cmdTarget + Vector3.up * 0.1f, 0.11f * pulse, yellow, true);
+				// 2.5.0：白 @0.85（原琥珀黄）；形状靠"小圈 + 中心点"保持辨识度，不靠色相
+				Color moveC = ER2Shared.Er2Ui.WMove;
+				string mtKey = "MT";
+				SceneMarkers.Ring(mtKey, cmdTarget + Vector3.up * 0.1f, 0.45f * PulseOf(mtKey, t) * MarkerScaleMul, moveC,
+					ER2Shared.Er2Ui.LineWidth(0.07f, camDist) * MarkerWidthMul, true);
+				SceneMarkers.Dot("MTD", cmdTarget + Vector3.up * 0.1f, 0.11f * PulseOf(mtKey, t) * MarkerScaleMul, moveC, true);
 			}
 		}
 		catch { }
@@ -3681,19 +3711,21 @@ internal static class GodViewController
 		// 1.2.1：改为只对【当前选中】的单位显示——用户反馈：选择已清空后连线仍挂着太杂乱
 		try
 		{
-			if (moveViz && (obsUnits.Count > 0 || obsVehicles.Count > 0))
+			if (moveViz && ShowPathLines && MarkersAllEnabled && (obsUnits.Count > 0 || obsVehicles.Count > 0))
 			{
-				Color pathC = new Color(0.7f, 0.7f, 0.7f, 0.4f);
+				// 2.5.0：行进路线 = 白 @0.26 **长虚线**（DashLong）——与登车线（短虚线 @0.48）区分开。
+				// 原 pathC 与 boardC 字面量完全相同（都是 0.7,0.7,0.7,0.4），两种语义撞色，已修。
+				Color pathC = ER2Shared.Er2Ui.WPath;
 				int n = 0;
 				for (int i = 0; i < obsUnits.Count && n < RouteLineCap; i++, n++)
 				{
 					Soldier s = obsUnits[i];
-					try { if (s != null && s.transform != null && s.IsAlive && IsSelectedUnit(s)) SceneMarkers.Line("PL" + n, s.transform.position + Vector3.up * 0.9f, obsTarget + Vector3.up * 0.3f, pathC, 0.06f, true); } catch { }
+					try { if (s != null && s.transform != null && s.IsAlive && IsSelectedUnit(s)) SceneMarkers.Line("PL" + n, s.transform.position + Vector3.up * 0.9f, obsTarget + Vector3.up * 0.3f, pathC, ER2Shared.Er2Ui.LineWidth(0.06f, camDist) * MarkerWidthMul, true, false); } catch { }
 				}
 				for (int i = 0; i < obsVehicles.Count && n < RouteLineCap + 10; i++, n++)
 				{
 					Vehicle v = obsVehicles[i];
-					try { if (v != null && v.transform != null && IsSelectedVehicle(v)) SceneMarkers.Line("PL" + n, v.transform.position + Vector3.up * 1.2f, obsTarget + Vector3.up * 0.3f, pathC, 0.08f, true); } catch { }
+					try { if (v != null && v.transform != null && IsSelectedVehicle(v)) SceneMarkers.Line("PL" + n, v.transform.position + Vector3.up * 1.2f, obsTarget + Vector3.up * 0.3f, pathC, ER2Shared.Er2Ui.LineWidth(0.08f, camDist) * MarkerWidthMul, true, false); } catch { }
 				}
 			}
 		}
@@ -3702,26 +3734,103 @@ internal static class GodViewController
 		// 1.0.5：登车路线——登车 pending 期间，每个步行登车单位 → 目标载具实时位置（1.2.1：同样只在选中时显示）
 		try
 		{
-			if (moveViz && pendingBoardVeh != null && pendingBoardUnits != null && pendingBoardVeh.transform != null)
+			if (moveViz && ShowPathLines && MarkersAllEnabled && pendingBoardVeh != null && pendingBoardUnits != null && pendingBoardVeh.transform != null)
 			{
-				Color boardC = new Color(0.7f, 0.7f, 0.7f, 0.4f);
+				// 2.5.0：登车线 = 白 @0.48 **短虚线**（DashShort）——与行进路线（长虚线 @0.26）区分
+				Color boardC = ER2Shared.Er2Ui.WBoard;
 				int n = 0;
 				for (int i = 0; i < pendingBoardUnits.Count && n < RouteLineCap; i++, n++)
 				{
 					Soldier s = pendingBoardUnits[i];
-					try { if (s != null && s.transform != null && s.IsAlive && IsSelectedUnit(s)) SceneMarkers.Line("PB" + n, s.transform.position + Vector3.up * 0.9f, pendingBoardVeh.transform.position + Vector3.up * 1.0f, boardC, 0.06f, true); } catch { }
+					try { if (s != null && s.transform != null && s.IsAlive && IsSelectedUnit(s)) SceneMarkers.Line("PB" + n, s.transform.position + Vector3.up * 0.9f, pendingBoardVeh.transform.position + Vector3.up * 1.0f, boardC, ER2Shared.Er2Ui.LineWidth(0.06f, camDist) * MarkerWidthMul, true, true); } catch { }
 				}
 			}
 		}
 		catch { }
 
 		// 1.2.0：阵型拖动标记（箭头+阵型线+落点标记；仅 RTS 拖动中显示；EndFrame 前刷新，未刷新自动隐藏）
-		if (Active && formationDragActive)
+		if (Active && formationDragActive && ShowFormationMarkers && MarkersAllEnabled)
 		{
 			try { Formation.DrawDragMarkers(); } catch { }
 		}
 
 		SceneMarkers.EndFrame();
+	}
+
+	// ===== 2.5.0：视觉 cfg 的运行时快照 + 每帧小工具 =====
+	// Plugin 里是 ConfigEntry（热重载），这里缓存成普通静态字段避免每帧 .Value 读字典。
+	// 由 Plugin 的 SettingChanged → ApplyMarkerConfig() 统一刷新。
+	internal static bool MarkersAllEnabled = true;   // markersEnabled 总开关
+	internal static bool ShowFriendlyRing = true;
+	internal static bool ShowSelectedBracket = true;
+	internal static bool ShowFocusRing = true;
+	internal static bool ShowMoveTarget = true;
+	internal static bool ShowPathLines = true;
+	internal static bool ShowFormationMarkers = true;
+	internal static bool MarkerPulseOn = true;
+	internal static float MarkerScaleMul = 1f;       // markerScale（半径总倍率）
+	internal static float MarkerWidthMul = 1f;       // markerLineWidth（线宽总倍率）
+	internal static bool MarkerThroughWall = false;  // markerThroughWall（穿墙，二期）
+	internal static bool MarkerNamePlates = true;    // showNamePlates
+
+	/// <summary>2.5.0：非 RTS 视角下也保持友军缓存新鲜（1s 节流），切回 RTS 时不闪一帧空标记。</summary>
+	private static void RebuildFriendlyCacheIfStale(float t)
+	{
+		if (t > smFriendlyNext)
+		{
+			smFriendlyNext = t + 1f;
+			RebuildFriendlyCache();
+		}
+	}
+
+	/// <summary>
+	/// 2.5.0：把 Plugin 的视觉 cfg 刷新到本类的静态快照。Plugin 启动与每个 SettingChanged 各调一次。
+	/// **必须对所有 cfg 都赋值**——漏一个就会出现"改了没反应"，且这种 bug 只在运行时显现。
+	/// </summary>
+	internal static void ApplyMarkerConfig()
+	{
+		try
+		{
+			MarkersAllEnabled = Plugin.markersEnabled.Value;
+			ShowFriendlyRing = Plugin.showFriendlyRing.Value;
+			ShowSelectedBracket = Plugin.showSelectedBracket.Value;
+			ShowFocusRing = Plugin.showFocusRing.Value;
+			ShowMoveTarget = Plugin.showMoveTarget.Value;
+			ShowPathLines = Plugin.showPathLines.Value;
+			ShowFormationMarkers = Plugin.showFormationMarkers.Value;
+			MarkerPulseOn = Plugin.markerPulse.Value;
+			MarkerScaleMul = Plugin.markerScale.Value;
+			MarkerWidthMul = Plugin.markerLineWidth.Value;
+			MarkerThroughWall = Plugin.markerThroughWall.Value;
+			MarkerNamePlates = Plugin.showNamePlates.Value;
+
+			ER2Shared.Er2Ui.SetMono(Plugin.uiMono.Value);
+			ER2Shared.Er2Ui.SetMarkerColorMode(Plugin.markerColorMode.Value);
+		}
+		catch (Exception ex)
+		{
+			// 失败必须可观测（工作区准则）：不加门控
+			SquadCmdLogic.LogWarning("[Markers] ApplyMarkerConfig 失败: " + ex.Message);
+		}
+	}
+
+	/// <summary>相机到世界原点的粗略距离——用于线宽距离补偿。取相机自身高度 ∝ 观察距离，够用且零分配。</summary>
+	private static float MarkerCamDist()
+	{
+		try
+		{
+			Camera cam = MainCam();
+			if (cam != null) return cam.transform.position.magnitude;
+		}
+		catch { }
+		return 30f; // 兜底 = 1.0 倍补偿
+	}
+
+	/// <summary>按 key 错相的脉动值。markerPulse 关掉时恒为 1（不呼吸）。</summary>
+	private static float PulseOf(string key, float t)
+	{
+		if (!MarkerPulseOn) return 1f;
+		return ER2Shared.Er2Ui.Pulse(key, t) * MarkerScaleMul;
 	}
 
 	private static float VehicleRingRadius(Vehicle v)
@@ -3807,7 +3916,8 @@ internal static class GodViewController
 			// 底部指令提示（1.2.0：快捷键化+阵型箭头）
 			string hint = Ui.Tr("WASD 移动    滚轮 缩放    中键 旋转    Q/E 升降    │    左键 选择/框选    右键 指令    长按拖动 阵型    │    Z/X/C 站/蹲/趴    V 停止    B 停火    N 掩体    M 集合    F 分散    │    空格 暂停    ESC 设置") + info;
 			GUIStyle hs = SquadCmdLogic.HudStyleSmall();
-			GUI.color = new Color(0.03f, 0.06f, 0.03f, 0.72f);
+			// 2.5.0：底部提示条底色去掉绿色调（原来 0.03,0.06,0.03 是军绿 UI 的一部分）
+			GUI.color = ER2Shared.Er2Ui.Scrim;
 			GUI.DrawTexture(new Rect((Screen.width - 1400f) * 0.5f, Screen.height - 30f, 1400f, 22f), Texture2D.whiteTexture);
 			GUI.color = Color.white;
 			GUI.Label(new Rect((Screen.width - 1400f) * 0.5f, Screen.height - 31f, 1400f, 22f), hint, hs);
@@ -3824,7 +3934,7 @@ internal static class GodViewController
 			}
 			if (status != "")
 			{
-				DrawShadowLabel(new Rect(14f, 9f, 400f, 22f), status, st, Paused ? new Color(1f, 0.85f, 0.2f, 0.98f) : uiText);
+				DrawShadowLabel(new Rect(14f, 9f, 400f, 22f), status, st, Paused ? ER2Shared.Er2Ui.Warn : uiText);
 			}
 
 			// 命令反馈

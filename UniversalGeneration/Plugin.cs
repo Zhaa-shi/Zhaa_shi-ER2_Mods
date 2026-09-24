@@ -9,7 +9,7 @@ using UnityEngine;
 
 namespace ER2UniversalGeneration;
 
-[BepInPlugin("er2.universalgeneration", "ER2 Universal Generation", "2.4.2")]
+[BepInPlugin("er2.universalgeneration", "ER2 Universal Generation", "2.5.0")]
 public class Plugin : BasePlugin
 {
 	internal static ManualLogSource ModLog;
@@ -20,6 +20,7 @@ public class Plugin : BasePlugin
 	internal static ConfigEntry<bool> noAttackNeutral;
 	internal static ConfigEntry<bool> enemyNativeAI; // 1.1.1：敌方生成物走原生 AI（推进/进攻）
 	internal static ConfigEntry<string> favorites; // 收藏的条目 id（"v:Panther,i:usa_infantry"）
+	internal static ConfigEntry<bool> uiMono;      // 2.5.0：灰黑单色 UI（与 SquadCommand 同名同义）
 
 	public override void Load()
 	{
@@ -31,6 +32,11 @@ public class Plugin : BasePlugin
 		enemyNativeAI = Config.Bind("General", "enemyNativeAI", true, Ui.Tr("生成的敌方单位走原生 AI（主动推进、随战役任务进攻）。关闭后敌方与我方单位一样原地驻守、只接战不移动。"));
 		debugLog = Config.Bind("Debug", "debugLog", false, new ConfigDescription(Ui.Tr("调试日志开关（发布版保持关闭）。输出枚举/反射/生成诊断。"), new AcceptableValueList<bool>(true, false)));
 		favorites = Config.Bind("General", "favorites", "", Ui.Tr("收藏的生成条目（自动维护，勿手改）。"));
+		// 2.5.0：与 SquadCommand 的 UI/uiMono 同名同义——两个 mod 的面板要长得一样，
+		// 玩家改一个就该两边都变（共享 Er2Ui 令牌，只有这一处开关各读各的 cfg）。
+		uiMono = Config.Bind("UI", "uiMono", true, Ui.Tr("灰黑单色 UI（推荐）。面板/列表/按钮走中性灰黑，靠明度区分层次；关掉则回退旧版军绿配色。"));
+		uiMono.SettingChanged += (s, e) => ER2Shared.Er2Ui.SetMono(uiMono.Value);
+		ER2Shared.Er2Ui.SetMono(uiMono.Value);
 
 		HostLink.Init();
 		GenCatalog.LoadFavorites();
@@ -60,6 +66,6 @@ public class Plugin : BasePlugin
 		ItemCatalog.Ensure();
 		new Harmony("er2.universalgeneration").PatchAll(typeof(Plugin).Assembly); // Tick/Draw 驱动补丁
 
-		ModLog.LogInfo("ER2 Universal Generation 2.4.2 loaded. panelKey=" + panelKey.Value);
+		ModLog.LogInfo("ER2 Universal Generation 2.5.0 loaded. panelKey=" + panelKey.Value);
 	}
 }

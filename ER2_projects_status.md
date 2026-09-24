@@ -18,8 +18,8 @@
 | 8 | `ZoomAnywhere` | `er2.zoomanywhere` | ER2 Zoom Anywhere | **1.0.1** | `ER2_ZoomAnywhere.dll` | 已部署 |
 | 9 | `HighValueTarget` | `er2.highvaluetarget` | ER2 Veteran HVT | **1.2.2** | `ER2_VeteranHVT.dll` | 已部署（+ Assets 目录） |
 | 10 | `InventoryPause` | `er2.inventorypause` | ER2 Inventory Pause | **1.0.5** | `ER2_InventoryPause.dll` | 已部署 |
-| 11 | `SquadCommand` | `er2.squadcommand` | ER2 Battlefield Commander | **1.4.18** | `ER2_BattlefieldCommander.dll` | 已发布 |
-| 12 | `UniversalGeneration` | `er2.universalgeneration` | ER2 Universal Generation | **2.4.2** | `ER2_UniversalGeneration.dll` | 已发布 |
+| 11 | `SquadCommand` | `er2.squadcommand` | ER2 Battlefield Commander | **1.4.19** | `ER2_BattlefieldCommander.dll` | 已发布 |
+| 12 | `UniversalGeneration` | `er2.universalgeneration` | ER2 Universal Generation | **2.5.0** | `ER2_UniversalGeneration.dll` | 已发布 |
 | 13 | `UnitCollision` | `er2.morephysics.unitcollision` | ER2 More Physics - Unit Collision | **1.0.8** | `ER2_MorePhysics_UnitCollision.dll` | 已部署 |
 | 14 | `UnitInfoOverlay` | `er2.unitinfooverlay` | ER2 Unit Inspector | **1.0.5** | `ER2_UnitInfoOverlay.dll` | 已部署 |
 | 15 | `FleshWoundsFixed` | `ER2_FleshWounds` | ER2 Flesh Wounds | **1.0.1** | （需手动构建部署，build.ps1 无条目） | 第三方修复版 |
@@ -116,7 +116,24 @@ AI 血量低于 `eatBelowHp`（默认 **40**）自动吃背包食物回血：`Fi
 打开背包（自己/尸体）时**真暂停**（延迟 timeScale 冻结，等打开动画完成）；暂停期间丢弃道具自动落地（扫描 `ItemObject.spawnedItems`）。
 **ER2 暂停机制图谱（全部实测定案，做任何暂停功能前必读）**：原生 `Pause.SetPause` = timeScale=0 + 弹菜单 + `disableOnPause`（藏菜单 = 死锁）；手动 `Pause.isPaused=true` 禁用输入但**不冻结世界**；`timeScale=0` 真暂停但**卡 UI 协程动画** + 丢弃武器浮空（解法：延迟冻结等动画完成 + 扫描 `spawnedItems` 拉下道具）；`enableAiBehaviour(false)` **无效**（true 才有效）；背包开关读 `InventoryPanel.isOpen`。
 
-### 2.11 SquadCommand（Battlefield Commander）`er2.squadcommand` v1.4.18
+### 2.11 SquadCommand（Battlefield Commander）`er2.squadcommand` v1.4.19
+**1.4.19（2026-09-24，用户第 20 轮："标记点等都用白色或半透明的灰色。我要那种灰黑色的UI。都给 cfg 开关" + "你这选中标记画的跟台风一样"）**：
+- **UI 重绘一期落地**：
+  - 灰黑单色 UI——`Shared/Er2Ui.cs` 结构色改中性灰黑（Panel/Surface/Row/Text 三组各两套：Mono 与 Legacy 由 `uiMono` 分派）；HUD 按钮色源默认值 `#1E1E1EE6/#3A3A3AF2/#E8E8E8`；底部提示条去掉军绿（`0.03,0.06,0.03` → `Scrim`）。
+  - 选中标记形状修正：`SceneMarkers.GetBracket` 由 4 段 9 点圆弧（`start=q*90+22.5`、`45*i/8`）改为**直角折角**（`positionCount 9→3`，三点 `[edge 端点, 角顶点, 另一 edge 端点]`，`loop=false`）——直修用户"跟台风一样"。4 个调用点签名不变。
+  - 世界空间颜色全量令牌化：`WFriendly(.28)/WFriendlyVeh(.34)/WSelected(.92)/WFocus/WMove(.85)/WPath(.26)/WBoard(.48)/WFormation(.80)/WVehicle(.60)/WGhost/WLabelPlate`；GVC 与 Formation 共 12 处字面量清零（反编译实证）。
+  - 路线/登车线拆分：新增 `DashTex(bool shortDash)`（长划 14/32、短划 22/32）+ `DashTexLong/Short` 双槽；`Line(...)` 加 `shortDash` 参数（默认 false）；平铺周期长划 2m / 短划 1.2m。修此前 `pathC == boardC` 字面量完全相同。
+  - 线宽距离补偿：`Er2Ui.WidthScale(camDist)=Clamp(camDist/30,0.6,2.5)`、`LineWidth(base,camDist)`；每帧一次 `camDist` 全帧复用。
+  - 脉动错相：`Er2Ui.Pulse(key,t)` 按 FNV-1a 哈希错相（修"所有标记同频同相一起呼吸"）。
+  - 名签底板：`SceneMarkers.EnsurePlate` 程序化 2 三角形面片 + 顶点色烘焙 `WLabelPlate`。
+  - 光标灰阶：`MouseCursor.StateColor` 8 形状改灰阶（仅 Enemy 红 / Emplacement 橙）。
+  - 幽灵预览：`(0.58,0.64,0.72,0.20)` → `Er2Ui.WGhost`（中性灰 @0.35，去掉蓝调）。
+- **新增 14 项 cfg**：`[Markers]` 13 项（markersEnabled/showFriendlyRing/showSelectedBracket/showFocusRing/showMoveTarget/showPathLines/showFormationMarkers/showNamePlates/markerPulse/markerScale/markerLineWidth/markerThroughWall/markerColorMode）+ `[UI] uiMono`；全部 `SettingChanged → GodViewController.ApplyMarkerConfig()`。
+- 新增 `SquadCmdLogic.LogWarning`（不受 debugLog 门控，失败可观测）。
+- 验证：编译 0 error（3 warning，均为既有）；部署 DLL 217,088 B，sha256 `F3513EEE935B889099DEFDBAB17DD42327172BEB508CCE60F2A15B91ADDECB77`，与构建产物逐字节一致；`ER2_BattlefieldCommander_v1.4.19.zip`。
+  反编译复核：版本双写 1.4.19 ✓；14 项 cfg 键全在 ✓；`positionCount = 3`（角标）✓；旧弧公式 `22.5` 0 处 ✓；旧字面量 12 处清零 ✓；`new GUIStyle(带参)` 0 处（陷阱 5）✓；`_ZTest` 1 处（穿墙材质仍在）✓。
+
+### 2.11.1 SquadCommand v1.4.18（历史）
 **1.4.18（2026-09-24，用户第 19 轮：2.4.1 运行良好，要求优化代码 + 为两个 mod 的 UI 重绘做准备）**：
 - **无玩法/视觉变化，纯地基**：`SquadCmdLogic.HudStyle/HudStyleSmall/ButtonStyle`、`InfoPanel.MakeSmall`、`BackpackPanel.MakeStyle` 四处手写 `GUIStyle` 全部改为转发共享层 `Er2Ui.MakeLabel`（`using ER2Shared;`），字号/对齐/配色/粗体语义逐项不变；csproj 加 `<Compile Include="..\Shared\Er2Ui.cs" Link="Shared\Er2Ui.cs" />`。
 - 验证：编译 0 error；部署 DLL 206,336 B，sha256 `3E306522BDAA185AD6036397AFB7B78FD47EFBD6C41727BA53491A15DFDE9DD2`，与构建产物逐字节一致；`ER2_BattlefieldCommander_v1.4.18.zip`；反编译复核：`[BepInPlugin]`+启动日志双 1.4.18、`Er2Ui.MakeLabel` 5 处调用在位 ✓。
@@ -296,7 +313,15 @@ AI 血量低于 `eatBelowHp`（默认 **40**）自动吃背包食物回血：`Fi
   2. 枚举型工具函数（`CollectSquads` 这类"遍历全局静态表"的）一律加短缓存，否则被连续调用时浏览器级开销；
   3. OnGUI 路径里 `new List<>`/`new Dictionary<>`/`ToArray()` 逐个清掉，复用静态缓冲区；
   4. 缓存失效点要显式（`InvalidatePlayerSoldier`/`InvalidateMainCam`），并让"拿不到值的缓存"不写入（避免把 null 缓存成半秒的真相）。
-### 2.12 UniversalGeneration `er2.universalgeneration` v2.4.2
+### 2.12 UniversalGeneration `er2.universalgeneration` v2.5.0
+**2.5.0（2026-09-24，用户第 20 轮：UI 重绘一期，与 SquadCommand 1.4.19 同批）**：
+- **面板换灰黑单色**：全部结构色经 `Shared/Er2Ui.cs` 的 Mono 预设（`PanelBg #0C0C0C@0.94`/`Surface #1E1E1E@0.90`/`SurfaceActive #3A3A3A`/`RowBg #121212`/`Text #E8E8E8`/`TextDim #A0A0A0`…），靠明度区分层次。
+- **新增 `UI/uiMono` cfg**（默认 true）；false 回退旧军绿预设（`Er2Ui.SetMono`，两 mod 同名同义）。
+- **零业务逻辑改动**——只换令牌与开关，行计划/页签自适应/物品枚举等 2.4.x 行为逐字不变。
+- **交付**：`build.ps1 -Mod UniversalGeneration`（EN）0 error；部署 DLL 115,200 B，sha256 `50623EFA6F6BC9D6F40D4E044756B571E35E4674A7A13B83B2D5D9D0E787AF96`，与构建产物逐字节一致；`ER2_UniversalGeneration_v2.5.0.zip`。
+  反编译复核：版本双写 2.5.0 ✓；`Er2Ui.*` 成员（Fill/TabGrid/TabGridH/Pager/MakeLabel/MakeButton + 全部配色令牌）✓；`Er2Ui.SetMono` 2 处（SettingChanged + 启动）✓。
+
+### 2.12.1 UniversalGeneration v2.4.2（历史）
 
 **2.4.2（2026-09-24，用户第 19 轮："它运行的不错，优化一下代码，总结经验。为之后指挥官mod和通用生成mod的ui重绘做准备，现在太丑了"）**：
 - **① 布局单一数据源（结构性消灭陷阱 75 复发）**：2.4.0 修的是"高度公式漏算动态行"，但**修法是镜像**——`PanelRect()` 里重新算一遍 y 累加，绘制里再算一遍，两边任何一处改动都会再次脱节。
@@ -738,8 +763,10 @@ M0 侦察工具，同 `HvtTestDriver` 定位。**刻意不打任何 Harmony 补�
 
 | 包 | 时间 |
 |---|---|
-| `ER2_UniversalGeneration_v2.4.2.zip`（EN，**当前部署**） | 09-24（**最新**：无可见改动，为 UI 重绘打底——布局改**行计划单一数据源**（高度 = 行计划求和，绘制遍历同一列表，结构性消灭"画到面板外"复发）；新增 `Shared/Er2Ui.cs` 共享令牌/原语层，两个 csproj 源码级链接；页签适配改 `CalcSize` 精确测量 + 缓存。DLL 110,592 B，sha256 `F6C37E8260F2…A431A`，与构建产物逐字节一致；反编译复核版本双写 2.4.2 + `Er2Ui.*` 成员 + `BuildRows`/`DrawRows` ✓） |
-| `ER2_BattlefieldCommander_v1.4.18.zip`（EN，**当前部署**） | 09-24（**最新**：内部调整，四处手写 `GUIStyle` 改走共享层 `Er2Ui.MakeLabel`，语义不变。DLL 206,336 B，sha256 `3E306522BDAA…DE9DD2`，与构建产物逐字节一致；反编译复核版本双写 1.4.18 + `Er2Ui.MakeLabel` ✓） |
+| `ER2_UniversalGeneration_v2.5.0.zip`（EN，**当前部署**） | 09-24（**最新**：UI 重绘一期——面板换灰黑单色（`Er2Ui` Mono 预设）+ 新增 `UI/uiMono` 开关（false 回退军绿）；零业务逻辑改动。DLL 115,200 B，sha256 `50623EFA6F6B…AF96`，与构建产物逐字节一致；反编译复核版本双写 2.5.0 + `Er2Ui.*` 成员 + `SetMono` ✓） |
+| `ER2_UniversalGeneration_v2.4.2.zip`（EN，历史） | 09-24（**最新**：无可见改动，为 UI 重绘打底——布局改**行计划单一数据源**（高度 = 行计划求和，绘制遍历同一列表，结构性消灭"画到面板外"复发）；新增 `Shared/Er2Ui.cs` 共享令牌/原语层，两个 csproj 源码级链接；页签适配改 `CalcSize` 精确测量 + 缓存。DLL 110,592 B，sha256 `F6C37E8260F2…A431A`，与构建产物逐字节一致；反编译复核版本双写 2.4.2 + `Er2Ui.*` 成员 + `BuildRows`/`DrawRows` ✓） |
+| `ER2_BattlefieldCommander_v1.4.19.zip`（EN，**当前部署**） | 09-24（**最新**：UI 重绘一期——灰黑单色 UI、选中标记改直角角标（修"像台风"）、世界空间标记全改白/半透灰（明度档 + 虚线节奏 + 形状）、路线/登车线拆分、线宽距离补偿、脉动错相、名签底板、光标灰阶，新增 14 项视觉 cfg。DLL 217,088 B，sha256 `F3513EEE935B…DCB77`，与构建产物逐字节一致；反编译复核版本双写 1.4.19 + 14 项 cfg + `positionCount=3` + 旧弧公式 0 处 + 旧字面量清零 ✓） |
+| `ER2_BattlefieldCommander_v1.4.18.zip`（EN，历史） | 09-24（**最新**：内部调整，四处手写 `GUIStyle` 改走共享层 `Er2Ui.MakeLabel`，语义不变。DLL 206,336 B，sha256 `3E306522BDAA…DE9DD2`，与构建产物逐字节一致；反编译复核版本双写 1.4.18 + `Er2Ui.MakeLabel` ✓） |
 | `ER2_UniversalGeneration_v1.3.2.zip` / `ER2_UniversalGeneration_CN_v1.3.2.zip` | 09-19（**待发 Nexus**：火力点页签 + 小队库 466 变体 + 敌方原生 AI + 启动时零卡顿探测；1.3.1 砍自定义班生成——运行时空壳，1.3.2 按用户决定砍全部第三方生成；拆包核对 = DLL + README.txt + Nexus_description.md ✓ 双语双包 ✓） |
 | `ER2_BattlefieldCommander_v1.4.15.zip` / `ER2_BattlefieldCommander_CN_v1.4.15.zip` | 09-24（**最新**：上帝视角打开设置后相机输入不再穿透菜单（滚轮/WASD/中键）；兼容 Advanced Combat Movement 吞掉"恢复开火"调用 → 改「调用→回读→直写 holdFire 字段」。EN 构建 = **当前部署**（sha256 `f474a84f…`，与 EN 包内 DLL 一致；CN 包 `f9600279…` 更小，仅打包不部署）；拆包核对均 = DLL + README.txt + Nexus_description.md（build.ps1 按包语言取文档，双语包各 3 文件）） |
 | `ER2_ModManager_v1.5.4.zip` / `ER2_ModManager_CN_v1.5.4.zip` | 09-24（**最新**：翻页音效兜底 —— 第三方假页吞掉原生 Tab 方法时由我们补 `ClickSound()`，并打印翻页分支追踪日志；拆包核对 = DLL + README.txt + Nexus_description.md（ModManager 无中文文档，CN 包文档仍为英文）） |

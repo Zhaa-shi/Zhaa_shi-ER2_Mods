@@ -824,14 +824,20 @@ internal static class Formation
 	internal static void DrawDragMarkers()
 	{
 		if (!dragging || !hasAnchor) return;
-		Color ac = new Color(1f, 0.9f, 0.4f, 0.9f);
+		// 2.5.0：阵型拖动标记统一走灰黑令牌（原来是一组琥珀黄 + 天蓝的字面量）
+		Color ac = ER2Shared.Er2Ui.WFormation;                       // 主指示（白 @0.80）
+		Color acLine = ER2Shared.Er2Ui.WPath;                        // 阵型基线（白 @0.26，暗）
+		Color acFacing = ER2Shared.Er2Ui.WVehicle;                   // 只转向目标（白 @0.60）
+		float camDist = MarkerCamDistForFormation();
 		try
 		{
 			if (hasEnd && lineLen > 0.3f)
 			{
-				SceneMarkers.Arrow("FMA", anchor + Vector3.up * 0.3f, end + Vector3.up * 0.3f, ac, 0.12f, true);
+				SceneMarkers.Arrow("FMA", anchor + Vector3.up * 0.3f, end + Vector3.up * 0.3f, ac,
+					ER2Shared.Er2Ui.LineWidth(0.12f, camDist), true);
 				SceneMarkers.Line("FML", anchor + perpDir * (lineLen * 0.5f) + Vector3.up * 0.25f,
-					anchor - perpDir * (lineLen * 0.5f) + Vector3.up * 0.25f, new Color(1f, 0.9f, 0.4f, 0.55f), 0.06f, true);
+					anchor - perpDir * (lineLen * 0.5f) + Vector3.up * 0.25f, acLine,
+					ER2Shared.Er2Ui.LineWidth(0.06f, camDist), true, false);
 			}
 			else
 			{
@@ -848,16 +854,28 @@ internal static class Formation
 		i = 0;
 		foreach (LineSlot ls in vehSlots)
 		{
-			try { SceneMarkers.Bracket("FMV" + i, ls.pos + Vector3.up * 0.15f, 3.2f, ac, 0.08f, true); } catch { }
+			try { SceneMarkers.Bracket("FMV" + i, ls.pos + Vector3.up * 0.15f, 3.2f, ac, ER2Shared.Er2Ui.LineWidth(0.08f, camDist), true); } catch { }
 			i++;
 		}
 		// 1.2.3：只转向的火力点/火炮——在自身位置画角括号（箭头已表示方向）
 		i = 0;
 		foreach (Vehicle v in facingOnly)
 		{
-			try { if (v != null && v.transform != null) SceneMarkers.Bracket("FMF" + i, v.transform.position + Vector3.up * 0.15f, 2.2f, new Color(0.6f, 0.9f, 1f, 0.85f), 0.08f, true); } catch { }
+			try { if (v != null && v.transform != null) SceneMarkers.Bracket("FMF" + i, v.transform.position + Vector3.up * 0.15f, 2.2f, acFacing, ER2Shared.Er2Ui.LineWidth(0.08f, camDist), true); } catch { }
 			i++;
 		}
+	}
+
+	/// <summary>2.5.0：Formation 侧取相机距离（与 GodViewController.MarkerCamDist 同义，但那边是 private）。</summary>
+	private static float MarkerCamDistForFormation()
+	{
+		try
+		{
+			Camera cam = GodViewController.MainCam();
+			if (cam != null) return cam.transform.position.magnitude;
+		}
+		catch { }
+		return 30f;
 	}
 
 	// ===== 工具 =====

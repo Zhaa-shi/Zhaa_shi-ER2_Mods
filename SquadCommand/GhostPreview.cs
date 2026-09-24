@@ -201,8 +201,10 @@ internal static class GhostPreview
 				return;
 			}
 			ghostMat = new Material(sh);
-			// 用户反馈"虚影太亮"：无光照 shader 下高亮白几乎自发光，压到 0.20 淡灰蓝
-			ghostMat.color = new Color(0.58f, 0.64f, 0.72f, 0.20f);
+			// 用户反馈"虚影太亮"：无光照 shader 下高亮白几乎自发光 → 压到 0.20。
+			// 2.5.0：改为**中性灰**（原偏蓝的 0.58,0.64,0.72）并提到 0.35——
+			// 灰黑主题里蓝调会"跳"出来；同时 0.20 在深色战场上几乎看不见预览轮廓。
+			ghostMat.color = ER2Shared.Er2Ui.WGhost;
 			try { ghostMat.SetColor("_Color", ghostMat.color); } catch { }
 			ghostMat.hideFlags = (HideFlags)61; // 陷阱 12：运行时创建的资源防场景卸载
 		}

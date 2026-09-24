@@ -113,18 +113,26 @@ internal static class MouseCursor
 		px[y * TexSize + x] = c;
 	}
 
+	/// <summary>
+	/// 2.5.0：光标配色改**灰阶**（用户："标记点等都用白色或半透明的灰色"）。
+	/// 灰黑主题下不再用色相区分目标类型；类型由**形状**承担（Default/Friendly/Enemy/Vehicle/…）。
+	/// 仅两处保留彩色，因为它们承载**危险/权限**语义而非类型：
+	///   Enemy = 红（敌对，必须一眼可辨）
+	///   Emplacement = 橙（可操作的重武器点，与普通建筑区分）
+	/// 其余按"可交互程度"排明度：Friendly 略暗（背景信息）→ Interactable 最亮（当前可点）。
+	/// </summary>
 	private static Color StateColor(Shape s)
 	{
 		switch (s)
 		{
-			case Shape.Friendly: return new Color(0.45f, 1f, 0.5f, 1f);
-			case Shape.Enemy: return new Color(1f, 0.38f, 0.33f, 1f);
-			case Shape.Vehicle: return new Color(0.5f, 0.88f, 1f, 1f);
-			case Shape.Building: return new Color(1f, 0.86f, 0.42f, 1f);
-			case Shape.Emplacement: return new Color(1f, 0.68f, 0.3f, 1f);
-			case Shape.Interactable: return new Color(0.72f, 0.9f, 1f, 1f);
-			case Shape.Cross: return new Color(1f, 1f, 1f, 1f);
-			default: return new Color(1f, 1f, 1f, 1f);
+			case Shape.Friendly: return new Color(0.80f, 0.80f, 0.80f, 1f);   // 灰（友军，含大量单位，压低不抢眼）
+			case Shape.Enemy: return new Color(1f, 0.38f, 0.33f, 1f);         // 红（敌对，保留）
+			case Shape.Vehicle: return new Color(0.92f, 0.92f, 0.92f, 1f);    // 亮灰
+			case Shape.Building: return new Color(0.72f, 0.72f, 0.72f, 1f);   // 中灰
+			case Shape.Emplacement: return new Color(1f, 0.68f, 0.3f, 1f);    // 橙（可操作重武器，保留）
+			case Shape.Interactable: return new Color(1f, 1f, 1f, 1f);        // 纯白（当前可交互，最亮）
+			case Shape.Cross: return new Color(1f, 1f, 1f, 1f);               // 纯白
+			default: return new Color(1f, 1f, 1f, 1f);                        // 纯白
 		}
 	}
 

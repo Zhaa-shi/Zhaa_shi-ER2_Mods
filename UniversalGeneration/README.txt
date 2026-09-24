@@ -1,4 +1,4 @@
-ER2 Universal Generation v2.4.2
+ER2 Universal Generation v2.5.0
 ================================
 
 Spawn any unit, vehicle, or item anywhere, right from Battlefield Commander's RTS god view.
@@ -41,6 +41,10 @@ How to use
 
 Changelog
 --------------------------------
+2.5.0
+- **Grey-black mono UI.** The panel now uses the neutral grey-black palette from the shared toolkit (`Shared/Er2Ui.cs`) instead of the old military green — list rows, tabs, buttons and the preview area all read as one flat dark-grey surface, with hierarchy carried by brightness rather than hue. Set `UI/uiMono=false` to fall back to the previous green preset.
+- Internal: the shared toolkit gained a `Mono` switch, so both this mod and Battlefield Commander change appearance from the same single place.
+
 2.4.2
 - **No user-visible change — this is a code-quality release that prepares the UI for a full redraw.** The panel's drawing code was restructured so that bugs like the 2.4.0 "list drawn past the bottom of the panel" cannot come back: the panel height is no longer a separate formula that has to be kept in sync with the drawing code. Both mods now build a **row plan** first (one entry per row: title / faction / tabs / list / pager / preview…), and the height is simply the sum of that plan, while drawing walks the very same list. Adding or removing a row can no longer desynchronise the height from what is drawn.
 - **Both mods now share one UI toolkit.** A new shared source file (`Shared/Er2Ui.cs`) holds the design tokens (spacing, font sizes, colours) and the drawing primitives (solid fills, style factories, adaptive tabs, pager, text fitting). The two assemblies do not reference each other, so each compiles the same file into itself. This means a visual change is made once and lands in both mods — the prerequisite for redrawing them into a single coherent look.

@@ -9,7 +9,7 @@ using UnityEngine;
 
 namespace ER2SquadCommand;
 
-[BepInPlugin("er2.squadcommand", "ER2 Battlefield Commander", "1.4.18")]
+[BepInPlugin("er2.squadcommand", "ER2 Battlefield Commander", "1.4.19")]
 public class Plugin : BasePlugin
 {
 	internal static ManualLogSource ModLog;
@@ -35,6 +35,21 @@ public class Plugin : BasePlugin
 	internal static ConfigEntry<string> uiColorBase;
 	internal static ConfigEntry<string> uiColorHover;
 	internal static ConfigEntry<string> uiColorText;
+	// 2.5.0：UI 单色系总开关 + 世界空间标记视觉开关（13 项，用户要求"都给 cfg"）
+	internal static ConfigEntry<bool> uiMono;
+	internal static ConfigEntry<bool> markersEnabled;
+	internal static ConfigEntry<bool> showFriendlyRing;
+	internal static ConfigEntry<bool> showSelectedBracket;
+	internal static ConfigEntry<bool> showFocusRing;
+	internal static ConfigEntry<bool> showMoveTarget;
+	internal static ConfigEntry<bool> showPathLines;
+	internal static ConfigEntry<bool> showFormationMarkers;
+	internal static ConfigEntry<bool> markerPulse;
+	internal static ConfigEntry<float> markerScale;
+	internal static ConfigEntry<float> markerLineWidth;
+	internal static ConfigEntry<bool> markerThroughWall;
+	internal static ConfigEntry<string> markerColorMode;
+	internal static ConfigEntry<bool> showNamePlates;
 
 	public override void Load()
 	{
@@ -57,21 +72,57 @@ public class Plugin : BasePlugin
 		// 1.4.8：半径回归 3m（用户规则）；兵停驻在圈外时由 LootTick 逐步重派移动带进圈（不再放大半径）
 		packRange = Config.Bind("Control", "packRange", 3f, new ConfigDescription(Ui.Tr("背包联动半径（米）：第一个打开的背包为锚点，其余背包距锚点超过此值将无法打开/自动关闭。"), new AcceptableValueRange<float>(1f, 100f)));
 		ghostPreview = Config.Bind("Control", "ghostPreview", true, Ui.Tr("阵型拖动中的白色半透明单位预览（克隆失败会自动降级为标记）。"));
-		customCursor = Config.Bind("Control", "customCursor", true, Ui.Tr("自定义光标（RTS 内按指向对象变色：友军绿/敌军红/载具青/建筑黄/火力点橙/可交互浅蓝）。"));
+		customCursor = Config.Bind("Control", "customCursor", true, Ui.Tr("自定义光标（RTS 内按指向对象换形状与明度：敌军红、火力点橙，其余灰阶）。"));
 		cursorStyle = Config.Bind("Control", "cursorStyle", "Circle", new ConfigDescription(Ui.Tr("光标样式：Circle=空心半透明圆（默认）/ Arrow=箭头 / Cross=细线十字。"), new AcceptableValueList<string>("Circle", "Arrow", "Cross")));
 		cursorStyle.SettingChanged += (s2, e2) => MouseCursor.InvalidateCache();
 
-		uiColorBase = Config.Bind("UI", "colorBase", "#0E1C0EB4", new ConfigDescription(Ui.Tr("UI 主色（#RRGGBB 或 #RRGGBBAA）：按钮底板、小队列表行。默认深绿半透明（与底部提示条一致）。")));
-		uiColorHover = Config.Bind("UI", "colorHover", "#3E703EE0", Ui.Tr("UI 悬停/选中指示颜色（中绿）。"));
-		uiColorText = Config.Bind("UI", "colorText", "#DFF0DF", Ui.Tr("UI 文字/描边颜色。"));
+		// 2.5.0：默认值改中性灰（原来深绿/中绿/淡绿是军绿主题）。uiMono 只管 Er2Ui 的面板令牌，
+		// 这三个是**世界空间与 HUD 按钮**的色源，必须同步换灰，否则"面板灰黑、按钮军绿"。
+		uiColorBase = Config.Bind("UI", "colorBase", "#1E1E1EE6", new ConfigDescription(Ui.Tr("HUD 按钮底板 / 小队列表行颜色（#RRGGBB 或 #RRGGBBAA）。默认中性深灰。")));
+		uiColorHover = Config.Bind("UI", "colorHover", "#3A3A3AF2", Ui.Tr("HUD 按钮悬停/选中颜色。默认中性亮灰。"));
+		uiColorText = Config.Bind("UI", "colorText", "#E8E8E8", Ui.Tr("HUD 文字/描边颜色。默认近白灰。"));
 		uiColorBase.SettingChanged += (s, e) => GodViewController.ApplyUiTheme();
 		uiColorHover.SettingChanged += (s, e) => GodViewController.ApplyUiTheme();
 		uiColorText.SettingChanged += (s, e) => GodViewController.ApplyUiTheme();
 		GodViewController.ApplyUiTheme();
 
+		// ===== 2.5.0：UI 单色系 =====
+		uiMono = Config.Bind("UI", "uiMono", true, Ui.Tr("灰黑单色 UI（推荐）。所有面板/列表/按钮走中性灰黑，靠明度区分层次；关掉则回退旧版军绿配色。"));
+		uiMono.SettingChanged += (s, e) => GodViewController.ApplyMarkerConfig();
+
+		// ===== 2.5.0：世界空间标记（全部可关）=====
+		markersEnabled = Config.Bind("Markers", "markersEnabled", true, Ui.Tr("3D 场景标记总开关。关掉后所有世界空间标记（脚环/角标/集火环/目标点/路线/阵型）都不再绘制。"));
+		showFriendlyRing = Config.Bind("Markers", "showFriendlyRing", true, Ui.Tr("友军脚环（步兵/载具地面圆环）。仅 RTS 视角显示。"));
+		showSelectedBracket = Config.Bind("Markers", "showSelectedBracket", true, Ui.Tr("选中角标（四角直角括号）。"));
+		showFocusRing = Config.Bind("Markers", "showFocusRing", true, Ui.Tr("集火目标环与名签（任务跨视角持续显示）。"));
+		showMoveTarget = Config.Bind("Markers", "showMoveTarget", true, Ui.Tr("移动目标点（小圈 + 中心点）。"));
+		showPathLines = Config.Bind("Markers", "showPathLines", true, Ui.Tr("行进路线与登车连线（虚线）。"));
+		showFormationMarkers = Config.Bind("Markers", "showFormationMarkers", true, Ui.Tr("阵型拖动标记（箭头 + 阵型线 + 落点）。"));
+		showNamePlates = Config.Bind("Markers", "showNamePlates", true, Ui.Tr("世界空间名签（集火目标名称，带深色底板）。"));
+		markerPulse = Config.Bind("Markers", "markerPulse", true, Ui.Tr("选中/目标指示的呼吸脉动效果。关掉为静态（性能略好，画面更稳）。"));
+		markerScale = Config.Bind("Markers", "markerScale", 1f, new ConfigDescription(Ui.Tr("标记整体尺寸倍率（角标/环/目标点半径同乘）。"), new AcceptableValueRange<float>(0.5f, 2f)));
+		markerLineWidth = Config.Bind("Markers", "markerLineWidth", 1f, new ConfigDescription(Ui.Tr("标记线宽倍率（在距离补偿之上再乘）。调粗看远处更清楚。"), new AcceptableValueRange<float>(0.5f, 3f)));
+		markerThroughWall = Config.Bind("Markers", "markerThroughWall", false, Ui.Tr("标记穿墙显示（不做深度测试）。开启后单位进建筑也能看到标记，但会糊在墙面上。"));
+		markerColorMode = Config.Bind("Markers", "markerColorMode", "Mono", new ConfigDescription(Ui.Tr("标记配色：Mono=白/半透灰单色（默认，配灰黑 UI）/ Semantic=集火红、降级橙（保留语义色）。"), new AcceptableValueList<string>("Mono", "Semantic")));
+		markersEnabled.SettingChanged += (s, e) => GodViewController.ApplyMarkerConfig();
+		showFriendlyRing.SettingChanged += (s, e) => GodViewController.ApplyMarkerConfig();
+		showSelectedBracket.SettingChanged += (s, e) => GodViewController.ApplyMarkerConfig();
+		showFocusRing.SettingChanged += (s, e) => GodViewController.ApplyMarkerConfig();
+		showMoveTarget.SettingChanged += (s, e) => GodViewController.ApplyMarkerConfig();
+		showPathLines.SettingChanged += (s, e) => GodViewController.ApplyMarkerConfig();
+		showFormationMarkers.SettingChanged += (s, e) => GodViewController.ApplyMarkerConfig();
+		showNamePlates.SettingChanged += (s, e) => GodViewController.ApplyMarkerConfig();
+		markerPulse.SettingChanged += (s, e) => GodViewController.ApplyMarkerConfig();
+		markerScale.SettingChanged += (s, e) => GodViewController.ApplyMarkerConfig();
+		markerLineWidth.SettingChanged += (s, e) => GodViewController.ApplyMarkerConfig();
+		markerThroughWall.SettingChanged += (s, e) => GodViewController.ApplyMarkerConfig();
+		markerColorMode.SettingChanged += (s, e) => GodViewController.ApplyMarkerConfig();
+		// 全部绑定完成后先跑一次，保证启动时快照与 cfg 一致
+		GodViewController.ApplyMarkerConfig();
+
 		new Harmony("er2.squadcommand").PatchAll(typeof(Plugin).Assembly);
 		FrameEndRunner.Ensure();
-		ModLog.LogInfo("ER2 Battlefield Commander 1.4.18 loaded. godKey=" + godKey.Value);
+		ModLog.LogInfo("ER2 Battlefield Commander 1.4.19 loaded. godKey=" + godKey.Value);
 		ThirdPartyCompat.LogCoexistenceHint(ModLog); // 1.4.15：第三方 mod 共存提示
 	}
 }

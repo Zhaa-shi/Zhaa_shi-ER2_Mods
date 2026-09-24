@@ -42,19 +42,159 @@ internal static class Er2Ui
 	public const int FontTabMax = 12;  // 页签自适应上限
 	public const int FontTabMin = 8;   // 页签自适应下限（再小就不可读）
 
-	// ══════════ ① 令牌：配色（军事深色 HUD）══════════
-	public static Color PanelBg => new Color(0.02f, 0.05f, 0.02f, 0.88f);        // 面板底
-	public static Color ListBg => new Color(0f, 0f, 0f, 0.35f);                   // 列表区底
-	public static Color Surface => new Color(0x0E / 255f, 0x1C / 255f, 0x0E / 255f, 0xB4 / 255f);        // 控件底
-	public static Color SurfaceRow => new Color(0x0E / 255f, 0x1C / 255f, 0x0E / 255f, 0.82f);           // 列表行底（比控件底略透）
-	public static Color SurfaceActive => new Color(0x3E / 255f, 0x70 / 255f, 0x3E / 255f, 0xE0 / 255f);  // 选中底
-	public static Color Text => new Color(0xDF / 255f, 0xF0 / 255f, 0xDF / 255f, 1f);                    // 正文
-	public static Color TextOnActive => new Color(0.04f, 0.09f, 0.04f, 1f);                              // 选中态文字（深）
-	public static Color TextDim => new Color(0.55f, 0.65f, 0.55f, 0.75f);         // 次要文字（星标未选中）
-	public static Color FavRow => new Color(0.4f, 0.58f, 0.4f, 0.95f);            // 收藏行底
-	public static Color RowBg => new Color(0.12f, 0.2f, 0.12f, 0.85f);            // 普通行底
-	public static Color StarOn => new Color(1f, 0.85f, 0.3f, 1f);                 // ★
-	public static Color StarHot => new Color(0.8f, 0.9f, 0.8f, 0.95f);            // ☆ 悬停
+	// ══════════ ① 令牌：配色（中性灰黑单色系）══════════
+	// 2.5.0 重绘：由"军绿 + 琥珀金"整体换为**中性灰黑**——强调色就是纯白，
+	// 靠「明度档 + 虚线节奏 + 形状」做区分，不再用色相区分（用户明确要求"灰黑色的 UI"）。
+	// 保留彩色的只有：收藏★(StarOn) / 危险(Danger) / 警告(Warn) / 成功(Success)。
+	// 旧军绿预设保留在 Legacy* 一组，供 cfg uiMono=false 回退（过渡期用）。
+
+	/// <summary>
+	/// cfg UI/uiMono。true（默认）= 灰黑单色系；false = 回退 2.4.x 的军绿预设。
+	/// **只影响下面这一组"结构色"**——世界空间标记(W*)与语义色(集火/警告/收藏)不受影响。
+	/// 两个 mod 各自在启动时调一次 SetMono()。
+	/// </summary>
+	public static bool Mono = true;
+
+	// 结构色的两套预设（Mono / Legacy），下面用属性按 Mono 分派。
+	private static readonly Color MonoPanelBg = new Color(0x0C / 255f, 0x0C / 255f, 0x0C / 255f, 0.94f);
+	private static readonly Color MonoPanelBorder = new Color(1f, 1f, 1f, 0.18f);
+	private static readonly Color MonoTitleBar = new Color(0x14 / 255f, 0x14 / 255f, 0x14 / 255f, 0.96f);
+	private static readonly Color MonoSurface = new Color(0x1E / 255f, 0x1E / 255f, 0x1E / 255f, 0.90f);
+	private static readonly Color MonoSurfaceHover = new Color(0x2A / 255f, 0x2A / 255f, 0x2A / 255f, 0.95f);
+	private static readonly Color MonoSurfaceActive = new Color(0x3A / 255f, 0x3A / 255f, 0x3A / 255f, 1f);
+	private static readonly Color MonoRowBg = new Color(0x12 / 255f, 0x12 / 255f, 0x12 / 255f, 0.86f);
+	private static readonly Color MonoFavRow = new Color(1f, 1f, 1f, 0.10f);
+	private static readonly Color MonoText = new Color(0xE8 / 255f, 0xE8 / 255f, 0xE8 / 255f, 1f);
+	private static readonly Color MonoTextDim = new Color(0xA0 / 255f, 0xA0 / 255f, 0xA0 / 255f, 0.90f);
+	private static readonly Color MonoTextDisabled = new Color(0x5A / 255f, 0x5A / 255f, 0x5A / 255f, 0.70f);
+	private static readonly Color MonoTextOnActive = new Color(1f, 1f, 1f, 1f);
+	private static readonly Color MonoTextOnPlate = new Color(0xF2 / 255f, 0xF2 / 255f, 0xF2 / 255f, 1f);
+	private static readonly Color MonoStarHot = new Color(0.78f, 0.78f, 0.78f, 0.95f);
+	private static readonly Color MonoSurfaceDisabled = new Color(0f, 0f, 0f, 0.55f);
+	private static readonly Color MonoRowHover = new Color(1f, 1f, 1f, 0.08f);
+	private static readonly Color MonoListBg = new Color(0f, 0f, 0f, 0.40f);
+
+	// —— A 面板结构 ——
+	public static Color PanelBg => Mono ? MonoPanelBg : LegacyPanelBg;                        // 面板底
+	public static Color PanelBorder => Mono ? MonoPanelBorder : new Color(0.35f, 0.5f, 0.35f, 0.55f); // 面板描边
+	public static Color TitleBar => Mono ? MonoTitleBar : new Color(0.06f, 0.11f, 0.06f, 0.95f);     // 标题条
+	public static Color ListBg => Mono ? MonoListBg : new Color(0f, 0f, 0f, 0.35f);            // 列表区底
+	public static Color Surface => Mono ? MonoSurface : LegacySurface;                        // 控件底
+	public static Color SurfaceHover => Mono ? MonoSurfaceHover : new Color(0.2f, 0.32f, 0.2f, 0.95f); // 悬停底
+	public static Color SurfaceActive => Mono ? MonoSurfaceActive : LegacySurfaceActive;      // 选中底
+	public static Color SurfaceDisabled => Mono ? MonoSurfaceDisabled : new Color(0f, 0f, 0f, 0.55f); // 禁用底
+	public static Color RowBg => Mono ? MonoRowBg : LegacyRowBg;                              // 普通行底
+	public static Color RowHover => Mono ? MonoRowHover : new Color(0.5f, 0.7f, 0.5f, 0.12f); // 行悬停覆盖
+	public static Color SurfaceRow => Surface;                                                // 兼容旧名（列表行底）
+	public static Color FavRow => Mono ? MonoFavRow : LegacyFavRow;                           // 收藏行底
+
+	// —— B 文字 ——
+	public static Color Text => Mono ? MonoText : LegacyText;                                 // 正文
+	public static Color TextOnActive => Mono ? MonoTextOnActive : new Color(0.04f, 0.09f, 0.04f, 1f); // 选中态文字
+	public static Color TextDim => Mono ? MonoTextDim : LegacyTextDim;                        // 次要文字
+	public static Color TextDisabled => Mono ? MonoTextDisabled : new Color(0.55f, 0.65f, 0.55f, 0.65f); // 禁用文字
+	public static Color TextOnPlate => Mono ? MonoTextOnPlate : new Color(0.9f, 0.96f, 0.9f, 1f);      // 底板上的字
+
+	// —— C 指示 ——
+	public static Color Accent => new Color(1f, 1f, 1f, 1f);                                  // 强调（灰黑主题里=纯白）
+	public static Color Warn => new Color(0xE0 / 255f, 0xA3 / 255f, 0x3A / 255f, 0.98f);      // 警告（暂停等）
+	public static Color Danger => new Color(0xC4 / 255f, 0x45 / 255f, 0x3C / 255f, 0.95f);    // 危险（集火）
+	public static Color Success => new Color(0x6F / 255f, 0xA8 / 255f, 0x60 / 255f, 0.95f);   // 成功
+	public static Color Scrim => new Color(0f, 0f, 0f, 0.50f);                                // 遮罩
+	public static Color StarOn => new Color(1f, 0xD4 / 255f, 0x5E / 255f, 1f);                // ★
+	public static Color StarHot => Mono ? MonoStarHot : LegacyStarHot;                        // ☆ 悬停
+
+	// ══════════ ① 令牌：世界空间标记（3D 层）══════════
+	// 全部白/半透灰，靠**不透明度档位**区分语义（用户："标记点等都用白色或半透明的灰色"）：
+	//   友军脚环最淡(.28/.34) → 路线(.26) → 登车线(.48) → 阵型/载具(.60/.80)
+	//   → 选中(.92) → 移动目标(.85) —— 越"当前正在操作"的越亮。
+	// 集火(Focus)保留红，仅在 markerColorMode=Semantic 时生效；Mono 模式下也走白灰。
+	public static Color WFriendly => new Color(1f, 1f, 1f, 0.28f);        // 友军脚环（步兵）
+	public static Color WFriendlyVeh => new Color(1f, 1f, 1f, 0.34f);     // 友军脚环（载具）
+	public static Color WSelected => new Color(1f, 1f, 1f, 0.92f);        // 选中角标
+	public static Color WSelectedDot => new Color(1f, 1f, 1f, 0.95f);     // 选中中心点
+	public static Color WFocus => new Color(0xC4 / 255f, 0x45 / 255f, 0x3C / 255f, 0.92f);  // 集火（红）
+	public static Color WFocusDown => new Color(0xE0 / 255f, 0xA3 / 255f, 0x3A / 255f, 0.80f); // 集火·降级（橙）
+	public static Color WMove => new Color(1f, 1f, 1f, 0.85f);            // 移动目标点
+	public static Color WPath => new Color(1f, 1f, 1f, 0.26f);            // 行进路线（长虚线 8-5，暗）
+	public static Color WBoard => new Color(1f, 1f, 1f, 0.48f);           // 登车线（短虚线 4-4，亮）
+	public static Color WFormation => new Color(1f, 1f, 1f, 0.80f);       // 阵型拖动标记
+	public static Color WVehicle => new Color(1f, 1f, 1f, 0.60f);         // 载具专用标记
+	public static Color WGhost => new Color(0xC8 / 255f, 0xC8 / 255f, 0xC8 / 255f, 0.35f);  // 幽灵预览
+	public static Color WLabelPlate => new Color(0x0C / 255f, 0x0C / 255f, 0x0C / 255f, 0.90f); // 名签底板
+
+	/// <summary>
+	/// 2.5.0：世界空间标记的颜色来源。默认 = 上面的灰黑令牌；
+	/// 若 cfg <c>markerColorMode=Semantic</c>，把集火/降级恢复为红/橙语义色（其它仍是白灰）。
+	/// </summary>
+	public static bool MarkerSemantic = false;
+
+	public static Color MarkerFocus => MarkerSemantic ? WFocus : WSelected;
+	public static Color MarkerFocusDown => MarkerSemantic ? WFocusDown : new Color(0.82f, 0.82f, 0.82f, 0.85f);
+
+	// ══════════ ① 令牌：旧军绿预设（cfg uiMono=false 回退用）══════════
+	public static Color LegacyPanelBg => new Color(0.02f, 0.05f, 0.02f, 0.88f);
+	public static Color LegacySurface => new Color(0x0E / 255f, 0x1C / 255f, 0x0E / 255f, 0xB4 / 255f);
+	public static Color LegacySurfaceActive => new Color(0x3E / 255f, 0x70 / 255f, 0x3E / 255f, 0xE0 / 255f);
+	public static Color LegacyText => new Color(0xDF / 255f, 0xF0 / 255f, 0xDF / 255f, 1f);
+	public static Color LegacyTextDim => new Color(0.55f, 0.65f, 0.55f, 0.75f);
+	public static Color LegacyRowBg => new Color(0.12f, 0.2f, 0.12f, 0.85f);
+	public static Color LegacyFavRow => new Color(0.4f, 0.58f, 0.4f, 0.95f);
+	public static Color LegacyStarHot => new Color(0.8f, 0.9f, 0.8f, 0.95f);
+
+	// ══════════ ① 令牌：世界空间绘制参数（2.5.0）══════════
+
+	/// <summary>脉动幅度（cfg markerPulse 关掉时由调用方传 0）。基准 = 1 ± 0.07*sin(t*5)。</summary>
+	public const float PulseAmp = 0.07f;
+	public const float PulseSpeed = 5f;
+
+	/// <summary>
+	/// 按 key 哈希错开脉动相位——修 2.5.0 前"4 个标记共用同一个全局 pulse，
+	/// 同频同相一起呼吸"的机械感（用户截图里选中/集火/目标点同步闪烁像在闪灯）。
+	/// hash 用 FNV-1a，稳定且无分配。
+	/// </summary>
+	public static float Pulse(string key, float t, float amp = PulseAmp, float speed = PulseSpeed)
+	{
+		if (amp <= 0f) return 1f;
+		unchecked
+		{
+			int h = (int)2166136261u;
+			if (!string.IsNullOrEmpty(key))
+				for (int i = 0; i < key.Length; i++) { h ^= key[i]; h *= 16777619; }
+			float phase = (h & 0xFFFF) / 65536f * Mathf.PI * 2f;   // [0, 2π)
+			return 1f + amp * Mathf.Sin(t * speed + phase);
+		}
+	}
+
+	/// <summary>
+	/// 线宽的世界单位补偿：LineRenderer.widthMultiplier 是**世界单位**（C11），
+	/// 远距离会细成一丝。按相机距离放大，夹在 [0.6, 2.5] 倍（近处不糊、远处可见）。
+	/// dist/30 的 30 是经验值：ER2 战场常见接敌距离 ~30m 时为 1.0 倍基准。
+	/// </summary>
+	public static float WidthScale(float camDist)
+	{
+		if (camDist <= 0f) return 1f;
+		return Mathf.Clamp(camDist / 30f, 0.6f, 2.5f);
+	}
+
+	/// <summary>cfg UI/uiMono → Mono。启动与 <c>SettingChanged</c> 时各调一次。</summary>
+	public static void SetMono(bool mono) { Mono = mono; }
+
+	/// <summary>
+	/// cfg Markers/markerColorMode（"Mono" / "Semantic"）→ MarkerSemantic。
+	/// 大小写不敏感；无法识别时保守取 Mono（灰黑是用户明确要的默认观感）。
+	/// </summary>
+	public static void SetMarkerColorMode(string mode)
+	{
+		MarkerSemantic = !string.IsNullOrEmpty(mode) &&
+			mode.Trim().Equals("Semantic", System.StringComparison.OrdinalIgnoreCase);
+	}
+
+	/// <summary>线宽补偿总入口：把调用点的原始线宽 + 相机距离揉成最终 widthMultiplier。</summary>
+	public static float LineWidth(float baseWidth, float camDist)
+	{
+		return baseWidth * WidthScale(camDist);
+	}
 
 	// ══════════ ② 资源：按色缓存的纯色贴图 ══════════
 	// 单槽缓存会把别的样式一起换掉（17g3），故按颜色建字典；

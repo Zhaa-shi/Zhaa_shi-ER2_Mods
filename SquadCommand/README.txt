@@ -1,7 +1,26 @@
-ER2 Battlefield Commander v1.4.18
+ER2 Battlefield Commander v1.4.19
 =================================
 
 A BepInEx plugin for Easy Red 2 that adds an "RTS god-view squad command" layer — mouse operations inspired by Gates of Hell: Ostfront.
+
+[1.4.19 UI]
+* **Grey-black mono UI.** Every panel, list and button now uses a neutral grey-black palette
+  (`Shared/Er2Ui.cs`) instead of the old military green — hierarchy comes from brightness, not hue.
+  Set `UI/uiMono=false` to fall back to the old green preset.
+* **World-space markers redrawn.** Selected-unit marker changed from four 45-degree arcs
+  (which read like a weather symbol) to **right-angle corner brackets**, the standard RTS language.
+  All ground markers (friendly rings, focus ring, move target, route/boarding lines, formation
+  markers) are now white / semi-transparent grey, separated by **opacity tier + dash rhythm + shape**.
+* **Route vs boarding lines finally distinguishable** — they used the identical colour literal before.
+  Route = dim long dashes, boarding = brighter short dashes.
+* Marker pulse phase is now offset per key (previously every marker breathed in perfect sync).
+* Line width compensates for camera distance (LineRenderer width is in world units and thinned out at range).
+* Name plates got a dark backing plate for readability over snow/sky.
+* Cursor states are greyscale (only Enemy stays red, Emplacement stays orange).
+* **14 new visual config switches** under `[Markers]` + `[UI]` so everything above can be toggled:
+  markersEnabled / showFriendlyRing / showSelectedBracket / showFocusRing / showMoveTarget /
+  showPathLines / showFormationMarkers / showNamePlates / markerPulse / markerScale / markerLineWidth /
+  markerThroughWall / markerColorMode (Mono|Semantic) / uiMono.
 
 [1.4.18 internal]
 * No gameplay or visual change. The HUD, info panel and backpack now build their text styles through

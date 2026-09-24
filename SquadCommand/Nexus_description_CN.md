@@ -6,7 +6,7 @@
 ## Installation instructions
 1. 安装 BepInEx（IL2CPP 版）到游戏根目录。
 2. 将 `ER2_BattlefieldCommander.dll` 放入 `Easy Red 2\BepInEx\plugins\`。
-3. 启动游戏，BepInEx 日志出现 `Loading [ER2 Battlefield Commander 1.4.18]` 表示加载成功。
+3. 启动游戏，BepInEx 日志出现 `Loading [ER2 Battlefield Commander 1.4.19]` 表示加载成功。
 
 ## Main features
 - **上帝视角指挥**：F9 进入自由视角，WASD 移动、滚轮缩放、中键旋转、Q/E 升降，空格暂停/继续世界。
@@ -38,6 +38,16 @@
 感谢 Easy Red 2 社区与 BepInEx / Harmony 生态，以及所有为 IL2CPP modding 提供思路的作者。
 
 ## 近期更新
+**1.4.19**
+- **灰黑单色 UI**：面板/列表/按钮改用中性灰黑（`Shared/Er2Ui.cs`），层次靠明度而非色相。`UI/uiMono=false` 回退旧版军绿。
+- **世界空间标记重绘**：选中标记由四段 45° 圆弧（像气象符号）改为**直角四角括号**（RTS 通用语言）。友军脚环、集火环、移动目标点、路线/登车线、阵型标记改为**白色/半透明灰**，靠「明度档 + 虚线节奏 + 形状」区分。
+- 路线与登车线终于能区分——此前两者颜色字面量完全相同。现在路线 = 暗色长虚线，登车线 = 亮色短虚线。
+- 标记脉动相位按 key 错开（此前所有标记同频同相）。
+- 线宽按相机距离补偿（线宽是世界单位，远处会细成一丝）。
+- 名签加深色底板（雪地/天空上也能读清）。
+- 光标各状态改灰阶（仅敌军红、火力点橙）。
+- **新增 14 项视觉开关**（`[Markers]` + `[UI]`）：markersEnabled、showFriendlyRing、showSelectedBracket、showFocusRing、showMoveTarget、showPathLines、showFormationMarkers、showNamePlates、markerPulse、markerScale、markerLineWidth、markerThroughWall、markerColorMode (Mono|Semantic)、uiMono。
+
 **1.4.18**
 - 仅内部调整，无玩法与视觉变化：HUD、信息面板、背包的文字样式改为统一走共享 UI 工具层
   （`Shared/Er2Ui.cs`，通用生成 mod 也用同一份），不再各自手写 `GUIStyle`。

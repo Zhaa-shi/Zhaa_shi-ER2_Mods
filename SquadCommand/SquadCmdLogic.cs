@@ -379,6 +379,15 @@ internal static class SquadCmdLogic
 		try { Plugin.ModLog.LogInfo(msg); } catch { }
 	}
 
+	/// <summary>
+	/// 2.5.0：**错误/降级**专用——不受 debugLog 门控（工作区准则：失败必须无条件可观测）。
+	/// 只用于"本不该发生"的路径（资源创建失败、配置解析异常等），常规诊断仍走 Log()。
+	/// </summary>
+	internal static void LogWarning(string msg)
+	{
+		try { Plugin.ModLog.LogWarning(msg); } catch { }
+	}
+
 	internal static void Log(string msg)
 	{
 		try

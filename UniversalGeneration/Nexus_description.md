@@ -51,6 +51,9 @@ Items go into backpacks as their **proper subclass** — magazines hold the righ
 
 ## Changelog
 
+**2.5.0**
+- **Grey-black mono UI.** The panel now uses the neutral grey-black palette from the shared toolkit (`Shared/Er2Ui.cs`) instead of the old military green — list rows, tabs, buttons and the preview area read as one flat dark surface, with hierarchy carried by brightness rather than hue. Set `UI/uiMono=false` to restore the previous green preset.
+
 **2.4.2**
 - **No user-visible change — a code-quality release preparing the UI for a full redraw.** The panel now builds a **row plan** first (one entry per row: title / faction / tabs / list / pager / preview) and derives its height by summing that plan, while drawing walks the same list — so a row can no longer be drawn outside the panel (the class of bug fixed in 2.4.0). Both mods now share one UI toolkit (`Shared/Er2Ui.cs`): design tokens (spacing, font sizes, colours) and drawing primitives live in a single place, so a visual change lands in both mods at once.
 - Tab text fitting now measures properly (`GUIStyle.CalcSize`) with caching, instead of estimating per-character widths.

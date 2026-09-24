@@ -6,7 +6,7 @@ Adds an "RTS god-view squad command" layer to Easy Red 2, with mouse operations 
 ## Installation instructions
 1. Install BepInEx (IL2CPP build) into the game root folder.
 2. Put `ER2_BattlefieldCommander.dll` into `Easy Red 2\BepInEx\plugins\`.
-3. Launch the game — `Loading [ER2 Battlefield Commander 1.4.18]` in the BepInEx log means success.
+3. Launch the game — `Loading [ER2 Battlefield Commander 1.4.19]` in the BepInEx log means success.
 
 ## Main features
 - **God-view command**: F9 to enter free camera, WASD move, wheel zoom, MMB rotate, Q/E height, Space to pause/resume the world.
@@ -38,6 +38,16 @@ Adds an "RTS god-view squad command" layer to Easy Red 2, with mouse operations 
 Thanks to the Easy Red 2 community and the BepInEx / Harmony ecosystem, and to all authors whose IL2CPP modding work paved the way.
 
 ## Recent changes
+**1.4.19**
+- **Grey-black mono UI.** Panels, lists and buttons now use a neutral grey-black palette (`Shared/Er2Ui.cs`) instead of the old military green — hierarchy comes from brightness, not hue. `UI/uiMono=false` restores the old green preset.
+- **World-space markers redrawn.** The selected-unit marker changed from four 45-degree arcs (which read like a weather symbol) to **right-angle corner brackets** — the standard RTS language. Friendly rings, focus ring, move target, route/boarding lines and formation markers are now white / semi-transparent grey, separated by **opacity tier + dash rhythm + shape**.
+- Route and boarding lines finally look different — they previously used the identical colour literal. Route = dim long dashes, boarding = brighter short dashes.
+- Marker pulse phase is offset per key (all markers used to breathe in perfect sync).
+- Line width compensates for camera distance (LineRenderer width is in world units and thins out at range).
+- Name plates gained a dark backing plate for readability over snow/sky.
+- Cursor states are greyscale (only Enemy stays red, Emplacement stays orange).
+- **14 new visual config switches** (`[Markers]` + `[UI]`): markersEnabled, showFriendlyRing, showSelectedBracket, showFocusRing, showMoveTarget, showPathLines, showFormationMarkers, showNamePlates, markerPulse, markerScale, markerLineWidth, markerThroughWall, markerColorMode (Mono|Semantic), uiMono.
+
 **1.4.18**
 - Internal only, no gameplay or visual change: the HUD, info panel and backpack now build their text styles through the shared UI toolkit (`Shared/Er2Ui.cs`) that Universal Generation also uses, instead of hand-rolling a `GUIStyle` in each file. Same fonts, alignment and colours — groundwork for redrawing both mods into one coherent look.
 

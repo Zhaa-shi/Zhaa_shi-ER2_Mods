@@ -1,7 +1,24 @@
-ER2 Battlefield Commander v1.4.18
+ER2 Battlefield Commander v1.4.19
 ================================
 
 一款给 Easy Red 2 增加「RTS 上帝视角小队指挥」的 BepInEx 插件，鼠标操作逻辑参照《地狱之门：东部前线》。
+
+【1.4.19 界面重绘】
+· **灰黑单色 UI**：面板/列表/按钮全部改用中性灰黑（`Shared/Er2Ui.cs`），层次靠明度而非色相区分。
+  设 `UI/uiMono=false` 可回退旧版军绿配色。
+· **世界空间标记重绘**：选中标记由四段 45° 圆弧（读起来像气象符号）改为**直角四角括号**，
+  这是 RTS 通用语言。所有地面标记（友军脚环、集火环、移动目标点、路线/登车线、阵型标记）改为
+  **白色 / 半透明灰**，靠「明度档 + 虚线节奏 + 形状」区分语义。
+· **路线与登车线终于能分开了**——此前两者用的是**完全相同的颜色字面量**。
+  现在路线 = 暗色长虚线，登车线 = 亮色短虚线。
+· 标记脉动相位按 key 错开（此前所有标记同频同相一起呼吸）。
+· 线宽按相机距离补偿（LineRenderer 线宽是世界单位，远处会细成一丝）。
+· 名签加深色底板（压在雪地/天空上也能读清）。
+· 光标各状态改灰阶（仅敌军保留红、火力点保留橙）。
+· **新增 14 项视觉开关**（`[Markers]` + `[UI]`），上述每一项都可关：
+  markersEnabled / showFriendlyRing / showSelectedBracket / showFocusRing / showMoveTarget /
+  showPathLines / showFormationMarkers / showNamePlates / markerPulse / markerScale / markerLineWidth /
+  markerThroughWall / markerColorMode (Mono|Semantic) / uiMono。
 
 【1.4.18 内部调整】
 · 无玩法与视觉变化。HUD、信息面板、背包的文字样式改为统一走共享 UI 工具层（`Shared/Er2Ui.cs`），
@@ -134,7 +151,7 @@ ER2 Battlefield Commander v1.4.18
 【安装】
 1. 确保已安装 BepInEx（IL2CPP 版）到游戏根目录。
 2. 把 ER2_BattlefieldCommander.dll 放进 游戏根目录\BepInEx\plugins\。
-3. 启动游戏，日志出现 "Loading [ER2 Battlefield Commander 1.4.18]" 即成功。
+3. 启动游戏，日志出现 "Loading [ER2 Battlefield Commander 1.4.19]" 即成功。
 
 【与 Advanced Combat Movement（Responsive Orders）共存】
 · 已内置兼容：恢复开火走「调用 → 回读校验 → 直写 holdFire 字段」，不会被它的 Prefix 吞掉（见 1.4.15）。
