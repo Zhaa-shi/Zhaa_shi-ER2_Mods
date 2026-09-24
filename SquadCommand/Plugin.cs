@@ -9,16 +9,29 @@ using UnityEngine;
 
 namespace ER2SquadCommand;
 
-[BepInPlugin("er2.squadcommand", "ER2 Battlefield Commander", "1.1.0")]
+[BepInPlugin("er2.squadcommand", "ER2 Battlefield Commander", "1.4.17")]
 public class Plugin : BasePlugin
 {
 	internal static ManualLogSource ModLog;
 
 	internal static ConfigEntry<bool> enabled;
 	internal static ConfigEntry<float> radius;
-	internal static ConfigEntry<bool> dragFacing;
 	internal static ConfigEntry<bool> debugLog;
 	internal static ConfigEntry<KeyCode> godKey;
+	// 1.2.0：命令快捷键（原命令环 8 项键盘化，全部可自定义）
+	internal static ConfigEntry<KeyCode> keyStand;
+	internal static ConfigEntry<KeyCode> keyCrouch;
+	internal static ConfigEntry<KeyCode> keyProne;
+	internal static ConfigEntry<KeyCode> keyStop;
+	internal static ConfigEntry<KeyCode> keyHoldFire;
+	internal static ConfigEntry<KeyCode> keyCover;
+	internal static ConfigEntry<KeyCode> keyRally;
+	internal static ConfigEntry<KeyCode> keyScatter;
+	internal static ConfigEntry<KeyCode> keyPack;   // 1.3.0：背包窗口
+	internal static ConfigEntry<float> packRange;   // 1.3.0：背包联动半径
+	internal static ConfigEntry<bool> ghostPreview;
+	internal static ConfigEntry<bool> customCursor;
+	internal static ConfigEntry<string> cursorStyle; // 1.2.13：Arrow（默认）/ Cross
 	internal static ConfigEntry<string> uiColorBase;
 	internal static ConfigEntry<string> uiColorHover;
 	internal static ConfigEntry<string> uiColorText;
@@ -29,9 +42,24 @@ public class Plugin : BasePlugin
 
 		enabled = Config.Bind("General", "enabled", true, Ui.Tr("主开关。"));
 		radius = Config.Bind("Control", "moveRadius", 8f, new ConfigDescription(Ui.Tr("移动到达判定半径（米）；双击右键「前往并防守」的防守半径同用此值。"), new AcceptableValueRange<float>(1f, 60f)));
-		dragFacing = Config.Bind("Control", "dragFacing", true, Ui.Tr("载具朝向拖动（地狱之门式）：选中载具后长按右键并拖动出箭头，松开车体原地转向。关闭后长按右键仅开命令环。"));
-		debugLog = Config.Bind("Debug", "debugLog", false, new ConfigDescription(Ui.Tr("调试日志开关（发布版保持关闭）。开启后输出全部指挥/登车/标记诊断日志，用于问题排查。")));
+		debugLog = Config.Bind("Debug", "debugLog", false, new ConfigDescription(Ui.Tr("调试日志开关（发布版保持关闭）。开启后输出全部指挥/登车/标记/阵型/背包/穿戴诊断日志，用于问题排查。")));
 		godKey = Config.Bind("General", "godKey", KeyCode.F9, Ui.Tr("上帝视角开关（仅进入）。退出＝选中小队后点顶部[控制该小队]随机接管一人；全军覆没时按键紧急退出。空格＝暂停/继续世界。"));
+
+		keyStand = Config.Bind("Hotkeys", "keyStand", KeyCode.Z, Ui.Tr("站起（恢复 AI 姿态）。"));
+		keyCrouch = Config.Bind("Hotkeys", "keyCrouch", KeyCode.X, Ui.Tr("蹲下。"));
+		keyProne = Config.Bind("Hotkeys", "keyProne", KeyCode.C, Ui.Tr("趴下。"));
+		keyStop = Config.Bind("Hotkeys", "keyStop", KeyCode.V, Ui.Tr("停止（取消移动/标记，单位原地）。"));
+		keyHoldFire = Config.Bind("Hotkeys", "keyHoldFire", KeyCode.B, Ui.Tr("停火/开火切换。"));
+		keyCover = Config.Bind("Hotkeys", "keyCover", KeyCode.N, Ui.Tr("就近掩体（以选中中心为准找掩护）。"));
+		keyRally = Config.Bind("Hotkeys", "keyRally", KeyCode.M, Ui.Tr("集合（各队向班长集结）。"));
+		keyScatter = Config.Bind("Hotkeys", "keyScatter", KeyCode.F, Ui.Tr("分散（各队就地散开找掩护）。"));
+		keyPack = Config.Bind("Hotkeys", "keyPack", KeyCode.G, Ui.Tr("打开/关闭焦点单位（步兵背包/载具货舱/尸体）的格子背包窗口。可开多个窗口，拖拽交换物品。"));
+		// 1.4.8：半径回归 3m（用户规则）；兵停驻在圈外时由 LootTick 逐步重派移动带进圈（不再放大半径）
+		packRange = Config.Bind("Control", "packRange", 3f, new ConfigDescription(Ui.Tr("背包联动半径（米）：第一个打开的背包为锚点，其余背包距锚点超过此值将无法打开/自动关闭。"), new AcceptableValueRange<float>(1f, 100f)));
+		ghostPreview = Config.Bind("Control", "ghostPreview", true, Ui.Tr("阵型拖动中的白色半透明单位预览（克隆失败会自动降级为标记）。"));
+		customCursor = Config.Bind("Control", "customCursor", true, Ui.Tr("自定义光标（RTS 内按指向对象变色：友军绿/敌军红/载具青/建筑黄/火力点橙/可交互浅蓝）。"));
+		cursorStyle = Config.Bind("Control", "cursorStyle", "Circle", new ConfigDescription(Ui.Tr("光标样式：Circle=空心半透明圆（默认）/ Arrow=箭头 / Cross=细线十字。"), new AcceptableValueList<string>("Circle", "Arrow", "Cross")));
+		cursorStyle.SettingChanged += (s2, e2) => MouseCursor.InvalidateCache();
 
 		uiColorBase = Config.Bind("UI", "colorBase", "#0E1C0EB4", new ConfigDescription(Ui.Tr("UI 主色（#RRGGBB 或 #RRGGBBAA）：按钮底板、小队列表行。默认深绿半透明（与底部提示条一致）。")));
 		uiColorHover = Config.Bind("UI", "colorHover", "#3E703EE0", Ui.Tr("UI 悬停/选中指示颜色（中绿）。"));
@@ -43,7 +71,53 @@ public class Plugin : BasePlugin
 
 		new Harmony("er2.squadcommand").PatchAll(typeof(Plugin).Assembly);
 		FrameEndRunner.Ensure();
-		ModLog.LogInfo("ER2 Battlefield Commander 1.1.0 loaded. godKey=" + godKey.Value);
+		ModLog.LogInfo("ER2 Battlefield Commander 1.4.17 loaded. godKey=" + godKey.Value);
+		ThirdPartyCompat.LogCoexistenceHint(ModLog); // 1.4.15：第三方 mod 共存提示
+	}
+}
+
+/// <summary>1.4.15：第三方 mod 共存。
+/// 只做**探测 + 提示**，不做任何编译期依赖（反射扫已加载程序集，找不到就是没装）。
+/// Advanced Combat Movement（Responsive Orders，GUID "AdvancedCombatMovement"）与
+/// 本 mod 同时装时的已知分工：
+/// · 停火还原被它吞掉 → 已在 GodViewController.ResumeFire 里改成「校验 + 直写字段」兜底；
+/// · 它的 F 键（标记/跟随）走 PlayerController.Update，上帝视角内该 Update 被本 mod 跳过
+///   → RTS 内由本 mod 独占 F（= 分散），FPS 内归它，**两者不打架**；
+/// · 它自带的 AI 防守驻留（Defensive Hold / Danger Memory）会给小队下自己的移动令，
+///   与我们的命令抢控制权——这类冲突只能由玩家在它的设置页里关掉对应开关。</summary>
+internal static class ThirdPartyCompat
+{
+	private static bool probed;
+	private static bool acmPresent;
+
+	/// <summary>是否检测到 Advanced Combat Movement（结果缓存，只扫一次）。</summary>
+	internal static bool AcmPresent
+	{
+		get { if (!probed) { probed = true; acmPresent = ScanFor("ResponsiveOrdersPlugin"); } return acmPresent; }
+	}
+
+	private static bool ScanFor(string typeName)
+	{
+		try
+		{
+			foreach (System.Reflection.Assembly asm in AppDomain.CurrentDomain.GetAssemblies())
+			{
+				Type t = asm.GetType(typeName, false, false);
+				if (t != null) return true;
+			}
+		}
+		catch { }
+		return false;
+	}
+
+	internal static void LogCoexistenceHint(ManualLogSource log)
+	{
+		try
+		{
+			if (!AcmPresent) return;
+			log.LogInfo("Third-party coex: Advanced Combat Movement detected — hold-fire restore is guarded; if your orders get overridden, disable its 'Squad Defensive Hold' / 'Danger Memory' in its settings page.");
+		}
+		catch { }
 	}
 }
 
@@ -82,6 +156,18 @@ internal class FrameEndRunner : MonoBehaviour
 			yield return new WaitForEndOfFrame();
 			try { GodViewController.FrameEndGuard(); } catch { }
 		}
+	}
+
+	/// <summary>1.4.2：启动原生（IL2CPP 侧）协程——Lua_Soldier.LoadAndSetWeapon 等官方异步通道。
+	/// interop 返回的只是协程对象，必须显式 StartCoroutine 才会运行（陷阱 25 同源；模式同 UniGen.CoroutineHost）。</summary>
+	internal static void RunNativeCoroutine(Il2CppSystem.Collections.IEnumerator routine)
+	{
+		try
+		{
+			if (routine == null || instance == null) return;
+			instance.StartCoroutine(routine);
+		}
+		catch (Exception ex) { Plugin.ModLog.LogError("RunNativeCoroutine 失败: " + ex.Message); }
 	}
 }
 
@@ -294,6 +380,22 @@ public static class GodViewSkipCameraDirectorDofPatch
 	}
 }
 
+/// <summary>
+/// 1.2.10：**跳过 TerrainCamera.Update**——这是"长按右键拖动视角被带动"的真凶。
+/// TerrainCamera 是游戏内置的自由/地形相机（字段：orbit / mouseRotate / distanceToTarget /
+/// mainSpeed / GetBaseInput），god view 把玩家设为"无单位"（SetPlayer(null)）后游戏启用了它，
+/// 按住鼠标即旋转视角，与我们的 camPos/camRot 互相打架。
+/// 之前只 patch 了 CameraDirector/SimpleCameraController，漏了这一个。
+/// </summary>
+[HarmonyPatch(typeof(TerrainCamera), "Update")]
+public static class GodViewSkipTerrainCameraPatch
+{
+	private static bool Prefix()
+	{
+		return !GodViewController.Active;
+	}
+}
+
 /// <summary>跳过 SimpleCameraController.Update。</summary>
 [HarmonyPatch(typeof(SimpleCameraController), "Update")]
 public static class GodViewSkipSimpleCamUpdatePatch
@@ -345,8 +447,24 @@ public static class VehiclePlayerIsInsideGuardPatch
 	}
 }
 
+/// <summary>
+/// 1.2.7：幽灵预览**伤害免疫**。预览幽灵是真实 Soldier/Vehicle 生成物，
+/// allowBeingTargeted(false) 挡不住"已经锁定它的敌人"（用户两次反馈预览被打掉）——
+/// 这里直接在伤害入口拒绝：幽灵受到的伤害一律丢弃。
+/// </summary>
+[HarmonyPatch(typeof(Creature), "Damage")]
+public static class GhostDamageImmunityPatch
+{
+	private static bool Prefix(Creature __instance)
+	{
+		try { if (GhostPreview.IsGhost(__instance)) return false; } catch { }
+		return true;
+	}
+}
+
 /// <summary>调试 HUD（PlayerController.OnGUI Postfix）。</summary>
 [HarmonyPatch(typeof(PlayerController), "OnGUI")]
+[HarmonyPriority(800)] // 1.2.18：最后执行 → 自绘光标压过其它 IMGUI（如通用生成面板）
 public static class DrawPatch
 {
 	private static void Postfix()
@@ -372,13 +490,14 @@ public static class CursorLockPatch
 	}
 }
 
-/// <summary>上帝视角激活时，原生 Cursor.set_visible 强制为 true（防闪烁）。</summary>
+/// <summary>上帝视角激活时，原生 Cursor.set_visible 强制为 false（1.2.7：改 IMGUI 自绘光标后
+/// 由我们负责绘制，系统光标必须藏起来；关闭 customCursor 或 ESC 菜单打开时放行原生）。</summary>
 [HarmonyPatch(typeof(UnityEngine.Cursor), "set_visible")]
 public static class CursorVisiblePatch
 {
 	private static void Prefix(ref bool value)
 	{
-		if (GodViewController.Active) value = true;
+		if (GodViewController.Active && MouseCursor.OwnsCursor) value = true; // 1.2.19：SetCursor 贴图只在 visible 时显示
 	}
 }
 
@@ -405,13 +524,9 @@ internal static class MarkedTargetSelectionPatch
 			// 只引导下达标记时的单位（切回 FPS 后仍生效；后来接管的单位不受影响）
 			if (!GodViewController.IsMarkUnit(__instance)) return;
 			// 玩家自己瞄准/控制的单位不受强制
-			try
-			{
-				PlayerController pc = PlayerController.currentController;
-				Soldier ctrl = pc != null ? pc.ControlledCharacter : null;
-				if (ctrl != null && __instance.Pointer == ctrl.Pointer) return;
-			}
-			catch { }
+			// 1.4.14 性能：本 Postfix 每兵每帧都跑，玩家控制单位查询走宿主缓存（0.5s，见 CachedPlayerSoldier）
+			Soldier ctrl = GodViewController.CachedPlayerSoldier();
+			if (ctrl != null && __instance.Pointer == ctrl.Pointer) return;
 			string viewerFac = "";
 			try { viewerFac = __instance.faction ?? ""; } catch { }
 			string myFac = GodViewController.MySideFaction();
@@ -453,8 +568,8 @@ internal static class MarkedVehicleTargetPatch
 			// 当前玩家若已接管该载具，交还给 FPS 原生目标链。
 			try
 			{
-				PlayerController pc = PlayerController.currentController;
-				Soldier ctrl = pc != null ? pc.ControlledCharacter : null;
+				// 1.4.14 性能：走宿主缓存（同 GetBestVisibleEnemy Postfix）
+				Soldier ctrl = GodViewController.CachedPlayerSoldier();
 				Vehicle playerVehicle = ctrl != null ? ctrl.GetComponentInParent<Vehicle>() : null;
 				if (playerVehicle != null && playerVehicle.Pointer == __instance.Pointer) return;
 			}

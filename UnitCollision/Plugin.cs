@@ -21,7 +21,7 @@ namespace ER2UnitCollision
 	///
 	/// 场景物件物理化 / 物品物理 / 击飞与碰撞伤害等其余功能全部移除。
 	/// </summary>
-	[BepInPlugin("er2.morephysics.unitcollision", "ER2 More Physics - Unit Collision", "1.0.6")]
+	[BepInPlugin("er2.morephysics.unitcollision", "ER2 More Physics - Unit Collision", "1.0.8")]
 	[BepInProcess("Easy Red 2.exe")]
 	public class Plugin : BasePlugin
 	{
@@ -65,7 +65,7 @@ namespace ER2UnitCollision
 				ModLog.LogWarning((object)("UnitCollision: type registration failed: " + ex.Message));
 			}
 			new Harmony("er2.morephysics.unitcollision").PatchAll(typeof(Plugin).Assembly);
-			ModLog.LogInfo((object)"ER2 More Physics - Unit Collision 1.0.6 loaded.");
+			ModLog.LogInfo((object)"ER2 More Physics - Unit Collision 1.0.8 loaded.");
 		}
 
 		internal static string T(string cn, string en)
@@ -198,10 +198,6 @@ namespace ER2UnitCollision
 		{
 			try
 			{
-				if (Plugin.GateBlocked())
-				{
-					return;
-				}
 				UnitCollision.Apply();
 			}
 			catch (Exception ex)
@@ -220,6 +216,16 @@ namespace ER2UnitCollision
 
 		private static int _ccLayer = -1;
 
+		// 兜底层锁定标记：战斗开局单位未生成时探不到 CC，会锁进固定层 1；
+		// 锁定后必须保持重探，拿到真实 CC 层要能改判（层矩阵开错对 = 玩家照样穿人）
+		private static bool _fallbackLocked;
+
+		// 本 mod 打开过的矩阵对标记：开关关掉时据此恢复成游戏默认的 ignore 状态。
+		// 物理矩阵是进程级状态，只开不关 = "关闭"永远不生效（热开关必修）
+		private static bool _unitMatrixOpen;
+
+		private static bool _corpseMatrixOpen;
+
 		private static int _warned;
 
 		private static float _nextApply;
@@ -231,6 +237,8 @@ namespace ER2UnitCollision
 		private static float _lastProbeLog;
 
 		private static float _lastCorpseLog;
+
+		private static float _lastLivingDump;
 
 		private static readonly Dictionary<int, float> _corpsePushTimes = new Dictionary<int, float>();
 
@@ -263,21 +271,46 @@ namespace ER2UnitCollision
 		{
 			try
 			{
-				bool unitColl = Plugin.UnitCollision != null && Plugin.UnitCollision.Value;
-				bool pushCorpses = Plugin.PushCorpses != null && Plugin.PushCorpses.Value;
-				bool diag = Plugin.UnitCollisionLayer != null && Plugin.UnitCollisionLayer.Value == -2;
+				// GateBlocked 折叠进来而不是在 tick 先拦：总开关关掉后 Apply 仍要进来，
+				// "开→关"的矩阵恢复才有机会执行
+				bool blocked = Plugin.GateBlocked();
+				bool unitColl = !blocked && Plugin.UnitCollision != null && Plugin.UnitCollision.Value;
+				bool pushCorpses = !blocked && Plugin.PushCorpses != null && Plugin.PushCorpses.Value;
+				bool diag = !blocked && Plugin.UnitCollisionLayer != null && Plugin.UnitCollisionLayer.Value == -2;
+				// 矩阵恢复：本 mod 打开过的对，开关一关立即还原成游戏默认 ignore 状态
+				// （游戏自身从不改矩阵，恢复是安全的）
+				if (_ccLayer >= 0 && (_unitMatrixOpen || _corpseMatrixOpen))
+				{
+					if (_unitMatrixOpen && !unitColl)
+					{
+						Physics.IgnoreLayerCollision(_ccLayer, 9, true);
+						_unitMatrixOpen = false;
+						Plugin.ModLog.LogInfo((object)("UC: unit matrix restored (ccLayer=" + _ccLayer + " bodyPartLayer=9 ignore=True)."));
+					}
+					if (_corpseMatrixOpen && !pushCorpses)
+					{
+						int corpseLayerR = GetCorpseLayer();
+						if (corpseLayerR >= 0 && corpseLayerR != _ccLayer)
+						{
+							Physics.IgnoreLayerCollision(_ccLayer, corpseLayerR, true);
+						}
+						_corpseMatrixOpen = false;
+						Plugin.ModLog.LogInfo((object)("UC: corpse matrix restored (ccLayer=" + _ccLayer + " corpseLayer=" + corpseLayerR + " ignore=True)."));
+					}
+				}
 				// 位置级防重叠/推尸体：AI 走 NavMeshAgent（transform 直写）不走物理，
 				// 碰撞矩阵只对玩家 CC 生效——AI 与 AI/玩家/尸体的交互必须每帧手动处理。
+				// 活体-活体只挂 UnitCollision、AI-尸体只挂 PushCorpses（方法内细分）。
 				if (unitColl || pushCorpses)
 				{
-					ResolveOverlaps();
+					ResolveOverlaps(unitColl, pushCorpses);
 				}
 				if ((!unitColl && !diag && !pushCorpses) || Time.time < _nextApply)
 				{
 					return;
 				}
 				_nextApply = Time.time + 1f;
-				if (_ccLayer < 0 && !ProbeCcLayer())
+				if ((_ccLayer < 0 || _fallbackLocked) && !ProbeCcLayer())
 				{
 					return;
 				}
@@ -285,18 +318,21 @@ namespace ER2UnitCollision
 				{
 					ProbeCcLayer();
 					ProbeBodies();
+					ProbeLivingColliders();
 					return;
 				}
 				bool changed = false;
 				if (unitColl && Physics.GetIgnoreLayerCollision(_ccLayer, 9))
 				{
 					Physics.IgnoreLayerCollision(_ccLayer, 9, false);
+					_unitMatrixOpen = true;
 					changed = true;
 				}
 				int corpseLayer = GetCorpseLayer();
 				if (pushCorpses && corpseLayer >= 0 && corpseLayer != _ccLayer && Physics.GetIgnoreLayerCollision(_ccLayer, corpseLayer))
 				{
 					Physics.IgnoreLayerCollision(_ccLayer, corpseLayer, false);
+					_corpseMatrixOpen = true;
 					changed = true;
 				}
 				if (changed && Time.time - _lastMatrixLog >= 10f)
@@ -304,8 +340,11 @@ namespace ER2UnitCollision
 					_lastMatrixLog = Time.time;
 					Plugin.ModLog.LogInfo((object)("UC: unit-collision ON ccLayer=" + _ccLayer + " bodyPartLayer=" + 9 + " corpseLayer=" + corpseLayer + " changed=" + changed));
 				}
-				EnsureCorpsePhysics();
-				EnsurePushers();
+				if (pushCorpses)
+				{
+					EnsureCorpsePhysics();
+					EnsurePushers();
+				}
 			}
 			catch (Exception ex)
 			{
@@ -394,14 +433,17 @@ namespace ER2UnitCollision
 				if (playerLayer >= 0)
 				{
 					_ccLayer = playerLayer;
+					_fallbackLocked = false;
 				}
 				else if (anyAiHasCc)
 				{
 					_ccLayer = aiLayer;
+					_fallbackLocked = false;
 				}
 				else if (_ccLayer < 0)
 				{
 					_ccLayer = 1;
+					_fallbackLocked = true;
 				}
 				if (log)
 				{
@@ -452,6 +494,123 @@ namespace ER2UnitCollision
 			catch (Exception ex)
 			{
 				Plugin.ModLog.LogWarning((object)("UnitCollision corpse diagnostics failed: " + ex.Message));
+			}
+		}
+
+		// 诊断（2.1 穿人排查）：dump 活体士兵的 CC 与受击碰撞体实际分层/启用/触发状态。
+		// 层矩阵开在 (ccLayer,9) 只在「AI 受击碰撞体确实在 9 层、非 trigger、已启用」时挡人；
+		// 任何一条不满足玩家就照样穿过——这里把三条事实直接打出来，不靠猜。
+		private static void ProbeLivingColliders()
+		{
+			try
+			{
+				if (Time.time - _lastLivingDump < 10f)
+				{
+					return;
+				}
+				_lastLivingDump = Time.time;
+				Il2CppSystem.Collections.Generic.List<Creature> alive = Creature.aliveCreatures;
+				if (alive == null)
+				{
+					return;
+				}
+				int dumped = 0;
+				foreach (Creature c in alive)
+				{
+					try
+					{
+						if (c == null || c.transform == null)
+						{
+							continue;
+						}
+						Soldier s = c.TryCast<Soldier>();
+						if (s == null)
+						{
+							continue;
+						}
+						bool ragdolled = false;
+						try
+						{
+							ragdolled = c.ragdoll_manager != null && c.ragdoll_manager.ragdollized;
+						}
+						catch
+						{
+						}
+						if (ragdolled)
+						{
+							continue;
+						}
+						bool isPlayer = false;
+						try
+						{
+							isPlayer = c.IsPlayer();
+						}
+						catch
+						{
+						}
+						if (!isPlayer && dumped >= 3)
+						{
+							continue;
+						}
+						string ccInfo;
+						try
+						{
+							CharacterController cc = s.m_controller;
+							ccInfo = (cc != null)
+								? ("cc(goLayer=" + cc.gameObject.layer + " enabled=" + cc.enabled + " r=" + cc.radius.ToString("F2") + ")")
+								: "cc=null";
+						}
+						catch (Exception ex)
+						{
+							ccInfo = "cc-err:" + ex.Message;
+						}
+						Dictionary<string, int> agg = new Dictionary<string, int>();
+						List<string> solid = new List<string>();
+						Collider[] cols = s.GetComponentsInChildren<Collider>(true);
+						int solidCount = 0;
+						foreach (Collider col in cols)
+						{
+							if (col == null)
+							{
+								continue;
+							}
+							string key = "L" + col.gameObject.layer + "/trig=" + (col.isTrigger ? 1 : 0) + "/en=" + (col.enabled ? 1 : 0);
+							if (agg.ContainsKey(key))
+							{
+								agg[key]++;
+							}
+							else
+							{
+								agg[key] = 1;
+							}
+							if (col.enabled && !col.isTrigger)
+							{
+								solidCount++;
+								if (solid.Count < 4)
+								{
+									solid.Add(col.gameObject.name + "@L" + col.gameObject.layer);
+								}
+							}
+						}
+						List<string> parts = new List<string>();
+						foreach (KeyValuePair<string, int> kv in agg)
+						{
+							parts.Add(kv.Key + "x" + kv.Value);
+						}
+						Plugin.ModLog.LogInfo((object)("UC: living-dump " + (isPlayer ? "PLAYER" : "AI") + " '" + s.gameObject.name + "' goLayer=" + s.gameObject.layer + " " + ccInfo + " colliders[" + cols.Length + "] " + string.Join("; ", parts) + " solid=" + solidCount + ((solid.Count > 0) ? (" e.g." + string.Join(",", solid)) : "")));
+						dumped++;
+						if (dumped >= 4)
+						{
+							break;
+						}
+					}
+					catch
+					{
+					}
+				}
+			}
+			catch
+			{
 			}
 		}
 
@@ -665,7 +824,7 @@ namespace ER2UnitCollision
 		//  - 活体-活体：水平距离小于阈值即分离（只推 AI，玩家由物理矩阵管，绝不推玩家）；
 		//  - AI-尸体：PushCorpses 开启且力度>0 时给尸体骨骼刚体施加冲量（推尸体），
 		//    否则把 AI 推出尸体（尸体只阻挡）。
-		private static void ResolveOverlaps()
+		private static void ResolveOverlaps(bool unitColl, bool pushCorpses)
 		{
 			try
 			{
@@ -716,6 +875,9 @@ namespace ER2UnitCollision
 					{
 					}
 				}
+				// 尸体数据源 2/3 + 合并：只在 PushCorpses 开启时收集（活体-活体不需要尸体表）
+				if (pushCorpses)
+				{
 				// 尸体数据源 2：allCreatures（全单位表，含尸体——ragdollized 单位会被移出
 				// aliveCreatures，这是 AI 推不动尸体的根因）。每帧遍历，开销与 alive 同级。
 				try
@@ -806,6 +968,7 @@ namespace ER2UnitCollision
 						_corpses.Add(rm);
 					}
 				}
+				} // end if (pushCorpses) 尸体收集
 				// 来源标记：0 = 单位表（alive/allCreatures），1 = 场景扫描兜底
 				_corpseScanSrc = (_corpses.Count > 0 && _scannedCorpses.Count == 0) ? 0 : 1;
 				if (_living.Count == 0)
@@ -825,7 +988,9 @@ namespace ER2UnitCollision
 					_livingIsPlayer[i] = s != null && IsPlayerUnit(s);
 					_livingRadius[i] = (s != null) ? GetUnitRadius(s) : 0.4f;
 				}
-				// 活体-活体防重叠
+				// 活体-活体防重叠（只挂 UnitCollision：PushCorpses 不应让士兵互推生效）
+				if (unitColl)
+				{
 				for (int i = 0; i < livingCount; i++)
 				{
 					Soldier a = _living[i];
@@ -878,8 +1043,9 @@ namespace ER2UnitCollision
 						// 玩家-玩家：不推（单机不存在；联机不同步，由 SingleplayerOnly 默认关）
 					}
 				}
-				// AI-尸体：推尸体或把 AI 推出
-				if (_corpses.Count > 0)
+				}
+				// AI-尸体：推尸体或把 AI 推出（只挂 PushCorpses）
+				if (pushCorpses && _corpses.Count > 0)
 				{
 					bool pushOn = Plugin.PushCorpses != null && Plugin.PushCorpses.Value;
 					float force = (Plugin.CorpsePushForce != null) ? Plugin.CorpsePushForce.Value : 10f;

@@ -5,7 +5,8 @@ using UnityEngine;
 namespace ER2SquadCommand;
 
 /// <summary>
-/// 1.0.2：载具朝向控制（地狱之门式：选中载具长按右键拖动，松开转向）。
+/// 1.0.2：载具朝向控制。1.2.0 起：入口改为阵型下发（Formation 线槽到位补发）与移动覆盖，
+/// 独立的"朝向拖动"手势已被阵型箭头上位替代。
 /// 1.0.3/1.0.4 实测定案：faceDirWhenStopped 通道无效（原生 IsRotatedToward 恒真、RotateVehicleTowardEnemy
 /// 外部直调不转车，且 StopAndClearPath 会停掉原生转向）——最终机制 = 直驱车体 yaw：
 /// C# Vector3.SignedAngle 算车头与目标方向夹角，每帧按该车转速（ResolveTurnSpeed，坦克慢/轮式快）
@@ -29,7 +30,6 @@ internal static class VehicleFacing
 
     private static readonly List<FacingTask> tasks = new List<FacingTask>();
 
-    internal const float DragThresholdPx = 14f;  // 长按 0.35s 到点时的拖动判定阈值（像素）
     private const float TimeoutSeconds = 15f;    // 15s 超时兜底
     private const float DoneAngleDeg = 4f;       // 夹角判定阈值（度）
     private const float FaceSpeedFallback = 60f; // 轮式车兜底角速度（读不到任何转速源时）
@@ -73,15 +73,27 @@ internal static class VehicleFacing
         catch { return 0f; }
     }
 
-    /// <summary>载具是否可转向：非飞机、有 AIVehicle、驾驶员存活、玩家未接管。</summary>
+    /// <summary>载具是否可转向：非飞机、玩家未接管，且（有 AIVehicle + 驾驶员存活）或（1.2.3：无 AIVehicle 的
+    /// 固定火力点/火炮——只要车上有存活乘员即可原地转向，因为转向只直驱 transform yaw，不依赖原生驾驶链）。
+    /// 1.2.7：炮位也带 AIVehicle 但没有驾驶员概念 → 判定改为"**可移动载具才要求驾驶员**，
+    /// 火力点/火炮只要有人操作就能转"（否则用户报的"火炮还是不能操控转向"）。</summary>
     internal static bool IsEligible(Vehicle v)
     {
         try
         {
             if (v == null || v.transform == null) return false;
             try { if (v.IsAirVehicle()) return false; } catch { return false; }
-            if (GetAi(v) == null) return false;
-            try { if (!v.HasDriverAlive) return false; } catch { }
+            bool mobile = Formation.IsMobileVehicle(v); // 履带/轮式/飞机 = 可移动
+            if (mobile)
+            {
+                if (GetAi(v) == null) return false;
+                try { if (!v.HasDriverAlive) return false; } catch { }
+            }
+            else
+            {
+                // 火力点/火炮/拖车：有人操作即可原地转向
+                if (!HasAliveCrew(v)) return false;
+            }
             try
             {
                 PlayerController pc = PlayerController.currentController;
@@ -93,6 +105,20 @@ internal static class VehicleFacing
             return true;
         }
         catch { return false; }
+    }
+
+    /// <summary>1.2.3：车上是否有存活乘员（无 AIVehicle 的火力点/火炮的可用性判据）。</summary>
+    private static bool HasAliveCrew(Vehicle v)
+    {
+        try
+        {
+            Soldier[] crew = v.GetComponentsInChildren<Soldier>();
+            if (crew != null)
+                for (int i = 0; i < crew.Length; i++)
+                    if (crew[i] != null && crew[i].IsAlive) return true;
+        }
+        catch { }
+        return false;
     }
 
     internal static bool HasEligible(List<Vehicle> cands)
@@ -125,9 +151,9 @@ internal static class VehicleFacing
                 AIVehicle ai = GetAi(v);
                 long p = (long)v.Pointer;
                 tasks.RemoveAll(t => { try { return t.veh == null || (long)t.veh.Pointer == p; } catch { return true; } });
-                try { ai.StopAndClearPath(); } catch { }
+                try { if (ai != null) ai.StopAndClearPath(); } catch { } // 1.2.3：火力点无 AIVehicle
                 GodViewController.CancelVehicleMoveObservation(v); // 摘除该车移动观察/待发重试，防与朝向任务互相打架
-                try { ai.faceDirWhenStopped = new Il2CppSystem.Nullable<Vector3>(point); } catch { }
+                try { if (ai != null) ai.faceDirWhenStopped = new Il2CppSystem.Nullable<Vector3>(point); } catch { }
                 float spd = ResolveTurnSpeed(v);
                 if (issued == 0)
                 {
@@ -221,31 +247,6 @@ internal static class VehicleFacing
 
     private static void ClearField(FacingTask t)
     {
-        try { t.ai.faceDirWhenStopped = new Il2CppSystem.Nullable<Vector3>(); } catch { }
-    }
-
-    /// <summary>拖动中的箭头绘制：每辆合格载具 → 鼠标落点。由 GodViewController.SceneMarkersFrame 在 EndFrame 前调用。</summary>
-    internal static void DrawDrag(Camera cam, List<Vehicle> cands)
-    {
-        if (cam == null || cands == null || cands.Count == 0) return;
-        Vector3 point;
-        try
-        {
-            if (!Physics.Raycast(cam.ScreenPointToRay(Input.mousePosition), out RaycastHit hit, 3000f)) return;
-            point = hit.point;
-        }
-        catch { return; }
-        Color c = new Color(0.7f, 0.7f, 0.7f, 0.5f); // 1.0.6：灰色半透明实线（与路线同系）
-        int n = 0;
-        foreach (Vehicle v in cands)
-        {
-            try
-            {
-                if (!IsEligible(v) || v.transform == null) continue;
-                SceneMarkers.Arrow("FD" + n, v.transform.position + Vector3.up * 1.2f, point + Vector3.up * 0.4f, c, 0.1f, true);
-                n++;
-            }
-            catch { }
-        }
+        try { if (t.ai != null) t.ai.faceDirWhenStopped = new Il2CppSystem.Nullable<Vector3>(); } catch { }
     }
 }

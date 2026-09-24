@@ -157,6 +157,8 @@ internal static class GenRunner
 			ap.followCustomSquadOrders();
 			ap.followCustomDirectCommands();
 			ap.allowMovements(true);
+			// 1.0.9：生成的中立（平民）单位不主动开战（用户反馈"中立单位为什么会主动攻击"）
+			{ string sf = null; try { sf = s.faction; } catch { } if (!string.IsNullOrEmpty(sf) && sf.IndexOf("civil", System.StringComparison.OrdinalIgnoreCase) >= 0) ap.allowCheckForEnemies(false); }
 		}
 		catch { }
 	}
@@ -232,18 +234,24 @@ internal static class GenRunner
 			yield break;
 		}
 
+		// 1.0.4：生成后收尾（阵营/解锁/乘员/登记）抽为公共方法——
+		// 幽灵预览把"预览实例"直接当真实生成物提交时，复用它（不再重新生成）。
+		FinalizeVehicle(veh, entry, faction, crewType, pos, onDone);
+	}
+
+	/// <summary>载具生成后收尾：SetFaction → 解锁 → 登记 → 乘员（spawnOnvehicle 直接生在车上）。</summary>
+	internal static void FinalizeVehicle(Vehicle veh, GenEntry entry, string faction, SquadType? crewType, Vector3 pos, Action<Vehicle> onDone)
+	{
 		try
 		{
 			veh.SetFaction(faction);
-			Plugin.ModLog.LogInfo("[UniGen] 载具已生成: " + entry.Id + " @ " + pos + " faction=" + faction);
+			ApplyYaw(veh.gameObject); // 1.0.5：应用预览朝向
+			Plugin.ModLog.LogInfo("[UniGen] 载具已生成: " + entry.Id + " @ " + pos + " faction=" + faction + " yaw=" + PreviewYaw.ToString("0"));
 		}
 		catch (Exception ex)
 		{
 			Plugin.ModLog.LogError("[UniGen] SetFaction 失败(" + entry.Id + "): " + ex.Message);
 		}
-
-		// 临时 spawner 清理（生成物是独立实例，不受影响）
-		try { if (spawnerGo != null) UnityEngine.Object.Destroy(spawnerGo); } catch { }
 
 		RegisterSpawnedVehicle(veh);
 
@@ -254,9 +262,8 @@ internal static class GenRunner
 		try { seats = veh.seats.Length; } catch { }
 		if (crewType.HasValue && seats > 0)
 		{
-			// 乘员流程（宿主 BoardVehicle 同款三步）：
-			// ①车旁落地（超员先裁）→ ②逐兵 Lua_Soldier.boardVehicle（可靠登车）
-			// → ③上车后 AIVehicle.squadInside=乘员班（驾驶资格——没有它车辆收不到指挥）
+			// 1.0.3（用户要求）：乘员**直接生成在车上**——SpawnAISquadGlobal 的 spawnOnvehicle 参数
+			// 就是原生"出生即入座"通道（战役增援/载具车组同款），不再走"车旁落地 + 逐员登车"。
 			Vehicle vehRef = veh;
 			string facRef = faction;
 			int standard = 0;
@@ -267,32 +274,12 @@ internal static class GenRunner
 			try { sd = ItemsDatabase.GetSquadLoadouts(crewType.Value, want); } catch { }
 			if (sd != null && sd.CountLoadouts() > 0)
 			{
-				StartCoroutineNative(SpawnManager.SpawnAISquadGlobal(facRef, null, sd, pos, 4f, null,
+				StartCoroutineNative(SpawnManager.SpawnAISquadGlobal(facRef, null, sd, pos, 4f, vehRef,
 					ToIl2Cpp((Action<Squad>)(sq =>
 					{
 						if (sq == null) return;
 						RegisterSpawnedSquad(sq);
-						// 超载裁剪（登车前处理，站在车边直接移除）
-						try
-						{
-							int cm = sq.CountMembers;
-							if (cm > seats)
-							{
-								for (int i = cm - 1; i >= seats; i--)
-								{
-									try
-									{
-										Soldier m = sq.GetMemberClamped(i);
-										if (m != null) UnityEngine.Object.Destroy(m.gameObject);
-									}
-									catch { }
-								}
-								Plugin.ModLog.LogInfo("[UniGen] 超载裁剪: " + cm + " → " + seats);
-							}
-						}
-						catch { }
-						// ②逐兵登车 + ③登车完成后给驾驶资格
-						StartCoroutine(BoardCR(sq, vehRef, seats));
+						StartCoroutine(FinishCrewCR(sq, vehRef, seats));
 					})), -1));
 			}
 			else
@@ -305,138 +292,86 @@ internal static class GenRunner
 	}
 
 	/// <summary>
-	/// 乘员登车（完整复刻宿主手动上车流程，实测该流程后车辆可指挥）：
-	/// 等待落地 → 新班（FindOrNew+SetFullySpawned+isOpenForJoiners）→ 逐兵转班 → 逐兵 boardVehicle
-	/// → 轮询全员上车 → AIVehicle.squadInside=新班（驾驶资格）。
+	/// 1.0.3：乘员收尾（已由 spawnOnvehicle 直接生在车上，无需登车流程）：
+	/// 等生成完成 → 超员裁剪 → 确认在车 → 授予驾驶资格（AIVehicle.squadInside）+ 登记宿主 rtsSquadSet。
 	/// </summary>
-	private static IEnumerator BoardCR(Squad spawnSq, Vehicle veh, int seats)
+	private static IEnumerator FinishCrewCR(Squad crewSq, Vehicle veh, int seats)
 	{
-		if (spawnSq == null || veh == null) yield break;
+		if (crewSq == null || veh == null) yield break;
 
-		// 等待生成完成（fullySpawned）——对未完成生成的兵下登车令会导致登车状态损坏
-		// （表现为有人不上车/车辆不可指挥；手动上下车之所以有效，是因为那时早已 fullySpawned）
 		float waitSpawn = Time.unscaledTime + 12f;
 		while (Time.unscaledTime < waitSpawn)
 		{
 			bool ready = false;
-			try { ready = spawnSq.fullySpawned; } catch { ready = true; }
+			try { ready = crewSq.fullySpawned; } catch { ready = true; }
 			if (ready) break;
 			yield return new WaitForSeconds(0.5f);
 		}
-		// 额外缓冲一拍，让落地动画收尾
-		yield return new WaitForSeconds(0.5f);
+		yield return new WaitForSeconds(0.5f); // 落地/入座收尾
 
-		// ① 新班：与宿主 CreateNewSquad 同款三件套
-		Squad ns = null;
+		// 超员裁剪（座位数上限；spawnOnvehicle 理论上按座位生成，这里兜底）
 		try
 		{
-			ns = Squad.FindOrNew(Guid.NewGuid().ToString());
-			ns.SetFullySpawned();
-			ns.isOpenForJoiners = true;
-		}
-		catch (Exception ex)
-		{
-			Plugin.ModLog.LogWarning("[UniGen] 新建乘员班失败（回退原班）: " + ex.Message);
-		}
-		Squad target = ns ?? spawnSq;
-
-		// ② 逐兵转班（Leave+Join，宿主 AddInfantryToSquadTo 同款）
-		int members = 0;
-		try { members = spawnSq.CountMembers; } catch { }
-		int moved = 0;
-		for (int i = 0; i < members; i++)
-		{
-			Soldier m = null;
-			try
+			int cm = crewSq.CountMembers;
+			if (cm > seats)
 			{
-				m = spawnSq.GetMemberClamped(i);
-				if (m == null || !m.IsAlive) continue;
-				Squad old = m.joinedSquad;
-				if (old != null && old.Pointer != target.Pointer) old.Leave(m, false);
-				target.Join(m);
-				moved++;
+				for (int i = cm - 1; i >= seats; i--)
+				{
+					try
+					{
+						Soldier m = crewSq.GetMemberClamped(i);
+						if (m != null) UnityEngine.Object.Destroy(m.gameObject);
+					}
+					catch { }
+				}
+				Plugin.ModLog.LogInfo("[UniGen] 超载裁剪: " + cm + " → " + seats);
 			}
-			catch { }
-			yield return new WaitForSeconds(0.05f);
 		}
-		if (Plugin.debugLog.Value) Plugin.ModLog.LogInfo("[UniGen] 乘员转班: " + moved + "/" + members + " → " + (target.squadCode ?? "?"));
-		if (ns != null)
-		{
-			RegisterSpawnedSquad(ns);
-			spawnedSquads.Remove(spawnSq); // 原班已空，移出清除表
-		}
+		catch { }
 
-		// ③ 逐兵登车
-		Lua_Vehicle lv = null;
-		try { lv = new Lua_Vehicle(veh); } catch { }
-		int cnt = 0;
-		try { cnt = target.CountMembers; } catch { }
-		int ordered = 0;
-		for (int i = 0; i < cnt; i++)
-		{
-			Soldier m = null;
-			try
-			{
-				m = target.GetMemberClamped(i);
-				if (m != null && m.IsAlive && lv != null) new Lua_Soldier(m).boardVehicle(lv);
-			}
-			catch { }
-			if (m == null || !m.IsAlive) continue;
-			ordered++;
-			yield return new WaitForSeconds(0.15f);
-		}
-		if (Plugin.debugLog.Value) Plugin.ModLog.LogInfo("[UniGen] 登车令已发: " + ordered + "/" + cnt);
-
-		// ④ 轮询全员上车
-		float deadline = Time.unscaledTime + 30f;
+		// 观察在车人数（仅日志：spawnOnvehicle 由原生入座，失败不回退登车流程）
 		int inside = 0;
-		while (Time.unscaledTime < deadline)
-		{
-			try { inside = veh.peopleInside; } catch { inside = 0; }
-			if (inside >= seats) break;
-			yield return new WaitForSeconds(0.5f);
-		}
-		Plugin.ModLog.LogInfo("[UniGen] 乘员登车" + (inside >= seats ? "完成: " : "超时: ") + inside + "/" + seats);
+		try { inside = veh.peopleInside; } catch { }
+		Plugin.ModLog.LogInfo("[UniGen] 乘员已在车（spawnOnvehicle）: " + inside + "/" + seats);
 
-		// ⑤ 驾驶资格：AIVehicle.squadInside 指向乘员班
+		// 驾驶资格：AIVehicle.squadInside 指向乘员班（没有它车辆收不到指挥）
 		try
 		{
 			AIVehicle ai = veh.GetComponent<AIVehicle>();
 			if (ai == null) ai = veh.GetComponentInChildren<AIVehicle>();
 			if (ai != null)
 			{
-				ai.squadInside = target;
+				ai.squadInside = crewSq;
 				if (Plugin.debugLog.Value) Plugin.ModLog.LogInfo("[UniGen] 驾驶资格已授予: squadInside=乘员班");
 			}
 		}
 		catch (Exception ex) { Plugin.ModLog.LogWarning("[UniGen] squadInside 设置失败: " + ex.Message); }
-		// ⑥ 关键：乘员班必须登记进宿主 rtsSquadSet（RTS 分队集合）——
-		// 宿主 DriveVehicleTo 拒绝指挥任何 squadInside 不在该集合内的载具（"syncWindow 未就绪"）。
-		// 手动下车→上车之所以有效，正是因为宿主 BoardVehicle 把新班登记了进去。
-		bool reg = HostLink.RtsRegisterSquad(target);
+		// 乘员班必须登记进宿主 rtsSquadSet（RTS 分队集合），否则宿主 DriveVehicleTo 拒绝指挥
+		bool reg = HostLink.RtsRegisterSquad(crewSq);
 		if (Plugin.debugLog.Value || !reg) Plugin.ModLog.LogInfo("[UniGen] RTS 分队登记: " + (reg ? "成功" : "失败"));
 	}
-
 	// ================= 步兵小队 =================
 
-	/// <summary>生成步兵小队（SpawnAISquadGlobal，受控参数=不抢任务、听指挥）。</summary>
-	public static void SpawnInfantrySquad(GenEntry entry, Vector3 pos, string faction, Action<Squad> onDone)
+	/// <summary>生成步兵小队（SpawnAISquadGlobal）。side = 面板所选阵营意图（mine/enemy/neutral），
+	/// 1.1.1 起决定 AI 模式：敌方默认原生 AI，我方/中立受控驻守。</summary>
+	public static void SpawnInfantrySquad(GenEntry entry, Vector3 pos, string faction, string side, Action<Squad> onDone)
 	{
-		StartCoroutine(SpawnInfantryCR(entry, pos, faction, onDone));
+		StartCoroutine(SpawnInfantryCR(entry, pos, faction, side, onDone));
 	}
 
-	private static IEnumerator SpawnInfantryCR(GenEntry entry, Vector3 pos, string faction, Action<Squad> onDone)
+	private static IEnumerator SpawnInfantryCR(GenEntry entry, Vector3 pos, string faction, string side, Action<Squad> onDone)
 	{
 		SquadData sd = null;
 		try
 		{
 			if (Plugin.debugLog.Value) Plugin.ModLog.LogInfo("[UniGen] SpawnSquad begin id=" + entry.Id + " faction=" + faction + " pos=" + pos);
-			// 枚举重载：官方 SquadType（字符串 label 已废弃——无效 label 游戏回落默认空小队）
-			sd = ItemsDatabase.GetSquadLoadouts(entry.SType, 0);
+			// 官方班型走 SquadType 枚举重载；小队库扩展班（季节/战场变体）走 string 重载
+			sd = entry.SpawnByKey ? ItemsDatabase.GetSquadLoadouts(entry.Id, 0)
+				: ItemsDatabase.GetSquadLoadouts(entry.SType, 0);
 			if (sd == null || sd.CountLoadouts() <= 0)
 			{
-				Plugin.ModLog.LogError("[UniGen] GetSquadLoadouts(" + entry.SType + ") 返回空小队——类型无效，条目已隐藏。");
-				GenCatalog.RemoveInfantry(entry.SType);
+				Plugin.ModLog.LogError("[UniGen] GetSquadLoadouts(" + entry.Id + ") 返回空小队——类型无效，条目已隐藏。");
+				GenCatalog.RemoveInfantryEntry(entry);
 				onDone?.Invoke(null);
 				yield break;
 			}
@@ -473,10 +408,346 @@ internal static class GenRunner
 			yield break;
 		}
 		RegisterSpawnedSquad(result);
-		// 受控参数：不抢任务（原地待命）、自动接战、听 RTS 指令——"打人就行，别乱跑"
-		ApplyControlledToSquad(result);
+		// 1.0.5：应用预览朝向（步兵班：逐个转朝向，保留散开站位）
+		try
+		{
+			int n = result.CountMembers;
+			for (int i = 0; i < n; i++)
+			{
+				Soldier m = result.GetMemberClamped(i);
+				if (m != null) ApplyYaw(m.gameObject);
+			}
+		}
+		catch { }
+		// 1.1.1：受控参数（原地驻守+听令）只给"有人指挥"的阵营——敌方没人下令会永远
+		// 站在出生点（用户实测反馈）。敌方默认原生 AI（随战役任务推进/进攻），cfg 可关回旧行为。
+		bool controlled = side != "enemy" || !Plugin.enemyNativeAI.Value;
+		if (controlled) ApplyControlledToSquad(result);
+		if (Plugin.debugLog.Value) Plugin.ModLog.LogInfo("[UniGen] AI 模式: " + (controlled ? "受控(驻守)" : "原生(自由接战/推进)") + " side=" + side);
 		Plugin.ModLog.LogInfo("[UniGen] 步兵小队已生成: " + entry.Id + " @ " + pos + " faction=" + faction);
 		onDone?.Invoke(result);
+	}
+
+	// ================= 放置预览（1.0.4：复用宿主幽灵视觉）=================
+
+	private static readonly List<GameObject> previewGhosts = new List<GameObject>();
+
+	/// <summary>
+	/// 1.0.4：生成一个"幽灵预览实例"（真实生成一次 → 立即幽灵化：停用 AI/碰撞、半透明白材质）。
+	/// 放置模式中跟随光标移动，确认时由调用方销毁并走正式生成；取消/退出时 DestroyPreview。
+	/// 宿主幽灵材质不可用时返回 false（调用方回退自绘圈）。
+	/// </summary>
+	public static void SpawnPreviewGhost(GenEntry entry, Vector3 pos, string faction, Action<bool> onReady)
+	{
+		// 1.0.9：记录代数——异步生成完成时若已被取消/已放置，立即自毁
+		// （否则成为孤儿预览，表现为"放置预览无法消失"）。
+		int gen = previewGeneration;
+		StartCoroutine(SpawnPreviewGhostCR(entry, pos, faction, onReady, gen));
+	}
+
+	/// <summary>1.0.9：预览代数。DestroyPreview 时自增 → 在途的异步预览作废。</summary>
+	private static int previewGeneration;
+
+	private static bool StalePreview(int gen) { return gen != previewGeneration; }
+
+	private static IEnumerator SpawnPreviewGhostCR(GenEntry entry, Vector3 pos, string faction, Action<bool> onReady, int gen)
+	{
+		if (!HostLink.GhostAvailable) { onReady?.Invoke(false); yield break; }
+		// 1.0.13：**这里不能再调 DestroyPreview()**——它会把 previewGeneration 自增，
+		// 而本次协程的 gen 是调用时捕获的（更小）→ 本次幽灵刚生成就被判"过期"销毁
+		// = 用户反馈"幽灵预览无法渲染"。旧预览的清理由 Begin() 负责（在捕获 gen 之前）。
+
+		if (!entry.IsInfantry)
+		{
+			// 载具：VehicleSpawner 生成一次 → 幽灵化
+			GameObject spawnerGo = null;
+			Vehicle veh = null;
+			try
+			{
+				spawnerGo = new GameObject("UniGen_PreviewSpawner");
+				spawnerGo.transform.position = pos;
+				VehicleSpawner sp = spawnerGo.AddComponent<VehicleSpawner>();
+				sp.vehiclePrefabID = entry.Id;
+				sp.camoId = 0;
+				sp.SpawnVehicle();
+			}
+			catch { onReady?.Invoke(false); yield break; }
+
+			VehicleSpawner spRef = spawnerGo != null ? spawnerGo.GetComponent<VehicleSpawner>() : null;
+			float deadline = Time.unscaledTime + 6f;
+			while (Time.unscaledTime < deadline)
+			{
+				try { veh = spRef != null ? spRef.GetSpawnedVehicle() : null; } catch { veh = null; }
+				if (veh != null) break;
+				yield return null;
+			}
+			try { if (spawnerGo != null) UnityEngine.Object.Destroy(spawnerGo); } catch { }
+			if (veh == null) { onReady?.Invoke(false); yield break; }
+
+			try
+			{
+				veh.SetFaction(faction);
+				veh.transform.position = pos;
+			}
+			catch { }
+			bool ok = HostLink.Ghostify(veh.gameObject);
+			if (!ok) { try { UnityEngine.Object.Destroy(veh.gameObject); } catch { } onReady?.Invoke(false); yield break; }
+			if (StalePreview(gen)) { try { UnityEngine.Object.Destroy(veh.gameObject); } catch { } onReady?.Invoke(false); yield break; }
+			try { veh.gameObject.name = "UniGenPreview_" + veh.gameObject.name; } catch { }
+			HostLink.RegisterGhost(veh.gameObject); // 1.0.8：登记（伤害免疫 + 地面射线豁免）
+			TrackGhost(veh.gameObject, pos);
+			onReady?.Invoke(true);
+			yield break;
+		}
+
+		// 步兵：生成一次小队 → 全队幽灵化
+		SquadData sd = null;
+		try
+		{
+			sd = entry.SpawnByKey ? ItemsDatabase.GetSquadLoadouts(entry.Id, 0)
+				: ItemsDatabase.GetSquadLoadouts(entry.SType, 0);
+		}
+		catch { }
+		if (sd == null || sd.CountLoadouts() <= 0) { onReady?.Invoke(false); yield break; }
+
+		Squad result = null;
+		bool done = false;
+		try
+		{
+			StartCoroutineNative(SpawnManager.SpawnAISquadGlobal(faction, null, sd, pos, 6f, null,
+				ToIl2Cpp((Action<Squad>)(sq => { result = sq; done = true; })), -1));
+		}
+		catch { onReady?.Invoke(false); yield break; }
+
+		float dl = Time.unscaledTime + 10f;
+		while (!done && Time.unscaledTime < dl) yield return null;
+		if (result == null) { onReady?.Invoke(false); yield break; }
+		// 1.0.9：生成期间被取消/已放置 → 把刚生成的这一队直接销毁，不留孤儿
+		if (StalePreview(gen))
+		{
+			try
+			{
+				int n0 = result.CountMembers;
+				for (int i = 0; i < n0; i++)
+				{
+					Soldier m0 = result.GetMemberClamped(i);
+					if (m0 != null) UnityEngine.Object.Destroy(m0.gameObject);
+				}
+			}
+			catch { }
+			onReady?.Invoke(false);
+			yield break;
+		}
+
+		// 1.0.14：**边生成边幽灵化**。SpawnAISquadGlobal 的回调触发时，大班型的成员可能还没落齐
+		// —— 未幽灵化的成员就是真人士兵：会与场上单位碰撞、会自行走动（用户反馈
+		// "超过两个人的小队会直接生成/幽灵会与已有单位碰撞"）。每 0.25s 补一轮，
+		// 直到 fullySpawned 且成员数稳定，才交给 onReady。
+		HashSet<long> donePtrs = new HashSet<long>();
+		int ghosted = 0;
+		float waitFull = Time.unscaledTime + 15f;
+		int lastCount = -1;
+		while (Time.unscaledTime < waitFull)
+		{
+			if (StalePreview(gen))
+			{
+				try
+				{
+					int n0 = result.CountMembers;
+					for (int i = 0; i < n0; i++)
+					{
+						Soldier m0 = result.GetMemberClamped(i);
+						if (m0 != null) UnityEngine.Object.Destroy(m0.gameObject);
+					}
+				}
+				catch { }
+				DestroyPreview();
+				onReady?.Invoke(false);
+				yield break;
+			}
+			int cnt = 0; bool full = false;
+			try { cnt = result.CountMembers; full = result.fullySpawned; } catch { }
+			try
+			{
+				for (int i = 0; i < cnt; i++)
+				{
+					Soldier m = result.GetMemberClamped(i);
+					if (m == null) continue;
+					long k = (long)m.Pointer;
+					if (donePtrs.Contains(k)) continue;
+					if (HostLink.Ghostify(m.gameObject))
+					{
+						try { new Lua_Soldier(m).getAiParams().allowBeingTargeted(false); } catch { }
+						try { m.gameObject.name = "UniGenPreview_" + m.gameObject.name; } catch { }
+						HostLink.RegisterGhost(m.gameObject); // 伤害免疫 + 地面射线豁免
+						TrackGhost(m.gameObject, pos);
+						donePtrs.Add(k);
+						ghosted++;
+					}
+				}
+			}
+			catch { }
+			// fullySpawned 且成员数两轮一致且全部幽灵化 → 完成
+			if (full && cnt > 0 && cnt == lastCount && ghosted >= cnt) break;
+			lastCount = cnt;
+			yield return new WaitForSeconds(0.25f);
+		}
+		if (Plugin.debugLog.Value) Plugin.ModLog.LogInfo("[UniGen] 步兵预览幽灵化 " + ghosted + " 人");
+		// 1.2.2：一个成员都没幽灵化 = 预览彻底失败——把刚生成的真实小队销毁，不留"看不见的真实士兵"
+		if (ghosted <= 0)
+		{
+			try
+			{
+				int n1 = result.CountMembers;
+				for (int i = 0; i < n1; i++)
+				{
+					Soldier m1 = result.GetMemberClamped(i);
+					if (m1 != null) UnityEngine.Object.Destroy(m1.gameObject);
+				}
+			}
+			catch { }
+			onReady?.Invoke(false);
+			yield break;
+		}
+		onReady?.Invoke(ghosted > 0);
+	}
+
+	// ================= 物品幽灵预览（2.2.0，用户要求"只要模型，不要光圈+图标"）=================
+
+	/// <summary>
+	/// 2.2.0：物品携带时的 3D 幽灵预览 —— **裸实例化一次 prefab（纯视觉，不走 ToVirtualItem 生成链）**
+	/// → 宿主 Ghostify 幽灵化（半透明 + 免伤 + 射线豁免，与单位/载具预览同一套视觉）。
+	/// 预览代数 guard 与单位预览共用（DestroyPreview 时自增 → 在途异步自毁）。
+	/// </summary>
+	public static void SpawnItemGhost(string itemId, Vector3 pos, Action<bool> onReady)
+	{
+		int gen = previewGeneration;
+		StartCoroutine(SpawnItemGhostCR(itemId, pos, onReady, gen));
+	}
+
+	private static IEnumerator SpawnItemGhostCR(string itemId, Vector3 pos, Action<bool> onReady, int gen)
+	{
+		ItemObject prefab = null;
+		try { prefab = ItemsDatabase.GetItemObject(itemId); } catch { }
+		if (prefab == null)
+		{
+			// 2.3.0：失败必须**无条件**可观测——此前静默 onReady(false)，"预览不显示"无从定位
+			Plugin.ModLog.LogWarning("[UniGen] 物品幽灵预览失败：GetItemObject(" + itemId + ") 返回 null");
+			onReady?.Invoke(false); yield break;
+		}
+
+		GameObject inst = null;
+		try { inst = UnityEngine.Object.Instantiate(prefab.gameObject); } catch (Exception ex) { Plugin.ModLog.LogWarning("[UniGen] 物品幽灵实例化异常: " + ex.Message); }
+		if (inst == null) { onReady?.Invoke(false); yield break; }
+		try { inst.SetActive(true); } catch { }
+
+		// 兜底定身：Ghostify 理论上会停物理，但 prefab 各异——显式冻结刚体防"预览掉进地里"
+		try
+		{
+			Rigidbody rb = inst.GetComponent<Rigidbody>();
+			if (rb == null) rb = inst.GetComponentInChildren<Rigidbody>();
+			if (rb != null) { rb.isKinematic = true; rb.useGravity = false; }
+		}
+		catch { }
+
+		bool ok = false;
+		try { ok = HostLink.Ghostify(inst); } catch { }
+		if (!ok)
+		{
+			try { UnityEngine.Object.Destroy(inst); } catch { }
+			Plugin.ModLog.LogWarning("[UniGen] 物品幽灵预览失败：宿主 Ghostify 返回 false（" + itemId + "）");
+			onReady?.Invoke(false);
+			yield break;
+		}
+		if (StalePreview(gen)) // 已取消/已投放：正常路径，静默自毁
+		{
+			try { UnityEngine.Object.Destroy(inst); } catch { }
+			onReady?.Invoke(false);
+			yield break;
+		}
+		try { inst.name = "UniGenPreview_ItemGhost_" + inst.name; } catch { }
+		// 2.3.0 根因修复：**先落位、再 TrackGhost**。2.2.0 首发顺序写反——TrackGhost 记下的是
+		// "prefab 模板原始坐标 − 锚点"（克隆体 Instantiate 时在模板位置，通常是世界原点附近），
+		// 下一帧 MovePreviewTo 按这个错误偏移每帧把幽灵挪走 → 永远不在镜头里
+		// = 用户实测"物品的 3D 模型不显示"。单位/载具预览没踩中：它们生成即在锚点，偏移天然≈0。
+		try { inst.transform.position = pos + Vector3.up * 0.25f; } catch { }
+		HostLink.RegisterGhost(inst);   // 免伤 + 本 mod 地面射线豁免
+		TrackGhost(inst, pos);
+		onReady?.Invoke(true);
+	}
+
+	/// <summary>销毁全部幽灵预览实例（取消放置 / 确认生成 / 退出 RTS 时调用）。</summary>
+	public static void DestroyPreview()
+	{
+		previewGeneration++; // 1.0.9：作废在途的异步预览
+		if (previewGhosts.Count == 0) { previewOffsets.Clear(); return; } // 1.0.10：幂等快速返回
+		foreach (GameObject g in previewGhosts)
+		{
+			try { if (g != null) HostLink.UnregisterGhost(g); } catch { }
+			try { if (g != null) UnityEngine.Object.Destroy(g); } catch { }
+		}
+		previewGhosts.Clear();
+		previewOffsets.Clear();
+	}
+
+	public static bool HasPreview => previewGhosts.Count > 0;
+
+	/// <summary>1.0.5：预览/生成的朝向（度，绕世界 Y）。由 Placer 左键长按拖动设置。</summary>
+	public static float PreviewYaw { get; set; }
+
+	/// <summary>1.0.8：把幽灵预览**绕锚点**旋转到指定朝向。
+	/// 旧实现只写 transform.rotation，而成员位置是"锚点 + 固定偏移"——班成员按弧形散布，
+	/// 只转朝向不转偏移，观感就是"在乱转/散开"（用户反馈）。
+	/// 现在偏移按 yaw 增量一起旋转，整队像刚体一样原地转向。</summary>
+	public static void SetPreviewYaw(float yawDeg)
+	{
+		float delta = yawDeg - PreviewYaw;
+		PreviewYaw = yawDeg;
+		Quaternion q = Quaternion.Euler(0f, delta, 0f);
+		for (int i = 0; i < previewGhosts.Count; i++)
+		{
+			GameObject g = previewGhosts[i];
+			if (g == null) continue;
+			try
+			{
+				if (i < previewOffsets.Count) previewOffsets[i] = q * previewOffsets[i];
+				g.transform.rotation = Quaternion.Euler(0f, yawDeg, 0f);
+			}
+			catch { }
+		}
+	}
+
+	/// <summary>把已生成对象旋转到预览朝向（生成时应用；步兵班只转朝向不改站位）。</summary>
+	private static void ApplyYaw(GameObject go)
+	{
+		try
+		{
+			if (go == null) return;
+			Vector3 e = go.transform.eulerAngles;
+			go.transform.rotation = Quaternion.Euler(e.x, PreviewYaw, e.z);
+		}
+		catch { }
+	}
+
+	/// <summary>幽灵相对"放置锚点"的偏移（步兵班成员是散开的，整体平移时保留队形）。</summary>
+	private static readonly List<Vector3> previewOffsets = new List<Vector3>();
+
+	/// <summary>登记一个幽灵及其相对锚点偏移。</summary>
+	private static void TrackGhost(GameObject g, Vector3 anchor)
+	{
+		previewGhosts.Add(g);
+		try { previewOffsets.Add(g.transform.position - anchor); } catch { previewOffsets.Add(Vector3.zero); }
+	}
+
+	/// <summary>把幽灵预览整体移到新落点（每帧跟随光标；保留各成员相对队形）。</summary>
+	public static void MovePreviewTo(Vector3 pos)
+	{
+		for (int i = 0; i < previewGhosts.Count; i++)
+		{
+			GameObject g = previewGhosts[i];
+			if (g == null) continue;
+			try { g.transform.position = pos + (i < previewOffsets.Count ? previewOffsets[i] : Vector3.zero); } catch { }
+		}
 	}
 
 	// ================= 生成物注册表（一键清除）=================
@@ -486,12 +757,25 @@ internal static class GenRunner
 
 	private static void RegisterSpawnedVehicle(Vehicle v)
 	{
-		if (v != null) spawnedVehicles.Add(v);
+		if (v == null) return;
+		spawnedVehicles.Add(v);
+		NeutralPacifist.RegisterShooter(v); // 1.0.2：中立不主动攻击——登记射手
 	}
 
 	private static void RegisterSpawnedSquad(Squad s)
 	{
-		if (s != null) spawnedSquads.Add(s);
+		if (s == null) return;
+		spawnedSquads.Add(s);
+		try
+		{
+			int count = s.CountMembers;
+			for (int i = 0; i < count; i++)
+			{
+				Soldier m = s.GetMemberClamped(i);
+				if (m != null) NeutralPacifist.RegisterShooter(m); // 1.0.2：中立不主动攻击——登记射手
+			}
+		}
+		catch { }
 	}
 
 	/// <summary>一键清除所有本 mod 生成的单位（先兵后车）。返回清除数量。</summary>
@@ -523,6 +807,7 @@ internal static class GenRunner
 			try { UnityEngine.Object.Destroy(v.gameObject); n++; } catch { }
 		}
 		spawnedVehicles.Clear();
+		NeutralPacifist.ClearRegistry(); // 1.0.2：登记表同步清空
 		Plugin.ModLog.LogInfo("[UniGen] 一键清除: " + n + " 个生成物");
 		return n;
 	}
@@ -535,6 +820,8 @@ internal static class GenRunner
 /// </summary>
 internal static class GenDriver
 {
+	private static float nextProbeCheck; // 1.3.1：探测看门狗节流
+
 	public static void Tick()
 	{
 		try
@@ -543,9 +830,19 @@ internal static class GenDriver
 			bool active = HostLink.GodViewActive;
 			GenPanel.RtsActive = active;
 
+			// 1.3.1：探测看门狗（每秒一次，任何场景）——场景切换杀死探测协程后自动重启续跑
+			if (Time.unscaledTime >= nextProbeCheck)
+			{
+				nextProbeCheck = Time.unscaledTime + 1f;
+				GenCatalog.ProbeWatchdog();
+				ItemCatalog.ProbeWatchdog(); // 2.0.2：物品目录枚举同款续跑看门狗
+				ModCatalog.ProbeWatchdog();  // 2.2.0：第三方内容（mod 载具/物品）目录
+			}
+
 			if (!active)
 			{
 				Placer.Cancel("RTS 退出");
+				ItemDragger.Cancel("RTS 退出", false); // 2.0.0：退出 RTS 一并收口物品携带
 				GenPanel.SetOpen(false);
 				return;
 			}
@@ -555,12 +852,14 @@ internal static class GenDriver
 
 			if (Plugin.panelKey.Value != KeyCode.None && Input.GetKeyDown(Plugin.panelKey.Value))
 			{
-				if (Plugin.debugLog.Value) Plugin.ModLog.LogInfo("[UniGen] G 按下（godView=true, placing=" + Placer.Placing + "）");
+				if (Plugin.debugLog.Value) Plugin.ModLog.LogInfo("[UniGen] G 按下（godView=true, placing=" + Placer.Placing + ", carrying=" + ItemDragger.Carrying + "）");
 				if (Placer.Placing) Placer.Cancel("G 键");
+				else if (ItemDragger.Carrying) ItemDragger.Cancel("G 键");
 				else GenPanel.Toggle();
 			}
 
 			Placer.TickPlacing();
+			ItemDragger.Tick(); // 2.0.0：物品携带/投放
 		}
 		catch (Exception ex)
 		{
@@ -574,7 +873,14 @@ internal static class GenDriver
 		{
 			if (!Plugin.enabled.Value) return;
 			if (HostLink.EscMenuOpen) return; // 宿主设置菜单打开时隐藏全部本 mod UI（跟随宿主行为）
-			// 放置模式画底部徽标（与面板 open 状态解耦）；否则画面板 + 左下角开关
+			// 携带物品优先：全屏拖放态只画拖放 UI（与放置模式同款，画面不叠）
+			if (ItemDragger.Carrying)
+			{
+				ItemDragger.Draw();
+				GenPanel.DrawFlash();
+				return;
+			}
+			// 放置模式画底部徽标（与面板 open 状态解耦）；否则画面板 + 左缘开关
 			if (Placer.Placing) GenPanel.DrawPlacingBadge();
 			else
 			{

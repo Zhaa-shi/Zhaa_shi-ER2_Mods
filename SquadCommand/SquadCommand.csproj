@@ -82,6 +82,11 @@
       <HintPath>E:\SteamLibrary\steamapps\common\Easy Red 2\BepInEx\interop\UnityEngine.TextRenderingModule.dll</HintPath>
       <Private>false</Private>
     </Reference>
+    <!-- 1.2.0：GhostPreview 需要 Animator/AnimationClip/SkinnedMeshRenderer（AnimationModule） -->
+    <Reference Include="UnityEngine.AnimationModule">
+      <HintPath>E:\SteamLibrary\steamapps\common\Easy Red 2\BepInEx\interop\UnityEngine.AnimationModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
   </ItemGroup>
 
 </Project>

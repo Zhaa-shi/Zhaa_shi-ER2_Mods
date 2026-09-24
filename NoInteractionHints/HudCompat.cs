@@ -46,7 +46,8 @@ namespace ER2NoInteractionHints
 			{ "er2.weathercontrol", "ER2 Weather Control" },
 			{ "er2.healthbars", "ER2 Health Bars" },
 			{ "er2.highvaluetarget", "ER2 Veteran HVT" },
-			{ "er2.unitinfooverlay", "ER2 Unit Inspector" }
+			{ "er2.unitinfooverlay", "ER2 Unit Inspector" },
+			{ "er2.conquest", "ER2 Conquest" }
 		};
 
 		// 自动发现的惯例字段名（精确匹配）

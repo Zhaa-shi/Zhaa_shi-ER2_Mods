@@ -20,6 +20,9 @@ internal static class HostLink
 	private static FieldInfo fiSavedFaction;
 	private static FieldInfo fiEscMenuOpen;
 	private static FieldInfo fiRtsSquadSet; // HashSet<long>：宿主 RTS 分队集合（车辆驾驶资格门槛）
+	private static FieldInfo fiCameraPass;  // 2.3.0：宿主 externalCameraPass（放置/携带中放行相机，见 CameraPassThrough）
+	private static MethodInfo miGhostify;    // 1.0.4：宿主 GhostPreview.Ghostify（放置预览复用同一套幽灵视觉）
+	private static Type ghostPreviewType;
 
 	private static Func<Rect?> guiBlockDelegate;
 
@@ -55,6 +58,24 @@ internal static class HostLink
 			fiSavedFaction = godViewType.GetField("SavedFaction", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static);
 			fiEscMenuOpen = godViewType.GetField("escMenuOpen", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static);
 			fiRtsSquadSet = godViewType.GetField("rtsSquadSet", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static);
+			// 2.3.0：注册 externalCameraPass（宿主 1.4.16+）——放置/携带的全屏互斥只吞点击手势，
+			// 不冻结相机（滚轮/中键）。用户反馈"预放置时不能滚动滚轮改变视角"即旧版被冻结。
+			// 宿主旧版无此字段：null 跳过，行为回退旧版（滚轮仍被冻结，但不报错）。
+			try
+			{
+				fiCameraPass = godViewType.GetField("externalCameraPass", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static);
+				if (fiCameraPass != null)
+					fiCameraPass.SetValue(null, new System.Func<bool>(CameraPassThrough));
+			}
+			catch { }
+			// 1.0.4：宿主幽灵预览（放置预览复用；宿主缺失时静默降级为自绘标记）
+			try
+			{
+				ghostPreviewType = hostAsm.GetType("ER2SquadCommand.GhostPreview");
+				if (ghostPreviewType != null)
+					miGhostify = ghostPreviewType.GetMethod("Ghostify", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static);
+			}
+			catch { }
 
 			if (piActive == null || fiExternalGuiBlock == null)
 			{
@@ -135,5 +156,53 @@ internal static class HostLink
 			if (godViewType == null || piCurrentMark == null) return null;
 			try { return piCurrentMark.GetValue(null); } catch { return null; }
 		}
+	}
+
+	/// <summary>1.0.4：把 GameObject 幽灵化（复用宿主 GhostPreview 的同一套半透明视觉）。
+	/// 宿主缺失或调用失败返回 false——调用方回退自绘标记。</summary>
+	public static bool Ghostify(UnityEngine.GameObject go)
+	{
+		if (miGhostify == null || go == null) return false;
+		try { return (bool)miGhostify.Invoke(null, new object[] { go }); } catch { return false; }
+	}
+
+	/// <summary>1.0.4：宿主幽灵预览是否可用（不可用则放置预览退回自绘圈）。</summary>
+	public static bool GhostAvailable => miGhostify != null;
+
+	/// <summary>
+	/// 2.3.0：放置/携带中告知宿主"全屏互斥是拖放手势，不是 UI 面板"——
+	/// 相机输入（滚轮升降/中键旋转）照常，点击手势仍被 externalGuiBlock 吞掉。
+	/// 修复用户反馈"预放置时不能滚动滚轮改变视角"（宿主 1.4.16 的 externalCameraPass 契约）。
+	/// </summary>
+	private static bool CameraPassThrough()
+	{
+		return Placer.Placing || ItemDragger.Carrying;
+	}
+
+	private static MethodInfo miRegisterGhost, miUnregisterGhost;
+
+	/// <summary>1.0.8：把预览对象登记进宿主幽灵表（伤害免疫 + 相机地面射线豁免）。</summary>
+	public static void RegisterGhost(UnityEngine.GameObject go)
+	{
+		try
+		{
+			if (go == null || ghostPreviewType == null) return;
+			if (miRegisterGhost == null)
+				miRegisterGhost = ghostPreviewType.GetMethod("RegisterGhost", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static);
+			if (miRegisterGhost != null) miRegisterGhost.Invoke(null, new object[] { go });
+		}
+		catch { }
+	}
+
+	public static void UnregisterGhost(UnityEngine.GameObject go)
+	{
+		try
+		{
+			if (go == null || ghostPreviewType == null) return;
+			if (miUnregisterGhost == null)
+				miUnregisterGhost = ghostPreviewType.GetMethod("UnregisterGhost", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static);
+			if (miUnregisterGhost != null) miUnregisterGhost.Invoke(null, new object[] { go });
+		}
+		catch { }
 	}
 }

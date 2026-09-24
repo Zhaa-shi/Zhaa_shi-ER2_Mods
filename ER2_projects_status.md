@@ -12,21 +12,21 @@
 | 2 | `WeatherControl` | `er2.weathercontrol` | ER2 Weather Control | **1.7.2** | `ER2_WeatherControl.dll` | 已部署 |
 | 3 | `AIFood` | `er2.aifood` | ER2 AI Food | **1.4.0** | `ER2_AIFood.dll` | 已部署 |
 | 4 | `NoInteractionHints` | `com.ryan.er2.nointeractionhints` | ER2 Hide Anything | **4.5.4** | `ER2_NoInteractionHints_DoneProMaxEnd.dll` | 已部署 |
-| 5 | `ModManager` | `er2.modmanager` | ER2 Mod Manager | **1.5.2** | `ER2_ModManager.dll` | 已部署 |
+| 5 | `ModManager` | `er2.modmanager` | ER2 Mod Manager | **1.5.4** | `ER2_ModManager.dll` | 已部署 |
 | 6 | `ThrowableWheel` | `er2.throwablewheel` | ER2 Throwable Wheel | **1.3.6** | `ER2_ThrowableWheel.dll` | 已部署 |
 | 7 | `CombatTweaks` | `er2.combattweaks` | ER2 Combat Tweaks | **1.2.2** | `ER2_CombatTweaks.dll` | 已部署 |
 | 8 | `ZoomAnywhere` | `er2.zoomanywhere` | ER2 Zoom Anywhere | **1.0.1** | `ER2_ZoomAnywhere.dll` | 已部署 |
-| 9 | `HighValueTarget` | `er2.highvaluetarget` | ER2 Veteran HVT | **1.2.1** | `ER2_VeteranHVT.dll` | 已部署（+ Assets 目录） |
+| 9 | `HighValueTarget` | `er2.highvaluetarget` | ER2 Veteran HVT | **1.2.2** | `ER2_VeteranHVT.dll` | 已部署（+ Assets 目录） |
 | 10 | `InventoryPause` | `er2.inventorypause` | ER2 Inventory Pause | **1.0.5** | `ER2_InventoryPause.dll` | 已部署 |
-| 11 | `SquadCommand` | `er2.squadcommand` | ER2 Battlefield Commander | **1.2.15** | `ER2_BattlefieldCommander.dll` | 已部署 |
-| 12 | `UniversalGeneration` | `er2.universalgeneration` | ER2 Universal Generation | **1.0.10** | `ER2_UniversalGeneration.dll` | 已部署 |
+| 11 | `SquadCommand` | `er2.squadcommand` | ER2 Battlefield Commander | **1.4.17** | `ER2_BattlefieldCommander.dll` | 已发布 |
+| 12 | `UniversalGeneration` | `er2.universalgeneration` | ER2 Universal Generation | **2.4.1** | `ER2_UniversalGeneration.dll` | 已发布 |
 | 13 | `UnitCollision` | `er2.morephysics.unitcollision` | ER2 More Physics - Unit Collision | **1.0.8** | `ER2_MorePhysics_UnitCollision.dll` | 已部署 |
 | 14 | `UnitInfoOverlay` | `er2.unitinfooverlay` | ER2 Unit Inspector | **1.0.5** | `ER2_UnitInfoOverlay.dll` | 已部署 |
 | 15 | `FleshWoundsFixed` | `ER2_FleshWounds` | ER2 Flesh Wounds | **1.0.1** | （需手动构建部署，build.ps1 无条目） | 第三方修复版 |
 | 16 | `MorePhysics` | `er2.morephysics` | ER2 More Physics | **0.1.49** | `ER2_MorePhysics.dll` | 复活（本地未部署，发 Nexus） |
-| 17 | `Conquest` | `er2.conquest` | ER2 Conquest | **0.2.0** | `ER2_Conquest.dll` | **开发中**（战略层对齐 GoH 完整化，自检 15/15；M3 战斗桥接默认关闭待实测） |
+| 17 | `Conquest` | `er2.conquest` | ER2 Conquest | **0.2.0** | — | **已终止并删除（2026-09-19）**——战略层复杂度失控 + 战斗桥接未实测；源码快照在 `research_out/conquest_salvage/`（回收清单见其 README），复盘见 §2.18，续作 = 无尽模式 |
 | — | `HvtTestDriver` | `er2.hvt.testdriver` | HVT Test Driver | **1.0.0** | — | **内部自测工具，不发布** |
-| — | `ConquestRecon` | `er2.conquest.recon` | ER2 Conquest Recon | **0.1.0** | `ER2_ConquestRecon.dll` | **内部侦察工具（M0），不发布** |
+| 18 | `Endless` | `er2.endless` | ER2 Endless | **0.3.0** | `ER2_Endless.dll` | **M0 尖峰 v16（待实测）**：0.2.2 实测=交接链全通（设置面板弹出，文件日志实证）；用户要求**原生战役页全程不可见 + mod 任务不出现在战役页**→ v16=交接全程在本页遮罩后进行（自动点行/卡/「开始」）+ 战役注册临时制（主档在 endless/，交接时复制进 mission_editor，战斗开始后删除注册），原版战役页永久干净（详见方案 §14.16） |
 
 **注意**：`NoInteractionHints` 的 DLL 名 `ER2_NoInteractionHints_DoneProMaxEnd.dll` 与显示名 "Hide Anything" 完全不同——**DLL 名 ≠ 插件名**，按 GUID 识别。`HighValueTarget` 目录产出 `ER2_VeteranHVT.dll`（v1.1.20 起改名 "Veteran HVT"），旧发布包名 `ER2_HighValueTarget_*` 是历史遗留。
 
@@ -49,7 +49,13 @@ AI 血量低于 `eatBelowHp`（默认 **40**）自动吃背包食物回血：`Fi
 **关键机制**：`UiGroups` 注册表（Register/IsHidden/ApplyAll/Enforce）；`UiHiders`（ElementHider 记忆式隐藏 + RefCache 5s 冷却）；所有节流用 `Time.unscaledTime`。
 **v4.5.3+ 游戏 2.1.x 兼容**：`FindGameType("PhaseBarGUI")` 运行时探测，类型缺失时该类别跳过（不再 TypeLoadException）。
 
-### 2.5 ModManager `er2.modmanager` v1.5.2
+### 2.5 ModManager `er2.modmanager` v1.5.4
+**v1.5.4（2026-09-24，翻页音效被第三方吞掉）**：玩家接着报"翻页到 mod 管理器页面时没有音效了"。**根因不是我们漏播，而是原生音效被第三方 Prefix 连带吞掉**：`SettingsGUI_V2.SettingsTabRight/TabLeft` **自身会播点击音效**（v1.1.4 已实证——我们拦截原生翻页后必须手动补 `SoundManager.ClickSound()`），而 ACM 的 `SettingsTabRight` Prefix 在原生第 3 页**恒 `return false`** → 原生不执行 → 音效随之消失，而它的 `ResponsiveOrdersNativeSettingsPage.cs`（1629 行）**全文没有任何 `SoundManager` 调用** → 第 3 页 → ACM I → ACM II 整段静音。**修法（规则化，不是打补丁）**：**凡是"这次原生不会执行"的分支，都由我们补一声；会走到原生的分支一律不补**（否则和原生音效叠成双击）。新增 `ModRegistry.TabSound()`（补音 + 分支追踪）/ `TabTrace()`（只追踪不补音），落在 6 个分支上：`right:yield-thirdparty-open`（打开它的首页）/ `right:yield-thirdparty-next`（假页 1→2）/ `left:yield-thirdparty`（从它的假页左翻）补音；`right:enter-mods` / `left:enter-mods` / `left:wrap-mods` / `right:wrap-first` 由 `EnterMyPage`/`WrapToFirstPage` 内部已有的 `ClickSound` 覆盖；`right:pass-native` / `left:pass-native` 交给原生。追踪日志形如 `ModManager: tab <branch> cur=.. myIndex=.. thirdParty=open/2|closed|none`，实测一眼看出走的哪条分支。版本 1.5.3→1.5.4（BepInPlugin + 启动日志 + README + Nexus）。
+
+**v1.5.3（2026-09-24，第三方原生设置页共存）**：玩家来报想让本 mod 与 **Advanced Combat Movement 1.2.2**（GUID `AdvancedCombatMovement`，内含 Responsive Orders / Slower Vehicles）共存。反编译比对补丁目标后的定案：它**在原生第 3 页劫持 `SettingsGUI_V2.SettingsTabRight` 并恒 `return false`**，而它的 DLL 按字母序（A < E）先于我们加载、同优先级下先执行 → 它的补丁先跑并短路 → 我们追加在最末的 MODS 页**再也无法用右箭头翻到**（只剩"第一页左翻绕回"这一条旁路）。**修法（反射桥 `ThirdPartyPage`，无编译期依赖）**：① 我们的 `TabRightPatch`/`TabLeftPatch` 提到 `[HarmonyPriority(Priority.First)]` 先判状态；② 它的假页（`CurrentFakePage` 1=主设置 / 2=续页，都是 **public static 字段**，必须 `GetField`）停在末页时右翻 → 交给我们 `EnterMyPage`；③ 它的假页还没到末页 → 放行走它自己的翻页；④ 停在它的入口页（原生第 3 页）→ 让位，否则我们抢先接管、它的页面永远打不开；⑤ 交接/离开时用 `Detach()` 把它的 `IsOpen=false`/`CurrentFakePage=0` 复位（不清会有两个后果：从 MODS 页左翻被它的 `TabLeft` 抢走、以及下次误判"还在它的末页"而跳过它的页面）。未安装该 mod 时 `Present=false`，原有行为一字不变。版本 1.5.2→1.5.3（BepInPlugin + 启动日志 + README + Nexus）。
+**v1.5.2（2026-09-18 发布：删掉自锁的开发开关 NativeFull + 整文件删除 NativePage.cs）**（下略，见下一段完整原文）
+
+### 2.5x ModManager `er2.modmanager` v1.5.2（历史）
 **v1.5.2（2026-09-18 发布：删掉最后一个开发开关 NativeFull —— 自锁陷阱）**：v1.5.1 把 `NativeFull` 判为"文案正常、功能可用"的**备案例外**保留了下来，**当天即被推翻**：用户"不小心把 NativeFull 打开了，现在 mod 管理器不能使用了"。根因是**自锁** —— `NativeFull` 是 `er2.modmanager` 自己的配置项，因此**会出现在 ModManager 自己的 MODS 页上**：打开它就把那一页弄坏，而关掉它**只能靠那一页** → 界面上无法自救，只能手改 cfg。**修法：删除 `NativeFull` 开关（字段 + `Config.Bind` + `FillContent` 分支 + 每帧清理里的 `nativeMode` 分支），并整文件删除 `NativePage.cs`**（它只被这条路径引用：`BuildAndRender` + `PruneExtras`），MODS 页从此只有一条建页路径。**教训（已写入 AGENTS.md §7.1 判定标准）：任何会改变"你用来操作它的那个界面"的开关，默认关是不够的 —— 它必须不存在。判定时多问一句"这个开关打开后，我还有办法关掉它吗？"答不上来就删。**
 **v1.5.1（2026-09-18 发布：删除遗留 PoC 测试页 + 接入 debugLog 开关）**：玩家反馈 "mod menu is broken. with 'poc'"，MODS 页只剩四行 —— `poc.header`（空白框）/ `poc.toggle`（拨不动）/ `poc.slider`（拖不动）/ `poc.button`（写着 click、点了没反应）。**根因不是第三方 mod 的新方法，而是 ModManager 自己的开发期脚手架 `NativePage.RenderPoc`**：硬编码上述四行，标签是没走 `HumanizeKey` 的生 key，三个回调只写 `LogInfo` 不干事；`AddHeaderRow` 又是用空 `content` 的 `SettingButton` 冒充标题 → 所以是"空白框"。它随发布版一起发了出去，cfg 里 `NativePoc=true` 即命中。**本机 cfg 为 `NativePoc=false`，所以复现不出**（这就是"我试了没问题"的原因）；报告里连按钮的 "click" 文案都逐字对上，可排除第三方 mod 巧合。**修法：删除 `RenderPoc` / `DumpStructure` / `CompSummary` 与 `NativePoc` 开关（字段 + `Config.Bind` + `FillContent` 分支 + `nativeMode` 引用），发布版不再可达 —— 不是靠"默认关"兜底。** 同时按新约定接入 `Debug`/`debugLog` 开关（默认 `false`）+ `Plugin.DebugOn` 属性，把建页/模板/取值/chainloader/native row 五处诊断 `LogInfo` 收进开关（`LogError`/`LogWarning` 不门控）。版本 1.5.0→1.5.1，四处同步（`BepInPlugin` + 启动日志 + README + Nexus）。**教训：开发脚手架用完即删，绝不能靠"默认关"兜底发版**（已写入 AGENTS.md §7.1 强制约定）。
 **v1.5.0 发布状态（2026-09-12 23:27 定稿）**：部署 = **英文构建**（`DefaultChinese=false`，玩家要求），`ER2_ModManager.dll` 与 `bin\Release\net6.0` sha256 一致（`980989EA…`）；两个发布包 `C:\Users\71011\Downloads\ER2_ModManager_v1.5.0.zip`（EN）/ `ER2_ModManager_CN_v1.5.0.zip`（CN，`DefaultChinese=true`），拆包核对均为 **DLL + README.txt + Nexus_description.md**。**注意：ModManager 没有 `README_CN.txt`/`Nexus_description_CN.md`，CN 包内的文档仍是英文**（build.ps1 缺文件时回退英文）——如需中文文档要另写。发布前**已清掉全部临时诊断**（LAYOUT/SCROLL dump），README/Nexus 的 v1.5.0 变更说明已覆盖全部修复项。
@@ -93,7 +99,7 @@ AI 血量低于 `eatBelowHp`（默认 **40**）自动吃背包食物回血：`Fi
 ### 2.8 ZoomAnywhere `er2.zoomanywhere` v1.0.1
 **任意姿态/移动状态下都能屏息 + 武器放大**（原版只允许站定瞄准时屏息），可选额外放大倍率。默认键 **Left Shift**。
 
-### 2.9 HighValueTarget（Veteran HVT）`er2.highvaluetarget` v1.2.1
+### 2.9 HighValueTarget（Veteran HVT）`er2.highvaluetarget` v1.2.2
 **击杀归属**（`BulletInstance.OnHit` Prefix / 爆炸 `responsible` / 近战上下文 / `ItemHelmet.User` 兜底 + 玩家命中窗口 5s 防抢）+ **阈值标记**（敌 5 杀=HVT 橙标、友 2 杀=叛徒红标，阵营按 faction 的 `_` 后缀判定，跨国家同盟算友军）+ **仇恨聚焦**（覆盖 `Soldier.GetBestVisibleEnemy`，走原生目标选择）+ **标记强化**（减伤 0.6/加伤 1.4/命中 1.7/射速 1.4/移速 1.15/无视压制/不投降）+ **叛徒机制**（玩家可伤友军 + 友军集火玩家，穿透 CombatTweaks 友军保护）+ 玩家提示（Hint + 红屏 + 顶部常驻指示）+ M 大地图图标（跟随 `unitsContainer` 游戏标记，载具去重）+ **3D 头顶标记（v1.2.0）** + **载具乘员击杀共享（v1.2.0）**。
 **v1.2.0（2026-09-13，玩家两点反馈）**：① **头顶标记改 3D 世界空间**——IMGUI 屏幕投影改为 billboard quad（`MeshFilter`+`MeshRenderer`，材质 `Shader.Find("Sprites/Default")`，回退 Unlit/Transparent，全缺置 `Marker3dUnavailable` 走旧 IMGUI `DrawMarkersScreen` 回退路径；quad 显式写入白色顶点色——Sprites/Default 片元色=纹理×顶点色，缺省属性不可依赖）。锚点步兵 +3.0m、载具 = 碰撞体最高点+0.9m（`VehicleTopOffset` 按载具缓存，排除 >30m 的巨型触发体）；**恒定屏占比 `scale=dist×0.03`**（约 28px @1080p/FOV60，全程无拐点）。每帧 `LateUpdate`（billboard/位置/缩放），对象池对账在 0.5s Tick（`RefreshDisplayEntries` 快照 + `ReconcileMarkers` 补建/回收）。贴图 32→128px + 3x3 超采样。门控与旧版一致：暂停/M 地图/Hide Anything 勾选/MarkerRange；**遮挡=深度测试自然消隐**（ZTest LEqual，被完全挡住时消失，无手动 raycast）。② **载具乘员合并标记 + 击杀共享**——乘员枚举走 `Soldier.GetCurrentVehicle()` + `Vehicle.seats[i].unitSet`（interop 正道，实测）；`OnUnitKilled` 归属到射手后若在载具内 → 全体乘员各 `CreditKill` 一次（等级同步提升；玩家命中窗口兜底排除已是乘员的玩家防双计）；显示层 `RefreshDisplayEntries` 把载具乘员合并为一条目（等级取乘员最高），3D 标记与 M 大地图图标共用该快照 → 一载具一枚标记。
 **v1.2.0 追加修复（不升号，玩家实测三连反馈）**：① **近距离缩放不自然**——旧 `max(0.55m, dist*k)` 下限导致 18m 内标记停止缩小、屏占比膨胀；改纯 `dist×0.03` 恒定屏占比（原生 Marker3DGUI 有 `MarkerScreenSize()` 转换接口，同为恒定屏占比设计；interop 只有桩体，原生逻辑读不到，按设计意图对齐）。② **标记显示为白色菱形（根因定案）**——`GUI/Text Shader` 是**字体着色器**：RGB 取自材质 `_Color`、纹理只提供 alpha（property 名即暗示：`_MainTex ("Alpha (A)")` / `_Color ("Tint (RGB)")`），烘焙进纹理的深红/蓝底色全被无视。**教训：世界空间 quad 要显示纹理本色别用 GUI/Text Shader，用 Sprites/Default（片元=纹理×顶点色+片元内预乘，行为确定性最高）。** ③ **关闭叛徒机制仍被标叛徒**——根因是**归属记录污染**：友军伤害被友军保护拦截（不掉血 ✓）但 `RecordHit` 照写命中记录，友军稍后死于炮击/AI 互射时残留记录把死亡误归玩家 → 友军击杀 +1 → 标叛徒。修三处：`CreditKill` 友军分支顶部加 `TraitorFeature` 门控（关闭=友军击杀完全不计数不提示）；`RecordHit` 机制关闭时不记同方命中（源头堵住）；新增 `PardonTraitorsWhenDisabled` 每 tick 赦免现有叛徒状态（关闭开关=立即生效）。
@@ -104,11 +110,32 @@ AI 血量低于 `eatBelowHp`（默认 **40**）自动吃背包食物回血：`Fi
 **为什么需要它**：HVT 内部的 `LevelOf`/`TryGetState`/`UnitStates` 都是 `internal`，外部只能反射内部实现（不稳定，HVT 一重构就断）→ 把耦合点收敛到一个 public 类；且 HVT 自己有 `BattleEndResetPatch`（每场战斗结束重置等级），而**跨战斗的持久军队**（如征服模式）必须能把等级灌回来。**本版无玩法改动**，接口在无人调用时是惰性的。消费者：`Conquest`（见 §2.18，走 `Conquest/Game/VeteranLink.cs` 反射对接，无编译期依赖）。
 **陷阱（本次踩到）**：`Squad` 的成员列表字段是 **`units`**（`Il2CppSystem.Collections.Generic.List<Soldier>`），**不是** `soldiers`；班成员数用 `CountMembers` 属性。写对接代码前先 `ilspycmd -t Squad` 核对字段名。
 
+**v1.2.2（2026-09-19，玩家反馈标记缩放反直觉）**：① **3D 标记改固定世界尺寸**——旧 `scale = dist * MarkerDistScale(0.03)` 是"恒定屏占比"公式（世界尺寸随距离线性放大以抵消透视缩小），玩家实测观感**反成"近小远大"**（近处偏小、远处膨胀过度），且不符合真实透视直觉。改 `MarkerWorldSize = 0.8f` 常量 → 屏上大小 = 纯透视投影，真实近大远小（0.8m 为用户实测定稿值，初版 1.6m 偏大）。锚点/遮挡/门控逻辑不变。**教训：恒定屏占比公式 `dist*k` 在数学上正确，但实际 FOV/视场动态变化与锚点偏移（+3.0m）叠加后观感会失真——涉及"屏幕恒定"的设计必须实测，不能只看公式。** ② **接入 `Debug/debugLog` 统一调试开关**（AGENTS.md §7.1 约定；原 6 处 `LogInfo` 全部门控，`LogWarning` 不门控）——HVT 从"尚未接入"名单移出。
+
 ### 2.10 InventoryPause `er2.inventorypause` v1.0.5
 打开背包（自己/尸体）时**真暂停**（延迟 timeScale 冻结，等打开动画完成）；暂停期间丢弃道具自动落地（扫描 `ItemObject.spawnedItems`）。
 **ER2 暂停机制图谱（全部实测定案，做任何暂停功能前必读）**：原生 `Pause.SetPause` = timeScale=0 + 弹菜单 + `disableOnPause`（藏菜单 = 死锁）；手动 `Pause.isPaused=true` 禁用输入但**不冻结世界**；`timeScale=0` 真暂停但**卡 UI 协程动画** + 丢弃武器浮空（解法：延迟冻结等动画完成 + 扫描 `spawnedItems` 拉下道具）；`enableAiBehaviour(false)` **无效**（true 才有效）；背包开关读 `InventoryPanel.isOpen`。
 
-### 2.11 SquadCommand（Battlefield Commander）`er2.squadcommand` v1.2.15
+### 2.11 SquadCommand（Battlefield Commander）`er2.squadcommand` v1.4.17
+**1.4.17（2026-09-24，用户第 17 轮：让单位拾取枪械时可以隔空拾取）**：
+- **根因（结构定案）**：地面物品右键按交互数分流——单交互 → `RequestItemPickup`（联动半径内即时 / 超出派兵走过去，正确）；多交互 → `OpenGroundMenu`，点条目 = **原样 `Interaction.Call()`**。**`HandheldItem`（`Weapon` 父类）覆写了 `GetInteractions`**（普通 `ItemObject` 不覆写，已反编译证实）→ 地面枪械天生多交互（"拾起置于右手"等，Ui 词典既有条目可证）→ **永远走菜单路径**；而原生拾起交互是为 FPS 玩家设计的，距离由玩家自身保证，`Call()` **无距离检查** → 隔空吸进交互者背包。普通物品不受影响，所以用户观察到"只有枪械隔空"。
+- **修法**：`BackpackPanel` 菜单增 `menuRaw`（与 `menuLabels` 严格等长的**未翻译原文**平行列表——剪枝与三处合成"穿上"条目同步增删）；`ExecuteInteraction` 里 `menuGroundItem != null` 且原文以 **"拾起"** 开头 → 改调 `RequestItemPickup(item, item.transform.position)`（联动半径内即时 / 超出派最近选中士兵走过去到达再捡，与单交互物品**同一条链路**），`LogAlways` 记录改道；其余交互（弹药箱"补充弹药"等）保持 `Call()`。格子物品菜单（`menuWin != null`）不受影响。新增 Ui 词条 `["物品已失效"] = "That item is no longer there"`。
+- 验证：编译 0 error；部署 DLL 203,264 B，sha256 `BDD7F1C26CCFCB4D0F7E0C3604238E6C25EC00342AC316C009F041AC0CFE8FBC`，与构建产物逐字节一致；`ER2_BattlefieldCommander_v1.4.17.zip`（20:23 重打包含新 README/Nexus）；反编译复核：`[BepInPlugin]`+启动日志双 1.4.17、`menuRaw` 列表 + 三处 `"穿上"` 占位 + `StartsWith("拾起")` 重路由 + `LogAlways` 改道日志 + Ui 词条全部在位 ✓。
+
+**（以下为历史版本条目，标题保持 1.4.16）**
+**1.4.16（2026-09-24，配合 UniGen 2.3.0：放置/携带中滚轮被冻结）**：
+- **用户反馈（经 UniGen 侧）"预放置时不能滚动滚轮改变视角"** → 根因：UniGen 放置/携带物品期间把 `externalGuiBlock` 报成**全屏 Rect**（防投放点击误触框选/指令），而 `UiPointerCapture()` 直接复用 `IsMouseOverGui()` → 同一个布尔既吞点击手势**又冻结相机**（`HandleHeight` 滚轮、`HandleDrag` 中键起手）→ 全屏互斥期间相机全死。
+- **修法（契约扩展）**：新增 `externalCameraPass`（`Func<bool>`，附属 mod 反射赋值，CS0649 预期）——`UiPointerCapture()` 命中 UI 后先问它，返回 true = "这次全屏是拖放手势不是面板" → 相机放行（滚轮/中键照常），**点击手势仍被 `externalGuiBlock` 吞掉**（互斥语义不变）。未赋值（旧附属 mod）= 行为与 1.4.15 完全一致。
+- 验证：编译 0 error；部署 DLL 202,752 B，sha256 `CEA6D4AD8E33802D808E1519C7805182634A9D5E997476E7EF167131CDBB9AE1`，与构建产物逐字节一致；`ER2_BattlefieldCommander_v1.4.16.zip`；反编译复核版本 1.4.16、`externalCameraPass` 字段与 `UiPointerCapture` 放行分支在位 ✓。
+
+**（以下为历史版本条目，标题保持 1.4.15）**
+**1.4.15（2026-09-24，修复 + 第三方 mod 兼容）**：
+- **① 上帝视角打开设置后滚轮仍能控制视角（玩家报）** → 根因：`Tick()` 里 `HandleMove/HandleHeight/HandleDrag` **完全不受 `escMenuOpen` 约束**（只有空格暂停、快捷键、IMGUI 绘制做了让位），于是原生 ESC 设置菜单开着时 WASD 平移、滚轮升降、中键旋转照旧生效。**修法：新增 `UiPointerCapture()` 让位判定**——`menuCapture`（ESC 菜单）= 冻结**全部**相机输入；`uiCapture`（指针停在我们的面板/背包窗口/信息面板/外部 mod 面板上，**复用已有的 `IsMouseOverGui()`**）= 只冻结**鼠标驱动**的相机操作（滚轮、中键起手），键盘 WASD/Q-E 保持可用（否则光标恰好压在小队列表上会让人以为"相机坏了"）。中键已在旋转中的手势不被打断（指针捕获惯例），只是不能在 UI 上起手。
+- **② 兼容 Advanced Combat Movement（Responsive Orders）的"永久停火"**：它对 `Squad.SetHoldFireOrder` 加了 Prefix，命中 `setEnabled=false && play_order_arnim=false`（正是我们"恢复开火"的调用签名）且**小队长 == 当前操控兵**时只记一次危险记忆就 `return false` → 下过移动令的小队可能**永远不再还击**。**修法：新增 `ResumeFire(Squad)`** = 「调用 → 回读校验（`sq.HoldFire`/`sq.holdFire`）→ 仍停火就直写原生 `holdFire` 字段」（字段写入不走方法，Harmony 前缀拦不住）。没装该 mod 时校验必然通过，行为零变化。两处调用点（`ClearMoveObservation()`、行军停火保险丝到期）已改。
+- **③ 键位冲突结论（实测无误伤）**：其 F（标记/跟随）、H（停火）、F1（重开任务）走原生 `PlayerController.Update`，而上帝视角内该 Update 被我们的 `GodViewSkipUpdatePatch` 跳过 → RTS 内 F=分散（我们）、FPS 内 F=它的标记命令，**互不干扰**。另：我们的 `ToggleHoldFireSelected`（B 键）本就直写 `sq.holdFire` 字段，不受影响。它的 AI 防守驻留（Defensive Hold / Danger Memory / Artillery Evasion）会给小队下**它自己的**移动令，属设计层冲突 → 启动时检测到该 mod 会打一条共存提示日志，README/Nexus 已写明在它的设置页关掉对应开关。
+- 验证：编译 0 error；`ER2_BattlefieldCommander_v1.4.15.zip` 已产出并部署（plugins DLL 18:29）；启动日志版本串已反编译复核为 1.4.15。
+
+**（以下为历史版本条目，标题保持 1.4.14）**
 **本工作区最大工程**（`GodViewController.cs` 150+ KB + `Formation.cs`/`GhostPreview.cs`/`InfoPanel.cs`）。F9 进上帝视角的 RTS 小队指挥层，操作仿 Gates of Hell。详见 `ER2_zcode_era.md` §1 与 `SquadCommand/README.txt`、`GPT_CONTEXT.md`、`ROADMAP.md`。
 **1.2.0（2026-09-13）**：① 删除右键长按命令环 → 命令快捷键（cfg Hotkeys 可改键：Z/X/C 站蹲趴、V 停止、B 停火、N 就近掩体、M 集合、F 分散）；② 长按+拖动 = 阵型箭头（线中心=长按点、垂直箭头、长度=箭头长，上位替代旧载具朝向拖动，`dragFacing` cfg 已删）；③ 有原生掩体（`CoverManager.GetCovers` 按阵营+受敌方向查询）→ 步兵进掩体，无掩体沿阵型线垂直排开；拖动中白色半透明幽灵模型预掩体位（克隆士兵 GameObject 换半透明白材质，失败自动降级为标记）；载具到位（距槽≤7m）后按箭头方向直驱转向；④ 左下角新增选中单位信息面板 + 只读装备/背包（`InfoPanel.cs`）。
 **1.2.1（2026-09-13，用户实测修复）**：① **`Lua_Soldier.findCover` 实测不下移动令**（分配掩体的单位原地不动）→ 掩体改走 `MoveUnits` + 到位（≤1.8m）`setPose(建议姿态)`（计入 poseLockedUnits，退出还原）；② 拖动视角抽搐 = 掩体查询/幽灵克隆的帧尖刺 → 查询半径钳 35m + 枚举 24 上限 + 幽灵池化（拖动中只建不毁、6 个/刷新预算、16 封顶、计划外隐藏）；③ 信息面板去底板、文字贴左缘（x=12）双描影（用户要求）；④ 行军/登车虚线改为只对当前选中单位显示；⑤ 死代码清理（wheelAnchorWorld/hasWheelAnchor）。
@@ -137,10 +164,227 @@ AI 血量低于 `eatBelowHp`（默认 **40**）自动吃背包食物回血：`Fi
 **1.2.13（2026-09-13）**：① **光标完全看不见** → 1.2.12 改用 `Camera.onPreRender` + `Graphics.DrawTexture` 绘制，而 `onPreRender` 在相机渲染**之前**执行，画的内容随即被相机清屏覆盖（所以什么都看不到）。**改回 IMGUI 绘制**（`OnGUI` Repaint 阶段覆盖在最终画面之上，稳定可见）。**教训：`onPreRender` 里画的东西会被该相机自己的清屏吃掉——要覆盖画面必须用 IMGUI 或在所有相机之后。** ② **样式重做**（用户反馈"十字不好看"）：默认改为**箭头光标**（RTS/Gates of Hell 惯用形态：经典指针多边形 + 1px 黑描边 + 状态色填充，热点在尖端）；新增 cfg `cursorStyle`（`Arrow` 默认 / `Cross`），选 `Cross` 时用重画的**细线十字**（1px 主色 + 描边 + 中心点，不再是又粗又白的方块感）。拖动阵型与放置模式**强制十字**（精度场景）。状态色：白默认/绿友军/红敌军/青载具(带小方框)/黄建筑/橙火力点(带转向弧)/浅蓝可交互。`InvalidateCache()` 让样式切换即时生效。
 **1.2.14（2026-09-13）**：**光标样式改为"空心半透明圆环"**（用户定案，箭头样式不理想）。环内不填充、主色半透明（alpha 0.55）+ 外侧一圈更淡的暗色描边（浅色地形上也能分辨），环心即热点。cfg `cursorStyle` 三选：`Circle`（**默认**，空心半透明圆）/ `Arrow`（箭头）/ `Cross`（细线十字）；`InvalidateCache()` 让切换即时生效。颜色仍随指向对象变化（白默认/绿友军/红敌军/青载具/黄建筑/橙火力点/浅蓝可交互）。
 **1.2.15（2026-09-13，发布预览版）**：**幽灵残留收口 + 组件遍历合并 + 英文版发布**。
+**1.2.16（2026-09-18，用户实测修复：幽灵原色/碰撞 + 光标遮挡 + 选多人拖动异常）**：① **幽灵变回原色** → 1.2.15 把材质换进 `Component[]` 单次遍历，实测"`c is Renderer` 未命中"（IL2CPP 下泛型遍历的类型判别不可靠）→ **材质改回已验证的强类型 `GetComponentsInChildren<Renderer>()`**，并加多 shader 兜底（Sprites/Default → Legacy Transparent → Unlit/Transparent → Particles → URP Unlit → Internal-Colored）。② **诊断补齐**：材质创建失败此前走 `debugLog` 门控日志 → **静默失败**（表现为幽灵原色/附属预览不显示却查不到原因）；现在幽灵化完成时无条件 `LogAlways` 一次（shader 名 / 换材质渲染器数 / 停用碰撞体数）。③ **光标被菜单遮挡** → `MouseCursor.Draw` 里把 `GUI.depth` 压到 -30000（IMGUI 中 depth 越小越后画），光标压到其它 IMGUI 之上。④ **选中人多时右键拖动异常** → 克隆整具士兵（骨骼+蒙皮）很贵，人多+快速拖动会叠成帧尖刺：幽灵总量 16→10、每轮新建 6→3、新增"**手稳**"判据（鼠标本帧位移 <20px 且上一帧不慢才允许新建，否则只 `MoveOnly` 平移已有幽灵）。⑤ 拖动起止各记一次 `[DragCam]` 相机状态（无条件、每次拖动两行），用于判定"镜头乱飞"到底是相机被移动还是标记在跳。
+**1.2.17（2026-09-18，用户实测修复：阵型失效 + 幽灵回归原色/带碰撞）**：① **阵型功能完全失效（1.2.15 引入）** → 1.2.15 加的看门狗（`DragTick` 检测"右键已松开"即取消）**在松开的那一帧抢先于 `HandleClick` 执行**（`DragTick` 在 Tick 持久段、`HandleClick` 在其后）——同帧把 `dragging` 置 false，随后 `IssueFromDrag` 直接 return → **阵型永远不下发**。修法：看门狗加 0.15s 宽限（`rmbUpSince`），只有"松开后迟迟没被收尾"才取消。**教训：给每帧轮询的函数加"状态检测"兜底时，必须先厘清同帧内其它消费方的执行顺序——兜底不能比正常路径先跑。** ② **幽灵变原色/带碰撞/带物理（1.2.15 引入，1.2.16 只修了一半）** → 1.2.16 只把**材质**改回强类型遍历，`Rigidbody`/`Joint`/`Collider` 仍留在 `Component[]`+`is` 判别里（同样不可靠）→ 幽灵仍带碰撞与物理（僵体乱动 = "视角乱飞"的实因，用户在 1.2.15 观察到的"选多人拖动时"正是幽灵多的时候）。现在 `ProcessComponents`/`DetachAndPacify`/`UnregisterGhost` **全部改回强类型 `GetComponentsInChildren<T>()`**。③ **幽灵数量对不上绿圈** → 1.2.16 的"手稳"判据（鼠标本帧位移 <20px 才建幽灵）在拖动中恒 false → 幽灵建不出来；且总量/每轮配额被砍到 10/3。已撤判据、恢复 16/6（幽灵按单位指针池化，本身只建一次；真正的惰性化靠强类型遍历实现）。④ 删除无调用方的 `MoveOnly`。
+**1.2.18（2026-09-19，用户实测修复：阵型失效真因 + 绿圈删除 + 光标置顶）**：① **阵型仍然失效（真因）** → 1.2.17 只修了看门狗时序，**漏了 `ResetRightGesture`**：1.2.15 在它里面加了"formationDragActive 时 CancelDrag"，而**松手收尾路径正是先 `ResetRightGesture()` 再 `IssueFromDrag()`** → 计划被清空、`dragging=false` → `IssueFromDrag` 直接 return。修法：`ResetRightGesture(bool cancelFormationDrag = true)`，**松手路径传 false**（由 Issue/Cancel 自己收尾）；其余中断路径（`ResetInputState` 等）仍取消。② **删除拖动中的绿色掩体圈**（`FMC` 环，用户要求）；删除时把共用循环变量 `int i` 的声明一并带走 → 补回。③ **自绘光标被通用生成面板遮挡** → `DrawPatch` 加 `[HarmonyPriority(800)]`（postfix 高优先级=后执行），让我们的 HUD（含光标）画在其它 mod 的 OnGUI 之后。
+**1.2.19（2026-09-19，用户实测修复：光标遮挡 + 预览碰撞/大班型直接生成）**：① **自绘光标被通用生成面板遮挡**（1.2.18 的 `HarmonyPriority(800)` 无效）→ 根因：我们的 HUD 与 UniGen 面板都是 `PlayerController.OnGUI` 的 Postfix，**在同一个 IMGUI 回调上下文里执行**，`GUI.depth`/patch 顺序都管不到"同一回调内的先后"。修法：**光标改回 `Cursor.SetCursor`（系统级光标）**——由 OS 合成，永远在一切内容之上且零延迟；圆环贴图是纯距离函数生成（可靠，1.2.5 时代的白块是箭头多边形算错）。形状变化或每 2s 重申一次 SetCursor；`CursorVisiblePatch` 改为强制 `visible=true`（SetCursor 贴图只在 visible 时显示）；退出 RTS `SetCursor(null)` 还原。② **幽灵与已有单位碰撞** → 见 UniGen 1.0.14。
 ① **幽灵可能残留在场上**（用户反馈"即便取消右键长按"）→ 审计出多条泄漏路径：`ResetRightGesture` 只清 `formationDragActive`、**没清 `Formation.dragging` 与幽灵**；松手时若鼠标在 UI 上（`guiNow`）直接跳过、既不执行也不清理；退出 RTS 的路径同样只置标志。现在新增 **`Formation.CancelDrag(reason)`**（唯一的中断入口：置标志 + 清计划 + `GhostPreview.ClearAll()`），并在**所有**结束路径调用：手势复位、UI 上松手、退出 RTS；另加**看门狗**（拖动中若"已退出 RTS"或"右键已松开"→ 立即取消），兜住所有异常路径。
 ② **组件遍历合并（性能）**：`Ghostify`/`MakeGhost`/`DetachAndPacify`/`UnregisterGhost` 原来各做 5~8 次 `GetComponentsInChildren`，现合并为**单次遍历**（`ProcessComponents` 一次处理 Collider/Rigidbody/Joint/Camera/Light/Renderer/Behaviour）；`Apply` 的"计划外幽灵"比对由 O(n×m) 改 HashSet；幽灵指针表加 512 上限防无界增长。
 ③ **英文版发布**：`-Mod SquadCommand`（EN 默认包）构建部署并打包 `ER2_BattlefieldCommander_v1.2.15.zip`；`ER2_UniversalGeneration_v1.0.10.zip` 同步。验收：双端 sha256 一致 ✓、反编译确认 `Ui.Tr` 走英文字典（EN 构建）✓、zip 内 DLL+README+Nexus_description 齐全 ✓。
-### 2.12 UniversalGeneration `er2.universalgeneration` v1.0.10
+**1.3.0（2026-09-19，大功能：格子背包系统，新增 `BackpackPanel.cs`）**：
+① **格子背包多窗口（MC 风格）**——容器统一走 `InventoryManager`（士兵背包/尸体背包/载具货舱一套代码），可同时开多个窗口：每页 6×4 格 + 翻页 + 可拖动标题栏 + 负重条（`GetWeightAndMaxWeight`）+ 右上关闭；物品 = 游戏原生图标（`ItemObject.icon` 同步实测路径为主，null 时 `LoadIconAsync` 异步补，绘制 `GUI.DrawTextureWithTexCoords` 防 atlas 整图）+ 数量角标（弹匣=弹药数、堆叠物=stackCount）+ 悬停提示；穿戴/手持（`vi.IsWearedItem()`）灰框锁定不可拖。
+② **鼠标拖拽交换**——拿起→放到其他格：空格=移动/同窗重排（`List.RemoveAt+Insert`）、有物=交换、同 id 可堆叠=合并（`Get/SetStackCount`，上限 `GetMaxAmmoStackCount`/prefab `maxStack`），全部带负重校验（`GetWeightAndMaxWeight` 自算，取不到退 `HasSpaceFor`）；**拖到所有窗外松手=扔地上**（`DropItem`，未生效兜底 `ExtractAndInstantiate`+手动移除）；右键/ESC 取消拖拽。
+③ **搬移通道（关键决策）**——不走 `TakeIntoInventory`/`AddVirtualItem`（陷阱 16：归一化成基类会废弹匣/弹药子类），直接 `items.RemoveAt/Add`（ThrowableWheel 已验证注入法）；debugLog 记录搬移前后子类类型名（`GetIl2CppType().Name`）验证无降级。
+④ **锚点规则（用户定案）**——第一个打开的背包为锚点：其余背包距锚点超过 `packRange`（cfg `Control/packRange`，默认 25m，5–100）拒绝打开；打开后每 0.5s（unscaled）复检，超距自动关闭；锚点窗口永不受范围规则约束，锚点关闭后由最旧余窗接任。
+⑤ **尸体可左键选中**——`ClickActOrCancel` 加尸体分支（阵亡 Soldier，不分阵营）→ `SelectedCorpseUnit` 选择槽（与单位/物品选择互斥），信息面板尸体行 + [背包] 开窗（此前尸体点不中 → 尸体背包开不了）。
+⑥ **入口与清理**——信息面板 [背包]/[货舱] 按钮 + 新热键 G（`Hotkeys/keyPack`）；分类列表背包面板（1.2.5）删除；`BackpackPanel.WantsMouse()` 挂进 `IsMouseOverGui`（拖拽中全屏吞手势防误框选）；`CloseAll()` 幂等单入口挂 Exit/TakeControlSelected/Enter；拖拽态收口 `ResetDrag`（ESC 菜单打开即收）。窗口内格子快照与 `items` 列表做一致性守卫（AI 0.25s 间隙动过背包 → 提示重试）。
+验证：EN/CN 双包重建（zip 内 README/Nexus 版本号 1.3.0 ✓、DLL 与部署 sha256 一致 ✓）。**1.3.0 首轮实测（用户反馈 5 项）→ 1.3.1 修订，见下**。
+**1.3.1（2026-09-19，用户实测修订五连）**：
+① **图标不显示** → 取图链改多级兜底：`GetItemPrefab()`（null 再试 `ItemsDatabase.GetItemObject`）→ `ItemsDatabase.cachedLoadedSprites` 按 id 直取/扫 name → `LoadAndCacheSprite(id/id_icon/icon_id, "er2gui")` → `LoadIconAsync` 异步；**全链失败无条件 `LogAlways` 一次/id**（prefab 有无 + cachedSprites 数 + 异步挂起，不被 debugLog 门控），失败后 2s 节流重试同步链。**待日志定真因**。
+② **无法选中尸体** → 三层修复：`IsAlive` 访问加 try/catch（尸体上 interop 属性异常会吞掉整个点击分支）；点击兜底 `NearestDeadSoldier(hit.point, 1.2m)`（布娃娃层级脱离/点到尸体上的枪时按 `Creature.allCreatures` 就近找阵亡士兵，禁 FindObjectsOfType）；未命中可选物时记 debugLog 命中诊断。
+③ **武器不能丢弃** → 穿戴/手持物品**允许拿起**，但只能**丢到地上**：首选士兵原生卸下路径 `DropItemNow(wearedItems 索引)`（正确处理手持模型），兜底 `DropItem` → `ExtractAndInstantiate`+手动移除；放回格子提示「装备中的物品只能丢弃到地上」。
+④ **物品太杂乱** → 格子改**同 id 合并成一格**（×N=总数：弹匣 Σ弹药数/堆叠 ΣstackCount，格内 N 件 VirtualItem），按 武器→弹药→爆炸物→医疗→装备→其他 分类排序；**拖动=整组移动/交换**（放下时按 id 活取成员，AI 间隙消耗过也一致）；删掉逐格堆叠合并逻辑（合并=同 id 移动）。
+⑤ **联动半径太大** → `packRange` 默认 25→**3m**（范围 1–100），提示改「距离太远（需距锚点 {0}m 内）」。
+验证：EN/CN 双包重建 1.3.1（DLL 与部署 sha256 一致 ✓）。**1.3.1 复测：武器丢弃 ✓（日志 DropItemNow 全成功）、图标仍不显示、尸体仍选不中 → 1.3.2，见下**。
+**1.3.2（2026-09-19，图标根因定位 + 尸体交互改右键）**：
+① **图标不显示（根因定位）** → 回读 LogOutput：1.3.1 的「图标未命中」诊断 **0 次触发** 且无任何异常 → **Sprite 实际取到了，是绘制调用不生效**：`GUI.DrawTextureWithTexCoords` 在 IL2CPP interop 下画不出像素（1.2.4 用整图 `GUI.DrawTexture` 是可见的）。修法：**整图优先**——`textureRect` 覆盖全贴图（独立贴图图标，绝大多数情况）直接 `GUI.DrawTexture(fit, tex, ScaleMode.ScaleToFit)`，仅图集子区域才走 TexCoords；每个 id 首次绘制/失败路径各记一次无条件诊断（tex 尺寸/name/tr）。
+② **尸体交互改右键（用户定案）** → 尸体**不可左键选中**（`SelectedCorpseUnit` 选择槽/信息面板尸体行/左键兜底全删，左键点尸体=空白清选）；**选中单位后右键尸体=开背包窗口**（直接组件查找 + `NearestDeadSoldier` 1.2m 就近兜底），无选中提示「先框选/选中单位」；`RightPressHitsUnit` 把尸体/物品也算"按在对象上"→ 长按不起阵型。
+③ **右键地上物品=拾取** → `IssueDirectCommand` 加物品分支：`PickupItemBySelected` 最近选中士兵（无步兵回退最近选中载具货舱）走原生 `AddItemToInventoryAndDestroyInstance`（实体消失入包）；`IssueDirectCommand` 重构为先射线后早退（无选中时对尸体/物品也能给提示）。
+验证：EN/CN 双包 1.3.2（sha256 一致 ✓）。**1.3.2 复测：右键尸体开背包 ✓；图标仍不显示（诊断行抓到真因）、拾取被尸体兜底拦截、隔空开尸包 → 1.3.3，见下**。
+**1.3.3（2026-09-19，图标 GC 真因修复 + 拾取拦截修复 + 派兵翻尸体）**：
+① **图标不显示（真因实锤）** → 1.3.2 诊断行输出：图标全是 **256×256 图集子区域**（`icon_carbine_m1` 等，走 TexCoords 路径），随后 **`绘制异常 Object was garbage collected in IL2CPP domain`**——图标 Sprite/Texture 只存在 C# Dictionary 的包装类里，**IL2CPP Boehm GC 把对象回收了**（1.3.0/1.3.1 的空 catch 吞掉同款异常 = 此前"不显示"的完整因果链）。修法：**IL2CPP 侧强引用保活**——`Il2CppSystem.Collections.Generic.List<Sprite/Texture>` 静态登记（CacheIcon 统一入口），跨分支生效（模板 icon/全局缓存/bundle 直取/LoadIconAsync 回调）。
+② **右键物品拾取不触发** → 日志「拾取」零条 = 分支没进：掉落物就在尸体旁，**尸体的 NearestDeadSoldier(1.2m) 兜底抢先拦截**（开了尸包没拾取）。修法：**物品分支提到尸体判定之前**。
+③ **隔空开尸包（用户定案不许）** → 右键尸体：最近选中士兵已在 packRange 内 → 直接开窗；**否则原生 `new Lua_Soldier(best).moveTo(corpsePos)` 派他走过去**，`BackpackPanel.LootTick()`（Tick 持久段 0.25s 节流）检测到达（≤packRange）自动开窗；90s 超时/士兵死亡取消并提示。
+④ **尸体悬停无光标** → `MouseCursor.Probe` 补：阵亡 Soldier → Shape.Interactable（浅蓝，与物品一致）。
+验证：EN/CN 双包 1.3.3（sha256 一致 ✓）。**1.3.3 复测：IL2CPP 侧保活 List 仍被 GC（诊断行依旧满屏 "Object was garbage collected"）→ 1.3.4 终案**。
+**1.3.4（2026-09-19，图标终案：光栅化自建贴图 + 右键友军会合开双背包）**：
+① **图标（终案）** → 1.3.3 日志实锤 `Il2CppSystem.List` 保活也拦不住 Boehm GC → 放弃保活外国对象：图标解析成功后**立刻光栅化**——`Graphics.Blit(图集) → RenderTexture → ReadPixels(子区域)` 拷进**自建 Texture2D**（hideFlags 61 陷阱 12 + C# 侧 keep-alive），之后 `GUI.DrawTexture` 只画自建贴图（与 whiteTexture 同一条全程已验证路径，绘制零外国对象）；光栅化只在 IMGUI Layout 阶段做（不打断绘制状态），每 id 首次记无条件诊断（`光栅化 OK WxH` / 异常）。
+② **右键徒步友军=会合开双背包（用户定案）** → 原"视为地面移动"移除：`RequestLoot(sol, pos, openBoth:true)`——最近选中士兵走到联动半径内到达后**同时开目标与 walker 自己的背包**（`ForceOpenSoldier` 强开，区别于按钮的 toggle，防同指针二次调用把窗关掉；walker==目标时只开一个）；车内友军仍是补员上车，右键地面仍是移动。
+③ 翻尸/会合统一为一个状态机（`lootBoth`/`lootSkipWalker`），90s 超时提示改「没有走到目标旁，已取消」。
+验证：EN/CN 双包 1.3.4（sha256 一致 ✓）。**1.3.4 复测：图标 ✓（光栅化方案实锚生效，截图可见全部物品图标）、会合流程 ✓；新需求：物品原生交互 → 1.4.0**。
+**1.4.0（2026-09-19，原生交互菜单）**：
+① **右键格子 = 游戏自己的交互菜单**——`vi.GetInventoryInteractions(所属背包, 所属背包)` 取该物品全部原生交互（穿戴/吃/医疗/卸下…，游戏本地化文案），IMGUI 弹出小菜单，点条目 = **`Interaction.Call()` 原生执行**（能走原生管线就走原生，陷阱 17）。点菜单外/再次拾取/ESC 菜单/窗口关闭 → 收菜单（CloseMenu 单入口，挂 CloseAll 与 ESC 钩子）；菜单 Rect 纳入 WantsMouse 防手势穿透。执行后 Flash 文案 + LogAlways（`[Backpack] 交互执行/交互失败`，失败不门控）+ 刷新窗口。
+② 已知限制（待实测）：interactor 传的是**所属士兵自己的背包**（兵用自己的东西）；长按类交互（IsHoldAction）在 RTS 下可能只触发一次；无交互的物品提示「该物品没有可用交互」。
+验证：EN/CN 双包 1.4.0（sha256 一致 ✓）。**1.4.0 复测 8 项反馈：日志零条「交互执行」→ 菜单点击被底下格子吃掉（穿透），穿戴/刺刀"不生效"其实是菜单根本点不到 → 1.4.1**。
+**1.4.1（2026-09-19，菜单模态化（总根因）+ 8 项反馈修复）**：
+① **交互菜单模态化（总根因）** → 菜单画在窗口之后但点击裁决在格子之后 → 菜单底下格子先吃掉点击（误触拾取拖拽=「操作丢失」、菜单项永远点不到=「穿不上/刺刀装不上」）。修法：Draw() **进格子前先裁决**——菜单开着时 MouseDown：命中条目=执行+收菜单；点菜单外=只收菜单并吞掉事件。DrawMenu 变纯绘制。
+② **选择与窗口生命周期（用户定案）** → `ClearSelection()` 挂 `BackpackPanel.CloseAll()`（取消/更换选择=关窗）；**背包窗口开着时左键空地不清选**（`ClickActOrCancel` 尾部 `HasOpenWindows` 守卫，保护拖拽/交互工作流）。
+③ **地上物品** → a) `HandleGroundItemClick`：`ItemObject.GetInteractions` 多于 1 条（弹药箱=补充弹药…）→ **地面交互菜单**（与格子菜单同一套模态机制）；单一拾取交互 → b) **拾取距离化**：联动半径内即时捡，超半径 `moveTo` 派最近士兵走过去到点自动捡（复用会合状态机，`lootItem` 标志），90s 超时取消。
+④ **光标太大** → `RingRadius` 10.5→**7**（描边 1.25→1.1）。
+⑤ **多窗重叠** → 级联偏移 26→**38px**。
+验证：EN/CN 双包 1.4.1（sha256 一致 ✓）。**1.4.1 复测：模态菜单本身 ✓；「穿上」菜单项根本不存在（原生列表只给脱下/丢弃）+ 会合到达不自动开窗 + UI 打磨 → 1.4.2**。
+**1.4.2（2026-09-19，合成「穿上」+ 会合到达修复 + UI 打磨）**：
+① **穿上（根因+方案）** → 原生 `GetInventoryInteractions` 对非玩家 interactor **不生成装备动作**（菜单只有脱下/丢弃）。补**合成条目**，走士兵的**官方 Lua 脚本通道**：武器=`Lua_Soldier.LoadAndSetWeapon(id, 0)`（官方协程，`FrameEndRunner.RunNativeCoroutine` 显式启动——interop 返回的只是协程对象，陷阱 25 同源）；衣/甲/盔=`wearUniform/wearVest/wearHeadgear(id)`（带 id 的官方重载）。菜单执行列表重构为统一 `menuExec`（原生=Interaction.Call，合成=Lambda），去重（原生已有 wear/equip 文案则不补）。
+② **会合到达不自动开窗** → `Lua_Soldier.moveTo(Vector3)` **无半径重载**，默认停距可能 >packRange(3m) → 到达判定永不满足。到达阈值放宽为 `max(4m, packRange)`（开窗规则本身不变）；`OpenMeet`/拾取到达补 LogAlways（`会合到达`），下轮可从日志判定到达是否触发。
+③ **UI 打磨** → 背包窗口标题栏加分隔线；信息面板血条与数字分离（数字右对齐独立框，不再叠在条上）；姿态/压制行加「 · 」分隔（EN 词条同步）。
+验证：EN/CN 双包 1.4.2（sha256 一致 ✓）。**1.4.2 复测：日志证实「Wear」有执行但无效（wearHeadgear 后头部模型没刷新）、胸挂 us_marine_gear_4a 不含 vest 字样→没合成条目、会合到达有触发但开窗结果日志撒谎 → 1.4.3**。
+**1.4.3（2026-09-19，穿戴子类判定 + 会合开窗放行 + 平铺布局 + 交互文案英文化）**：
+① **头盔/胸挂穿不上（两个叠加根因）** → a) **关键字匹配漏**：胸挂 id `us_marine_gear_4a` 不含 "vest" → 没合成穿戴项；改**按物品子类判定**（`TryCast<VirtualHelmet>/VirtualClothing/VirtualWeapon`），clothing 再按 id 分 uniform/vest；b) **戴了但头上没有**：日志「Wear」执行成功 = wearHeadgear(id) 数据层生效但**头部模型没刷新** → 戴后补 `RefreshHeadgearVisibility()`。
+② **会合到达仍要再点一下** → 日志「会合到达」有触发，但旧日志写「已打开」是**假话**（OpenWindow 可能被远处旧窗口的锚点检查拦掉而静默）。修法：到达开窗 **bypassAnchor**（走过去≤4m 已证明距离）；开窗被拒（上限/锚点）改 LogAlways 如实记录；`ForceOpenSoldier` 返回真实结果；**30s 新窗豁免**范围自动关闭（会合后 units 还在动，宽限期后回归规则）。
+③ **窗口重叠** → 26→38px 级联实测仍叠 → 改**槽位平铺**：开新窗取最低空闲槽位（列×行，屏幕内换列），互相不压；手动拖过的窗保留位置但槽位不释放。
+④ **EN 版交互菜单显示中文** → `GetInteractionText()` 返回的是游戏**中文源串**（不经本地化）。修法：标签过 `TrInteraction`——常见动作进 Ui 词典（丢弃/脱下/摘下/使用/吃/喝/补充弹药/装填/安装配件/拾起置于右手），前缀规则翻译（拆下X→Detach X 等），未知保留原文。
+验证：EN/CN 双包 1.4.3（sha256 一致 ✓）。**1.4.3 复测：右键点到别人头盔 → 头盔被当掉落物捡走；日志零条「派兵前往」→ 远距会合全被物品分支劫持（穿戴物=ItemObject，判定顺序物品在士兵前）→ 1.4.4**。
+**1.4.4（2026-09-19，右键判定顺序重构）**：`IssueDirectCommand` 顺序改为 载具 → **活人士兵（友军=会合/敌军=标记）** → 尸体（尸包）→ 地面物品（此时 sol 必为 null，真掉落物）→ 尸体就近兜底 → 其余。点中头盔/胸挂=点中那个兵（身上穿戴也是 ItemObject，旧顺序把人家头盔当掉落物捡走=「头盔消失」，且远距会合永远启动不了=「走过去不自动开」的同根因）。日志佐证：1.4.3 三条「会合到达」全是近距即时开窗，「派兵前往」零条。
+验证：EN/CN 双包 1.4.4（sha256 一致 ✓）。**1.4.4 复测：日志只有 3 条「会合到达」且全部 target=True walker=True，但「派兵前往」仍零条 → 远距右键根本没走到会合分支——**真正根因：高视角远景下兵太小，"右键他"实际点中的是他脚边的地面** → 走了普通移动命令，兵到了但没人知道要开包 =「走过去了还不自动打开，还要再按一遍」**。
+**1.4.5（2026-09-19，右键点偏容错）**：空白地面移动之前加**友军点偏容错**——命中点 2.5m 内有徒步友军（`NearestFriendlySoldier`，allCreatures 静态表，排除车内兵）→ 按会合处理（走过去开双背包），不再落进普通移动；尸体就近容错 1.2→2.5m 对齐。**注意**：想右键移动到友军身边 2.5m 内的点位会被会合劫持——点远一点即可（用户操作模式优先）。
+验证：EN/CN 双包 1.4.5（sha256 一致 ✓）。**1.4.5 复测：用户否决"点偏地面"理论（光标变色才点的，点的就是本人）→ 真凶锁定**到达判定 4m vs 原生 moveTo 停距 8m**：`Lua_Soldier.moveTo(Vector3)` 无半径参数，兵在 moveRadius（默认 8m，本 mod 移动系统的到达半径就是这个值）处停住 → 4m 判定永不满足 → 90s 静默超时 =「明明走到旁边却不自动开」**。
+**1.4.6（2026-09-19，到达判定对齐真实停距 + 会合请求全程日志）**：① LootTick 到达阈值 `max(4,packRange)` → **`max(moveRadius, packRange)`**（默认 8m——这是游戏原生 moveTo 的真实停距量级，本 mod 移动观察同源参数）；② `RequestLoot` 两个分支各加一条无条件日志（`会合请求 <title> 距离=X.Xm → 即时开窗/派 X 前往`）——下轮日志可完整还原：点击是否进入会合、距离多少、走没走、停在多远。开窗 3m 联动规则本身不变（到达开窗本就 bypassAnchor）。
+验证：EN/CN 双包 1.4.6（sha256 一致 ✓）。**1.4.6 复测：用户抓到规则矛盾——「到达 8m 才开窗」vs「3m 自动关闭」互相打架（会合开的窗 30s 后又被 3m 规则关掉）→ 1.4.7 统一半径**。
+**1.4.7（2026-09-19，联动半径对齐移动停距）**：`packRange` 默认 3→**10m**（cfg 仍可 1–100 调）——3m 是在不知道「原生 moveTo 会让兵停在 ~8m 处」时定的；现在开窗门槛、自动关闭、到达判定（`max(moveRadius, packRange)`=10m）三者同一半径：会合开窗不再被更小的半径马上关掉。规则本质不变：隔着半个地图的背包照样自动关闭，只是"近"的定义对齐了游戏移动粒度。
+验证：EN/CN 双包 1.4.7（sha256 一致 ✓）。**1.4.7 被用户否决：「单位的手长 10m？」——放大半径是逃避修 bug，规则回到 3m，用停驻重派令把兵真正带进圈 → 1.4.8**。
+**1.4.8（2026-09-19，半径回 3m + 停驻重派移动）**：① `packRange` 默认 **回 3m**（用户规则；10m 方案废弃）；② 到达判定回归 packRange（3m）；③ **停驻检测 + 重派移动**：LootTick 每 1.2s 检查 walker 位移，若 <0.5m 且仍在圈外 → 重新下达 `moveTo(目标点)`（最多 8 次，每次无条件 LogAlways 停驻距离）——把兵一步步带进 3m 圈才开窗；④ 超时提示带最后停驻距离（`没有走到目标旁（停在第 Xm），已取消`），重派失败/粒度不足时日志有精确数据。
+验证：EN/CN 双包 1.4.8（sha256 一致 ✓）。**1.4.8 复测：走过去了仍不开窗（用户：「近到都把那个单位挤开了，还是没有自动背包」）；但用户第二次右键时日志 `距离=0.9m → 即时开窗` 证明 walker 确实走到了贴身——距离判定本该早就满足 → 真凶不是距离，而是「到达检测整段没执行」**。
+**1.4.9（2026-09-19，会合自动开窗：任务静默失效排查 + 停驻即开窗）**：
+① **双路驱动 LootTick**：`Tick` 里的调用点位于 `if (!Active || flyingToSquad) return;` 门控之后，历史遗留静默失效风险；OnGUI 渲染循环（`BackpackPanel.Draw`，图标一直在画 = 全程验证存活）也调一次 → 谁活谁驱动（0.25s 节流，双调幂等）。
+② **ResetLoot 全程记原因**：此前任务是**静默**被清掉的（一条日志都没有）；现在每次重置打 `会合任务重置（原因）`，LootTick 另每 2s 打一条 `会合进行中 dist=X.Xm 重派=N/8` 全程跟踪。
+③ **任务与窗口解耦（关键修复）**：`CloseAll()` 原来顺手 `ResetLoot` —— 而**取消/更换选择链（`ClearSelection` → `CloseAll`）也走这里**，会合途中任何一次选择变动都会静默清掉在途任务（walker 照走，但再没人判定到达）。现在 `CloseAll` 只关窗口/拖拽态；新增 `CancelLoot(reason)` 才杀任务，只在「进 RTS / 接管单位 / 退出 RTS」三处调用。
+④ **停驻即开窗**（用户定案「就不能在停止后再触发一次开背包解决吗」）：独立于 packRange 的第二通道——0.25s 采样位移 <0.2m 连续 0.8s（任务开始后 1.5s 宽限）判「停了」，停在 `max(packRange, 5m)` 内直接开窗并记实际距离；停得远了才继续重派/等超时。
+⑤ 到达开窗抽成唯一收口 `ArriveOpen(walker, why)`（先取任务态局部量再 ResetLoot，避免收口过程被重入清空）。
+验证：1.4.9 编译部署（`ER2_BattlefieldCommander.dll` 11:28，本地/游戏目录 sha256 一致 ✓；cfg 缺失将按默认 3m 重建）。**1.4.9 实测（12:01 日志）：会合自动开窗成功 ✓**——活体单位两例全部 `会合进行中 dist=6.6m/7.2m → 会合到达，开窗 target=True walker=True`；但尸体那例暴露出新根因（见 1.4.10）。
+**1.4.10（2026-09-19，车内乘员三连修 + 背包标题叠字）**（用户三条反馈：①背包文字重叠 ②无法打开尸体背包 ③让单位上坦克后又会立刻下车）：
+- **共同真凶 = 把「车里的兵」当徒步单位**（1.4.9 日志实锤）：`会合请求 ... (KIA) 距离=8.1m → 派 Frank Nelson 前往` 之后 `dist` 恒为 8.1m、重派 4 次毫无变化 —— 因为挑中的 walker 是**坦克里的乘员**，对他 `moveTo` 不会走过去（原生 AI 的反应是**下车步行**）。同一份日志里 `[SquadCmd] 移动 ... via=Fallback` 也把乘员卷进逐兵 `moveTo` → 正是「上车后立刻下车」。
+  → 新增 `GodViewController.IsOnFoot(s)`（`GetComponentInParent<Vehicle>` + `Lua_Soldier.isInsideVehicle()` 双检测，`IsInfantry` 改为它的别名）与 `FilterOnFoot(list, out embarked)`；`MoveUnits`、`MoveCommandTo`（含登车 pending 摘除）全部先过滤；`BackpackPanel.RequestLoot`/`RequestItemPickup` 的候选集只从徒步单位里挑（都选自 `anyBest` 兜底，仅在「已在半径内→即时开窗/拾取」时用）；**选中的单位全在载具里时改派最近的徒步友军**（`NearestOnFootFriendly` = `NearestFriendlySoldier` 暴露版，30m 内；上车后「转选」到载具是常态，不改派的话那个背包永远打不开），附近也没有则提示并记日志。
+- **背包标题叠字**（截图：`Backpack · Melvin McCampbell` 压住 `44.2/60`）：根因是 IMGUI `GUI.Label` **不裁剪**，长标题直接画到右边。新增 `FitTitle`：按可用宽度三轮适配（缩字号 12→9 → 去掉「背包 · 」前缀保留「（阵亡）」后缀 → 9 号字省略号截断），结果按 (文本,宽度) 缓存；同时把负重/迷你条从 `xMax-194(宽92)` 收窄到 `xMax-166(宽64)`、标题可用宽 `WinW-182`。
+验证：1.4.10 编译部署（`ER2_BattlefieldCommander.dll` 12:10，196096 字节，sha256 一致 ✓，cfg 重置为默认）。**1.4.10 实测（12:20 日志）：尸体背包修好了 ✓** —— `会合请求 Backpack · Wade Malarkey (KIA) 距离=14.5m → 派 Desmond Harmon 前往` → `会合进行中 dist=14.5m → 7.9m` → `会合到达，开窗 target=True`（兵真的走过去了，不再是恒定的 8.1m）；后续 6 具尸体全部一次点开。
+**1.4.11（2026-09-19，尸包开双方背包 + 关窗不再取消选择）**（用户两条新反馈）：
+- **① 打开尸体背包时同时打开选中单位的背包**：两处尸体分支 `RequestLoot(corpse…)` / `RequestLoot(corpseNear…)` 补 `openBoth: true`（原先只有徒步友军传 true）→ 与"右键友军开双方背包"一致。到达/停驻/即时三条路径都走同一个 `OpenMeet(target, walker, true)`，walker 窗口 `bypassAnchor=true` 不会被锚点规则拒。
+- **② 关闭背包不再取消选中单位**（真凶是**跨帧残留手势**）：点 ✕ 时按下帧 `guiNow=true` 所以不建立选择手势，但 **OnGUI 里窗口在同一帧被关掉** → 松手那一帧 `guiNow` 已变 false → 松手被当成"空地点击" → `ClickActOrCancel()` → `ClearSelection()`。修法：`BackpackPanel` 里凡 `e.Use()` 吃掉事件（✕/◀/▶、标题栏拖动、交互菜单项、格子、拖拽落地）都在 `Draw()` 末尾 `MarkConsumed(e)`（`e.type == EventType.Used` 即命中）→ 调新增的 `GodViewController.SwallowLeftGesture()`，让战场手势吞掉这一按的剩余部分（与既有的 `swallowLeftGesture` 收尾机制同源）。
+验证：1.4.11 编译部署（`ER2_BattlefieldCommander.dll` 12:24，196608 字节，sha256 一致 ✓）。
+**1.4.12（2026-09-19，穿戴「只能脱不能穿」诊断+双通道修复）**（用户反馈：让单位装备还是不行，只能脱下来）：
+- 现状证据（12:30 日志）：`交互执行 'Wear'` 有执行、`Take Off` 正常、无任何异常 → **原生 Lua 穿戴通道静默 no-op**；`debugLog=false` 导致 `合成穿戴项` 这类 `Log` 级诊断一条都看不到（**诊断也得用 LogAlways**）。
+- 三个怀疑与对应动作（一次实测即可定案）：
+ ① **虚拟物品没有活体实例**（头号嫌疑）：原生 `wearXxx` 拿到只有 `item_id`、`instance==null` 的 `VirtualItem` 会静默 return → 新增 `EnsureItemInstance`（`IsInstance/GetInstance/GetItemPrefab/SetInstance`）。
+ ② **菜单里那条"Wear"可能是原生条目**（原生 `Interaction.Call()` 无参=interactor 已绑定，对非玩家静默无效）→ 新增**剪除原生 wear/equip 条目**（保留 Unwear），并 `LogAlways` 打印**原生菜单原文**，一次就能看出"Wear"来源。
+ ③ **原生改的是数据、视觉不刷新** → 穿戴后无条件 `TriggerClothingObjRefresh` + `RefreshHeadgearVisibility`。
+- **直写兜底**：调用原生后比对 `WearSnapshot`（`hasHeadgear/headgear_ref.item_id`、`hasUniform/uniform_ref`、`hasVest/vest_ref`），**状态没变就直接写原生字段**：盔=`headgear_ref`+`SetHelmetObject(ItemHelmet)`；衣=`uniform_ref`+`uniform_Obj`；甲=`vest_ref`+`vest_Obj`（六个字段反编译确认都有 setter），末尾再 `TriggerClothingObjRefresh(kind==0, kind==2, kind==1)`。
+- 每次穿戴留一行完整快照：`穿戴 id=… 类型=盔 实例=True/False 取到物件=… 路径=原生/直写兜底 前[盔=- 衣=x 甲=-] 后[盔=x ...] 穿戴标记=True/False`。
+验证：1.4.12 编译部署（`ER2_BattlefieldCommander.dll` 12:35，sha256 一致 ✓）。
+**1.4.12 实测（12:39 日志）定案三件事**：
+① 原生菜单原文 = `Drop Item | Take Off` → **原生列表里根本没有穿戴条目**（菜单里那条 "Wear" 确实是我们合成的）→ 假设 ② 排除。
+② `实例=False`（虚拟物品确实没有活体实例）+ `路径=直写兜底` + **`前[盔=- …] 后[盔=- …]` 完全没变** → `Lua_Soldier.wearHeadgear(id)` 与直写 `headgear_ref/SetHelmetObject` **全都无效**；第三次尝试后 `穿戴标记=True`（虚拟物品被标记为已穿）但盔槽仍为空 = 用户看到的「模型没出现在头上」。
+③ **`debugLog=false` 把 `合成穿戴项` 这类 `Log` 级诊断全吞了** → 排查阶段的诊断必须用 LogAlways（本次已统一改回受开关控制）。
+**1.4.13（2026-09-19，穿戴改用反编译确认的原生入口 + 日志开关收口）**：
+- **反编译 interop 找到真正的原生穿戴 API**（此前两轮用的都不是它）：
+  `Soldier.SetWerable(VirtualItem, bool sync=false)` / `SetWerableCR(…)`（原生"穿上虚拟衣物"，CR 版负责异步加载 prefab）、
+  `Soldier.PickUpItemFromInventory(VirtualItem, InventoryManager source, int wearedItemIndex=0)`、`IsWearing(VirtualItem)`、
+  `UpdateWearedItemsToInventory()`、`GetHeldItemIndex(VirtualItem)`；
+  `WearedItem`（struct）= `{ ItemObject itemInstance; VirtualItem inventoryReference; }`，即**穿戴记录里存的是"活体物件"**——
+  这就是"直写 `headgear_ref` 没用"的原因（缺 `itemInstance`，游戏侧无法建模型）。
+- `WearItem` 改成**阶梯式尝试 + 每步验证**（验证=穿戴快照变化 或 `IsWearing(vi)` 翻转），第一个见效即停：
+  ① `SetWerable(vi)` → ② Lua `wearXxx(id)` → ③ `PickUpItemFromInventory(vi, invMgr, 0)` → ④ 直写字段（仅在已有活体实例时）
+  → ⑤ `SetWerableCR(vi)`（协程，异步，交给下一帧）。日志记 `生效级=…`，**下一轮实测看完即可把无效的几级删掉**。
+- 不再用 `GetItemPrefab()` 冒充实例（`SetInstance(prefab)` 是错的，已删除该步骤）。
+- **日志开关收口（用户要求）**：所有排查用诊断（`原生菜单项`/`合成穿戴项`/`穿戴 id=…`/`会合进行中`/`会合任务重置`/停驻系列/`图标诊断`/`移动：跳过车内乘员`）统一走 `SquadCmdLogic.Log`，由 cfg **`debugLog`** 控制、**默认 false**；用户可见的状态事件（开窗成功/到达/超时/丢弃）仍 `LogAlways`。本轮测试已在本地 cfg 临时置 `debugLog = true`（发布前改回 false 或删 cfg 即可）。
+验证：1.4.13 编译部署（`ER2_BattlefieldCommander.dll` 12:44，sha256 一致 ✓）。用户实测确认**穿戴修好了**。
+**1.4.14（2026-09-19，性能优化 + 发布）**——用户定案「修好了。优化一下游戏与代码，性能优先，准备发布」。本轮**不动任何行为**，只消除每帧/每流程的重复 interop 调用与临时分配：
+- **① 友军小队枚举加 0.3s 缓存**（`SquadCmdLogic.GetAllFriendlySquads`）：原实现每次调用都 `CollectSquads()` → 遍历**全场景所有 `Creature`** 并逐个 `TryCast<Soldier>`（大战场数百次 interop）+ 分配 `Dictionary`/`List`，而它在「进 RTS / 接管 / 编组 / 死亡重挂」等流程里会被**连续多次**调用 → 数百毫秒卡顿感的主因。新增 `GetAllFriendlySquadsCopy()` 供需要长期持有的调用方（现有 5 个调用点全部只做 `foreach` 遍历，不修改，安全）。
+- **② `ResMult()` 加 0.5s 缓存**（分辨率倍率）：`HudStyle/HudStyleSmall/ButtonStyle/InfoPanel/BackpackPanel` **每次**取样式都读一次 `ResourcesManager.ResolutionMult` interop 属性，而 OnGUI 一帧多次事件 × 每帧十几处取样式 → 每秒上千次 interop 读。
+- **③ `MainCam()` 加 0.5s 缓存**：每帧被调 5 次（`HandleMove`/`HandleHeight`/`ApplyCam`/`LateApply`/`OnPreRenderCamera`），兜底路径 `Camera.main` 内部是 `FindGameObjectWithTag`（很贵）。只在拿到有效相机时缓存，拿不到保持重试。
+- **④ `MySideFaction()` 加 2s 缓存** + **⑤ `CachedPlayerSoldier()`（0.5s）**：这两个是**最热**的 interop 路径——`Soldier.GetBestVisibleEnemy` Postfix 与 `Vehicle.CurrentVisibleTarget` Postfix **每兵每帧**各跑一次，集火标记生效期间战场上数百单位 → 每秒上万次 `PlayerController.currentController` / `ControlledCharacter.faction` 读取 + 字符串封送。两处 Postfix 已改为走缓存；`SetPlayer` 三处调用点（进 RTS / 退出 / 接管）插入 `InvalidatePlayerSoldier()` 立即失效，`SavedFaction` 变化时阵营缓存自动失效。
+- **⑥ 每帧标记绘制去分配**：`SceneMarkersFrame` 里 `new List<Vehicle>(selVehicleRefs)`（每帧一次）改为按下标遍历；`smSelected` 从"每帧 Clear+逐单位 Add"改为与 `markerCache` 同批 0.2s 刷新；顺带在同批算出 `smSelectedInVehicle`，**取代**"每个选中兵每帧一次 `GetComponentInParent<Vehicle>()`"。
+- **⑦ `PruneMark` 的 `new List<Soldier>()`（每 0.5s 一次）改为复用缓冲区**。
+- **⑧ `IsSelectedUnit` 加缓存快路**：先查 `smSelected`（与 `GetCommandUnits` 同源的 0.2s 指针集），未命中再走原 interop 兜底 —— **保持语义不变**（缓存只加速，不是唯一判据）。
+- 验证：编译 0 error；EN 构建 sha256 `462f1f59…9094`，已部署（13:01）+ 双包产出（`ER2_BattlefieldCommander_v1.4.14.zip` / `_CN_v1.4.14.zip`）；CN 构建 `Ui.Tr` 反编译确认返回中文原文（`CN_BUILD` 生效 ✓）。
+- 发布收尾：本地 cfg `debugLog` **已复位 `false`**（上一轮临时开的），README/Nexus 描述版本号与性能说明已同步。
+**1.4.14 性能优化清单（供后续在同一量级工程上复用）**：
+  1. 判断"这个 interop 读会不会在每帧/每兵每帧被调到"——`PlayerController.currentController`、`ControlledCharacter`、`ResourcesManager.*`、`Camera.main`、任何 `.faction`/`.name` 字符串读都是重点嫌疑；
+  2. 枚举型工具函数（`CollectSquads` 这类"遍历全局静态表"的）一律加短缓存，否则被连续调用时浏览器级开销；
+  3. OnGUI 路径里 `new List<>`/`new Dictionary<>`/`ToArray()` 逐个清掉，复用静态缓冲区；
+  4. 缓存失效点要显式（`InvalidatePlayerSoldier`/`InvalidateMainCam`），并让"拿不到值的缓存"不写入（避免把 null 缓存成半秒的真相）。
+### 2.12 UniversalGeneration `er2.universalgeneration` v2.4.1
+
+**2.4.1（2026-09-24，用户第 18 轮：同轮授权提交 git；报"这个标签页有重叠，显示不完整。同时是空的"）**：
+- **① 页签重叠/显示不完整（截图：`Mod Vehicles` 选中态文字压出按钮框）** → **根因 = 定宽页签 + 固定字号**：类别页签 4 列网格每格 ≈72px（`PanelW=320` → `w=300` → `(300-12)/4`），字号固定 12；英文 "Mod Vehicles"（12 拉丁字符）≈78~84px 超宽——`GUI.Button` 文字 MiddleCenter 且**不按矩形裁剪** → 溢出压到相邻页签。中文 "Mod载具" 放得下 → **只在英文版暴露**。物品页签 "Medical/Food" 同病。
+  **修法**：新增 `DrawTabButton`/`TabFontSize`——按字符估宽（CJK≈1.0em，拉丁≈0.56em）取塞得进 `(w-6)` 的最大字号（12→8 下限）；应用到单位页签/物品页签/收藏子页签/物品子分类行四处。⚠️ 用**专用样式实例** `tabStyle/tabActiveStyle` 逐次改写 `fontSize`（不能复用共享样式；不能 `new GUIStyle(style)` 拷贝——陷阱 5）。
+- **② Mod载具页签恒空** → **根因 = 探测挂在 `ModsLoader.mods_installed` + 终态**：该静态字典**进战斗后才填充**；主菜单探测等 30s 拿到 mod=0（日志第 126 行）→ `ready=true`（第 128 行"目录就绪: mod=0 载具候选=0"）→ 看门狗见 ready 直接 return，永不重试；而 mod 内容进战斗后（物品库 949→2107）才可用 → 页签整个会话空着。工坊实测 51 个 mod 里 7+ 个注册载具，内容存在。
+  **修法**：`ModCatalog` 重写——① 目录**磁盘直扫**：`<游戏根>/../..` 推出 `<Steam库>/steamapps/workshop/content/<appid>/*/index.xml`（appid 优先 `steam_appid.txt`，兜底 1324780；解析 `libraryfolders.vdf` 其他库）+ `<游戏>/Mods|mods|LocalMods`，运行时 `mods_installed` 只兜底；② 解析与**校验解耦**——候选缓存复用（`seenIndex`/`srcs`/`gotItems`/`gotVeh`），校验延后到 `ItemCatalog.Ready`，没就绪本轮跳过 15s 再来（**不写终态**）；③ 空闲 60s 重扫（新订阅 mod 不重启也会出现），每轮载具校验上限 10 个（单个最坏 8s），失败 5 次放弃该候选并打日志。
+- **交付**：`build.ps1 -Mod UniversalGeneration`（EN），0 error；部署 DLL 107,520 B，sha256 `8AE3A54157400677DBFE23212394BE1CBEDF12DFCF774084611427A025824CEA`，与构建产物逐字节一致。
+  **反编译复核**：`[BepInPlugin]`+启动日志双 2.4.1 ✓；`TabFontSize`/`DrawTabButton`（5 处调用）✓；`ModRoots`/`OtherLibraries`/`steam_appid.txt`/`libraryfolders.vdf`/`ItemCatalog.Ready` 门控 ✓。
+- **本轮教训（guide 陷阱 76/77、AGENTS 17g12/17g13 已记）**：① 定宽容器 + 可变长文本，字号必须绘制前定案、按最长语言验证；② "扫完了"≠"扫到了东西"，扫完为空不是终态；依赖运行时状态的数据源先在主菜单验证。
+
+**2.4.0（2026-09-24，用户第 17 轮：仍有中文/列表选项跑到菜单外；同轮宿主 1.4.17 修武器隔空拾取）**：
+- **① 面板列表溢出（用户第 17 轮第 2 条）** → **根因 = `PanelRect()` 固定高度没算动态行**：OnGUI 的 y 逐段累加——物品页签族 `irows*(TabH+4)`（6 桶 2 行 = 56px）、收藏子页签 `frows*(TabH+4)`、物品子分类行（28px）、字母索引行（3 行 = 68px）、物品帮助行（34px）——**全都不在固定公式里**；物品页实际 ~630px vs 面板背景 ~504px，下半段列表/分页/帮助画到背景外（截图实证）。单位页几乎不暴露（只差 4px 间隙）。
+  **修法**：高度**按内容实算**——`PanelRect` 镜像 OnGUI 每一段累加；物品列表高度 `ItemListHeight(bucket, favOnly)` 用与绘制**同一判据**（`ItemCatalog.SubsOf`/`LettersOf`）计算，不重复猜。每帧多两次线性扫描，成本可忽略（绘制本身每帧还在 `Query`）。
+- **② 物品名仍中文（用户第 17 轮第 1 条，截图：81-1突击步枪/85式微声冲锋枪等）** → 双层结论：
+  - **结构修正**：取名链 `io.name`（GameObject 内部名，如 "arisaka t38carbine"）→ 改为**优先 `ItemObject.GetMappedResourcesName()`**（映射 `MappedResources.prefs` → `PropData.name` 登记名，游戏 UI 的 4 处原生调用方同款，反编译证实 `[CallerCount(4)]`），取不到再退 `io.name` → 原版物品显示登记名。
+  - **数据结论（非 bug，向用户复述）**：截图里的中文名条目是**第三方工坊武器 mod**（81式/85式是现代中式枪械，非原版内容）——mod 作者把物品登记成中文名，任何游戏语言下都显示中文；这是 mod 数据不是本 mod UI 文案，本 mod 不改写。README/Nexus 已写明。
+- **交付**：`build.ps1 -Mod UniversalGeneration`（EN），0 error；部署 DLL 104,448 B，sha256 `703D067136E9A63FE273B31E86A321009F11C8BCB33ED82FBBE8A203829FDA48`，与构建产物逐字节一致；`ER2_UniversalGeneration_v2.4.0.zip`（20:23 重打包含新 README/Nexus）。
+  **反编译复核**：`[BepInPlugin]`+启动日志双 2.4.0 ✓；`GenPanel` 含 `ItemListHeight` 与按内容分支 ✓；`ItemCatalog` 含 `GetMappedResourcesName()` 调用 ✓。
+- **本轮教训（guide 陷阱 74/75、AGENTS 17g10/17g11 已记）**：① 原生交互无距离校验 → 见 §2.11 1.4.17；② IMGUI 固定高度必须与绘制逐项镜像。
+
+**2.3.0（2026-09-24，用户第 16 轮：仍有中文/物品 3D 模型不显示/预放置不能滚轮）**：**三连修（前两条同轮改宿主 1.4.16）**。
+- **① 物品 3D 幽灵预览不显示（2.2.0 起）** → **根因 = `TrackGhost` 与落位顺序写反**：`SpawnItemGhostCR` 里先 `TrackGhost(inst, pos)` 再 `inst.transform.position = pos + up*0.25`——而克隆体 `Instantiate` 时在 **prefab 模板原始坐标**（通常世界原点附近），于是记录的偏移 = 模板坐标 − 锚点（巨大），**下一帧 `MovePreviewTo` 每帧按错误偏移把幽灵挪走** → 永远不在镜头里。单位/载具预览没踩中：它们生成即在锚点，偏移天然 ≈0。
+  **修法**：先落位、再 `RegisterGhost`+`TrackGhost`（偏移 = (0,0.25,0)）；命名统一 `UniGenPreview_` 前缀（与宿主 `IsGhostTransform` 射线豁免一致）；失败路径（GetItemObject null / 实例化异常 / Ghostify false）**无条件 `LogWarning`**（对齐 Placer 1.0.11 规则）；`ItemDragger` 加 `!GhostAvailable` 一次性警告（`warnedNoGhost`）。
+- **② 放置/携带中滚轮与中键被冻结** → 根因在宿主：全屏 `externalGuiBlock`（防投放点击误触框选）同时命中 `UiPointerCapture()` → `HandleHeight` 滚轮、`HandleDrag` 中键全被冻结。**修法 = 宿主 1.4.16 新增 `externalCameraPass` 契约**（见 §2.11），UniGen `HostLink.Init` 反射注册 `CameraPassThrough()` = `Placer.Placing || ItemDragger.Carrying`——放置/拖放中相机照常（滚轮缩放/中键旋转），点击手势照吞；宿主旧版无字段则静默回退旧行为。
+- **③ 英文版「可穿戴」子页签漏中文** → `GenPanel.SubLabel` 返回中文原串，**调用点没包 `Ui.Tr()`**（与 2.2.2 的"字典漂移"不同的另一种漏翻：词条在字典里有，但调用根本没查表）。修法：`Ui.Tr(SubLabel(subs[i]))`。
+  **教训补全**：EN 漏中文有两种形态——**字典键漂移**（查了表但键对不上）与**调用点漏包 `Ui.Tr`**（根本没查）。自检日志只抓前者；后者要靠扫描所有用户可见串的包装情况（本轮全量扫过：`BucketLabel`/`favCatNames`/`catNames` 调用点均已包，仅 `SubLabel` 漏）。
+- **"生成物中的中文"结论（非 bug）**：物品/小队/载具**名称**来自游戏数据库与各 mod 自己的 `index.xml` `DisplayName`（如 PLA 服装 mod 的中文名）——是数据不是 mod UI 文案，跟随游戏语言设置与 mod 作者用词，无法由本 mod 翻译；README/Nexus 已写明。
+- **交付**：`build.ps1 -Mod UniversalGeneration`（EN），0 error；部署 DLL 103,936 B，sha256 `CFD5049DA870DB8467E1DF947AE143BFF87FF7505EF83A2DCB8678CCF6892C6E`，与构建产物逐字节一致；`ER2_UniversalGeneration_v2.3.0.zip`（重打包以纳入更新后的 README/Nexus）。
+  **反编译复核**：版本双写 2.3.0 ✓；`SpawnItemGhostCR` 确为 name → position → `RegisterGhost` → `TrackGhost` 顺序 ✓；`HostLink` 含 `fiCameraPass`/`CameraPassThrough` ✓；`ItemDragger.warnedNoGhost` ✓；`GenPanel` 子分类按钮确为 `Ui.Tr(SubLabel(...))` ✓。
+- **环境坑（新增）**：本机 PowerShell 执行策略为 **Restricted**——PowerShell 工具里 `& build.ps1` **静默被拒**（exit 0、无输出、无效果），必须 `powershell.exe -NoProfile -ExecutionPolicy Bypass -File …`。已记入 AGENTS.md。
+
+**2.2.2（2026-09-24，用户第 15 轮：「英文版为什么还有中文」）**：**修英文版残留中文**。
+- **先证伪"部署了中文版"**：反编译已部署 DLL 的 `Ui` —— 字典在位（`步枪→Rifles` 等）、`Tr` 走查表 → **确实是 EN 构建**。
+- **真因 = 字典键漂移**：`Ui` 的 EN 字典键必须与代码里的中文串**逐字一致**，不一致就静默回退中文（陷阱 17）。
+  两条配置说明（`panelKey` / `noAttackNeutral`）的措辞后来改过，**字典没跟着改** → 查表落空 →
+  Mod 配置界面显示中文。另「物品生成失败：」压根没词条。
+- **修法**：键改为与代码逐字一致；补「物品生成失败：」→"Item spawn failed: "；
+  **新增缺失自检**——`Ui.Tr` 查不到时（开 debugLog）打一条 `[UniGen] 英文词条缺失（回退中文）: <串>`，
+  每条只打一次，以后再漂移立刻暴露（同类：脚本化比对 `Ui.Tr("…")` 全量串 vs 字典键，本次用一次性脚本扫出 3 条）。
+- **不属 mod 文案、无法翻译的部分**：物品/小队/载具**名称**来自游戏数据库（`ItemObject.name`、`SquadsArchive`）
+  与各 mod 自己的 `index.xml` 的 `DisplayName` → 跟随**游戏语言设置**与 mod 作者用词；
+  若游戏设为中文，这些名字就是中文（这是数据不是 UI 文案）。
+- **交付**：EN 部署 DLL 103,424 B，sha256 `B235F402FA8D32BBC9A348E13A3C27D1F33B218DF5C483A9F54596C3CEB92A5E`，
+  与构建产物逐字节一致；`ER2_UniversalGeneration_v2.2.2.zip`。
+  **反编译复核**：版本双写 2.2.2 ✓；部署产物中两条配置说明的字典键**与代码串逐字一致** ✓；
+  `物品生成失败：`→`Item spawn failed: ` ✓。
+
+**2.2.1（2026-09-24，用户第 14 轮：「原本正常的物品生成列表也不见了，都不显示」）**：**修 2.2.0 字母行下标越界回归**。
+- **根因（截图即诊断）**：2.2.0 把「全部」改为占两格（i==0），但循环写的是 `else { letters[i - 2] }`
+  —— **i=1 时 `letters[-1]` 抛 ArgumentOutOfRangeException** → 整帧 OnGUI 中断 → 字母与整个物品列表全消失。
+  截图特征：子分类页签 + **孤零零一个「全部」按钮**（画在 i=0，异常发生在 i=1）——
+  与 2.1.1 的 TextField 翻车同一模式：**"某段之后全空白" = 那段抛了异常**。
+  （讽刺：修复"按钮重叠"时引入了比重叠严重得多的越界——改布局索引必须把"占位格"和"数据下标"分开算。）
+- **修法**：`else` → `else if (i >= 2)`；i==1 只是「全部」的第二格占位，跳过。
+- **交付**：EN 部署 DLL 102,912 B，sha256 `09EA30C533C75F36123996DFED1671A1D19D5B8DA73DC8D78719D8348EBAC851`，
+  与构建产物逐字节一致；`ER2_UniversalGeneration_v2.2.1.zip`。
+  **反编译复核**：版本双写 2.2.1 ✓；部署产物中字母行确为 `else if (j >= 2) { text = list2[j - 2]; }` ✓。
+- **待实测**：物品列表恢复 + 字母行不再重叠且不越界。
+
+**2.2.0（2026-09-24，用户三条反馈：物品预览改纯模型 / 菜单按钮重叠 / 重启 mod 内容生成）**：
+- **① 物品携带预览 = 3D 幽灵模型**（去掉地面光圈 + 光标图标）。`GenRunner.SpawnItemGhost`：
+  裸实例化 prefab（纯视觉，不走 ToVirtualItem 生成链）→ 显式冻结刚体（防预览穿地）→
+  宿主 `Ghostify` + `RegisterGhost`（与单位/载具同一套幽灵视觉；射线豁免防自遮挡）。
+  `ItemDragger` 管 3 态生命周期（悬停地面=跟随显示 / 悬停单位或落点无效=收起 / 失败 1.5s 退避）；
+  删除 `DrawGhostMarker`/`DrawCursorIcon`；悬停士兵的绿色目标环保留（背包指向反馈，非落点预览）。
+- **② 按钮重叠修复**：字母索引行「全部」按钮原宽 34px > 27px 网格间距 → 压住相邻按钮。
+  改为**占两格**（51px），字母从第 3 格起排，整行同一网格。
+- **③ 第三方内容支持回归**（1.3.2 按用户决定砍掉，本轮要求重启；新文件 `ModCatalog.cs`）：
+  - **发现 = 磁盘解析每个已装 mod 的 `index.xml`**（`ModData/Metadata/{ModName,BundleName}` +
+    `Prefabs/RegisteredPrefab/{PrefabName,DisplayName,Type}`；从 `ModData.assetBundleFolder` 向上最多 4 级找）。
+    不走运行时数据库的原因：2.0.7 定案 `GetAllItemsOfType<PropData>` 恒空（库按泛型 T 过滤），
+    `ItemObject` 上无 mod_id —— **运行时无法区分官方/mod 条目**；index.xml 是游戏自己启动消费的同一份清单。
+  - **id = 游戏公开 API `ModsLoader.GenerateModItemId(bundleName, prefabName)`**（裸 prefab 名作第二候选）。
+  - **物品**（Type 3/4/5/6/7 = items/weapons/ammo/attachment/uniforms）：`GetItemObject(id) != null` 才入
+    「Mod物品」桶（ItemCatalog 新桶 `mod`，BucketOrder 尾部追加）；时间片 3ms/帧。
+  - **载具**（Type 2）：`VehicleSpawner.GetVehiclePrefabAsync` 异步验证 prefab 可加载
+    （`DelegateSupport.ConvertDelegate` 转托管委托；转换失败退化为不验证直接列出；8s 超时；临时 spawner
+    **不能提前销毁**——会杀死内部协程导致回调不来）；验证通过的 id 直接可喂 `vehiclePrefabID` →「Mod载具」页签。
+  - **小队**：mod/自定义小队本就在 `SquadsArchive.squads` 全量 key 里（GenCatalog 步兵页 1.2.1 起即枚举）——
+    不重复建桶，输出覆盖诊断日志（总数 / 非官方枚举键数）。
+  - **UI**：单位页签族 7→8（`modveh`，两行 4 列正好）；物品桶追加 `mod`；收藏分类子页签同步；
+    GenCatalog.GetBucket/ResolveFav 接入 ModCatalog.vehicles；Ui 新词条 Mod载具/Mod物品（EN 双语）。
+  - 看门狗同款 tick 判活（无放弃路径）；已装 mod 数 / 每 mod 候选数 / 验证通过数全部进日志。
+- **交付**：`build.ps1 -Mod UniversalGeneration`（EN），0 error（1 个既有 CS0649）。
+  部署 DLL **102,912 B**，sha256 `B9CD69DB9650C606ADE11028D5595DA4A02169B918B7A81A23F328D51478D8D3`，
+  与构建产物**逐字节一致**；`ER2_UniversalGeneration_v2.2.0.zip`。
+  **反编译复核**：两处版本均 2.2.0 ✓；`SpawnItemGhost` 在位且 `DrawCursorIcon`/`DrawGhostMarker` 已消失 ✓；
+  `GenerateModItemId`/`GetVehiclePrefabAsync`/`DelegateSupport` ✓；Ui 英文词条 ✓。
+- **待实测**：① 携带物品悬停地面是否显示半透明模型、松手放置正常；② 字母行是否不再重叠；
+  ③ 日志 `第三方内容: 已装 mod=N` 各 mod 候选/验证数 —— **用户机器上装了 40 个工坊 mod**，
+  首轮日志将定案物品/载具各自能验证出多少条；④ Mod载具能否正常放置带乘员；⑤ mod 小队是否已在步兵页。
+
+### 2.12.1 UniversalGeneration v2.1.1（历史）
 RTS 上帝视角内**自定义生成单位/载具**（作弊向）。详见 `ER2_zcode_era.md` §2。
 1.0.1 = "生成"开关按钮从左下角移到左缘中段（左下角让位给宿主信息面板）；1.0.2 = 生成的敌/我单位不主动攻击中立（Civilian）阵营（cfg `noAttackNeutral` 可关）。
 **1.0.3**：① **中立保护不再拦玩家指令**——玩家手动标记的目标照打（反射读宿主 `GodViewController.CurrentMark` 的 `Spottable` 字段比对，`IsPlayerMarkedTarget`）；② **载具乘员直接生在车上**——`SpawnManager.SpawnAISquadGlobal(..., spawnOnvehicle: veh, ...)`（原生"出生即入座"通道，战役增援同款），取代"车旁落地 + 逐员 boardVehicle"（`BoardCR` 已删，收尾改 `FinishCrewCR`：等 fullySpawned → 超员裁剪 → `AIVehicle.squadInside` 授驾驶资格 → 登记宿主 `rtsSquadSet`）。
@@ -151,6 +395,156 @@ RTS 上帝视角内**自定义生成单位/载具**（作弊向）。详见 `ER2
 **1.0.8**：① **预览仍被敌人打掉** → `allowBeingTargeted(false)` 挡不住"已锁定的敌人"；宿主新增 `Creature.Damage` Prefix 伤害免疫（按幽灵指针表拒绝伤害），UniGen 侧登记/注销（`HostLink.RegisterGhost/UnregisterGhost`）。② **转朝向时乱转** → `SetPreviewYaw` 只改 `transform.rotation`，而成员位置是"锚点+固定偏移"（班成员弧形散布）→ 看起来在乱转/散开；现在偏移随 yaw 增量一起旋转，整队原地刚性转向。③ **中立仍被双方主动攻击** → 两个根因：阵营判定用精确等值（实际可能是 `Civilian_id` 等变体，全部漏判）→ 改**含 "civil" 即中立**（不区分大小写）；且保护范围原先只限"本 mod 生成物" → 改为**全局生效**（开关打开时所有射手都不主动打中立）。④ 预览对象加 `UniGenPreview_` 前缀（供宿主地面射线豁免）。
 **1.0.9**：① **放置预览无法消失** → 预览是**异步生成**的：确认/取消后它才创建完成，就再也没人销毁（孤儿预览）。新增**预览代数**（`previewGeneration`）：`DestroyPreview()` 自增作废在途请求，异步回调完成时校验 `StalePreview(gen)`，过期即自毁（载具直接销毁、步兵整队销毁）。② **中立单位自己主动攻击** → 补上射手侧：`Soldier.GetBestVisibleEnemy` Postfix 增加"中立射手不获取任何目标"（`IsCivilianShooter`，玩家手动标记仍放行），并对生成的中立单位 `allowCheckForEnemies(false)`。
 **1.0.10**：**预览生命周期收口（防残留）**。审计出两条泄漏路径：① `exitOnRelease` 分支退出放置时只置标志、**没销毁预览**；② `Cancel` 在"RTS 退出"分支提前 return，标志未清。现在 `Cancel` 无论 `placing` 状态如何都幂等清理（清标志 + `DestroyPreview`），`exitOnRelease` 退出时一并销毁，并新增**看门狗**（放置中宿主 RTS 已退出 → 强制取消），`DestroyPreview` 空表快速返回。
+**1.0.11（2026-09-18）**：**预览失败可观测**——幽灵预览创建失败此前只在 `debugLog` 开启时打印（默认关闭）→ "预览不显示/点了没反应"无从定位。现在：失败时 `LogWarning` 无条件输出（含原因指向宿主 `GhostPreview.Ghostify` 返回 false），宿主预览不可用时再给一次性提示。
+**1.0.12（2026-09-18）**：随宿主 1.2.17 同步——预览不显示的根因是宿主幽灵化在 1.2.15/1.2.16 失效（Component[]+is 判别不可靠），宿主改回强类型遍历后预览恢复；此前"点列表直接生成"实为预览不可见的观感问题。
+**1.0.13（2026-09-19）**：**预览不显示真因** → `SpawnPreviewGhostCR` 开头调用 `DestroyPreview()`，而它会把 `previewGeneration` 自增——本协程的 `gen` 是调用时捕获的（更小）→ 刚生成即被判"过期"销毁 = 预览永远不出现。已移除该调用（旧预览清理由 `Placer.Begin` 在捕获 gen 之前负责）。
+**1.0.14（2026-09-19，用户实测修复：大班型直接生成/幽灵碰撞）**：**步兵预览改为"边生成边幽灵化"** → 根因：`SpawnAISquadGlobal` 的回调触发时，大班型（>2 人）的成员可能**还没落齐**——`GetMemberClamped` 只能拿到已落地的成员，未赶上幽灵化轮次的成员就是**真人士兵**（带碰撞、会自行走动）= 用户反馈的"超过两个人的小队直接生成""幽灵与已有单位碰撞"。修法：预览协程每 0.25s 补一轮幽灵化（按指针去重），直到 `fullySpawned` 且成员数两轮一致且全部幽灵化才交给 `onReady`；取消/过期时整队（含已幽灵化成员）销毁。
+**1.1.0（2026-09-19，玩家需求：火力点 + 自定义小队）**：① **火力点（机枪）类目**——游戏 `Assets/Prefabs/Vehicles/MGs/` 有 **32 个固定机枪 prefab**（MG34/MG42/勃朗宁/马克沁/九二式/维克斯/ZB37/Breda37 等的 地面/三脚架/碉堡 形态 + 高射机枪 + M45 四联装防空），此前目录正则只认 `Tanks|Wheeled|Planes|Artillery` 把整类漏掉；现加 `mgs` 桶 + 「机枪」页签（7 页签，宽度按数量自适应），走与载具完全相同的 VehicleSpawner 管线，乘员默认按座位数 spawnOnvehicle 入座。② **自定义小队（自动探测路线）**——游戏原生自带 `CustomSquad : SquadData`（`SquadEditorScene` 编辑器的数据模型，成员=`CustomSquadMember`（uniform/vest/headgear/weap1+配件/weap2/otherItems），`ToLoadout()` 虚方法）+ `SquadsArchive.squads`（**静态** `Dictionary<string, SquadDataTable>`）+ `ItemsDatabase.GetSquadLoadouts` 的 **string 重载**——即 SquadData 可用任意 loadout id 数组直接构造，SpawnAISquadGlobal 无需改动即可吃自定义班。现在 `ProbeInfantryTypes` 枚举 `SquadsArchive.squads` 全量 key：不在 SquadType 枚举里的 key（= 游戏注册的玩家自定义班）校验 `CountLoadouts>0` 后进步兵列表（标题取 `squadTypeLabel`），生成/预览走 string 重载同一条管线；`RemoveInfantry(SquadType)` 改 `RemoveInfantryEntry(GenEntry)`（按 Id，兼容自定义 key）；乘员选择池 `crewPool` 只收官方班型（自定义班不作乘员来源）。**待实测**：a) MGs 生成 + 机枪手是否开火（TurretGun 座位与 AIVehicle 行为）；b) SquadsArchive 里是否真有自定义班 key（开 debugLog 看 `[custom]` dump——若游戏自建班不在此处，下一步走 `new SquadData(name, loadoutIds)` 组合方案，Kit 池取各班型 loadouts 并集）。
+
+**1.1.1（2026-09-19，用户实测反馈二轮）**：① **战役生成的敌方单位站桩在出生点** → 根因：`ApplyControlled` 的"受控参数"（`followCustomSquadOrders()`+`followCustomDirectCommands()`+`allowMovements(true)`）把单位锁进**听令模式**——只有被下令才移动；我方有 RTS 指挥所以正常，**敌方没人下令 = 永远站在出生点**。且前两个方法是**无参启用式**（Lua API 风格，无 false 重载），不能事后"释放"。修法：`side`（面板所选 mine/enemy/neutral）从 GenPanel→Placer→GenRunner 全程贯通，**敌方默认不套受控**（新生单位默认即原生 AI：随战役任务推进/进攻），我方/中立保持驻守；cfg `General.enemyNativeAI`（默认 true）可关回。**注意：受控参数对载具乘员班从来就没套过**（`FinishCrewCR` 无 ApplyControlled），敌方载具乘员本来就是原生 AI——本轮只影响步兵。② **自定义班列表为空定案**：反编译+落盘实证——**自定义班内嵌在任务编辑器战斗文件里**（`.mer2` = BinaryFormatter，内含 `customSquads: CustomSquad[]` + 成员 `CustomSquadMember`），随战斗加载后挂在各出生点 `SpawnManager.custom_squad` 实例属性上（`SpawnManager.activeSpawns` 静态可枚举）；**战役里根本没有自定义班**（gamedata.er2 只有 settings/statistics/progresses），战役里列表为空是**预期行为**。修法：探测时枚举 `SpawnManager.activeSpawns` 收集 `custom_squad != null` 的班（按 squad_id 去重，标题取 `GetSquadName()`），**直接持有 SquadData 引用生成**（`GenEntry.DirectSquadData`，不经 GetSquadLoadouts）；探测日志改为「官方 X + 库自定义 A + 场上自定义班 B」。**待实测**：敌方原生 AI 是否推进；任务编辑器/自定义战斗里建自定义班后能否在场上捕获并生成（debugLog 看 `[custom@field]`）。
+
+**1.2.0（2026-09-19，用户实测反馈三轮：菜单太密 + 第三方类目）**：① **页签两行 4 列**（`TabsPerRow=4`，8 页签：收藏/步兵/机枪/坦克/轮式/飞机/火炮/第三方）——此前 7 个塞一行（每格仅 ~39px，"Tanks Wheeled" 挤在一起，用户截图实证）；列表行高 26→28；面板总高 +~50px。② **新增「第三方」类目**（category=`modded`）——**运行时枚举 `ItemsDatabase.GetAllItemsOfType<PropData>(PropType.vehicles)` 取 `mod_id != 0` 的条目**（内容 mod 注册进游戏数据库的载具；`PropData` 有 prefab_name/name/mod_id/deprecated/Category 字段，官方 Category 枚举 = Tank/Wheeled/Plane/StaticMg/StaticGun/Special/AutoTransport/Unlisted）；**此前 manifest 方案只读 CorvoBundles，从来没枚举到创意工坊内容 mod**（README 的 "content mods" 说法是错的，本轮修正文档）。非官方班组也归入第三方桶：SquadsArchive 额外 key（库自定义班）+ 场上 `SpawnManager.custom_squad` 捕获（`GenEntry.DirectSquadData` 直接引用生成）——不再混进步兵列表。官方四桶（tanks/wheeled/planes/artillery/mgs）继续走 manifest 正则（已实证），不受影响。`ResolveFav`/`RemoveInfantryEntry`/`GetBucket` 同步适配 modded 桶。**内容 mod 结构事实**：工坊条目 `workshop/content/1324780/<id>/index.xml`（`<ModData>`+`RegisteredPrefab Type`），`ModsLoader.LoadWorkshopMods/RegisterModObject(ModPropType, prefab_name, item_id, ws_file_id)` 注册，`mods_installed : Dictionary<uint, ModData>`；`ModPropType` 枚举无 squad 类型（内容 mod 不能加班型，第三方班=自定义班）。**待实测**：mod 载具 prefab_name 走 VehicleSpawner 是否可生成；第三方页签布局观感。
+
+**1.2.1（2026-09-19，用户实测反馈四轮：打开面板游戏无响应很久）**：日志定案 = **「库自定义班 466」**——`SquadsArchive.squads` 里有 466 个非枚举 key（游戏完整班型库：季节/战场变体如 win/dday/early 后缀 + 可能的战斗内注册班），1.2.0 的探测对每个 key 调了一次 `GetSquadLoadouts(key,0)`（每次都原生建一整套班数据）→ **466 次原生建班调用在打开面板的主线程上同步跑 = 卡死数秒**。修法：① 探测**只读表元数据**（`SquadDataTable.squadTypeLabel` + `IsUnlockedOnThisBranch()` 过滤未拥有 DLC，均无建班开销），有效性校验推迟到生成时（`GetSquadLoadouts` 返回空 → LogError + 自动移除，路径已有）；② 466 个扩展班型**归位步兵页**（它们是官方班型，1.2.0 误归第三方）——步兵页现在 = 55 官方枚举 + ~466 小队库扩展（分页 ~52 页）；第三方页只留真第三方（场上自定义班 + mod 载具）。`IsCustomSquad` 改名 `SpawnByKey`（语义 = 按字符串 key 生成，不再暗示"自定义"）。**教训：每 key 一次原生"构建型"调用（GetSquadLoadouts 会实例化 SquadData+解析 loadout）× 数百 = 主线程冻结；探测只读元数据，构建推迟到用点。**
+
+**1.2.2（2026-09-19，用户实测反馈五轮：点条目条目消失+没生成 + 仍然卡顿）**：日志双定案——① **「第三方」4 个条目 = 场上捕获的自定义班，但生成全败**：错误行 `GetSquadLoadouts(squad_0x…) 返回空小队` ×4 → **编辑器建的 `CustomSquad` 其 `CountLoadouts()` 返回 0**（且 squad_id 为空退化成指针 id），而生成/预览路径都以 `CountLoadouts()>0` 为前置 → 必败，且失败即 `RemoveInfantryEntry` = 点一个少一个（用户看到的"选择后消失"）。**修法 = 装备转换**：`TryConvertCustomSquad` 逐成员 `FixMember()`+`ToLoadout()` → 以临时 id 注册进 `LoadoutsArchive.loadouts`（静态字典可写）→ `new SquadData(id, ids)` 得到普通 SquadData（CountLoadouts=成员数）→ 存 `GenEntry.DirectSquadData`，生成/预览直接引用，走与官方班型完全相同的管线；members 为 0 的坏班不列 + LogWarning。② **仍然卡顿**：预览失败后 Placer **每帧重试**幽灵创建（本局 636 条"幽灵预览创建失败"刷屏，9MB 日志）+ 探测仍在主线程同步跑。修法：预览失败 1.5s 退避；步兵预览 `ghosted==0` 时销毁刚生成的真实小队（不留隐形真兵）；**探测整体改分帧协程**（`BeginProbe`/`ProbeCR`：枚举同步 55 个 → 小队库 32/帧 → 场上班 → mod 载具 64/帧，CS1626 注意 yield 不能落在带 catch 的 try 里——收集与批处理分离）+ **无条件计时日志**（`耗时 枚举 Xms / 小队库 Yms / 场上班 Zms / mod载具 Wms`，下轮实测直接定位残余卡顿）。**教训：失败重试必须有退避；预览失败路径要清理已生成的真实单位；"探测"类操作一律分帧。**
+
+**1.3.0（2026-09-19，用户实测反馈六轮：仍卡 + 场上班没列出来 + "不行就砍"通牒）**：① **探测整体搬到游戏启动时**（用户点名"就不能在游戏启动的时候完成吗"）——`Plugin.Load`（主菜单）即启动 `BeginStartupProbe` 后台协程：官方 55 枚举（逐项切片）→ 小队库 466 key（只读元数据）→ mod 载具；**每帧时间片 3ms**（`budgetUntil` 模式）；**物品数据库未就绪自动每 2s 重试**（最多 2 分钟，放弃后复位 probeState 由面板打开补跑）；面板打开只做 `EnsureBattleSquads`（场上班捕获，几个原生调用）。② **看门狗**：场景切换会静默杀死探测协程（probeState 永远停在 1）→ 面板打开时若 `state==1 && 已过 45s` 判死收尾。③ **场上班诊断一锤定音**：每次签名变化打一条 `场上班点扫描: 出生点 N，带自定义班 M，成员合计 K`（无条件）——1.2.2 的转换修法（ToLoadout→LoadoutsArchive→SquadData）保留，但 **1.2.2 用户实测"一个班组都没有"且日志被覆盖无实证**；若下轮日志显示 members 全 0（运行时 CustomSquad 是空壳），**按用户指示砍掉自定义班生成功能**（第三方页只留 mod 载具）。**待实测：启动后按 G 应零卡顿；看 `场上班点扫描` 行定生死。**
+
+**1.3.1（2026-09-19，用户实测反馈七轮：仍空列表 → 终审判决）**：1.3.0 诊断日志定案两件事——① **`场上班点扫描: 出生点 4，带自定义班 4，成员合计 0` + `无成员数据（members=0）` ×8**：场上 `SpawnManager.custom_squad` 是**空壳**（成员数据不挂在出生点对象上，游戏生成自己的班走的是出生点内部 `loadout` 字段等私有路径），装备转换无从转换 → **自定义班生成判死，功能已砍**（`TryConvertCustomSquad`/`EnsureBattleSquads`/`DirectSquadData` 全删，第三方页 = mod 载具 only；README 已知限制注明）。② **`启动探测协程被场景切换中断，已接受部分结果（步兵 1 条）`**：注入的协程宿主在「主菜单→加载→战斗」场景切换时被 Unity 连 DontDestroyOnLoad 一起清掉，协程只来得及扫 1 条——旧看门狗"接受部分结果"导致步兵页近乎全空。修法：看门狗移到 `GenDriver.Tick`（每秒，任何场景）+ **判死后自动重启续跑**（`probeRestarts>6` 放弃；重启不清列表，条目去重 guard 幂等，战斗场景内一次跑完）；`ProbeWatchdog` 判死阈值 20s（正常全程 <5s）。**本轮实测预期：启动后步兵页应有 55 官方 + ~466 变体、第三方页 mod 载具（如有）、机枪页 32；面板打开零卡顿。**
+**教训（探测三连坑全占）**：探测别放面板打开路径（卡）；"构建型"原生调用逐 key × 数百 = 冻结（1.2.0）；协程跨场景不可靠——注入 MonoBehaviour 即使 DontDestroyOnLoad 也可能被清，长后台任务必须有 Tick 看门狗 + 幂等续跑（1.3.0→1.3.1）。
+
+**1.3.2（2026-09-19，用户决定：不要所有第三方生成）**：**「第三方」页签与 mod 载具枚举整体移除**（`modded` 桶/`GetAllItemsOfType` mod_id 枚举/页签/Ui 词条/README·Nexus 全清）——本 mod 只生成官方内容：步兵 = 55 官方枚举 + ~466 小队库变体，载具 = manifest 四桶（tanks/wheeled/planes/artillery）+ mgs 火力点。页签回到 7 个两行（4+3）。历史脉络：1.2.0 加第三方页（用户要求）→ 1.3.1 砍自定义班（运行时空壳）→ 1.3.2 砍 mod 载具（用户决定）。**mod 内容注册事实留存备查**：工坊条目 `index.xml`（ModData/RegisteredPrefab）→ `ModsLoader.RegisterModObject(ModPropType, prefab_name, item_id, ws_file_id)` → `PropData`（`mod_id != 0` 可识别，Category 官方枚举含 StaticMg/StaticGun）；将来若重启第三方生成，按此路径恢复即可。
+
+**2.1.1（2026-09-19，用户反馈十三轮：「完全没有显示。部署英文版」）**：**去掉 `GUI.TextField`，改纯点击首字母索引；部署英文版**。
+- **根因定案（用户截图 + 日志）**：截图里子分类页签（全部/步枪/手枪/可穿戴）**画出来了**，但其下的过滤框与整个物品列表**全空白**；
+  日志为 `[Error :ER2 Universal Generation] [UniGen] OnGUI 异常: Method unstripping failed` ×8。
+  → **`GUI.TextField` 在本游戏的 IL2CPP 构建里被 Unity 裁剪**（同 `RectOffset` 那个坑）：一调用就抛，
+  异常冒泡到面板外层 try/catch，**整帧 OnGUI 中断**，后画的列表自然全无。页签在 TextField 之前绘制，所以幸存。
+- **修法**：彻底放弃键盘输入。`ItemCatalog` 删掉 `Matches()`，新增
+  `LettersOf(bucket, sub, favOnly)` / `LetterOf(e)` / `HasLetter(e, letter)`；`Query` 的 `filter` 参数改为 `letter`。
+  UI 侧画**首字母索引行**：只列当前桶/子分类**实际出现过的字母** + 「全部」，按钮固定 24px 宽、按面板宽度自动换行
+  （字母最多 30+ 个，塞单行会窄到不可点）；子分类或桶切换时若字母行消失则自动复位 `letterFilter`，避免空列表。
+  删掉 `fieldStyle`（及其底图 Texture2D）与 `GUI.SetNextControlName`。
+- **教训**：**IMGUI 里"某控件一画就整块空白"，先怀疑该控件的原生方法被裁剪**，而不是布局/数据问题。
+  判据是日志里的 `Method unstripping failed`；排查顺序=看异常发生在哪个绘制段之后。
+- **交付**：`build.ps1 -Mod UniversalGeneration`（**英文版，未加 `-Cn`**），0 warning 0 error。
+  部署 DLL 93,696 B，sha256 `D292BEF5E55AE1BFFF1A70ED11A3AB00D57E3652C9850ACE221FE438BC32990C`，
+  与构建产物**逐字节一致**；`ER2_UniversalGeneration_v2.1.1.zip`。
+  **反编译复核**：`[BepInPlugin]`=2.1.1 **且**启动日志=2.1.1 ✓；`GUI.TextField`/`SetNextControlName`/`fieldStyle`
+  在产物中**已全部消失** ✓；`letterFilter` 全套逻辑在位 ✓。
+- **待实测**：物品列表是否恢复显示；字母索引行点击是否生效；★ 收藏与持久化。
+
+**2.1.0（2026-09-19，用户反馈十二轮：「物品实在太多了，翻起来很麻烦。收藏也应该分类」）**：**物品收藏 + 收藏分类 + 物品子分类 + 关键字过滤**。
+- **背景数据（2.0.7 实测日志定案）**：`items=IO:963 weapons=IO:143 ammo=IO:137 attachment=IO:63`（PD 全 0，
+  证明 2.0.7 改用 `ItemObject` 是正确修复）；补漏后**合计 2106 条**
+  （`weapons=698 ammo=208 throwables=29 gear=542 food=8 misc=1` → 补漏 1486→2106）→ 用户翻找困难。
+- **① 物品可收藏**：物品行右侧加 ★（`ItemCatalog.favIds` + `ToggleFav`），持久化进同一配置项 `Plugin.favorites`
+  （物品用 `t:<id>` 前缀，单位沿用 `v:`/`i:`）。**写入点合并到 `GenCatalog.SaveFavs` 一处**——
+  两个模块各写一次会互相覆盖（`ItemCatalog.FavIdsPrefixed()` 供其拼接）。
+- **② 收藏按类别分组**：`RebuildFavTabs()` 生成收藏分类子页签（单位 6 类 + 物品 6 类，**只列有收藏的**），
+  选中后分别走单位/物品各自的渲染路径——**刻意不做混合列表**（单位点击=放置、物品点击=拿起，混排易误操作）。
+- **③ 物品子分类**：子分类**只用游戏官方字段，不猜名字**（吸取 2.0.2"猜 id 全错"的教训）：
+  `Weapon : HandheldItem : ItemObject`（已反编译确认继承链）→ 枚举到的实例可
+  `TryCast<Weapon>()`（陷阱 5：IL2CPP 下 C# `as` 恒失败）取 `weaponPose`（`rifle=1/pistol=2`）→ 步枪/手枪；
+  再用 `Interagible.IsWerable()` → 可穿戴。`WeaponPose` 只有 rifle/pistol 两档，故粒度到此为止。
+- **④ 关键字过滤框**：物品 id 全 ASCII（`mp44`/`kar`），故 `GUI.TextField` 够用、**不依赖中文输入法**；
+  id 与显示名都匹配、忽略大小写。切换分类时复位 `itemSub`/`filter`，避免"切过去是空列表"。
+- **踩坑**：`new RectOffset(int,int,int,int)` 在 IL2CPP interop 下**被裁剪 → CS1729**，改用 `contentOffset`；
+  运行时创建的 Texture2D 按陷阱 12 设 `hideFlags=(HideFlags)61`，且**不复用 `SolidTexture` 的单槽缓存**以免动到别的样式。
+- **交付**：`build.ps1 -Mod UniversalGeneration -Cn`，0 error（仅 1 个既有 CS0649）。部署 DLL 88,576 B，
+  sha256 `343A8B7CF8DB8246E43E10DC2E3AA500792D95EACFAF374970641D40C46EA0E3`，与构建产物**逐字节一致**；
+  `ER2_UniversalGeneration_CN_v2.1.0.zip`。**反编译复核**：两处版本均 2.1.0 ✓；`favCats`/`favCat`/`itemSub` ✓；
+  `GUI.SetNextControlName("UniGenFilter")` + `GUI.TextField` ✓；`((Il2CppObjectBase)io).TryCast<Weapon>()` +
+  `weaponPose==2→pistol` + `IsWerable()` ✓；`ItemCatalog.ToggleFav`（物品星标）✓。
+- **待实测**：物品行 ★ 能否点击收藏并持久化（重开游戏后保留）；收藏页签分类子页签是否只列已收藏分类；
+  武器桶是否出现 全部/步枪/手枪 子页签；过滤框能否输入（**若游戏吞键则输入框无反应，需改焦点处理**）。
+
+**2.0.7（2026-09-19，用户实测反馈十一轮续三：「还是没有」）**：**根因终于定案，且不是协程问题 —— 是「就绪闸门条件恒不成立」+「问错了类型」。前四轮修的全是"等闸门的协程活不活"，而闸门本身永远不开。**
+- **决定性证据（2.0.6 新增的诊断日志，连续 154 秒、跨 Menu→LoadingScene→Aberdeen 三场景）**：
+  `物品库就绪探测: Loaded=true 但 items 枚举 n=0（null=-1）（已等 153.9s, scene=Aberdeen）`
+  → `ItemsDatabase.Loaded` **恒为 true**；`GetAllItemsOfType<PropData>(PropType.items)`(=6) **永远返回空数组**。
+  同时 L120 `物品目录探测已停止（tick 停在 1），自动重启补齐（第 1 次，已有 0 条）` 证明 **2.0.6 的 tick 看门狗本身工作正常**——
+  即：协程活得好、重启也正常，**但闸门永远不放行，枚举代码一次都没跑到**。
+- **两处病灶与修法**：
+  1. **闸门整体移除**（`ProbeDatabaseReady` 删除 → `SampleCounts` 只观测不返回布尔）。
+     此前每版都要等「库已就绪 **且** items 类别非空」才开工，而这个条件**永远不可能成立**。
+     现改为**无条件枚举**（`ProbeCR` 直接进 attempt 循环，`SampleCounts` 只写入日志），拿不到就下一轮重试。
+     **这消除了"闸门条件猜错"这一整类故障，而不是再猜一个条件。**
+  2. **泛型实参问错了类型**：一直调用 `GetAllItemsOfType<PropData>`，而该原生方法极可能**按泛型 T 过滤**。
+     数据库里真正存的是 **`ItemObject`**——`GetItemObject(id)` 返回的就是它，带 `item_id`（生成键）与 `icon`
+     （2.0.2 已发现"图标非空 = 条目真在库里"）。现 **ItemObject 为主数据源，PropData 兜底**，两边按 id 去重。
+- **诊断升级**：`SampleCounts` 打印 **两种类型 × 四个类别** 的真实条数：
+  `物品库可枚举(IO=ItemObject, PD=PropData): items=IO:12/PD:0 weapons=IO:80/PD:0 ammo=… attachment=…`
+  （`CountItemObjects` / `CountPropDatas`，null=-1，异常=-2）→ **下一次日志会直接告诉我哪一类型有数据**。
+- **新增"补漏"重扫**：`Ready` 后 20s 一次性 `EnrichCR`（`nextEnrichAt`），防数据库分批加载导致首轮只拿到一部分；
+  条目数有增长才 `GenPanel.RebuildItemTabsPublic()` 重建页签。
+- **交付**：`build.ps1 -Mod UniversalGeneration -Cn`，0 error（仅 1 个既有 CS0649 警告）。部署 DLL 82,944 B，
+  sha256 `56737DA250DA0B8738A74954E7A278EA2560D6B69FC2EF5B8DC3310419D08F3A`，与构建产物**逐字节一致**；
+  `ER2_UniversalGeneration_CN_v2.0.7.zip`（48,383 B）。**反编译复核**：`[BepInPlugin]`=2.0.7 且启动日志=2.0.7 ✓；
+  `ProbeDatabaseReady` **已消失** ✓；`ProbeCR` 无阻塞等待循环 ✓；`GetAllItemsOfType<ItemObject>` + `val.item_id` ✓。
+- **待实测**：日志应出现 `物品库可枚举(IO=ItemObject, PD=PropData): …` 与 `物品目录就绪(来源=运行时 ItemsDatabase 枚举): …`，
+  **面板出现物品页签**。若 IO/PD 全为 0/-1，说明 `GetAllItemsOfType` 在运行时确实取不到东西，需换数据源（如 AssetBundle 资源名 + `GetItemObject` 校验）。
+
+**2.0.6（2026-09-19，用户实测反馈十一轮续二：「改几轮了，现在一个显示物品生成的分类都没有」）**：**根因 = 2.0.5 的看门狗判断逻辑写反了 —— `if (probeState == 1) return;` 让它在协程已死时反而什么都不做。**
+- **证据链（靠"缺失的日志"定案）**：L92 `Loading [ER2 Universal Generation 2.0.5]` → 2.0.5 在跑；L97 `物品数据库未就绪，逐帧轮询等待` → 协程启动过；**但此后 `物品库就绪探测: …`（2.0.5 新加的诊断）一条都没打、`物品目录探测被中断` 的重启日志也消失** → **看门狗一次都没动作**。而 L122/L142 证明 GenCatalog 那条链路在同一局里正常完成。
+- **我自己的逻辑错误**：2.0.5 为"移除放弃路径"把看门狗写成：
+  `if (Ready||Failed) return; if (probeState == 1) return; if (probeState == 0) Begin();`
+  —— **但协程被场景切换杀死时，没有任何代码把 `probeState` 复位**（该复位的是已死的协程自己）→ `probeState` **永远卡在 1** → 看门狗永远认为"它在跑"，**一次都不重启**。
+  **讽刺之处**：2.0.4 之所以还能重启，靠的正是那个"时间阈值"顺带复位 `probeState`——我把它当 bug 删掉，等于把唯一能发现"协程已死"的机制一起删了。
+- **修法（2.0.6，判活判据第四次迭代，这次终于不依赖时间）**：新增 `probeTicks`（协程每帧 `++`，两处：就绪等待循环、`EnumerateAll` 时间片）+ `watchdogLastTicks`（看门狗上次观察值）。
+  `ProbeWatchdog()`：`probeState==0` → 启动；`probeState==1` → **比对 tick 计数**，`watchdogLastTicks < 0`（首次，只建基线）或 `probeTicks != watchdogLastTicks` → 活着，更新基线返回；**计数与上次完全相同 → 协程一帧都没跑 → 真死，`probeState=0` + `Begin()` 重启**。
+  **为什么这次对**：判据是"**协程自己跑的帧数**"，与时间无关。同时满足两个看似矛盾的需求——① 场景加载期间看门狗自己也没被调用，不会去比对（不误杀合法停摆）；② 看门狗被调用时协程必须也在涨（真死必被发现）。**`Time.timeScale`/场景加载/墙上时钟全都骗不过它。**
+- **四次判据迭代的教训（已写进 guide 陷阱 67 + AGENTS 17d-2）**：2.0.3「150s 无进展」→ 2.0.4「20s 心跳停跳」→ 2.0.5「不判死只续跑（等于不检测）」→ 2.0.6「**tick 计数**」。**前三轮共同错误 = 拿"时间流逝"当"协程死亡"的判据**，而场景加载期间主线程被占、协程停摆但时钟照走 → 必然误判。**正解 = 让被检测者自己产出与时间无关的存活信号（帧计数），检测者只在"自己也在跑"的时刻比对。**
+- **交付**：`build.ps1 -Mod UniversalGeneration -Cn`，0 error（1 个 CS0649 警告：`Failed` 字段现已只读不写，因放弃路径全删——无害）。部署 DLL 81,920 B，sha256 `93E8FD0494B95D172006A63D`，与构建产物**逐字节一致**；`ER2_UniversalGeneration_CN_v2.0.6.zip`。**反编译复核**：① `[BepInPlugin]`=2.0.6 **且**启动日志=2.0.6；② `ProbeWatchdog` 确含 tick 比对分支（`watchdogLastTicks < 0 || probeTicks != watchdogLastTicks` → 返回；否则重启）✓
+- **待实测**：启动后日志应出现 `物品数据库已就绪，开始枚举物品目录（等待 xxxms）` + `物品目录就绪(来源=运行时 ItemsDatabase 枚举): weapons=… ammo=…`，**面板出现 6 个物品页签**。若仍无，日志必有 `物品目录探测已停止（tick 停在 N）` 或 `物品库就绪探测: …` 指明卡点。
+
+**2.0.5（2026-09-19，用户实测反馈十一轮续：**"根本没有对应的选项"**——仍是 7 个页签、零物品页签）**：**根因 = 2.0.4 的看门狗在场景加载期间误判"心跳停跳"→ 重启 → 6 次触顶后 probeState=3 永久放弃。**
+- **证据链（日志直接命中）**：第 92 行 `Loading [ER2 Universal Generation 2.0.4]` → **2.0.4 确实在跑**；第 97 行 `物品数据库未就绪，逐帧轮询等待`（**2.0.4 新串 → 逐帧轮询代码已生效**）；第 122 行 `物品目录探测被中断（第 1 次），自动重启补齐（已有 0 条）` ← **心跳看门狗误杀**；第 123 行重启后再次 `物品数据库未就绪，逐帧轮询等待`；第 133 行 `scene=Aberdeen active=True`（**数据库此时必然已就绪**）→ 但**此后再无任何 ItemCatalog 日志**，物品页签一个都没有。
+- **误杀机理（关键）**：加载战斗场景期间**主线程被 Unity 占住** → 探测协程拿不到 tick、**心跳无法刷新**；而 `Time.unscaledTime` 是**墙上时钟、照常前进** → 心跳"停跳"是**假象**，不是协程死了。看门狗据此重启，重启次数递增；**6 次触顶后 `probeState=3` 永久放弃**——此后即使进了战斗场景也永不重试。**2.0.3 的 150s 硬阈值与 2.0.4 的 20s 心跳判活，本质是同一个错误：用"时间流逝"当"协程死亡"的判据，而二者都不可靠。**
+- **修法（`ItemCatalog.cs`）**：
+  ① **彻底移除"自动放弃"**——`probeState` 从 0/1/2/3 四态收缩为 **0/1/2 三态（无放弃路径）**；`ProbeWatchdog()` 改为"**不判死、只续跑**"：`if (Ready||Failed) return; if (probeState==1) return; if (probeState==0) Begin();`，**删除 `probeRestarts>=6` 放弃分支与全部时间阈值**；`Ensure()` 里 `probeState==3` 不再视为终态（复位为 0 重新开始）。
+  ② 协程内"枚举 0 条"也不再 `Failed=true`，改为复位 `probeState=0` 交看门狗下一轮重试（`Add` 按 Id 去重保证幂等）。
+  ③ **新增 `LogProbeDiag()` 诊断**：`ProbeDatabaseReady()` 的每条失败路径（`Loaded=false` / `Loaded 抛异常` / `枚举 n=0` / `枚举抛异常`）都输出原始值，**每 5s 节流**一条，附已等待秒数 + 当前场景名——前两轮都卡在"闸门永不放行却不知为何"，现在让日志自己说话。
+- **⚠️ 三次同型教训（写进 guide 陷阱 67）**：2.0.2 一次跑死 → 2.0.3 判据修好但轮询太慢被杀 → 2.0.4 逐帧轮询却"误判死亡 + 触顶放弃"。**三次都栽在"探测链路里存在一个永久终态"**。结论：**长时后台任务绝不能有"放弃"分支**，重启必须幂等且无限次；"是否卡死"要靠**诊断日志**判断，不能靠猜时间阈值。
+- **交付**：`build.ps1 -Mod UniversalGeneration -Cn`（0 warning 0 error）；部署 DLL 81,920 B，sha256 `E15E864D9FB7C3816AD04616`，与构建产物**逐字节一致**；`ER2_UniversalGeneration_CN_v2.0.5.zip`（47,309 B）。**反编译三重复核**：① `[BepInPlugin]`=2.0.5 **且**启动日志=2.0.5；② `ProbeWatchdog` **确无 `probeRestarts>=6` 放弃分支、无任何时间阈值**；③ `ProbeDatabaseReady` 四条失败路径**均带 `LogProbeDiag`** ✓。
+- **待实测**：若成功——日志出现 `物品数据库已就绪，开始枚举物品目录（等待 xxxms）` + `物品目录就绪(来源=运行时 ItemsDatabase 枚举)`，面板出现 6 个物品页签；若仍失败——**新增的 `物品库就绪探测: …` 诊断行会直接指出是哪一条判据卡住**（这是本轮最大的排查收益）。
+
+**2.0.4（2026-09-19，用户实测反馈十一轮：**根本不能生成物品**——用户怀疑"部署的中文版没和最新英文版同步"）**：**先证伪用户的假设，再定位真因 = 2.0.3 的轮询节奏太慢，输给了场景切换。**
+- **假设证伪（三段硬证据）**：① 部署 DLL sha256 `5013e1cfd0e76e13ebc08b13…` / 80,896 B，与 EN 构建产物**逐字节一致** → **不存在中英不同步**；② 当时（15:37）日志第 92 行 `Loading [ER2 Universal Generation 2.0.3]` + 第 98 行 `2.0.3 loaded. panelKey=G` → 跑的确实是 2.0.3；③ 第 97 行 `物品数据库未就绪，2s 后重试` 是 **2.0.3 新增的日志串**、2.0.2 没有 → **2.0.3 的新代码确实生效并在运行**。结论：不是部署问题，是**2.0.3 的修法本身没修好**。
+- **真因（日志时间线定案）**：第 97 行（主菜单）打印"未就绪，2s 后重试"后，第 120/121 行是 `GenCatalog` 的探测**被场景切换中断**并重启，第 122 行 GenCatalog 重启后**几秒内就跑完**（官方枚举 55 + 小队库 466）——**同一时刻、同一宿主，GenCatalog 已成功，ItemCatalog 却毫无动静**。关键：第 136 行 `物品目录探测被中断（第 1 次），自动重启补齐（已有 0 条）` 是 **2.0.3 的 150s 看门狗**触发的（`已有 0 条`），而第 143 行场景已在 `LoadingScene`、第 148 行已到 `Aberdeen active=True`（**物品数据库那时必然已加载完**）——但 ItemCatalog 毫无输出。即：**2.0.3 的 `WaitForSeconds(2f)` 轮询卡在等待里，随场景切换被杀死；看门狗 150s 后才重启，此时 60 次 × 2s 的预算已在主菜单空耗光**（第 148 行场景早已就绪，却再也没有任何 ItemCatalog 日志）。对比 `GenCatalog` 用 `if (enumCount > 0) break;` + 60×2s 能成功，差别在于 **GenCatalog 重启后立刻拿到结果**，而 ItemCatalog 重启后仍要先等 2s 才检查——窗口正好落在场景切换上。
+- **修法（`ItemCatalog.cs` 三处）**：① `ProbeCR()` 就绪等待改 **每帧轮询**（`while(!ProbeDatabaseReady()) { ...; yield return null; }`）——成本极低（一次 bool 读 + 一次数组长度检查），数据库一就绪**当帧开始枚举**，等待窗口 < 1 帧，场景切换再无处截断；删除 `WaitForSeconds(2f)`。② **看门狗改心跳判活**：新增 `lastHeartbeat`（在 `Begin()`、每帧轮询、`EnumerateAll` 时间片三处刷新），`ProbeWatchdog()` 判据从"150s 无进展"改为"**心跳停跳 > 20s**"——既不把"数据库确实还没加载"的合法等待误判为死亡，也不放过真死的协程（替代 2.0.3 的 150s 硬阈值）。③ 就绪后最多重试 5 轮（每轮间 `yield null`），新增 `loggedDbReady` 就绪日志；重启时重置 `loggedDbWait`/`loggedDbReady`（2.0.3 重启后全程静默，日志上无从判断协程是否在跑）；**枚举预算改为数据库就绪之后才起算**。
+- **交付**：`scripts/build.ps1 -Mod UniversalGeneration -Cn`（0 warning 0 error），DLL 已部署（81,408 B，sha256 `2D9D95A8B1CC6F122F798875…`，与构建产物**逐字节一致**）；`ER2_UniversalGeneration_CN_v2.0.4.zip`（含 README.txt + Nexus_description.md ✓）。**反编译三重复核**：① `[BepInPlugin]` = `2.0.4` **且**启动日志 = `2.0.4`；② `ProbeDatabaseReady` 确含 `ItemsDatabase.Loaded` + `Count > 0` 双判据；③ `ProbeCR` 确为 `while(!ProbeDatabaseReady()) { … yield return null; }` **逐帧轮询**（无 `WaitForSeconds`）+ `for (attempt < 5)` 重试 + `lastHeartbeat` 心跳三处刷新 ✓。
+- **⚠️ 本轮踩坑（同类第二次，务必记住）**：**`[BepInPlugin]` 那行的编辑第一次没有落盘**——反编译发现特性是 `2.0.3` 而启动日志是 `2.0.4`（**两处不一致 = 陷阱 14 的经典形态**）。当时直接 `build.ps1` 会产出一个"日志说 2.0.4、BepInEx 实际识别 2.0.3"的坏包。修法：重新 Edit 后**必须回读文件确认落盘**，再构建；**构建后必须反编译复核两处版本**。**别信 Edit 工具的"成功"回执，要信磁盘。**
+- **待实测**：启动日志应出现 `物品数据库已就绪，开始枚举物品目录（等待 xxxms）`（等待毫秒数应很小）+ `物品目录就绪(来源=运行时 ItemsDatabase 枚举): weapons=… ammo=… …`（各类目数 > 0，预计合计约 300±）；面板应出现 6 个物品页签；点选物品能否拿起并拖放入包/落地。
+
+**2.0.3（2026-09-19，用户实测反馈十轮：**物品生成整体不可用**）**：**根因 = 2.0.2 的就绪闸门太弱，被"非 null 空数组"骗过，物品目录一次跑死 → 物品页签一个都建不起来。**
+- **证据链（三段闭合）**：① 日志第 97 行 `[UniGen] 物品枚举到 0 条——ItemsDatabase.GetAllItemsOfType 可能不可用或数据库未就绪。`，发生在 `Plugin.Load()`（主菜单阶段）；且此后**再无任何 ItemCatalog 行**（第 120 行是 GenCatalog 的），说明协程一次就到 `probeState=3` 死路，**不是"数据库慢"**。② 反编译 `ItemsDatabase` 确认 `GetAllItemsOfType<T>` 签名正确（不是 API 不可用），且存在官方就绪标志 `public unsafe static bool Loaded`（`ItemsDatabase.decompiled.cs:1705`）——2.0.2 完全没用上。③ 与 `GenCatalog`（工作正常）对比：`GenCatalog` 判据是 `if (enumCount > 0) break;`（要求真收到条目）+ 60 次重试；`ItemCatalog` 判据是 `return l != null;`（非 null 即放行）→ 数据库未加载时该方法返回**非 null 空数组**，瞬间放行 → 枚举 0 条 → `Failed=true` + `probeState=3` **永久放弃**。
+- **修法（`ItemCatalog.cs` 三处）**：① `ProbeDatabaseReady()` 改为双判据——`ItemsDatabase.Loaded`（权威，try 包裹以便属性不可用时退化）+ 实枚举 `Count > 0`（空数组不算就绪）；② `ProbeCR()` 从"一锤子"改 **attempt 循环**（对齐 `GenCatalog.StartupProbeCR`）：未就绪等 2s 重试、枚举到 0 条也等 2s 重试，上限 60 次（约 2 分钟）才 `Failed`；枚举体抽出为 `EnumerateAll()` 迭代器（时间片跨帧保留，`budgetUntil` 按值传递每轮重置无害）；③ **看门狗阈值 20s → 150s**：2.0.3 的 attempt 循环会**合法等待**最长 2 分钟，20s 会把"正常等待"误判成"协程被场景切换杀死"并反复重启（白白耗尽 `probeRestarts`）；另加 `lastWatchedCount` 进度基线——条目在增长即视为存活。
+- **交付**：EN 构建 0 warning 0 error，DLL 已部署（80,896 B，sha256 `5013e1cfd0e76e13ebc08b13…`，与构建产物**逐字节一致**）；`ER2_UniversalGeneration_CN_v2.0.3.zip`（45,050 B，拆包 = DLL + README.txt + Nexus_description.md ✓）。**反编译三重复核**：① `[BepInPlugin]` = `2.0.3` 且启动日志 = `2.0.3`（陷阱 14 两处）；② 部署 DLL 的 `ProbeDatabaseReady` 确含 `ItemsDatabase.Loaded` + `Count > 0`；③ `ProbeCR` 确为 `for (attempt < 60)` + 两条 `WaitForSeconds(2f)` 的重试结构 ✓。文档同步 README/_CN（标题+Changelog）+ 两个 Nexus（Changelog）+ 本台账。
+- **本轮排查副产物（避免下次误判）**：同批截图里火炮页签被怀疑"名称渲染空白"，**实为误读**——把 mod 自己的 manifest 正则做本地复现，排序+10 行分页后**与截图 10/10 精确匹配**（`15mm GPF`…`Ger Pak 38`，全 ASCII）；再对截图做像素采样，列表区有 **1704 个纯白 (255,255,255) 文字像素**、按 10 条 y 带分布 → **文字渲染完全正常**，此前是我对 346×531 缩略图的误判（**已向用户更正**）。教训：**判断"UI 文字是否渲染"不要靠缩略图肉眼，要看像素**；另该截图里"无物品页签"本就是 2.0.2 就绪失败的直接后果，与渲染无关。
+- **待实测**：启动日志应出现 `物品目录就绪(来源=运行时 ItemsDatabase 枚举): weapons=… ammo=… …` **且各类目数 > 0**（预计合计约 300±，远少于旧 1147）；面板应出现 6 个物品页签；点选物品能否拿起并拖放入包/落地。
+
+**2.0.2（2026-09-19，用户实测反馈九轮：**只有带图标的物品能生成，其余全部无效**）**：**根因 = 物品 id 猜错了来源**。用户截图实证规律"有图标=能生成、无图标=无效"，日志一锤定音（本局失败行全为 `GetItemObject 返回 null`：ArisakaT38/Carcano/Syringe/Thompson_M1928/commonwealth/aus_infantry_uniform_1/box aspirine/DroppableRefillCrate…；成功行全为 bar_1918/bandages/37mm_ns37_ammo/ToolBox）。**画句号的证据**：这些 id 在 `er2items.manifest` 里**确实存在**（`Items/ Carcano.prefab`、`Items/ Syringe.prefab`、`Items/ArisakaT38.prefab` 实盘 grep 可见）——即 2.0.0 的正则解析**没错**，错的是**把"磁盘预制品文件名"当成了"运行时物品数据库的键"**；两者并非一一对应。`ItemObject.icon` 是物品对象自带字段 → **图标非空 ⟺ 该 id 真能查到物品**，于是图标无意中成了"有效"的天然标志物（这正是用户看到的现象）。另一大类：`Uniforms/` 全部 757 条无效（服装是 `Loadout`/`CustomSquadMember.uniform` 字段，**根本不是 ItemObject**）。**2.0.1 的 `BeginValidate` 抽样剔除为何没救回来**：日志里**完全没有 `物品校验完成` 行**，只有 `物品目录就绪`——校验协程在场景切换中被杀且无看门狗续跑（1.3.0/1.3.1 同款坑，本次又踩一次），于是列表原样保留 1147 条，玩家点了才报无效；且"失败即剔除"的设计会让用户**点一个少一个**（1.2.2 已踩过）。**修法 = 停止猜 id，直接向游戏要**：`ItemCatalog` 整体重写，改用运行时 `ItemsDatabase.GetAllItemsOfType<PropData>((PropData.PropType)t)` 枚举 `items=6 / weapons=7 / ammo=8 / attachment=9` 四类，取 `PropData.prefab_name` 作 Id（= 数据库键）、`PropData.name` 作标题，**分类直接用游戏自己的 `PropType`**（不再靠字符串启发式），并过滤 `deprecated` 与 `mod_id != 0`。列表从源头只含真实条目 → "点了才发现无效"结构上不可能再发生；`Uniforms` 桶整体消失（不再有服装页签）。**性能**：保留分帧（每帧 3ms 时间片）+ 数据库未就绪每 2s 重试（上限 2 分钟）+ **看门狗接进 `GenDriver.Tick`**（与 GenCatalog 同款，20s 判死、最多重启 6 次、`Add` 按 Id 去重保证幂等续跑）。**编译踩坑**：`GetAllItemsOfType<T>` 返回的是 `Il2CppArrayBase<T>`（不是 `Il2CppSystem...List<T>`），须用全名 `Il2CppInterop.Runtime.InteropTypes.Arrays.Il2CppArrayBase<PropData>`；另 **`ilspycmd -o <mod目录>` 会被 SDK 通配符 glob 进编译** → `CS0101 Plugin 已定义` + `CS0579 BepInPlugin 特性重复`，**反编译产物必须落在项目目录之外**（本次改到 `%TEMP%`）。**交付**：EN 构建 0 warning 0 error；反编译核对 `[BepInPlugin]` 与启动日志**两处版本均 2.0.2**（陷阱 14；本轮首次编辑该行未生效、靠反编译才发现，**必须反编译复核版本**）。**待实测**：物品页条目数（预计 300±，远少于旧 1147）、是否所有条目都能生成、拖放入包与落地是否正常、启动日志 `物品目录就绪(来源=运行时 ItemsDatabase 枚举)` 各类目数量。
+
+**2.0.1（2026-09-19，用户实测反馈八轮：点一下就放置 + 很多物品无效）**：三条修复，全部由实测日志定案（本局 `物品已落地 40 / 物品已入背包 0` —— **从未成功入包**、全是落地，直接指向 ① 与 ③）。
+- **① "按下左键选取后直接就放置了"**：`ItemDragger.Tick()` 里 `ignoreUntilRelease` 分支**形同虚设**——命中条件后只把标志置 false 却没有 `return`，同一帧继续往下走到 `if (leftUp) Drop();`。根因是**时间线**：`GenPanel.BeginCarry` 跑在 `OnGUI`，`GenDriver.Tick` 跑在 `Update`，而终止面板点击的那次 `MouseUp` 在**两个时间线里同帧都成立** → 拿起即投放。修法：吞掉该次松手后**立即 return**（本帧到此为止）。
+- **② "很多物品提示无效"**（两个独立成因）：
+  - **(a) 61 件枪械被错归「其他」桶**：`Classify` 的武器关键字表是**英文/音译名**（kar/mosin/garand…），而游戏用**本国名**（`Gewehr43`/`Mannlicher_95_31`/`Springfield_1903`/`PPSH41`/`MAS_36`/`VZ24`/`MAB38`…）→ 落不进表就掉进 misc。实测分桶 `weapons=92 / misc=62`，玩家在武器页找不到就报"无效"。修法：**武器判定改为兜底默认**（弹药/投掷物/医疗/装备/服装以外一律归武器），misc 只留真正零星物（`DroppableRefillCrate` 等）。修正后实测 **`weapons=153 / misc=1`**。
+  - **(b) manifest ≠ 运行时数据库**：`er2items.manifest` 列的是**磁盘上全部预制品**，而 `ItemsDatabase.GetItemObject(id)` 查的是**游戏运行时注册表**，两者并非一一对应（尤其 `Uniforms/` 760 条：服装在游戏里是 `Loadout`/`CustomSquadMember.uniform` 字段，很可能根本不是 ItemObject）。修法：新增 **`ItemCatalog.BeginValidate`** 启动后**分帧抽样核对**（每帧 20 条，约 1 秒跑完 1147 条；同步跑会卡 = 1.2.0 教训），无效条目**直接从列表剔除**，完成后回调 `RebuildItemTabsPublic` 重建页签（含"当前物品页签被清空则退回首个可用页签"）。面板只显示能生成的。
+- **③ 拖到单位身上经常失败**：RTS 上帝视角相机离地很远，鼠标指向士兵时射线**常先命中他脚下的地形**，原实现只在"命中的不是士兵"时用 `NearestSoldier(hit.point, 1.6f)` 兜底 → 命中点在地面、1.6m 半径够不到人 → `hoverSoldier` 恒 null → 永远走落地分支（**这正是 40/0 的来源**）。修法：搜索半径**按相机距离反算**（`SearchRadiusFor`：屏高 3% × 距离，FOV 修正，夹在 1.6~6m）。同时 `GroundUnderMouse` 由 `Raycast` 改 **`RaycastAll` + 由近及远遍历**，命中士兵不再直接判否而是**继续往后找真正的地面**（原先想丢在单位旁边很容易先打到人 → "此处无法放置"）。另：`DrawItemList` 改**取快照遍历**（校验协程后台删条目 vs OnGUI 渲染同一 List → 防"集合被修改"异常）。
+- **可观测性补齐（工作区教训：失败必须无条件可观测）**：`GiveToInventory` 三条失败分支、`DropAt` 的 `prefab == null` 分支（**「物品无效」的唯一出口，原先完全无日志**）全部加 `LogWarning` 并带原因；`Drop()` 第三分支加 debug 日志。
+- **交付**：`ER2_UniversalGeneration_v2.0.1.zip`（44.0 KB）/ `_CN_`（42.8 KB）；DLL 已部署（85.5 KB）；反编译核对 `BepInPlugin` 与启动日志**两处版本均 2.0.1**（陷阱 14）。文档同步 README/_CN（含 Changelog）+ 两个 Nexus（含 Changelog，并把"380+"改为"启动核对后只列可生成的"）。**待实测**：点选是否不再秒放、拖到单位身上能否入包、武器页条目数是否明显变多、启动日志 `物品校验完成` 的剔除数。
+
+**2.0.0（2026-09-19，用户需求：物品生成 + 鼠标拖放）**：新增**物品生成能力**——面板加物品页签，展示游戏全量物品（含真实图标），点选后**鼠标拖动**：拖到单位身上 = 进他的背包，拖到地上 = 生成世界实体。
+- **物品目录（`ItemCatalog.cs`，新增）**：走**磁盘 manifest 解析**（与载具同款已验证技术）——`Application.dataPath/StreamingAssets/CorvoBundles/er2items.manifest`，正则 `-\s+Assets/.+Prefabs/(Items|grenades|Uniforms)/(.+?)\.prefab` 抓 id（= prefab 文件名去扩展名）。**实测规模：Items 339 + grenades 48 + Uniforms 760 = 1,147 条**；启动时毫秒级解析，零原生调用、零卡顿（对比 1.2.0 卡顿教训：探测只用只读数据）。分桶（`Classify` 启发式；**2.0.1 修正后实测分布：武器 153 / 弹药 113 / 装备 63 / 投掷物 48 / 医疗食物 8 / 其他 1 / 服装 757**。修正前为 武器 92 / 其他 62 —— 见 2.0.1 段）：`ammo_*`/`_mag`/`_belt`→弹药，`grenade*`/`satchel`/`tnt`/`tankmine`/`at_*`→投掷物，`bandage`/`medkit`/`morphine`/`ration`/`can`→医疗食物，`scope`/`bipod`/`bayonet`/`bag`/`radio`/`helmet`/`gear`/`pouch`/`tripod`→装备，其余按目录（Uniforms→服装、grenades→投掷物）；**2.0.1 起「其余」一律兜底归武器**（原关键字表用英文名，游戏用本国名 → 61 件枪械被错归其他桶）。过滤 `test_` 前缀、大小写去重。页签两组各 4 个两行排（`ItemTabsPerRow=4`），**页签数随库存/收藏变化动态重建**（`RebuildItemTabs`）。
+- **进背包（`ItemSpawner.cs`，新增）**：**绝不走 `AddVirtualItem`/`AddItemToInventory`**（两者把物品归一化成基类 `VirtualItem`，弹匣/手雷子类语义全废 = 陷阱 23，ThrowableWheel 实证）——一律**直接 `inventory.items.Add(vi)`**（`Inventory.items` 已反编译确认 = `public unsafe List<VirtualItem>`）。**子类正确性三级兜底**：① `ItemsDatabase.GetItemObject(id).ToVirtualItem()`（**原生自己产子类**，最准）→ ② `VirtualItem.Create(id)` → ③ `new VirtualItem(id)` 基类兜底。放进前校验负重（`GetWeightAndMaxWeight`），放进后**复核 `ContainsId`**（`Add` 静默失败时给准确反馈而不是假成功）。背包定位：`Soldier.inventory` 快路（**注意该字段继承自 `Creature`，不在 `Soldier` 自身**）+ `InventoryManager.activeInventories` 反查归属（与宿主 InfoPanel 同款）。
+- **拖到地上（`ItemSpawner.DropAt`）**：`ItemObject.ToVirtualItem()` → `VirtualItem.InstantiatePrefab()`（**坑：`InstantiatePrefab()` 在 `VirtualItem` 上，不在 `ItemObject` 上** —— `ItemObject` 只有 `ToVirtualItem()`，反编译实证 `ItemObject.decompiled.cs:313`；编译期即报 CS1061）→ 兜底 `Object.Instantiate(prefab.gameObject)`。落点 = 地面 + `up*0.25` + 随机偏航。
+- **拖放状态机（`ItemDragger.cs`，新增）**：与 `Placer` 完全同款手势契约，避免两套状态机打架——① 拿起时 `GenPanel.SetOpen(false)` + `BlockRect()` 返回**全屏 Rect** 给宿主 `externalGuiBlock` → 拖放期间宿主完全让位，投放点击不会触发原生框选/指令；② **`ignoreUntilRelease`**：面板里点条目那一下左键的"松开"会落进状态机（Placer 1.0.6 同款教训），必须吞到真正松开；③ **修正了一个会致死功能的时序 bug**——松开那一帧 `GetMouseButton(0)` 已为 false，原来的 `if (!leftHeld && !leftUp) return;` 会吞掉唯一一次放置判定，改为 `leftUp` 优先判、`leftHeld` 兜后；④ 右键/ESC/G = 放弃携带（G 键由 `GenDriver` 分发，携带优先于放置）；⑤ **看门狗**：宿主 RTS 退出 → `Cancel("RTS 退出", false)` 强制收口（不重开面板）。投放判定**士兵优先于地面**；两者都不中 → 给明确文案「此处无法放置（对准单位或地面）」且**不收手**（允许继续找落点）。
+- **交互反馈**：目标单位脚下**绿色光环**、地面落点**琥珀光环**（世界空间 28 段圆环 → `WorldToScreenPoint` 投影，绕开 `GetWorldCorners` 全零陷阱 14；IMGUI 画线用 `RotateAroundPivot`）；光标处**跟手图标**；底部提示条实时显示"松手 → 放入 X 的背包 / 丢到地上"。目标名读取 0.2s 节流（`Time.unscaledTime`，陷阱 20）。
+- **图标（关键复用宿主终案）**：游戏图标是**图集子区域**，直接持有 `Sprite` 会 "Object was garbage collected in IL2CPP domain" → 必须**立刻光栅化成自建 `Texture2D`**（`RenderTexture.GetTemporary` + `Graphics.Blit` + `ReadPixels`）并 `hideFlags=(HideFlags)61`（陷阱 12），再用 `GUI.DrawTexture` 画。本 mod **不在 OnGUI 里做 GPU 光栅化**（面板每帧重绘，避免打断 IMGUI 状态）——改**惰性后台协程**逐个解析、就绪即画；解析三级：`prefab.icon` → `ItemsDatabase.cachedLoadedSprites` → `ItemsDatabase.LoadAndCacheSprite(name,"er2gui")`。
+- **构建事实**：`UniversalGeneration.csproj` 里 `UnityEngine.SpriteModule` 是**无效引用**（interop 目录下不存在该 dll，只有 SpriteMask/SpriteShape）——它一直只是 MSB3245 警告，本轮顺手删除。`Sprite` 经 `Assembly-CSharp`/`CoreModule` 传递解析。
+- **交付**：`ER2_UniversalGeneration_v2.0.0.zip`（42.5 KB）/ `ER2_UniversalGeneration_CN_v2.0.0.zip`（41.3 KB），双语包内容核对 ✓（EN 包 README 含 "Item spawning"、CN 包含"物品生成"）；反编译核对 EN 构建 `Ui.Tr` 走英文字典且新增物品词条（武器/弹药/投掷物/装备/医疗食物/服装…）**全部有英文值**、CN 构建 `Tr` 直通中文 ✓；DLL 已部署（78 KB）。**待实测**：物品图标解码、拖放入包后弹匣/手雷子类行为、拖到地上的实体能否被拾取。
 
 ### 2.13 UnitCollision `er2.morephysics.unitcollision` v1.0.8
 单位/尸体碰撞（MorePhysics 删除后的轻量保留版）。**修复原理 = 开碰撞矩阵**：`Physics.IgnoreLayerCollision(1,9,false)` 活体互碰（复用原版受击碰撞体）+ `(1,10,false)` + 尸体骨骼刚体强制动态 = 尸体可推开不挡活人。诊断模式 `UnitCollisionLayer=-2`（只打矩阵日志不修改）。**排查单位碰撞用 `Physics.GetIgnoreLayerCollision(l1,l2)` 直接读，别猜。**
@@ -176,6 +570,8 @@ RTS 上帝视角内**自定义生成单位/载具**（作弊向）。详见 `ER2
 **v0.1.49（2026-09-13）**：同步轻量版 v1.0.8 的热开关修复（`GateBlocked` 折叠进 `Apply` + `_unitMatrixOpen`/`_corpseMatrixOpen` 矩阵恢复 + 软推按开关细分）；`PhysicsTickPatch.Postfix` 重构为**先** `UnitCollision.Apply()` **再** `GateBlocked` 短路（物件物理/场景物理仍归总开关管，不受影响）；`PushItemsNearAI` 从 pushCorpses 块内移到块后（它自带 `PushPhysItems` 检查，不应被尸体开关牵连）。发布包 `ER2_MorePhysics_v0.1.49.zip`（EN，拆包核对 = DLL + README.txt + Nexus_description.md）；**本地 plugins 不部署**（与轻量版重叠，用户要求只部署轻量版）。
 
 ### 2.18 Conquest `er2.conquest` v0.2.0（2026-09-13；战略层对齐 GoH 完整化 + M3 战斗桥接待实测）
+
+> **【2026-09-19 项目终止】**：用户决定放弃征服模式开发。原因：战略层（206 省/回合/研究树/四资源）复杂度失控、五轮实测返工主要在解决"看不懂"、最高风险的合成战斗启动链路（M3/M4）始终未实测。**本文档以下内容保留为复盘与侦察档案**；已实测验证的 UI 基建与 Core 组件由无尽模式回收（`ER2_无尽模式_设计方案.md` §1.2）。**同日已卸载游戏内 DLL/cfg 并删除工作区源码**（`Conquest/`、`ConquestRecon/`），源码快照在 `research_out/conquest_salvage/`（回收清单见其 README）。
 
 **把《Gates of Hell: Ostfront》的征服模式搬进 ER2**：持久化军队 + 领土 + 资源 + 回合制推进，战斗只是战略层的一次结算事件。方案见 **`ER2_征服模式_设计方案.md`**（15 节，含全部反编译与实测证据）；**参考拆解见 `ER2_征服模式_参考拆解.md`**（GoH `.pak` 解包实证 + HLL 检索 + 机制映射表）。
 
@@ -316,6 +712,7 @@ M0 侦察工具，同 `HvtTestDriver` 定位。**刻意不打任何 Harmony 补�
 | `ER2_Coax_MG_Hotkey.dll` | Coax MG Hotkey（用 `UnityEngine.InputSystem.Key` 枚举做快捷键——ModManager 枚举支持就是为它加的） |
 | `ER2_MeleeTweaks.dll` | Melee Tweaks |
 | `ER2_FPSBodyShadowsFix.dll` | FPS Body Shadows Fix |
+| `AdvancedCombatMovement_1.2.2_StablePatch.dll` | **Advanced Combat Movement 1.2.2**（GUID `AdvancedCombatMovement`，DLL 内合并了 Responsive Orders + Slower Vehicles 两套补丁；2026-09-24 装机供兼容实测）。**已知互打点**：① 在第 3 页劫持 `SettingsGUI_V2.SettingsTabRight`（恒 false）→ 与 ModManager 翻页链冲突（1.5.3 已桥接）；② 同上这一跳**连同原生点击音效一起吞掉**（它自己不播）→ 翻页静音（1.5.4 已兜底补音）；③ 吞 `Squad.SetHoldFireOrder(false,false,false,false)` → 与 Battlefield Commander 恢复开火冲突（1.4.15 已兜底）；④ 自带 AI 防守驻留会覆盖我方的移动令（设计层，需在它的设置页关掉 Defensive Hold / Danger Memory）。**另注：它编译时用的是 2026-09-12 之前的 interop**（`SettingsTabLeft` 里写死 1 参 `__instance.UpdateOpenedMenu(true)`，当前游戏是 2 参）→ 它自己的左翻在当前游戏版本上有 MissingMethodException 风险（未实测，属它自己的版本兼容问题，非我方拦截） |
 | `ER2_LeaveRedeploy`（第三方） | 曾在死亡时接管"小队选择→部署界面"流程（隔离验证用） |
 
 ## 4. 发布包状态（`C:\Users\71011\Downloads\`）
@@ -324,7 +721,12 @@ M0 侦察工具，同 `HvtTestDriver` 定位。**刻意不打任何 Harmony 补�
 
 | 包 | 时间 |
 |---|---|
-| `ER2_BattlefieldCommander_v1.1.0.zip` / `ER2_BattlefieldCommander_CN_v1.1.0.zip` | 09-06（**最新**） |
+| `ER2_UniversalGeneration_v1.3.2.zip` / `ER2_UniversalGeneration_CN_v1.3.2.zip` | 09-19（**待发 Nexus**：火力点页签 + 小队库 466 变体 + 敌方原生 AI + 启动时零卡顿探测；1.3.1 砍自定义班生成——运行时空壳，1.3.2 按用户决定砍全部第三方生成；拆包核对 = DLL + README.txt + Nexus_description.md ✓ 双语双包 ✓） |
+| `ER2_BattlefieldCommander_v1.4.15.zip` / `ER2_BattlefieldCommander_CN_v1.4.15.zip` | 09-24（**最新**：上帝视角打开设置后相机输入不再穿透菜单（滚轮/WASD/中键）；兼容 Advanced Combat Movement 吞掉"恢复开火"调用 → 改「调用→回读→直写 holdFire 字段」。EN 构建 = **当前部署**（sha256 `f474a84f…`，与 EN 包内 DLL 一致；CN 包 `f9600279…` 更小，仅打包不部署）；拆包核对均 = DLL + README.txt + Nexus_description.md（build.ps1 按包语言取文档，双语包各 3 文件）） |
+| `ER2_ModManager_v1.5.4.zip` / `ER2_ModManager_CN_v1.5.4.zip` | 09-24（**最新**：翻页音效兜底 —— 第三方假页吞掉原生 Tab 方法时由我们补 `ClickSound()`，并打印翻页分支追踪日志；拆包核对 = DLL + README.txt + Nexus_description.md（ModManager 无中文文档，CN 包文档仍为英文）） |
+| `ER2_ModManager_v1.5.3.zip` / `ER2_ModManager_CN_v1.5.3.zip` | 09-24（与第三方"假页"式原生设置页（Advanced Combat Movement）共享翻页链 —— MODS 页不再被它的 TabRight 劫持挡住） |
+| `ER2_BattlefieldCommander_v1.4.14.zip` / `_CN_v1.4.14.zip` | 09-19（历史：性能优化） |
+| `ER2_BattlefieldCommander_v1.1.0.zip` / `ER2_BattlefieldCommander_CN_v1.1.0.zip` | 09-06 |
 | `ER2_UniversalGeneration_v1.0.0.zip` / `ER2_UniversalGeneration_CN_v1.0.0.zip` | 09-06 |
 | `ER2_ModManager_v1.5.2.zip` | 09-18（**最新**：删掉自锁的开发开关 `NativeFull` + 整文件删除 `NativePage.cs`，MODS 页只剩一条建页路径；拆包核对 = DLL + README.txt + Nexus_description.md） |
 | `ER2_ModManager_v1.5.1.zip` | 09-18（历史：删除遗留 PoC 测试页 + `NativePoc` 开关；新增 `Debug`/`debugLog` 开关，默认关） |
@@ -333,6 +735,17 @@ M0 侦察工具，同 `HvtTestDriver` 定位。**刻意不打任何 Harmony 补�
 | `ER2_UnitInfoOverlay_v1.0.5.zip`、`ER2_HideAnything_v4.5.4.zip`、`ER2_WeatherControl_v1.7.2.zip`、`ER2_LimbTweaks_v2.13.101.zip` | 09-05 |
 | `ER2_VeteranHVT_v1.2.0.zip`（EN，**当前部署**）/ `ER2_VeteranHVT_CN_v1.2.0.zip`（CN） | 09-13（**最新**：头顶标记改 3D 世界空间 billboard（恒定屏占比 + 深度遮挡）+ 载具乘员击杀共享/一载具一标记 + 关闭叛徒机制完全失效；**本次补齐 `README_CN.txt`/`Nexus_description_CN.md`** → CN 包文档首次为中文；拆包核对 = DLL + README.txt + Nexus_description.md + bf1_kill.wav；EN/CN 包 DLL sha256 不同（`-Cn` 带 `CN_BUILD`）） |
 | `ER2_MorePhysics_UnitCollision_v1.0.8.zip`、`ER2_MorePhysics_v0.1.49.zip` | 09-13（**热开关修复**：矩阵开→关即时恢复原状，不再"关了还有碰撞"；轻量版另修软推开关细分；拆包核对均 = DLL + README.txt + Nexus_description.md） |
+| `ER2_UniversalGeneration_v2.2.1.zip`（EN，**当前部署**） | 09-24（**2.2.1 修 2.2.0 回归**：字母行「全部」占两格后循环 `letters[i-2]` 从 i=1 起读 → `letters[-1]` 越界 → 整帧 OnGUI 中断 → 物品列表全空白（截图=子分类页签+孤零零「全部」）。修=字母从 i>=2 起排。**教训：改"按钮占位格"时必须把占位格与数据下标分开算**） |
+| `ER2_UniversalGeneration_v2.2.0.zip`（EN） | 09-24（**2.2.0 三条用户反馈**：① 物品携带预览改 3D 幽灵模型（裸实例化+冻结刚体+宿主 Ghostify，删光圈/光标图标）；② 字母行「全部」占两格修按钮重叠；③ **mod 内容支持回归**（新 `ModCatalog.cs`）：磁盘解析各 mod `index.xml`（Runtime DB 无法区分官方/mod，2.0.7 定案 PD 恒空）→ `GenerateModItemId` 算 id → 物品 `GetItemObject` 校验入「Mod物品」、载具 `GetVehiclePrefabAsync` 验证入「Mod载具」；mod 小队已在步兵页（SquadsArchive 全量 key）。DLL 102,912 B，sha256 `B9CD69DB…478D8D3`，反编译复核 ✓） |
+| `ER2_UniversalGeneration_v2.1.1.zip`（EN） | 09-19（**2.1.1 修复"完全没有显示"**：日志 `[UniGen] OnGUI 异常: Method unstripping failed` ×8 → **`GUI.TextField` 被 IL2CPP 裁剪**，一抛异常整帧 OnGUI 中断（子分类页签在它之前绘制故幸存，列表全空）。**彻底弃用键盘输入**，改纯点击首字母索引：`LettersOf/LetterOf/HasLetter` + 24px 按钮自动换行、只列实际出现的字母 + 「全部」；`Query` 的 `filter`→`letter`；删 `fieldStyle` 与 `SetNextControlName`。**按用户要求部署英文版**（不加 `-Cn`）。DLL 93,696 B，sha256 `D292BEF5…32990C`，与构建产物逐字节一致；反编译复核版本双写 2.1.1 且 TextField 已消失 ✓） |
+| `ER2_UniversalGeneration_CN_v2.1.0.zip` | 09-19（**2.1.0 物品收藏 + 收藏分类 + 子分类 + 过滤框**：2.0.7 修好后物品 2106 条（weapons 698 / gear 542）翻找困难。物品行加 ★；收藏页签下多一行分类子页签（只列已收藏分类，单位/物品各走各渲染不混排）；物品子分类用**游戏官方字段**（`TryCast<Weapon>().weaponPose` → 步枪/手枪，`IsWerable()` → 可穿戴，不猜名字）；过滤框用 `GUI.TextField`（物品 id 全英文，无需中文输入法）。踩坑：`new RectOffset(4参)` 被 IL2CPP 裁剪 → CS1729，改 `contentOffset`；收藏**写入点合并到 `GenCatalog.SaveFavs` 一处**防互相覆盖） |
+| `ER2_UniversalGeneration_CN_v2.0.7.zip` | 09-19（**2.0.7 修复"还是没有"——真正根因定案**：2.0.6 诊断日志连续 154s 跨三场景打印 `Loaded=true 但 items 枚举 n=0` → **就绪闸门条件恒不成立**（`Loaded` 恒 true、`items`(6) 恒空），闸门永不开 → 枚举从未执行（tick 看门狗本身工作正常，它重启了但每次都卡同一处）。修法两条：① **闸门整体移除**（`ProbeDatabaseReady`→`SampleCounts` 只观测），无条件枚举 + 空则重试；② **泛型实参问错类型**——`GetAllItemsOfType<PropData>` 改为 **`<ItemObject>`**（`GetItemObject(id)` 返回的类型，带 `item_id`/`icon`），PropData 兜底、按 id 去重。另加 Ready 后 20s 一次性补漏重扫。诊断打印两种类型×四类别真实条数。**教训：前四轮只查"等闸门的循环活不活"，没查"闸门条件本身对不对"**） |
+| `ER2_UniversalGeneration_v2.0.6.zip` / `ER2_UniversalGeneration_CN_v2.0.6.zip` | 09-19（**2.0.6 修复"一个物品分类都没有"**：根因 = **2.0.5 看门狗逻辑写反**——`if (probeState==1) return;` 但协程被场景切换杀死时无人复位 `probeState` → 永远卡 1 → 看门狗永远不重启（证据 = 2.0.5 新加的诊断日志一条都没打）。修法 = **tick 计数判活**（协程每帧 `probeTicks++`，看门狗比对是否增长；不增长即真死）。**判据第四次迭代**：150s 硬阈值 → 20s 心跳 → 不判死 → **tick 计数**；前三轮共同错误 = 拿时间流逝当协程死亡判据。反编译复核两处版本 + tick 比对分支 ✓） |
+| `ER2_UniversalGeneration_v2.0.5.zip` / `ER2_UniversalGeneration_CN_v2.0.5.zip` | 09-19（**2.0.5 修复"根本没有对应的选项"**：2.0.4 已生效且逐帧轮询在跑，但**看门狗在场景加载期间误判"心跳停跳"→ 重启 → 6 次触顶后 probeState=3 永久放弃** → 物品页签永不建起。修法 = 移除放弃路径 + 新增 `LogProbeDiag` 就绪诊断。**但本轮引入新 bug：看门狗"不判死只续跑"导致协程真死时永不重启 → 2.0.6 再修**） |
+| `ER2_UniversalGeneration_v2.0.4.zip` / `ER2_UniversalGeneration_CN_v2.0.4.zip` | 09-19（**2.0.4 修复"仍然不能生成物品"**：先证伪"中英不同步"（部署 DLL 与 EN 构建**逐字节一致**、日志证明 2.0.3 在跑）→ 真因 = 2.0.3 的 `WaitForSeconds(2f)` 轮询卡在等待里、随场景切换被杀，150s 看门狗重启时预算已空耗；改**逐帧轮询** + 心跳判活 + 预算就绪后起算。**本轮踩坑：`[BepInPlugin]` 首次编辑未落盘，反编译才发现特性 2.0.3 / 日志 2.0.4 不一致**） |
+| `ER2_UniversalGeneration_v2.0.3.zip` / `ER2_UniversalGeneration_CN_v2.0.3.zip` | 09-19（**2.0.3 修复物品生成整体不可用**：就绪闸门 `l != null` 被"非 null 空数组"骗过 → 一次跑死、页签建不起来；改双判据 `ItemsDatabase.Loaded` + `Count>0`，重试上限 60 次/2 分钟，看门狗 20s→150s 并加进度基线；拆包核对 = DLL + README.txt + Nexus_description.md；反编译三重复核版本/闸门/重试结构 ✓） |
+| `ER2_UniversalGeneration_v2.0.2.zip` / `ER2_UniversalGeneration_CN_v2.0.2.zip` | 09-19（**2.0.2 物品目录重写**：停止猜 id，改运行时 `ItemsDatabase.GetAllItemsOfType<PropData>` 枚举四类；`Uniforms` 桶整体移除） |
+| `ER2_UniversalGeneration_v2.0.1.zip` / `ER2_UniversalGeneration_CN_v2.0.1.zip` | 09-19（**2.0.1 修复**：点选不再秒放（`ignoreUntilRelease` 补 `return`）、武器判定改兜底默认 + `BeginValidate` 启动剔除无效条目、士兵命中半径按相机距离反算 + `RaycastAll` 找地面；失败路径补全日志） || `ER2_UniversalGeneration_v2.0.0.zip` / `ER2_UniversalGeneration_CN_v2.0.0.zip` | 09-19（**物品生成 + 鼠标拖放**：物品页签 380+ 条目带真实图标，拖到单位身上进背包 / 拖到地上生成实体；Direct`items.Add` 注入保子类；双语包内容与 Tr 字典反编译核对 ✓） |
 | `ER2_CombatTweaks_v1.2.2.zip`（+CN）、`ER2_InventoryPause_v1.0.5.zip`（+CN） | 08-25/26 |
 
 **历史清理**：SquadCommand 全部中间版本包与暂存目录已删（只留 1.1.0 双语）；工作区根目录 `EasyRed2_BepInEx_Dependencies.zip` 已删。

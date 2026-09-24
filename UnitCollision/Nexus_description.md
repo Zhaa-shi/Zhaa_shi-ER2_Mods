@@ -13,6 +13,7 @@ A lightweight companion mod to ER2 More Physics that ONLY keeps the unit and cor
 - **Corpse shoving**: corpses no longer stop living units — both the player and AI shove them aside instead of walking over them. Works with any corpse state: kinematic (game-frozen) corpses are translated directly, dynamic ones get their velocity written.
 - **Reliable corpse detection**: corpses are gathered from the unit tables plus a cached full-scene scan, so AI interactions work even though the game removes ragdollized units from `aliveCreatures`.
 - **Independent toggles**: `UnitCollision` (unit blocking) and `PushCorpses` (corpse shoving) can be disabled separately; `CorpsePushForce` controls how far corpses are shoved (0 = corpses block but are not shoved).
+- **Hot-applying toggles**: switching the mod (or unit blocking / corpse shoving) off in the Mod Manager instantly restores the vanilla collision matrix — no game restart needed.
 - **Singleplayer only by default** (`SingleplayerOnly`), like the full More Physics mod.
 - **Diagnostics mode**: set `UnitCollisionLayer` to `-2` to log collision matrices and collider details without changing anything.
 - Bilingual config descriptions (follows the game's language in the regular build; the `_CN_` package is fixed Chinese).

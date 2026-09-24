@@ -8,7 +8,9 @@ namespace ER2SquadCommand;
 /// 上帝视角 v0.7.93（RTS 指挥，RTS/FPS 共存版）。
 ///   左键：单击选友军（临时指挥，不建队）/拖框/双击选队/空白清选/Shift 追加
 ///   右键短按：空白=移动(M7)｜敌军=集火标记（只改目标，不移动）｜友军载具/车内兵=交互环｜徒步友军=视为地面移动（合并已上移顶栏）；双击=原生前往并防守(HoldArea)
-///   右键长按 0.35s（仅按在空地/无效目标时）：单位环（站起[resetPose]/蹲下/趴下[setPose+还原名单]/停止）；按在单位上=短按指令，不弹环
+///   右键长按 0.35s + 拖动 = 阵型箭头（Formation.cs，地狱之门式：垂直排开/掩体散开/载具到位转向；1.2.0 上位替代命令环与朝向拖动）
+///   命令快捷键（cfg Hotkeys 可自定义）：Z/X/C 站/蹲/趴  V 停止  B 停火  N 就近掩体  M 集合  F 分散
+///   左下角信息面板 + 只读装备/背包（InfoPanel.cs）
 ///   交互环：上车（成功后转选车组）/下车/修理（原生 OrderRepairVehicle）；合并只保留顶栏入口（0.7.96 移出轮盘）
 ///   顶栏按钮：控制该小队 / 分队（显式新建组）/ 合并（并入当前激活 RTS 组）
 ///   空格暂停；F9 进入/紧急退出；顶部按钮接管（保护窗+独苗转移）
@@ -127,41 +129,7 @@ internal static class GodViewController
 	private static float flyStartTime;
 	private static Vector3 flyStartPos;
 
-	// ===== 交互命令环（仅上车/下车/修理，不含 Move/Attack）=====
-	private static bool showInteractionWheel = false;
-	private static Vector2 wheelScreenPos;
-	private static Vehicle wheelTargetVehicle;      // 目标载具（上车/开车）
-	private static Squad wheelTargetVehicleCrew;    // 目标载具车组（下车）
-	private static Soldier wheelTargetSoldier;      // 目标友军士兵（上车/物品）
-	// 布局常量：槽位在半径 WheelRadius() 的圆周上均布（正上起始）。
-	// 三项时相邻按钮中心距 = 2*72*sin60° ≈ 125px > 按钮宽 84px；七项时半径翻倍（144px）保持间距。
-	private const float WheelBtnW = 84f;
-	private const float WheelBtnH = 32f;
-	private const float WheelItemDist = 72f;      // 基准按钮中心到环心距离（>5 槽时自动翻倍）
-	// 动态条目：kind0=交互环(上车/下车/修理)，kind2=命令环(站/蹲/趴/停止/掩体/集合/停火)；槽位按数量均布
-	private const int WheelSlotMax = 8;
-	private static readonly string[] WheelItemLabels = new string[WheelSlotMax];
-	private static readonly bool[] WheelItemEnabled = new bool[WheelSlotMax];
-	private static int wheelItemCount;
-	/// <summary>轮盘类型：0=交互环（右键载具/车内士兵），2=常驻单位环（选中后长按右键）。友军环已移除（合并上移顶栏）。</summary>
-	private static int wheelKind;
-
-	// 开环右键豁免：Update 阶段 GetMouseButtonDown(1) 开环后，同一次按压的 MouseDown(1)
-	// 仍会进入本帧 IMGUI 队列——若不豁免，环会在打开的同一帧被自己的"右键关闭"吃掉。
-	// 窗口内且未移出豁免半径的右键 Down 不视为"第二次右键"；两条阈值常量均可调。
-	private const float WheelOpenGuardSeconds = 0.25f;   // 开环后的豁免时长
-	private const float WheelOpenGuardPixels = 30f;     // 豁免最大位移（像素）
-	// 常驻单位环的世界锚点（开环时鼠标射线落点）：环随镜头/世界一致移动
-	private static Vector3 wheelAnchorWorld;
-	private static bool hasWheelAnchor;
-	private static float wheelOpenedAtTime = -10f;
-	private static Vector2 wheelOpenedAtGuiPos = Vector2.zero; // 开环时鼠标位置（IMGUI 左上原点）
-	// 关环后吞掉同一次左键手势的余下部分：松开事件发生在环已关闭的下一帧，
-	// 会落进普通 ClickActOrCancel 把刚执行的命令结果（如转选车组）静默清掉
-	private static bool swallowLeftGesture;
-	// ◆ 标记绘制缓存（OnGUI 每帧多 pass）
-	private static List<Soldier> markerCache = new List<Soldier>();
-	private static float markerCacheUntil = -10f;
+	// ===== 选择状态（重写核心） =====
 
 	// 右键长按手势状态（长按=常驻命令环，短按=直接指令）
 	private const float RightLongPressSeconds = 0.35f;
@@ -172,7 +140,12 @@ internal static class GodViewController
 	private static Vector2 rightDownScreenPos;
 	private static bool rightDownOnUnit; // 按下点命中单位时不开姿态环（松开一律走短按指令）
 	private static float lastRightBlankClickTime = -10f;
-	private static bool facingDragActive; // 1.0.2：朝向拖动进行中（选中载具长按右键拖出阈值，松开转向）
+	private static bool formationDragActive; // 1.2.0：阵型箭头拖动进行中（长按右键拖出，松开下发阵型/掩体/载具朝向）
+	// 关环后吞掉同一次左键手势的余下部分（1.2.3：指令环已删，仅保留状态字段供手势链复用）
+	private static bool swallowLeftGesture;
+	// ◆ 标记绘制缓存（OnGUI 每帧多 pass）
+	private static List<Soldier> markerCache = new List<Soldier>();
+	private static float markerCacheUntil = -10f;
 	// ===== 标记敌军（集火）——0.7.63 最终形态重建（0.7.68 误删恢复） =====
 	internal sealed class MarkedTarget
 	{
@@ -201,6 +174,9 @@ internal static class GodViewController
 	/// <summary>LOS/范围缓存（0.5s 刷新）：GetBestVisibleEnemy Postfix 用它替代每兵每帧射线。</summary>
 	internal static bool MarkLosCached = true;
 
+	/// <summary>1.4.14 性能：PruneMark 的存活单位暂存（复用，避免每 0.5s 一次 List 分配）。</summary>
+	private static readonly List<Soldier> pruneMarkBuf = new List<Soldier>();
+
 	private static void PruneMark()
 	{
 		if (mark == null) return;
@@ -218,7 +194,9 @@ internal static class GodViewController
 			}
 			catch { }
 			markInteropFailures = 0;
-			List<Soldier> uu = new List<Soldier>();
+			// 1.4.14 性能：复用缓冲区（原每次 new List<Soldier>()，0.5s 一次也算白扔的 GC）
+			List<Soldier> uu = pruneMarkBuf;
+			uu.Clear();
 			for (int i = persistentMarkUnits.Count - 1; i >= 0; i--)
 			{
 				Soldier u = persistentMarkUnits[i];
@@ -318,6 +296,10 @@ internal static class GodViewController
 	private const float DragThreshold = 10f;
 	private const float FlyDuration = 1.2f;
 	private static float panelHideTimer = -10f;
+	// 1.2.10：控制权登记节流（原每帧调 GetComponentsInChildren，见维护段注释）
+	private static float ctrlSyncNext = -10f;
+	private static readonly List<Soldier> ctrlSyncBuf = new List<Soldier>();
+	private static readonly List<Squad> ctrlSyncSquads = new List<Squad>();
 	// 定期清理
 	private static float cleanupTimer = -10f;
 	// 移动 pending（同步窗口重试）
@@ -326,6 +308,8 @@ internal static class GodViewController
 	private static float pendUntil;
 	private static float pendNextRetry;
 
+	// 1.2.4：HasSelection 仍只算"单位"——顶栏按钮（控制/分队/合并）只对单位有意义；
+	// 可交互物选择（propVehicle/propItem）走 InfoPanel 单独显示。
 	private static bool HasSelection => SelInfantryCount() > 0 || selVehicles.Count > 0;
 
 	private static int SelInfantryCount()
@@ -345,12 +329,24 @@ internal static class GodViewController
 		selVehicleRefs.Clear();
 		virtualUnits.Clear();
 		hasCmdTarget = false;
+		ClearPropSelection(); // 1.2.4：可交互物选择与单位选择互斥
+		BackpackPanel.CloseAll(); // 1.4.1（用户定案）：取消/更换选择 → 背包窗口随选关闭（CloseAll 幂等）
+		// 1.4.9：**不杀在途的派兵会合任务**——兵还在走过去，选择变了不该让任务消失（1.4.8「走到贴身也不开窗」的嫌疑链）
 	}
 
 	/// <summary>当前选中的步兵（身上 ◆ 光标；只移动它们 = 未选不动）。</summary>
 	internal static List<Soldier> GetSelectedInfantry()
 	{
 		List<Soldier> list = new List<Soldier>();
+		GetSelectedInfantryInto(list);
+		return list;
+	}
+
+	/// <summary>1.2.1：填充到调用方提供的列表（零分配版本，供每帧调用的 Formation/InfoPanel 使用）。</summary>
+	internal static void GetSelectedInfantryInto(List<Soldier> list)
+	{
+		if (list == null) return;
+		list.Clear();
 		if (mainSquad != null)
 		{
 			try
@@ -372,7 +368,6 @@ internal static class GodViewController
 				if (s != null && s.IsAlive && s.transform != null) list.Add(s);
 			}
 		}
-		return list;
 	}
 
 	/// <summary>本次指令的全部指挥对象（步兵 + 选中载具的实际在车乘员）。
@@ -451,11 +446,36 @@ internal static class GodViewController
 		return new List<Squad>(selVehicles);
 	}
 
-	private static bool IsInfantry(Soldier s)
+	/// <summary>1.4.9：徒步判定（公开版）。**车内乘员不是徒步单位**——对他们下发 moveTo / allowMovements(true)
+	/// 不会"走过去"，原生 AI 的反应是**下车步行**（用户实测「让单位上坦克后又会立刻下车」的真凶）。
+	/// 所有"走过去/发移动/派兵拾取"的链路都必须先过这一关。</summary>
+	internal static bool IsOnFoot(Soldier s)
 	{
+		if (s == null) return false;
 		try { if (s.GetComponentInParent<Vehicle>() != null) return false; } catch { }
 		try { if (new Lua_Soldier(s).isInsideVehicle()) return false; } catch { }
 		return true;
+	}
+
+	private static bool IsInfantry(Soldier s)
+	{
+		return IsOnFoot(s);
+	}
+
+	/// <summary>1.4.9：把选中集拆成「可步行的徒步单位」。返回被排除的车内乘员数。</summary>
+	internal static List<Soldier> FilterOnFoot(List<Soldier> src, out int embarked)
+	{
+		List<Soldier> res = new List<Soldier>();
+		embarked = 0;
+		if (src == null) return res;
+		for (int i = 0; i < src.Count; i++)
+		{
+			Soldier s = src[i];
+			if (s == null) continue;
+			bool onFoot = IsOnFoot(s);
+			if (onFoot) res.Add(s); else embarked++;
+		}
+		return res;
 	}
 
 	private static Squad CrewOf(Soldier s)
@@ -540,7 +560,9 @@ internal static class GodViewController
 		try { if (mainSquad != null) mainSquad.RemoveNullUnits(); } catch { }
 	}
 
-	/// <summary>移动兜底：只对选中步兵逐单位 moveTo。普通 RTS 指令先尝试原生 Squad 订单。</summary>
+	/// <summary>移动兜底：只对选中步兵逐单位 moveTo。普通 RTS 指令先尝试原生 Squad 订单。
+	/// 1.4.9：**跳过车内乘员**——对车里的兵 allowMovements(true)+moveTo 等于命令他下车步行
+	/// （用户实测「让单位上坦克后又会立刻下车」）。车辆移动走 selVehicleRefs → DriveVehicleTo。</summary>
 	internal static int MoveUnits(List<Soldier> units, Vector3 point)
 	{
 		int n = 0;
@@ -548,6 +570,7 @@ internal static class GodViewController
 		foreach (Soldier s in units)
 		{
 			if (s == null || !s.IsAlive) continue;
+			if (!IsOnFoot(s)) continue; // 1.4.9：车内乘员不接步行指令
 			try
 			{
 				SquadCmdLogic.RegisterControlledUnit(s);
@@ -563,8 +586,8 @@ internal static class GodViewController
 		return n;
 	}
 
-	/// <summary>让载具/火力点车组开到目标点（Squad 原生订单链）。</summary>
-	private static int DriveVehicleTo(Vehicle vehRef, Vector3 point)
+	/// <summary>让载具/火力点车组开到目标点（Squad 原生订单链）。1.2.0：改 internal 供 Formation 阵型下发。</summary>
+	internal static int DriveVehicleTo(Vehicle vehRef, Vector3 point)
 	{
 		if (!Active) return 0;
 		RTSTrace("DriveEntry", "vehicle=" + (vehRef != null ? vehRef.name : "null"));
@@ -694,7 +717,7 @@ internal static class GodViewController
 		SquadCmdLogic.Log("[SquadCmd] 标记目标物 " + mark.Name);
 	}
 
-	private static string SafeName(Soldier s)
+	internal static string SafeName(Soldier s)
 	{
 		try { string n = s.name_surname; return string.IsNullOrEmpty(n) ? ("单位#" + s.GetInstanceID()) : n; } catch { return "单位"; }
 	}
@@ -1172,8 +1195,9 @@ internal static class GodViewController
 	}
 
 	/// <summary>0.7.99：下达移动后登记完成度观测。0.9.15：改用原生停火通道 + 压制有效期。
-	/// 1.0.3：routeOnly=true 仅登记路线显示/到位统计，不加行军停火（双击「前往并防守」用）。</summary>
-	private static void RegisterMoveObservation(Vector3 point, List<Soldier> units, bool routeOnly = false)
+	/// 1.0.3：routeOnly=true 仅登记路线显示/到位统计，不加行军停火（双击「前往并防守」用）。
+	/// 1.2.0：改 internal——Formation 阵型下发复用（routeOnly，进掩体需要自由行为）。</summary>
+	internal static void RegisterMoveObservation(Vector3 point, List<Soldier> units, bool routeOnly = false)
 	{
 		obsTarget = point;
 		obsUnits.Clear();
@@ -1247,6 +1271,31 @@ internal static class GodViewController
 		return null;
 	}
 
+	/// <summary>1.4.15 兼容：恢复开火（解除行军停火）。
+	/// 直接用 `SetHoldFireOrder(false, false, false, false)` 会被第三方 mod 吞掉——
+	/// Advanced Combat Movement（Responsive Orders）对该签名组合加了 Prefix：
+	/// 「小队长 == 当前操控兵」时它只记一次危险记忆就 return false，
+	/// 小队因此**永久停火**（表现：下了移动令后部队再也不还击）。
+	/// 这里改成「调用 → 回读校验 → 不生效就直写原生 holdFire 字段」：
+	/// 字段写入不经过方法，Harmony 前缀拦不住。无第三方 mod 时校验必然通过，行为不变。</summary>
+	private static void ResumeFire(Squad sq)
+	{
+		if (sq == null) return;
+		try { sq.SetHoldFireOrder(false, false, false, false); } catch { }
+		try
+		{
+			bool stillHolding = false;
+			try { stillHolding = sq.HoldFire; } catch { }
+			if (!stillHolding) { try { stillHolding = sq.holdFire; } catch { } }
+			if (stillHolding)
+			{
+				sq.holdFire = false;
+				SquadCmdLogic.LogAlways("[SquadCmd] 恢复开火被第三方 mod 拦截，已直写 holdFire 兜底");
+			}
+		}
+		catch { }
+	}
+
 	private static void ClearMoveObservation()
 	{
 		// 0.9.15：观测结束（到位/超时/改令/到期）恢复开火与被压制找掩护
@@ -1269,7 +1318,7 @@ internal static class GodViewController
 			try
 			{
 				Squad sq = ResolveSquadByPointer(k);
-				if (sq != null) sq.SetHoldFireOrder(false, false, false, false);
+				ResumeFire(sq); // 1.4.15：兼容第三方吞调用（见方法注释）
 			}
 			catch { }
 		}
@@ -1280,6 +1329,7 @@ internal static class GodViewController
 		obsNoEngageExpire = -10f;
 		ObsTotal = 0;
 		ObsArrived = 0;
+		hasCmdTarget = false; // 1.2.1：观察结束 → 目标点标记与行进连线一起消失（用户要求二者同步）
 	}
 
 	/// <summary>0.8.00：载具移动成功发单后登记（去重；到位半径=2×moveRadius，车体大停得远）。</summary>
@@ -1324,7 +1374,7 @@ internal static class GodViewController
 			}
 			foreach (long k in obsNoEngageSquads)
 			{
-				try { Squad sq = ResolveSquadByPointer(k); if (sq != null) sq.SetHoldFireOrder(false, false, false, false); } catch { }
+				try { Squad sq = ResolveSquadByPointer(k); ResumeFire(sq); } catch { }
 			}
 			obsNoEngageSquads.Clear();
 			SquadCmdLogic.LogAlways("[SquadCmd] 行军停火到期，已恢复交战（单位仍未到位可再下移动令）");
@@ -1392,6 +1442,8 @@ internal static class GodViewController
 				try { if (bs != null && bs.IsAlive && !inCar.Contains((long)bs.Pointer)) { allIn = false; break; } } catch { }
 			}
 			if (allIn) { FinishBoardPending("全员在车"); return; }
+			// 1.2.1：登车期间目标点标记跟随载具（标记与登车连线一起显示、一起消失）
+			try { RecordCmdTarget(veh.transform.position); } catch { }
 			if (Time.unscaledTime > pendingBoardUntil)
 			{
 				foreach (Soldier bs in pendingBoardUnits)
@@ -1490,22 +1542,68 @@ internal static class GodViewController
 	}
 
 	/// <summary>我方阵营（上帝视角用缓存，平时读受控角色）。</summary>
-	internal static string MySideFaction()
+	/// <summary>1.4.14 性能：阵营缓存。MySideFaction 在 `GetBestVisibleEnemy` Postfix 里被
+	/// **每兵每帧**调用一次（集火标记生效期间战场上数百兵 × 60fps → 每秒上万次 interop 读 +
+	/// 字符串封送），而阵营在整场战斗里根本不变。缓存 2s；SavedFaction 变化时立即失效。</summary>
+	private static string mySideFacCache = null;
+	private static float mySideFacNext = -10f;
+	private static string mySideFacSaved; // 缓存时生效的 SavedFaction（用于失效判定）
+
+	/// <summary>1.4.14 性能：玩家当前操控士兵的缓存（0.5s）。
+	/// `PlayerController.currentController` + `ControlledCharacter` 是两次 interop 读，
+	/// 而它在 `GetBestVisibleEnemy` / `Vehicle.CurrentVisibleTarget` 两个 Postfix 里
+	/// **每兵每帧**被查询（战场上数百单位 → 每秒上万次）。切换操控单位最多晚 0.5s 生效，
+	/// 对"标记不强制玩家自己"这一用途完全够用。</summary>
+	private static Soldier playerSoldierCache;
+	private static float playerSoldierNext = -10f;
+
+	internal static Soldier CachedPlayerSoldier()
 	{
+		float now = Time.unscaledTime;
+		if (now < playerSoldierNext) return playerSoldierCache;
+		playerSoldierNext = now + 0.5f;
 		try
 		{
-			if (Active && !string.IsNullOrEmpty(SavedFaction)) return SavedFaction;
 			PlayerController pc = PlayerController.currentController;
-			if (pc != null && pc.ControlledCharacter != null && !string.IsNullOrEmpty(pc.ControlledCharacter.faction)) return pc.ControlledCharacter.faction;
+			Soldier c = pc != null ? pc.ControlledCharacter : null;
+			playerSoldierCache = (c != null && c.transform != null) ? c : null;
+		}
+		catch { playerSoldierCache = null; }
+		return playerSoldierCache;
+	}
+
+	/// <summary>1.4.14：切换操控/接管/退出时立刻失效玩家缓存。</summary>
+	internal static void InvalidatePlayerSoldier() { playerSoldierCache = null; playerSoldierNext = -10f; }
+
+	internal static string MySideFaction()
+	{
+		float now = Time.unscaledTime;
+		if (mySideFacCache != null && now < mySideFacNext && string.Equals(mySideFacSaved, SavedFaction, StringComparison.Ordinal)) return mySideFacCache;
+		mySideFacNext = now + 2f;
+		mySideFacSaved = SavedFaction;
+		if (Active && !string.IsNullOrEmpty(SavedFaction)) { mySideFacCache = SavedFaction; return mySideFacCache; }
+		try
+		{
+			PlayerController pc = PlayerController.currentController;
+			if (pc != null && pc.ControlledCharacter != null && !string.IsNullOrEmpty(pc.ControlledCharacter.faction))
+			{
+				mySideFacCache = pc.ControlledCharacter.faction;
+				return mySideFacCache;
+			}
 		}
 		catch { }
+		// 拿不到就返回空串（调用方 Friendly() 对空串返回 false = 不改写 AI 目标），
+		// 但**不缓存空串**，下帧继续重试。
 		return "";
 	}
 
-	/// <summary>该士兵是否在当前选择中（步兵选择 / 选中载具车组）。标记集火只引导选中单位。</summary>
+	/// <summary>该士兵是否在当前选择中（步兵选择 / 选中载具车组）。标记集火只引导选中单位。
+	/// 1.4.14 性能：先查 smSelected（0.2s 刷新的选中指针集，与 GetCommandUnits 同源）；
+	/// 命中即真，未命中再走原 interop 兜底——**保持语义不变**（缓存只是加速，不是唯一判据）。</summary>
 	internal static bool IsSelectedUnit(Soldier s)
 	{
 		if (s == null) return false;
+		try { if (smSelected.Count > 0 && smSelected.Contains((long)s.Pointer)) return true; } catch { }
 		try
 		{
 			if (mainSquad != null && mainSquad.GetMemberIndex(s) >= 0) return true;
@@ -1824,12 +1922,15 @@ internal static class GodViewController
 				try { new Lua_Soldier(savedSoldier).getAiParams().enableAiBehaviour(true); } catch { }
 				try { new Lua_Soldier(savedSoldier).getAiParams().followCustomSquadOrders(); } catch { }
 				try { PlayerController.currentController?.SetPlayer(null, 0f); } catch { }
+				InvalidatePlayerSoldier(); // 1.4.14：操控单位变了 → 立刻失效缓存
 				SquadCmdLogic.Log("[SquadCmd] 上帝视角：玩家单位 AI 接管，已脱离控制。");
 				HideSquadPanel();
 			}
 			SquadCmdLogic.ClearControlledSelection();
 			ClearSelection();
-			ResetInputState(false);
+			ResetInputState();
+			BackpackPanel.CloseAll(); // 1.3.0：进入上帝视角先收干净（幂等）
+			BackpackPanel.CancelLoot("进入 RTS"); // 1.4.9：进 RTS = 用户主动中断在途的派兵会合任务
 			flyingToSquad = false;
 
 			Vector3 start = Vector3.zero;
@@ -1840,6 +1941,7 @@ internal static class GodViewController
 			RecomputeRot();
 			Active = true;
 			SetCursor(true);
+			EnsureCameraAuthority(); // 1.2.11：装上 onPreRender 相机接管
 			ApplyCam(MainCam());
 			cmdFlash = Ui.Tr("上帝视角 ON（框选临时选择，右键指挥，空格暂停）"); cmdFlashUntil = Time.unscaledTime + 4f;
 			SquadCmdLogic.Log("[SquadCmd] 上帝视角 ON  pos=" + camPos.ToString("0.0") + " RTS 控制权仅绑定当前选择");
@@ -1851,11 +1953,15 @@ internal static class GodViewController
 	{
 		if (!Active) return;
 		Active = false;
-		ResetInputState(false);
+		ResetInputState();
 		EnsureTimeResumed();
 		// 退出只关闭 RTS 界面和相机接管。已经下达的移动、登车、车辆同步
 		// 与集火任务必须留在世界中，由 Tick 的持久任务段继续维护。
 		RestoreAllPoses();
+		Formation.OnRtsExit(); // 1.2.0：清阵型拖动态/幽灵预览/待转向任务
+		MouseCursor.Restore(); // 1.2.5：恢复系统光标
+		BackpackPanel.CloseAll(); // 1.3.0：关背包窗口 + 清拖拽态
+		BackpackPanel.CancelLoot("退出 RTS"); // 1.4.9：退出 = 中断在途会合任务
 		SquadCmdLogic.ClearControlledSelection();
 		flyingToSquad = false;
 		ClearSelection();
@@ -1866,6 +1972,7 @@ internal static class GodViewController
 			if (savedSoldier.IsAlive && PlayerController.currentController != null)
 			{
 				try { PlayerController.currentController.SetPlayer(savedSoldier, 0f); } catch { }
+				InvalidatePlayerSoldier(); // 1.4.14：操控单位变了 → 立刻失效缓存
 			}
 			else
 			{
@@ -2090,7 +2197,9 @@ internal static class GodViewController
 			suppressSwitchMemberUntil = Time.unscaledTime + SwitchMemberSuppressSeconds;
 			RestoreAllPoses(); // 接管的单位若被蹲/趴锁定，先还原否则玩家自己也无法站起
 			SquadCmdLogic.ClearControlledSelection();
-			ResetInputState(false);
+			ResetInputState();
+			BackpackPanel.CloseAll(); // 1.3.0：关背包窗口 + 清拖拽态
+			BackpackPanel.CancelLoot("接管单位"); // 1.4.9：接管 = 中断在途会合任务
 			flyingToSquad = false;
 			ClearSelection();
 			SavedFaction = "";
@@ -2099,6 +2208,7 @@ internal static class GodViewController
 			SetCursor(false);
 			try { PlayerController.currentController?.SetPlayer(pick, 0f); }
 			catch (Exception ex) { SquadCmdLogic.Log("[SquadCmd] SetPlayer 失败: " + ex.Message); }
+			InvalidatePlayerSoldier(); // 1.4.14：操控单位变了 → 立刻失效缓存
 			lastKnownSoldier = pick; // 0.7.37：观测死亡沿的缓存基准
 			takeoverProtectUntil = Time.unscaledTime + 10f; // A：接管保护窗启动
 			lastProtectCheck = -10f; deathGuardDone = false;
@@ -2169,17 +2279,131 @@ internal static class GodViewController
 		}
 	}
 
+	// ===== 1.2.0：命令快捷键（旧命令环 8 项的键盘化，cfg Hotkeys 节可自定义键位） =====
+
+	private static void HandleCommandHotkeys()
+	{
+		// 1.3.0：背包窗口热键（焦点单位/尸体/载具；尸体选择不走 HasSelection，须在最前）
+		if (Plugin.keyPack.Value != KeyCode.None && Input.GetKeyDown(Plugin.keyPack.Value)) { BackpackPanel.ToggleFocused(); return; }
+		if (formationDragActive) return;
+		if (!HasSelection) return;
+		if (Plugin.keyStand.Value != KeyCode.None && Input.GetKeyDown(Plugin.keyStand.Value)) { ResetPoseToSelection(); return; }
+		if (Plugin.keyCrouch.Value != KeyCode.None && Input.GetKeyDown(Plugin.keyCrouch.Value)) { ApplyPoseToSelection(SoldierPose.Crouch); return; }
+		if (Plugin.keyProne.Value != KeyCode.None && Input.GetKeyDown(Plugin.keyProne.Value)) { ApplyPoseToSelection(SoldierPose.Prone); return; }
+		if (Plugin.keyStop.Value != KeyCode.None && Input.GetKeyDown(Plugin.keyStop.Value)) { ClearFollow("停止", false); ClearMark(); StopSelected(); return; }
+		if (Plugin.keyHoldFire.Value != KeyCode.None && Input.GetKeyDown(Plugin.keyHoldFire.Value)) { ToggleHoldFireSelected(); return; }
+		if (Plugin.keyCover.Value != KeyCode.None && Input.GetKeyDown(Plugin.keyCover.Value)) { CoverAtSelectionCenter(); return; }
+		if (Plugin.keyRally.Value != KeyCode.None && Input.GetKeyDown(Plugin.keyRally.Value)) { RallyToLeaders(); return; }
+		if (Plugin.keyScatter.Value != KeyCode.None && Input.GetKeyDown(Plugin.keyScatter.Value)) { ScatterSelected(); return; }
+	}
+
+	/// <summary>停火/开火切换：有停火的小队→全部恢复开火；全部开火中→全部停火（原命令环【停火】）。</summary>
+	private static void ToggleHoldFireSelected()
+	{
+		HashSet<long> doneH = new HashSet<long>();
+		List<Squad> squads = new List<Squad>();
+		foreach (Soldier s in GetSelectedInfantry())
+		{
+			try
+			{
+				if (s == null || !s.IsAlive) continue;
+				Squad sq = s.joinedSquad;
+				if (sq == null || !doneH.Add((long)sq.Pointer)) continue;
+				squads.Add(sq);
+			}
+			catch { }
+		}
+		foreach (Squad csq in GetSelectedVehicleCrews())
+		{
+			try { if (csq != null && doneH.Add((long)csq.Pointer)) squads.Add(csq); } catch { }
+		}
+		if (squads.Count == 0) { cmdFlash = Ui.Tr("无可用小队"); cmdFlashUntil = Time.unscaledTime + 2f; return; }
+		bool anyHolding = false;
+		foreach (Squad sq in squads) { try { if (sq.holdFire) { anyHolding = true; break; } } catch { } }
+		bool hold = !anyHolding;
+		int nH = 0;
+		foreach (Squad sq in squads) { try { sq.holdFire = hold; nH++; } catch { } }
+		cmdFlash = (hold ? Ui.Tr("停火 → ") : Ui.Tr("开火 → ")) + nH + Ui.Tr(" 队"); cmdFlashUntil = Time.unscaledTime + 2f;
+		SquadCmdLogic.LogAlways("[SquadCmd] " + (hold ? "停火" : "开火") + " squads=" + nH);
+	}
+
+	/// <summary>就近掩体：以选中单位中心为圆心 SendUnitsToCovers（原命令环【掩体】快捷键版）。</summary>
+	private static void CoverAtSelectionCenter()
+	{
+		HashSet<long> doneC = new HashSet<long>();
+		int nC = 0;
+		Vector3 p = SelCenter();
+		foreach (Soldier s in GetSelectedInfantry())
+		{
+			try
+			{
+				if (s == null || !s.IsAlive) continue;
+				Squad sq = s.joinedSquad;
+				if (sq == null || !doneC.Add((long)sq.Pointer)) continue;
+				SquadCmdLogic.RegisterControlledSquad(sq);
+				sq.SendUnitsToCovers(p, Plugin.radius.Value * 2f);
+				nC++;
+			}
+			catch { }
+		}
+		if (nC > 0)
+		{
+			ClearFollow("就近掩体", false);
+			cmdFlash = string.Format(Ui.Tr("就近掩体 → {0} 队"), nC); cmdFlashUntil = Time.unscaledTime + 2f;
+			SquadCmdLogic.LogAlways("[SquadCmd] 就近掩体 squads=" + nC + " center=" + p.ToString("0.0"));
+		}
+		else { cmdFlash = Ui.Tr("无可用步兵小队"); cmdFlashUntil = Time.unscaledTime + 2f; }
+	}
+
+	/// <summary>集合：各步兵小队向自己的班长（原生 getLeader）位置集结（原命令环【集合】快捷键版）。</summary>
+	private static void RallyToLeaders()
+	{
+		HashSet<long> doneF = new HashSet<long>();
+		int nF = 0;
+		foreach (Soldier s in GetSelectedInfantry())
+		{
+			try
+			{
+				if (s == null || !s.IsAlive) continue;
+				Squad sq = s.joinedSquad;
+				if (sq == null || !doneF.Add((long)sq.Pointer)) continue;
+				Soldier leader = null;
+				try { leader = new Lua_Squad(sq).getLeader()?.connectedSoldier; } catch { }
+				if (leader == null || !leader.IsAlive || leader.transform == null) continue;
+				SquadCmdLogic.RegisterControlledSquad(sq);
+				new Lua_Squad(sq).moveTo(leader.transform.position, Plugin.radius.Value);
+				nF++;
+			}
+			catch { }
+		}
+		if (nF > 0) SquadCmdLogic.LogAlways("[SquadCmd] 集合（向班长集结） squads=" + nF);
+		else { cmdFlash = Ui.Tr("无可用小队（找不到班长）"); cmdFlashUntil = Time.unscaledTime + 2f; }
+	}
+
 	internal static void Tick()
 	{
 		// 持久任务段：无论当前是 RTS 还是 FPS，都继续维护已经下达的任务。
 		try
 		{
-			PruneMark();
-			SceneMarkersFrame(); // 0.9.0：3D 场景标记每帧跟随（RTS/FPS 均显示集火/目标环）
-			VehicleFacing.Tick(); // 1.0.2：载具朝向任务维护（到位/超时清字段，FPS 下也生效）
-			ObsMoveTick();
-			BoardPendingTick();
-			VehiclePendingTick();
+			// 1.2.8：**每步独立 try/catch**。此前整块共用一个 try——任一步抛异常就跳过
+			// SceneMarkersFrame()，而 SceneMarkers.EndFrame()（隐藏本轮未刷新标记）在它内部，
+			// 于是已画出的阵型箭头/路线虚线/掩体圈**永久卡在画面上**（用户截图里的残留标记）。
+			SafeStep("PruneMark", PruneMark);
+			SafeStep("FormationDrag", Formation.DragTick);
+			bool markersDrawn = false;
+			try { SceneMarkersFrame(); markersDrawn = true; }
+			catch (Exception ex) { SquadCmdLogic.Log("[SquadCmd] 场景标记错误: " + ex.Message); }
+			// 1.2.9：SceneMarkersFrame **内部自己会**调 EndFrame()（并清空 used 集合）——
+			// 1.2.8 在这里无条件又调一次，第二次 used 已空 → 本帧所有标记被立刻隐藏
+			//（用户反馈"所有3D随动标记都没了"）。只在绘制中途失败（没走到它自己的 EndFrame）时补清理。
+			if (!markersDrawn) { try { SceneMarkers.EndFrame(); } catch { } }
+			SafeStep("VehicleFacing", VehicleFacing.Tick);
+			SafeStep("FormationFacing", Formation.TickPendingFacings);
+			SafeStep("CoverArrivals", Formation.TickCoverArrivals);
+			SafeStep("Cursor", MouseCursor.Tick);
+			SafeStep("ObsMove", ObsMoveTick);
+			SafeStep("BoardPending", BoardPendingTick);
+			SafeStep("VehiclePending", VehiclePendingTick);
 		}
 		catch (Exception ex)
 		{
@@ -2200,12 +2424,17 @@ internal static class GodViewController
 			}
 			PeriodicCleanup();
 			PruneSelection();
-			// 0.7.44：注册链不得带共享 Squad——Vehicle 选择只注册其乘员 Soldier
+			// 0.7.44：注册链不得带共享 Squad——Vehicle 选择只注册其乘员 Soldier。
+			// 1.2.10 性能：原实现**每帧**调 SelectedVehicleOccupants()（内部 GetComponentsInChildren
+			// 会分配数组）+ 3 个 List 分配。改为 0.25s 节流，且无载具选择时直接跳过乘员展开。
+			if (Time.unscaledTime >= ctrlSyncNext)
 			{
-				List<Soldier> occ = SelectedVehicleOccupants();
-				List<Soldier> withOcc = GetSelectedInfantry();
-				withOcc.AddRange(occ);
-				SquadCmdLogic.SyncControlledSelection(withOcc, new List<Squad>());
+				ctrlSyncNext = Time.unscaledTime + 0.25f;
+				ctrlSyncBuf.Clear();
+				GetSelectedInfantryInto(ctrlSyncBuf);
+				PruneVehicleRefs();
+				if (selVehicleRefs.Count > 0) ctrlSyncBuf.AddRange(SelectedVehicleOccupants());
+				SquadCmdLogic.SyncControlledSelection(ctrlSyncBuf, ctrlSyncSquads);
 			}
 		}
 		catch (Exception ex)
@@ -2215,12 +2444,14 @@ internal static class GodViewController
 
 		// 输入先处理，避免相机/原生对象访问异常阻断鼠标手势收尾。
 		try { if (!escMenuOpen) HandleGroupHotkeys(); } catch { }
+		try { if (!escMenuOpen) HandleCommandHotkeys(); } catch { } // 1.2.0：命令快捷键（cfg Hotkeys 可自定义）
+		try { BackpackPanel.LootTick(); } catch { } // 1.3.3：派兵翻尸体——到达后自动开背包窗口
 		// 0.9.11：原版 M 地图在 god 视角强制显示也为空（显隐机制未明），已按设计在 RTS 内禁用，
 		// 相关强制显示/还原代码一并移除；FPS 模式下 M 键走原生流程不受影响。
 		try { HandleClick(); }
 		catch (Exception ex)
 		{
-			ResetInputState(true);
+			ResetInputState();
 			SquadCmdLogic.Log("[SquadCmd] 输入处理失败，已复位 RTS 手势: " + ex.Message);
 		}
 
@@ -2234,6 +2465,8 @@ internal static class GodViewController
 				{
 					Pause.SetPause(true);
 					escMenuOpen = true;
+					BackpackPanel.ResetDrag("ESC 菜单"); // 1.3.0：菜单打开期间 OnGUI 停跑，拖拽态先收干净
+					BackpackPanel.CloseMenu(); // 1.4.0：交互菜单同上
 					SquadCmdLogic.Log("[SquadCmd] ESC 打开原生菜单");
 				}
 				else
@@ -2253,13 +2486,15 @@ internal static class GodViewController
 
 		try
 		{
-			// 空格暂停（0.9.6：ESC 菜单打开期间让位）
-			if (!escMenuOpen && Input.GetKeyDown(KeyCode.Space)) TogglePause();
+			// 1.4.15：先算本帧的"让位"状态，相机输入全部按它分流（见 UiPointerCapture 注释）。
+			bool menuCapture = escMenuOpen;                          // 原生 ESC 设置/暂停菜单
+			bool uiCapture = menuCapture || UiPointerCapture();      // 指针停在 UI（我方面板/外部 mod 面板）上
+			if (!menuCapture && Input.GetKeyDown(KeyCode.Space)) TogglePause();
 			// 用 unscaledDeltaTime：空格暂停（timeScale=0）时镜头仍可移动
 			float dt = Mathf.Min(Time.unscaledDeltaTime, 0.05f);
-			HandleMove(dt);
-			HandleHeight(dt);
-			HandleDrag();
+			HandleMove(dt, menuCapture);
+			HandleHeight(dt, menuCapture, uiCapture);
+			HandleDrag(menuCapture, uiCapture);
 			AssertFreeCursor();
 			ApplyCam(MainCam());
 		}
@@ -2268,6 +2503,66 @@ internal static class GodViewController
 			// 相机链单独记录，不影响下一帧继续接收 RTS 输入。
 			SquadCmdLogic.Log("[SquadCmd] Tick 相机错误: " + ex.Message);
 		}
+	}
+
+	/// <summary>1.2.8：单步隔离执行（一步失败不影响后续步骤，尤其是标记清理）。</summary>
+	private static void SafeStep(string tag, Action step)
+	{
+		try { step(); }
+		catch (Exception ex) { SquadCmdLogic.Log("[SquadCmd] " + tag + " 错误: " + ex.Message); }
+	}
+
+	// ══════════════════════════════════════════════════════════
+	// 1.2.11：**相机最终接管**。此前用 WaitForEndOfFrame（1.2.9）没能解决——
+	// 说明原生相机写入发生在那之后（同相位的其他协程/渲染前回调）。
+	// Camera.onPreRender 是**每个相机渲染前的最后一刻**（晚于所有 LateUpdate 与
+	// WaitForEndOfFrame 协程），在这里把主相机压回我们的姿态 = 最终画面一定由我们决定。
+	// 只在上帝视角内生效；只接管主相机（其他相机放行）。
+	// ══════════════════════════════════════════════════════════
+	private static bool camAuthorityInstalled;
+	private static float camDiagNext = -10f;
+
+	internal static void EnsureCameraAuthority()
+	{
+		if (camAuthorityInstalled) return;
+		camAuthorityInstalled = true;
+		try
+		{
+			Camera.CameraCallback cb = (System.Action<Camera>)OnPreRenderCamera;
+			Camera.onPreRender = Camera.onPreRender + cb;
+			SquadCmdLogic.Log("[CamAuthority] onPreRender 钩子已安装");
+		}
+		catch (Exception ex) { SquadCmdLogic.Log("[CamAuthority] 安装失败: " + ex.Message); }
+	}
+
+	private static void OnPreRenderCamera(Camera cam)
+	{
+		try
+		{
+			if (!Active || flyingToSquad || cam == null) return;
+			Camera main = MainCam();
+			if (main == null || cam.Pointer != main.Pointer) return;
+			// 诊断：渲染前相机若已偏离我们的姿态，说明本帧有人更晚写入了它。
+			// 1.2.12：改用 LogAlways 且**仅在偏离时**记录（原用 Log 被 debugLog 门控 → 一行都没记下来；
+			// 无条件记录又会刷屏，故只在异常时输出）。
+			if (Time.unscaledTime > camDiagNext)
+			{
+				Vector3 dp = cam.transform.position - camPos;
+				Vector3 dr = cam.transform.rotation.eulerAngles - camRot.eulerAngles;
+				if (dp.sqrMagnitude > 0.25f || Mathf.Abs(dr.y) > 3f)
+				{
+					camDiagNext = Time.unscaledTime + 1f;
+					SquadCmdLogic.LogAlways("[CamAuthority] 渲染前相机偏离 dPos=" + dp.ToString("0.00")
+						+ " dRotY=" + dr.y.ToString("0.0")
+						+ " now=" + cam.transform.position.ToString("0.0")
+						+ " want=" + camPos.ToString("0.0")
+						+ " rmb=" + Input.GetMouseButton(1));
+				}
+			}
+			cam.transform.position = camPos;
+			cam.transform.rotation = camRot;
+		}
+		catch { }
 	}
 
 	internal static void LateApply() { if (!Active) return; try { AssertFreeCursor(); ApplyCam(MainCam()); } catch { } }
@@ -2287,20 +2582,25 @@ internal static class GodViewController
 		catch { }
 	}
 
-	/// <summary>上帝视角期间强制光标自由（Cursor patch 已兜底，这里双保险；右键按住跳过防闪烁）。</summary>
+	/// <summary>上帝视角期间强制光标自由（Cursor patch 已兜底，这里双保险）。
+	/// 1.2.7：**右键按住时不再跳过**——跳过会导致拖动期间无人维持 lockState=None，
+	/// 游戏一旦把光标锁回中央，鼠标位置突变 → 箭头端点暴走（用户报的"视角乱飞"）。</summary>
 	private static void AssertFreeCursor()
 	{
 		try
 		{
-			if (Input.GetMouseButton(1)) return;
 			if (Cursor.lockState != CursorLockMode.None) Cursor.lockState = CursorLockMode.None;
-			if (!Cursor.visible) Cursor.visible = true;
+			if (MouseCursor.OwnsCursor) { if (!Cursor.visible) Cursor.visible = true; }
+			else if (!Cursor.visible) Cursor.visible = true;
 		}
 		catch { }
 	}
 
 	internal static void FrameEndGuard()
 	{
+		// 1.2.10：此处的"帧末强制复位相机"已移除——1.2.9 的兜底既没解决问题（与原生相机逐帧互斗），
+		// 真凶是 **TerrainCamera**（原生自由视角，见 Plugin.cs 的 GodViewSkipTerrainCameraPatch），
+		// 现已从源头跳过其 Update，不再需要兜底互斗。
 		if (Active)
 		{
 			// 0.9.11：返回主菜单/战斗结束检测——BattleManager 跨场景常驻（0.9.10 判据无效），
@@ -2337,9 +2637,9 @@ internal static class GodViewController
 		if (!Active) return;
 		try
 		{
-			if (Input.GetMouseButton(1)) return;
 			if (Cursor.lockState != CursorLockMode.None) Cursor.lockState = CursorLockMode.None;
-			if (!Cursor.visible) Cursor.visible = true;
+			if (MouseCursor.OwnsCursor) { if (!Cursor.visible) Cursor.visible = true; }
+			else if (!Cursor.visible) Cursor.visible = true;
 		}
 		catch { }
 	}
@@ -2404,8 +2704,31 @@ internal static class GodViewController
 
 	// ===== 控制 =====
 
-	private static void HandleMove(float dt)
+	/// <summary>1.4.15：相机输入让位判定。
+	/// 背景：此前 HandleMove/HandleHeight/HandleDrag 完全不受 escMenuOpen 约束——
+	/// 上帝视角下打开原生设置菜单后，WASD 仍在平移、滚轮仍在改高度、中键仍能旋转
+	/// （玩家报"打开设置后转动滚轮视角仍然会跟着动"）。
+	/// 规则（照搬 RTS 惯例，也要兼顾"菜单里还要能干活"）：
+	/// · menuCapture（ESC 原生菜单）：**全部**相机输入冻结，菜单完全独占鼠标与键盘。
+	/// · uiCapture（指针停在我们的面板/背包窗口/信息面板/外部 mod 面板上）：只冻结
+	///   **鼠标驱动**的操作（滚轮缩放、中键旋转），键盘 WASD/QE 照常——否则光标恰好
+	///   压在小队列表上会让玩家以为"相机坏了"。</summary>
+	private static bool UiPointerCapture()
 	{
+		try
+		{
+			if (!IsMouseOverGui()) return false;
+			// 1.4.16：附属 mod 的"手势互斥全屏"不是面板——相机（滚轮/中键）放行，点击手势照吞
+			//（externalGuiBlock 仍 gate 战场手势，互斥语义不变，见 IsMouseOverGui 注释）。
+			if (externalCameraPass != null && externalCameraPass()) return false;
+			return true;
+		}
+		catch { return false; }
+	}
+
+	private static void HandleMove(float dt, bool menuCapture)
+	{
+		if (menuCapture) return; // 1.4.15：菜单打开期间冻结键盘平移/升降
 		Camera cam = MainCam(); if (cam == null) return;
 		Vector3 fwd = cam.transform.forward; fwd.y = 0f; fwd.Normalize();
 		Vector3 right = cam.transform.right; right.y = 0f; right.Normalize();
@@ -2425,25 +2748,56 @@ internal static class GodViewController
 		}
 	}
 
-	private static void HandleHeight(float dt)
+	private static void HandleHeight(float dt, bool menuCapture, bool uiCapture)
 	{
-		float wheel = Input.mouseScrollDelta.y;
-		if (Mathf.Abs(wheel) > 0.001f) camPos.y += -wheel * HeightStep * (1f + camPos.y / 150f);
+		if (menuCapture) return; // 1.4.15：菜单打开期间完全不让相机响应滚轮/QE
+		if (!uiCapture)
+		{
+			float wheel = Input.mouseScrollDelta.y;
+			if (Mathf.Abs(wheel) > 0.001f) camPos.y += -wheel * HeightStep * (1f + camPos.y / 150f);
+		}
 		if (Input.GetKey(KeyCode.E)) camPos.y += BaseSpeed * 0.7f * dt;
 		if (Input.GetKey(KeyCode.Q)) camPos.y -= BaseSpeed * 0.7f * dt;
 		float ground = GroundHeightAt(camPos);
 		camPos.y = Mathf.Clamp(camPos.y, Mathf.Max(MinHeight, ground + 3f), MaxHeight);
 	}
 
+	/// <summary>取该点下方地面高度。1.2.7：**忽略幽灵预览**——幽灵在相机下方会把"地面"抬高，
+	/// 相机高度被反复往上推 = 用户报的"摄像机在其上方会一直上升"。
+	/// 1.2.10 性能：原实现用 `Physics.RaycastAll`（**每帧分配数组** + 逐命中走父链判幽灵），
+	/// 是卡顿主因之一。改为单次 `Physics.Raycast`；仅当命中物是幽灵时，从该点下方再打一次
+	/// （最多 2 次射线，**零分配**）。</summary>
 	private static float GroundHeightAt(Vector3 p)
 	{
-		try { Vector3 origin = new Vector3(p.x, p.y + 200f, p.z); if (Physics.Raycast(origin, Vector3.down, out RaycastHit hit, 500f)) return hit.point.y; } catch { }
+		try
+		{
+			Vector3 origin = new Vector3(p.x, p.y + 200f, p.z);
+			if (Physics.Raycast(origin, Vector3.down, out RaycastHit hit, 500f))
+			{
+				Transform t = hit.collider != null ? hit.collider.transform : null;
+				if (!GhostPreview.IsGhostTransform(t)) return hit.point.y;
+				// 命中幽灵：从它下方再打一次（幽灵通常悬在地面上方，跳过它即可拿到真实地面）
+				Vector3 o2 = new Vector3(p.x, hit.point.y - 0.3f, p.z);
+				if (Physics.Raycast(o2, Vector3.down, out RaycastHit hit2, 500f)) return hit2.point.y;
+			}
+		}
+		catch { }
 		return 0f;
 	}
 
-	private static void HandleDrag()
+	/// <summary>1.4.15：menuCapture（ESC 菜单）= 手势立刻作废，鼠标完全让给原生菜单；
+	/// blockStart（指针在 UI 上）= 只不让**新手势**起手，已经按住的中键拖动保持到松手
+	///（指针捕获惯例），避免划过面板就把视角转飞。</summary>
+	private static void HandleDrag(bool menuCapture, bool blockStart)
 	{
+		if (menuCapture) { midDrag = false; return; } // 菜单打开：正在进行的旋转也一并结束
 		bool down = Input.GetMouseButton(2);
+		if (blockStart && !midDrag)
+		{
+			// 冻结基准点，解除遮挡后再起手不会瞬移一大段。
+			lastDragX = Input.mousePosition.x; lastDragY = Input.mousePosition.y;
+			return;
+		}
 		if (down && !midDrag) { midDrag = true; lastDragX = Input.mousePosition.x; lastDragY = Input.mousePosition.y; }
 		else if (!down && midDrag) { midDrag = false; }
 		if (midDrag)
@@ -2455,32 +2809,31 @@ internal static class GodViewController
 	}
 
 	/// <summary>清理一次右键手势；不关闭已经显示的命令环。</summary>
-	private static void ResetRightGesture()
+	private static void ResetRightGesture(bool cancelFormationDrag = true)
 	{
+		// 1.2.15：拖动中遇到手势复位（异常复位/新按压/UI 命中/ESC 等）→ 必须真正结束拖动并清幽灵，
+		// 否则 Formation.dragging 残留、幽灵留在场上。
+		// **1.2.18 修复（阵型失效真因）**：右键松开的收尾路径**不能**走这里取消——
+		// 松开时 HandleClick 先调本方法、再调 IssueFromDrag 下发阵型；此前在这里抢先
+		// CancelDrag（dragging=false + 清计划）→ IssueFromDrag 直接 return → 阵型永远不下发。
+		// 所以松手路径传 cancelFormationDrag=false，由 IssueFromDrag / CancelDrag 自己收尾。
+		if (cancelFormationDrag && formationDragActive) { try { Formation.CancelDrag("手势复位"); } catch { } }
 		rightHoldActive = false;
 		rightLongPressOpened = false;
 		rightGestureWheelOpen = false;
-		facingDragActive = false;
+		formationDragActive = false;
 		rightDownTime = -10f;
 		rightDownScreenPos = Vector2.zero;
 		rightDownOnUnit = false;
 	}
 
 	/// <summary>切换 RTS/FPS 或输入异常后的统一手势复位。</summary>
-	private static void ResetInputState(bool keepWheel)
+	private static void ResetInputState()
 	{
 		isDragging = false;
 		midDrag = false;
 		addingToSelection = false;
 		ResetRightGesture();
-		if (!keepWheel)
-		{
-			showInteractionWheel = false;
-			wheelTargetVehicle = null;
-			wheelTargetVehicleCrew = null;
-			wheelTargetSoldier = null;
-			hasWheelAnchor = false;
-		}
 		swallowLeftGesture = false;
 	}
 
@@ -2489,7 +2842,7 @@ internal static class GodViewController
 		try { HandleClickCore(); }
 		catch (Exception ex)
 		{
-			ResetInputState(true);
+			ResetInputState();
 			SquadCmdLogic.Log("[SquadCmd] 输入处理失败，已复位 RTS 手势: " + ex.Message);
 		}
 	}
@@ -2499,6 +2852,12 @@ internal static class GodViewController
 	// 0.9.11：原版 M 地图在 god 视角强制显示也为空（机制未明），已按设计在 RTS 内禁用。
 	private static bool escMenuOpen;
 	private static float smEmptyWorldSince = -10f; // 0.9.11：无存活生物连续计时（返回主菜单检测）
+
+
+	/// <summary>1.4.11：UI（背包窗口/交互菜单/窗口按钮）**吃掉**了这次左键 → 让战场手势也吞掉这一按的剩余部分。
+	/// 否则「点 ✕ 关窗」的松手落在窗口已消失的下一帧，`guiNow` 变 false → 被当成一次空地点击 → **取消选中单位**
+	/// （用户实测「关闭背包后也会取消选中单位」）。</summary>
+	internal static void SwallowLeftGesture() { swallowLeftGesture = true; }
 
 	private static void HandleClickCore()
 	{
@@ -2510,23 +2869,8 @@ internal static class GodViewController
 		bool rightUp = Input.GetMouseButtonUp(1);
 		bool guiNow = IsMouseOverGui() || escMenuOpen; // 0.9.11：ESC 菜单打开时点击让位（地图已在 RTS 禁用）
 
-		// 轮盘打开期间，Update 只负责收尾手势；按钮点击和右键关闭由 OnGUI 处理。
-		// 不能让旧的 rightHoldActive 卡在轮盘状态里。
-		if (showInteractionWheel)
-		{
-			if (leftDown)
-			{
-				Vector2 mg = MouseGui();
-				if (!MouseOverWheelButton(mg))
-				{
-					CloseInteractionWheel("左键空白");
-					isDragging = false;
-					pressStart = mg;
-				}
-			}
-			if (rightDown || rightUp) ResetRightGesture();
-			return;
-		}
+		// 1.2.3：指令环/交互环已全部删除（右键直接下指令，其余操作在左下角信息面板），
+		// 这里不再有"轮盘打开期间"的收尾分支。
 
 		// 关环后只吞掉同一次左键的剩余部分；右键仍要正常进入状态机。
 		bool suppressLeft = swallowLeftGesture;
@@ -2549,44 +2893,36 @@ internal static class GodViewController
 			ResetRightGesture();
 			if (!guiNow)
 			{
-				SquadCmdLogic.Log("[SquadCmd] RMB↓ gui=" + guiNow + " wheel=" + showInteractionWheel + " swallow=" + swallowLeftGesture + " sel=" + SelTotal);
+				SquadCmdLogic.Log("[SquadCmd] RMB↓ gui=" + guiNow + " swallow=" + swallowLeftGesture + " sel=" + SelTotal);
 				rightHoldActive = true;
 				rightDownTime = Time.unscaledTime;
 				rightDownScreenPos = Input.mousePosition;
-				rightDownOnUnit = RightPressHitsUnit(rightDownScreenPos);
+			rightDownOnUnit = RightPressHitsUnit(rightDownScreenPos);
 			}
 		}
-		// 姿态环只在按在空地/无效目标时开：按在单位上时瞄准按压常超阈值，误弹环打断指令。
-		// 按在单位上的右键无论按压多久，松开一律走短按指令路径。
-		// 1.0.2：长按到点仲裁——已拖出阈值且选中含可转向载具 → 朝向拖动（地狱之门式）；否则命令环（原行为）。
-		if (rightHoldActive && rightHeld && !showInteractionWheel && !rightGestureWheelOpen
+		// 长按=阵型箭头（Formation.cs）。按在单位上默认不开（瞄准按压误触），
+		// 但 1.2.5：选中只含不可移动火力点/火炮时**允许按在单位上**——用户就是从炮位上长按拉箭头的。
+		if (rightHoldActive && rightHeld && !rightGestureWheelOpen
 			&& !rightLongPressOpened && !guiNow
-			&& SelTotal > 0 && !rightDownOnUnit && Time.unscaledTime - rightDownTime >= RightLongPressSeconds)
+			&& SelTotal > 0 && (!rightDownOnUnit || Formation.SelectionIsFacingOnlyNow())
+			&& Time.unscaledTime - rightDownTime >= RightLongPressSeconds)
 		{
 			rightLongPressOpened = true; // 本次右键不再等待 MouseUp 发短按命令
-			if (Plugin.dragFacing.Value
-				&& (Input.mousePosition - (Vector3)rightDownScreenPos).sqrMagnitude > VehicleFacing.DragThresholdPx * VehicleFacing.DragThresholdPx
-				&& VehicleFacing.HasEligible(selVehicleRefs))
+			if (Formation.TryBeginDrag(rightDownScreenPos, rightDownOnUnit))
 			{
-				facingDragActive = true; // 保持手势态直到松开；ResetRightGesture 不调用
-				SquadCmdLogic.Log("[SquadCmd] 朝向拖动开始 vehicles=" + VehicleFacing.EligibleCount(selVehicleRefs));
-			}
-			else
-			{
-				OpenCommandRing();
-				// 命令环成为独立状态。
-				ResetRightGesture();
+				formationDragActive = true; // 保持手势态直到松开；ResetRightGesture 不调用
 			}
 		}
 		if (rightUp)
 		{
-			bool facing = facingDragActive;
+			bool formation = formationDragActive;
 			bool issue = rightHoldActive && !rightLongPressOpened && !rightGestureWheelOpen && !guiNow;
 			Vector2 downPos = rightDownScreenPos;
-			ResetRightGesture();
-			if (facing && !guiNow)
+			ResetRightGesture(false); // 1.2.18：松手路径不复位拖动（下一行自己下发/取消）
+			if (formation)
 			{
-				IssueFacingFromMouse();
+				if (!guiNow) Formation.IssueFromDrag();
+				else Formation.CancelDrag("松手在 UI 上"); // 1.2.15：UI 上松手=取消（原来什么都不做 → 幽灵残留）
 			}
 			else if (issue)
 			{
@@ -2658,6 +2994,16 @@ internal static class GodViewController
 	internal static Func<Rect?> externalGuiBlock;
 #pragma warning restore CS0649
 
+	// 1.4.16：附属 mod 声明"当前的全屏互斥是拖放/放置手势，不是 UI 面板"——返回 true 时
+	// 相机输入（滚轮升降/中键旋转）**不冻结**，只吞点击手势。
+	// 背景：UniversalGeneration 放置/携带物品期间把 externalGuiBlock 报成全屏 Rect（防点击
+	// 误触框选/指令），但同一个布尔也 gate 了 HandleHeight 滚轮与 HandleDrag 中键
+	// → 用户实测"预放置时不能滚动滚轮改变视角"。全屏手势互斥不该连相机一起接管。
+	// 由附属 mod 反射赋值（本程序集内无赋值点，CS0649 预期内；未赋值=行为与旧版一致）。
+#pragma warning disable CS0649
+	internal static Func<bool> externalCameraPass;
+#pragma warning restore CS0649
+
 	private static bool IsMouseOverGui()
 	{
 		try
@@ -2671,6 +3017,8 @@ internal static class GodViewController
 				if (MergeButtonRect().Contains(m)) return true;
 			}
 			if (squadPanelHit.height > 0f && squadPanelHit.Contains(m)) return true;
+			if (InfoPanel.WantsMouse()) return true; // 1.2.0：左下角信息面板
+			if (BackpackPanel.WantsMouse()) return true; // 1.3.0：格子背包窗口（含拖拽中全屏吞手势）
 			if (externalGuiBlock != null && externalGuiBlock() is Rect ex && ex.Contains(m)) return true;
 		}
 		catch { }
@@ -2697,7 +3045,10 @@ internal static class GodViewController
 	}
 	// 0.9.0：【分散】已移入命令环（槽 7），顶栏不再单独设按钮
 
-	/// <summary>左键单击：只负责选择/取消选择（友军=选中，其余=清空选择）。</summary>
+	/// <summary>左键单击：只负责选择/取消选择。
+	/// 1.2.4（用户要求）：**非单位的可交互物也可选中**——空载具（无车组）、
+	/// 可交互物品（ItemObject.CanInteract）都进"物品选择"（selectedProps），
+	/// 面板显示其信息，右键可对其下"上车/进入"指令。</summary>
 	private static void ClickActOrCancel()
 	{
 		Camera cam = MainCam(); if (cam == null) return;
@@ -2708,29 +3059,147 @@ internal static class GodViewController
 			{
 				Vehicle veh = hit.collider.transform.GetComponentInParent<Vehicle>();
 				if (veh == null) veh = hit.collider.transform.GetComponent<Vehicle>();
-				if (veh != null && VehicleFriendly(veh))
+				if (veh != null)
 				{
-					// 友军载具：选中整车组（车组 Squad 从任一乘员取）
-					Squad crew = CrewOf(FirstCrew(veh));
-					if (addingToSelection) { AddVehicle(crew); AddVehicleRef(veh); }
-					else { SelectVehicleCrew(crew); selVehicleRefs.Clear(); AddVehicleRef(veh); }
-					return;
+					// 友军载具：选中整车组
+					if (VehicleFriendly(veh))
+					{
+						Squad crew = CrewOf(FirstCrew(veh));
+						if (addingToSelection) { AddVehicle(crew); AddVehicleRef(veh); }
+						else { SelectVehicleCrew(crew); selVehicleRefs.Clear(); AddVehicleRef(veh); }
+						return;
+					}
+					// 1.2.5 修复：**非敌对载具一律进载具选择**（含空载具、无车组/阵营判定不出的火力点/火炮）。
+					// 1.2.4 曾把它们路由到"可交互物"槽 → selVehicleRefs 为空 → 火力点既不能阵型也不能转向（回归 bug）。
+					// 载具选择允许 selVehicles 为空（只有 selVehicleRefs），驾驶/转向/朝向链路都按 refs 工作。
+					if (!VehicleHostile(veh))
+					{
+						Squad crew = CrewOf(FirstCrew(veh));
+						if (addingToSelection) { AddVehicle(crew); AddVehicleRef(veh); }
+						else { SelectVehicleCrew(crew); selVehicleRefs.Clear(); AddVehicleRef(veh); }
+						return;
+					}
 				}
 				Soldier sol = hit.collider.transform.GetComponentInParent<Soldier>();
 				if (sol == null) sol = hit.collider.transform.GetComponent<Soldier>();
-				if (sol != null && sol.IsAlive && FriendlyUnit(sol))
+				// 1.3.1：IsAlive 访问加保护（尸体上的 interop 属性异常会吞掉整个点击）
+				bool solValid = sol != null;
+				bool solAlive = false;
+				if (solValid) { try { solAlive = sol.IsAlive; } catch { solAlive = false; } }
+				if (solValid && solAlive && FriendlyUnit(sol))
 				{
 					// 友军步兵：选中（Shift=追加）
 					if (addingToSelection) AddInfantry(sol);
 					else SelectSingle(sol);
 					return;
 				}
+				// 1.3.2：尸体不再左键选中（用户定案：尸体=右键开背包）；左键点尸体等同空白（清选）
+				// 1.2.4：可交互物品（ItemObject.CanInteract，如掉落的武器/弹药箱）→ 物品选择
+				ItemObject item = null;
+				try { item = hit.collider.transform.GetComponentInParent<ItemObject>(); } catch { }
+				if (item == null) { try { item = hit.collider.transform.GetComponent<ItemObject>(); } catch { } }
+				if (item != null)
+				{
+					bool canInteract = false;
+					try { canInteract = item.CanInteract(); } catch { canInteract = true; }
+					if (canInteract) { SelectProp(item); return; }
+				}
+				SquadCmdLogic.Log("[SquadCmd] LMB 未命中可选物 hit='" + hit.collider.name + "' sol=" + solValid + " item=" + (item != null));
 			}
-			// 敌军/中立/空白 → 取消选择（不影响进行中的任务；停止用【停止】按钮）
+			// 敌军/空白 → 取消选择（不影响进行中的任务；停止用快捷键 V）
+			// 1.4.1（用户定案）：背包窗口开着时左键空地**不清选**——保护拖拽/交互工作流；
+			// 点其他单位仍会切换选择并随选关窗。
+			if (BackpackPanel.HasOpenWindows) return;
 			ClearSelection();
 			cmdFlash = Ui.Tr("已清空选择"); cmdFlashUntil = Time.unscaledTime + 1.5f;
 		}
 		catch { }
+	}
+
+	// ===== 1.2.4：非单位可交互物选择（可交互物品；载具走正常载具选择）=====
+	internal static ItemObject SelectedPropItem => propItem;
+	private static ItemObject propItem;
+
+	private static void SelectProp(ItemObject it)
+	{
+		ClearSelection();
+		propItem = it;
+		selFlash = Time.unscaledTime + 3f;
+		string nm = ""; try { nm = it.item_id; } catch { }
+		cmdFlash = Ui.Tr("已选中物品：") + (string.IsNullOrEmpty(nm) ? "?" : nm); cmdFlashUntil = Time.unscaledTime + 2f;
+		SquadCmdLogic.Log("[SquadCmd] 选中可交互物品 " + nm);
+	}
+
+	/// <summary>清掉可交互物选择（单位选择接管时调用）。</summary>
+	internal static void ClearPropSelection()
+	{
+		propItem = null;
+	}
+
+	internal static bool HasPropSelection => propItem != null;
+
+	// ===== 1.3.2：尸体交互改右键（用户定案：尸体不可左键选中；选中单位后右键尸体=开背包，
+	//       右键地上物品=拾取）。尸体选择槽已删除，仅保留 NearestDeadSoldier 供右键判定。=====
+
+	/// <summary>1.4.5：按命中点就近找**徒步友军**（右键点偏容错——远景下"右键他"经常点空）。
+	/// 只查 Creature.allCreatures 静态表，禁 FindObjectsOfType。</summary>
+	private static Soldier NearestFriendlySoldier(Vector3 pos, float radius)
+	{
+		Soldier best = null;
+		float bestD = radius * radius;
+		try
+		{
+			var all = Creature.allCreatures;
+			if (all == null) return null;
+			for (int i = 0; i < all.Count; i++)
+			{
+				Creature c = all[i];
+				if (c == null) continue;
+				Soldier s = null; try { s = c.TryCast<Soldier>(); } catch { }
+				if (s == null) continue;
+				bool alive = true; try { alive = s.IsAlive; } catch { alive = true; }
+				if (!alive) continue;
+				try { if (s.GetComponentInParent<Vehicle>() != null) continue; } catch { } // 车内兵不走会合（那是补员上车）
+				if (!FriendlyUnit(s)) continue;
+				Vector3 p;
+				try { if (s.transform == null) continue; p = s.transform.position; } catch { continue; }
+				float d = (p - pos).sqrMagnitude;
+				if (d < bestD) { bestD = d; best = s; }
+			}
+		}
+		catch { }
+		return best;
+	}
+
+	/// <summary>1.4.10：最近的**徒步**友军（`NearestFriendlySoldier` 已排除车内乘员、只认同阵营存活兵）。
+	/// 背包派兵用：选中的单位全在载具里时改派他，否则那个背包永远打不开。</summary>
+	internal static Soldier NearestOnFootFriendly(Vector3 pos, float radius) => NearestFriendlySoldier(pos, radius);
+
+	/// <summary>1.3.1：按命中点就近找阵亡士兵（右键尸体判定兜底）。只查 Creature.allCreatures 静态表，禁 FindObjectsOfType。</summary>
+	private static Soldier NearestDeadSoldier(Vector3 pos, float radius)
+	{
+		Soldier best = null;
+		float bestD = radius * radius;
+		try
+		{
+			var all = Creature.allCreatures;
+			if (all == null) return null;
+			for (int i = 0; i < all.Count; i++)
+			{
+				Creature c = all[i];
+				if (c == null) continue;
+				Soldier s = null; try { s = c.TryCast<Soldier>(); } catch { }
+				if (s == null) continue;
+				bool alive = true; try { alive = s.IsAlive; } catch { alive = true; }
+				if (alive) continue;
+				Vector3 p;
+				try { if (s.transform == null) continue; p = s.transform.position; } catch { continue; }
+				float d = (p - pos).sqrMagnitude;
+				if (d < bestD) { bestD = d; best = s; }
+			}
+		}
+		catch { }
+		return best;
 	}
 
 	private static Soldier FirstCrew(Vehicle veh)
@@ -2899,12 +3368,26 @@ internal static class GodViewController
 	private static void RecomputeRot() { camRot = Quaternion.Euler(pitch, yaw, 0f); }
 	private static void ApplyCam(Camera cam) { if (cam == null) return; cam.transform.position = camPos; cam.transform.rotation = camRot; }
 
+	/// <summary>1.4.14 性能：主相机缓存。MainCam 每帧被调用约 5 次（HandleMove/HandleHeight/ApplyCam/
+	/// LateApply/OnPreRenderCamera），每次都走一次 interop 属性读 + 兜底 `Camera.main`
+	///（后者内部是 FindGameObjectWithTag，很贵）。缓存 0.5s，且只在拿到有效值时缓存
+	///（相机尚未就绪时保持重试，不把 null 缓存进去）。</summary>
+	private static Camera mainCamCache;
+	private static float mainCamNext = -10f;
+
 	internal static Camera MainCam()
 	{
-		try { Camera c = ResourcesManager.mainCamera; if (c != null) return c; } catch { }
-		try { Camera m = Camera.main; if (m != null) return m; } catch { }
+		float now = Time.unscaledTime;
+		if (mainCamCache != null && now < mainCamNext && mainCamCache.Pointer != IntPtr.Zero) return mainCamCache;
+		mainCamNext = now + 0.5f;
+		try { Camera c = ResourcesManager.mainCamera; if (c != null) { mainCamCache = c; return c; } } catch { }
+		try { Camera m = Camera.main; if (m != null) { mainCamCache = m; return m; } } catch { }
+		mainCamCache = null;
 		return null;
 	}
+
+	/// <summary>1.4.14：相机重建（切场景等）时立刻失效缓存，避免多等半秒。</summary>
+	internal static void InvalidateMainCam() { mainCamCache = null; mainCamNext = -10f; }
 
 	private static void SetCursor(bool god)
 	{
@@ -3068,6 +3551,9 @@ internal static class GodViewController
 	private static readonly List<Vehicle> smFriendlyVeh = new List<Vehicle>();
 	private static float smFriendlyNext = -10f;
 	private static readonly HashSet<long> smSelected = new HashSet<long>();
+	/// <summary>1.4.14 性能：选中集里**在载具内**的成员指针（与 markerCache 同批 0.2s 刷新）。
+	/// 只给"是否为车内乘员"这一类每帧判定用，避免每帧逐单位 GetComponentInParent。</summary>
+	private static readonly HashSet<long> smSelectedInVehicle = new HashSet<long>();
 	private const int SceneMarkerCap = 200;
 	private const int RouteLineCap = 30; // 1.0.3：路线线数量上限（步兵），载具另加 10
 
@@ -3076,9 +3562,27 @@ internal static class GodViewController
 		float t = Time.unscaledTime;
 		float pulse = 1f + 0.07f * Mathf.Sin(t * 5f); // 0.9.1：选中/目标指示呼吸脉动
 		// 选中集（0.2s 缓存，含车内乘员——车组成员由载具环覆盖，不单独画）
-		if (t > markerCacheUntil) { markerCacheUntil = t + 0.2f; markerCache = GetCommandUnits(); }
-		smSelected.Clear();
-		foreach (Soldier s in markerCache) { try { if (s != null) smSelected.Add((long)s.Pointer); } catch { } }
+		// 1.4.14 性能：smSelected 与 markerCache 同步刷新（原每帧 Clear + 逐单位 Add，
+		// 且 GetComponentInParent 判定也每帧做）——两者生命周期完全一致，没必要分开算。
+		if (t > markerCacheUntil)
+		{
+			markerCacheUntil = t + 0.2f;
+			markerCache = GetCommandUnits();
+			smSelected.Clear();
+			smSelectedInVehicle.Clear();
+			for (int i = 0; i < markerCache.Count; i++)
+			{
+				Soldier s = markerCache[i];
+				if (s == null) continue;
+				try
+				{
+					long k = (long)s.Pointer;
+					smSelected.Add(k);
+					if (!IsOnFoot(s)) smSelectedInVehicle.Add(k);
+				}
+				catch { }
+			}
+		}
 
 		// 友军脚环 + 选中角括号：仅 RTS 显示（FPS 第一人称满屏脚环会干扰视野）
 		if (Active)
@@ -3118,18 +3622,21 @@ internal static class GodViewController
 				catch { }
 			}
 			// 选中步兵：灰白角括号 + 呼吸脉动（载具上面已画）
+			// 1.4.14 性能：车内乘员判定用 smSelected 同批算好的 smSelectedFoot 集合
+			//（原每帧对每个选中兵做一次 GetComponentInParent<Vehicle> interop 调用）。
 			foreach (Soldier s in markerCache)
 			{
 				try
 				{
 					if (s == null || !s.IsAlive || s.transform == null) continue;
-					if (s.GetComponentInParent<Vehicle>() != null) continue;
+					if (smSelectedInVehicle.Contains((long)s.Pointer)) continue;
 					SceneMarkers.Bracket("S" + (long)s.Pointer, s.transform.position + Vector3.up * 0.15f, UnitRingRadius(s) * 1.3f * pulse, selWhite, 0.08f, true);
 				}
 				catch { }
 			}
-			foreach (Vehicle v in new List<Vehicle>(selVehicleRefs))
+			for (int vi = 0; vi < selVehicleRefs.Count; vi++)
 			{
+				Vehicle v = selVehicleRefs[vi]; // 1.4.14 性能：原 new List<Vehicle>(selVehicleRefs) 每帧分配
 				try
 				{
 					if (v == null || v.transform == null) continue;
@@ -3152,11 +3659,15 @@ internal static class GodViewController
 		}
 		catch { }
 
+
+		// 1.2.1：目标点标记与行进连线**同源**（同时出现、同时隐藏）——用户反馈二者错开很乱。
+		// 判据 = 标点未过期 或 移动观察任务进行中 或 登车任务进行中；ClearMoveObservation 会同时清 hasCmdTarget。
+		bool moveViz = hasCmdTarget && (t < cmdTargetUntil || obsUnits.Count > 0 || obsVehicles.Count > 0 || pendingBoardVeh != null);
+
 		// 移动目标点：RTS/FPS 都显示——0.9.2 黄色小圈 + 中心圆点（不再是孤零零的大圈）
 		try
 		{
-			bool show = hasCmdTarget && t < cmdTargetUntil;
-			if (show)
+			if (moveViz)
 			{
 				Color yellow = new Color(1f, 0.85f, 0.35f, 0.95f);
 				SceneMarkers.Ring("MT", cmdTarget + Vector3.up * 0.1f, 0.45f * pulse, yellow, 0.07f, true);
@@ -3167,46 +3678,47 @@ internal static class GodViewController
 
 		// 1.0.3：移动路线标识——观察任务存续期间，每个行进单位/载具 → 目标点灰色半透明虚线
 		//（含双击「前往并防守」的 routeOnly 登记；45s 观察窗到期或全员到位自动消失）1.0.5：减细
+		// 1.2.1：改为只对【当前选中】的单位显示——用户反馈：选择已清空后连线仍挂着太杂乱
 		try
 		{
-			if (obsUnits.Count > 0 || obsVehicles.Count > 0)
+			if (moveViz && (obsUnits.Count > 0 || obsVehicles.Count > 0))
 			{
 				Color pathC = new Color(0.7f, 0.7f, 0.7f, 0.4f);
 				int n = 0;
 				for (int i = 0; i < obsUnits.Count && n < RouteLineCap; i++, n++)
 				{
 					Soldier s = obsUnits[i];
-					try { if (s != null && s.transform != null && s.IsAlive) SceneMarkers.Line("PL" + n, s.transform.position + Vector3.up * 0.9f, obsTarget + Vector3.up * 0.3f, pathC, 0.06f, true); } catch { }
+					try { if (s != null && s.transform != null && s.IsAlive && IsSelectedUnit(s)) SceneMarkers.Line("PL" + n, s.transform.position + Vector3.up * 0.9f, obsTarget + Vector3.up * 0.3f, pathC, 0.06f, true); } catch { }
 				}
 				for (int i = 0; i < obsVehicles.Count && n < RouteLineCap + 10; i++, n++)
 				{
 					Vehicle v = obsVehicles[i];
-					try { if (v != null && v.transform != null) SceneMarkers.Line("PL" + n, v.transform.position + Vector3.up * 1.2f, obsTarget + Vector3.up * 0.3f, pathC, 0.08f, true); } catch { }
+					try { if (v != null && v.transform != null && IsSelectedVehicle(v)) SceneMarkers.Line("PL" + n, v.transform.position + Vector3.up * 1.2f, obsTarget + Vector3.up * 0.3f, pathC, 0.08f, true); } catch { }
 				}
 			}
 		}
 		catch { }
 
-		// 1.0.5：登车路线——登车 pending 期间，每个步行登车单位 → 目标载具实时位置
+		// 1.0.5：登车路线——登车 pending 期间，每个步行登车单位 → 目标载具实时位置（1.2.1：同样只在选中时显示）
 		try
 		{
-			if (pendingBoardVeh != null && pendingBoardUnits != null && pendingBoardVeh.transform != null)
+			if (moveViz && pendingBoardVeh != null && pendingBoardUnits != null && pendingBoardVeh.transform != null)
 			{
 				Color boardC = new Color(0.7f, 0.7f, 0.7f, 0.4f);
 				int n = 0;
 				for (int i = 0; i < pendingBoardUnits.Count && n < RouteLineCap; i++, n++)
 				{
 					Soldier s = pendingBoardUnits[i];
-					try { if (s != null && s.transform != null && s.IsAlive) SceneMarkers.Line("PB" + n, s.transform.position + Vector3.up * 0.9f, pendingBoardVeh.transform.position + Vector3.up * 1.0f, boardC, 0.06f, true); } catch { }
+					try { if (s != null && s.transform != null && s.IsAlive && IsSelectedUnit(s)) SceneMarkers.Line("PB" + n, s.transform.position + Vector3.up * 0.9f, pendingBoardVeh.transform.position + Vector3.up * 1.0f, boardC, 0.06f, true); } catch { }
 				}
 			}
 		}
 		catch { }
 
-		// 1.0.2：载具朝向拖动箭头（仅 RTS 拖动中显示；EndFrame 前刷新，未刷新自动隐藏）
-		if (Active && facingDragActive)
+		// 1.2.0：阵型拖动标记（箭头+阵型线+落点标记；仅 RTS 拖动中显示；EndFrame 前刷新，未刷新自动隐藏）
+		if (Active && formationDragActive)
 		{
-			try { VehicleFacing.DrawDrag(MainCam(), selVehicleRefs); } catch { }
+			try { Formation.DrawDragMarkers(); } catch { }
 		}
 
 		SceneMarkers.EndFrame();
@@ -3292,16 +3804,17 @@ internal static class GodViewController
 			Camera cam = MainCam();
 			string info = cam != null ? Ui.Tr("  高度 ") + cam.transform.position.y.ToString("0") + "m" : "";
 
-			// 底部指令提示（0.9.1：分组拉开间距）
-			string hint = Ui.Tr("WASD 移动    滚轮 缩放    中键 旋转    Q/E 升降    │    左键 选择/框选    右键 指令    长按空地 命令环    载具长按拖动 朝向    │    空格 暂停    ESC 设置") + info;
+			// 底部指令提示（1.2.0：快捷键化+阵型箭头）
+			string hint = Ui.Tr("WASD 移动    滚轮 缩放    中键 旋转    Q/E 升降    │    左键 选择/框选    右键 指令    长按拖动 阵型    │    Z/X/C 站/蹲/趴    V 停止    B 停火    N 掩体    M 集合    F 分散    │    空格 暂停    ESC 设置") + info;
 			GUIStyle hs = SquadCmdLogic.HudStyleSmall();
 			GUI.color = new Color(0.03f, 0.06f, 0.03f, 0.72f);
-			GUI.DrawTexture(new Rect((Screen.width - 1150f) * 0.5f, Screen.height - 30f, 1150f, 22f), Texture2D.whiteTexture);
+			GUI.DrawTexture(new Rect((Screen.width - 1400f) * 0.5f, Screen.height - 30f, 1400f, 22f), Texture2D.whiteTexture);
 			GUI.color = Color.white;
-			GUI.Label(new Rect((Screen.width - 1150f) * 0.5f, Screen.height - 31f, 1150f, 22f), hint, hs);
+			GUI.Label(new Rect((Screen.width - 1400f) * 0.5f, Screen.height - 31f, 1400f, 22f), hint, hs);
 
 			// 左上角：暂停 + 选择信息
-			PruneSelection();
+			// 1.2.10 性能：此处原每帧调 PruneSelection()，但 OnGUI 每帧有多次事件（Layout/Repaint），
+			// 每次都遍历小队成员；而 Tick（Update，先于 OnGUI）已经清理过一次 → 这里去掉。
 			string status = "";
 			if (Paused) status = Ui.Tr("⏸ 已暂停（空格继续）");
 			if (HasSelection)
@@ -3321,10 +3834,13 @@ internal static class GodViewController
 			}
 
 			// 0.7.99：移动完成度进度行（纯观察统计，ObsMoveTick 维护）
+			float hudY = 65f;
 			if (ObsTotal > 0)
 			{
-				DrawShadowLabel(new Rect(14f, 65f, 320f, 22f), Ui.Tr("移动 → ") + ObsArrived + "/" + ObsTotal + Ui.Tr(" 已到位"), st, uiHover);
+				DrawShadowLabel(new Rect(14f, hudY, 320f, 22f), Ui.Tr("移动 → ") + ObsArrived + "/" + ObsTotal + Ui.Tr(" 已到位"), st, uiHover);
+				hudY += 24f;
 			}
+
 
 			// 顶部控制按钮（0.9.0：统一主题色，文字居中；分散已移入命令环）
 			if (HasSelection)
@@ -3378,8 +3894,11 @@ internal static class GodViewController
 			// 右下角小队列表（编号 + 装甲□/步兵○ 符号）
 			DrawSquadPanel(st);
 
-			// 交互命令环（仅上车/下车/物品）
-			DrawInteractionWheel(st);
+			// 1.2.0：左下角选中单位信息面板 + 只读装备/背包
+			InfoPanel.Draw();
+
+			// 1.3.0：格子背包窗口（多开 + 拖拽交换，BackpackPanel.cs）
+			BackpackPanel.Draw();
 		}
 		catch { }
 	}
@@ -3389,6 +3908,28 @@ internal static class GodViewController
 	private const float PanelW = 190f, PanelH = 22f, PanelGap = 2f;
 
 	/// <summary>小队符号串：装甲单位 □ 在前，步兵单位 ○ 在后（用户要求：正方形总是在圆形前面）。</summary>
+	// 1.2.10 性能：符号串缓存。原实现每次 OnGUI 事件、每行都重算 SquadSymbols，
+	// 而它内部逐成员调 IsInfantry()（GetComponentInParent + Lua_Soldier.isInsideVehicle 两次 interop），
+	// 10 行小队 × 8 人 × 每帧多次 OnGUI 事件 ≈ 数百次 interop/帧 —— 卡顿主因之一。
+	private static readonly Dictionary<long, string> squadSymbolCache = new Dictionary<long, string>();
+	private static float squadSymbolNext = -10f;
+
+	private static string SquadSymbolsCached(Squad sq)
+	{
+		if (sq == null) return "";
+		long k = 0;
+		try { k = (long)sq.Pointer; } catch { return SquadSymbols(sq); }
+		if (Time.unscaledTime >= squadSymbolNext)
+		{
+			squadSymbolCache.Clear();
+			squadSymbolNext = Time.unscaledTime + 2f; // 与小队列表刷新同节拍
+		}
+		if (squadSymbolCache.TryGetValue(k, out string cached)) return cached;
+		string v = SquadSymbols(sq);
+		squadSymbolCache[k] = v;
+		return v;
+	}
+
 	private static string SquadSymbols(Squad sq)
 	{
 		if (sq == null) return "";
@@ -3472,7 +4013,7 @@ internal static class GodViewController
 			GUI.color = isSel ? new Color(0f, 0f, 0f, 0.9f) : uiText;
 			GUI.Label(numR, idx.ToString(), SquadCmdLogic.ButtonStyle());
 			GUI.color = uiText;
-			GUI.Label(new Rect(numR.xMax, r.y, r.width - numR.width, r.height), SquadSymbols(sq), SquadCmdLogic.ButtonStyle());
+			GUI.Label(new Rect(numR.xMax, r.y, r.width - numR.width, r.height), SquadSymbolsCached(sq), SquadCmdLogic.ButtonStyle());
 			GUI.color = Color.white;
 			if (Event.current.type == EventType.MouseDown && Event.current.button == 0 && r.Contains(Event.current.mousePosition))
 			{
@@ -3563,37 +4104,137 @@ internal static class GodViewController
 			if (veh != null) return true;
 			Soldier sol = hit.collider.transform.GetComponentInParent<Soldier>();
 			if (sol == null) sol = hit.collider.transform.GetComponent<Soldier>();
-			return sol != null && sol.IsAlive;
+			// 1.3.2：尸体也算"按在对象上"——右键尸体=开背包，不该起阵型长按
+			if (sol != null) return true;
+			// 1.3.2：地上物品同理（右键=拾取）；布娃娃脱离层级时按命中点就近找尸体兜底
+			ItemObject it = null;
+			try { it = hit.collider.transform.GetComponentInParent<ItemObject>(); } catch { }
+			if (it == null) { try { it = hit.collider.transform.GetComponent<ItemObject>(); } catch { } }
+			if (it != null) return true;
+			return NearestDeadSoldier(hit.point, 1.2f) != null;
 		}
 		catch { return false; }
 	}
 
+	/// <summary>1.2.4：把点投影到该处地面（沿 XZ 向下射线）。建筑命中点在屋顶时用于取"房内/房前地面"。</summary>
+	private static Vector3 GroundPointUnder(Vector3 p)
+	{
+		try
+		{
+			Vector3 origin = new Vector3(p.x, p.y + 60f, p.z);
+			if (Physics.Raycast(origin, Vector3.down, out RaycastHit hit, 200f)) return hit.point;
+		}
+		catch { }
+		return new Vector3(p.x, 0f, p.z);
+	}
+
+	/// <summary>1.2.3：命中物是否属于可进入的建筑/房屋（含可交互门）。用于右键"进入并防守"。</summary>
+	private static bool IsBuildingHit(RaycastHit hit)
+	{		try
+		{
+			Transform t = hit.collider.transform;
+			if (t == null) return false;
+			if (t.GetComponentInParent<DestructableBuilding>() != null) return true;
+			if (t.GetComponentInParent<BuildingFurnitureSpawner>() != null) return true;
+			if (t.GetComponentInParent<InteragibleDoor>() != null) return true;
+		}
+		catch { }
+		return false;
+	}
+
+	/// <summary>1.4.1：右键地上物品——有多个原生交互（弹药箱"补充弹药"等）→ 地面交互菜单；
+	/// 单一拾取交互 → 快速拾取（联动半径内即时，超半径派最近士兵走过去捡）。</summary>
+	private static void HandleGroundItemClick(ItemObject item, Vector3 pos)
+	{
+		if (SelTotal == 0)
+		{
+			cmdFlash = Ui.Tr("先框选/选中单位"); cmdFlashUntil = Time.unscaledTime + 2f;
+			return;
+		}
+		Soldier best = NearestSelectedSoldier(pos);
+		InventoryManager inter = null;
+		if (best != null)
+		{
+			try { inter = InfoPanel.FindInventoryManager(best); } catch { }
+			if (inter == null) { try { inter = best.inventory; } catch { } }
+		}
+		int count = 0;
+		try { var l = item.GetInteractions(inter); count = l != null ? l.Count : 0; } catch { }
+		if (count > 1)
+		{
+			BackpackPanel.OpenGroundMenu(item, inter, MouseGui());
+			return;
+		}
+		BackpackPanel.RequestItemPickup(item, pos);
+	}
+
+	private static Soldier NearestSelectedSoldier(Vector3 pos)
+	{
+		Soldier best = null;
+		float bd = float.MaxValue;
+		foreach (Soldier s in GetSelectedInfantry())
+		{
+			try
+			{
+				if (s == null || !s.IsAlive || s.transform == null) continue;
+				float d = (s.transform.position - pos).sqrMagnitude;
+				if (d < bd) { bd = d; best = s; }
+			}
+			catch { }
+		}
+		return best;
+	}
+
+	/// <summary>1.4.1：执行地面拾取（即时/走过去到达后共用）。原生 AddItemToInventoryAndDestroyInstance。</summary>
+	internal static void ExecuteGroundPickup(Soldier s, ItemObject item)
+	{
+		if (s == null || item == null) return;
+		InventoryManager im = null;
+		try { im = InfoPanel.FindInventoryManager(s); } catch { }
+		if (im == null) { try { im = s.inventory; } catch { } }
+		if (im == null)
+		{
+			cmdFlash = Ui.Tr("找不到该单位的背包数据"); cmdFlashUntil = Time.unscaledTime + 2f;
+			return;
+		}
+		string nm = ""; try { nm = item.item_id; } catch { }
+		string taker = ""; try { taker = SafeName(s); } catch { }
+		bool ok = false;
+		try { ok = im.AddItemToInventoryAndDestroyInstance(item); }
+		catch (Exception ex) { SquadCmdLogic.LogAlways("[SquadCmd] 拾取异常: " + ex.Message); }
+		cmdFlash = (ok ? Ui.Tr("已拾取 ") + nm + " → " + taker : Ui.Tr("拾取失败（超重？）"));
+		cmdFlashUntil = Time.unscaledTime + 2f;
+		SquadCmdLogic.LogAlways("[SquadCmd] 拾取 '" + nm + "' → " + taker + " ok=" + ok);
+	}
+
 	private static void IssueDirectCommand(Vector2 screenPos)
 	{
-		if (SelTotal == 0) return; // 0.7.86：无选中单位不响应右键指令（弹环/标记/驾驶都会穿帮）
 		Camera cam = MainCam(); if (cam == null) return;
 		try
 		{
 			Ray ray = cam.ScreenPointToRay(screenPos);
 			if (!Physics.Raycast(ray, out RaycastHit hit, 1500f))
 			{
-				cmdFlash = Ui.Tr("未命中地面"); cmdFlashUntil = Time.unscaledTime + 2f;
+				if (SelTotal > 0 || HasPropSelection)
+				{
+					cmdFlash = Ui.Tr("未命中地面"); cmdFlashUntil = Time.unscaledTime + 2f;
+				}
 				return;
 			}
 			Vehicle veh = hit.collider.transform.GetComponentInParent<Vehicle>();
 			if (veh == null) veh = hit.collider.transform.GetComponent<Vehicle>();
 			Soldier sol = hit.collider.transform.GetComponentInParent<Soldier>();
 			if (sol == null) sol = hit.collider.transform.GetComponent<Soldier>();
+			bool solAlive = false;
+			if (sol != null) { try { solAlive = sol.IsAlive; } catch { solAlive = false; } }
 
-			// ---- 载具 ----
+			// ---- 载具 ----（最先：命中载具=整车组交互）
 			if (veh != null)
 			{
 				if (VehicleFriendly(veh) || !VehicleHostile(veh))
 				{
-					// 友军/中立载具 → 打开交互轮盘（上车/下车/物品）
-					Squad hitCrew = CrewOf(FirstCrew(veh));
-					bool isSelected = hitCrew != null && selVehicles.Contains(hitCrew);
-					OpenInteractionWheel(screenPos, veh, isSelected ? hitCrew : null);
+					// 1.2.3：友军/中立载具 → 直接上车/进入（原交互环已删；下车/修理移到左下角信息面板）
+					BoardVehicle(veh);
 				}
 				else
 				{
@@ -3603,20 +4244,25 @@ internal static class GodViewController
 				return;
 			}
 
-			// ---- 士兵 ----
-			if (sol != null && sol.IsAlive)
+			// ---- 士兵（1.4.4：**先于物品**——穿戴物本身就是 ItemObject，点中别人头上的头盔/身上装备
+			//      也是点了那个兵；旧顺序会把他头盔当掉落物捡走=用户实测"头盔消失"）----
+			if (sol != null && solAlive)
 			{
 				if (FriendlyUnit(sol))
 				{
-					// 友军士兵：坐在载具/火力点里 → 交互环（上车）；徒步友军 → 视为地面移动目标（0.7.57：合并已上移顶栏）
+					// 友军士兵：坐在载具/火力点里 → 直接上车（补员）
 					Vehicle vIn = null;
 					try { vIn = sol.GetComponentInParent<Vehicle>(); } catch { }
 					if (vIn != null && (VehicleFriendly(vIn) || !VehicleHostile(vIn)))
 					{
-						OpenInteractionWheel(screenPos, veh: vIn, sol: sol);
+						BoardVehicle(vIn);
 						return;
 					}
-					MoveCommandTo(hit.point);
+					// 1.3.4（用户定案）：徒步友军 → 最近的选中士兵走过去，到达后开**双方**背包
+					//（原"视为地面移动"移除；移动请点地面）
+					Vector3 spos = hit.point;
+					try { if (sol.transform != null) spos = sol.transform.position; } catch { }
+					BackpackPanel.RequestLoot(sol, spos, true);
 					return;
 				}
 				else
@@ -3627,12 +4273,68 @@ internal static class GodViewController
 				return;
 			}
 
-			// ---- 火力点（TurretGun 无载具父级）→ 交互轮盘 ----
+			// ---- 尸体 → 右键开尸包（点尸体身上的装备也=开尸包，而不是把装备捡走；
+			//      布娃娃层级脱离时按命中点就近兜底）----
+			Soldier corpse = null;
+			if (sol != null && !solAlive) corpse = sol;
+			if (corpse != null)
+			{
+				if (SelTotal == 0)
+				{
+					cmdFlash = Ui.Tr("先框选/选中单位"); cmdFlashUntil = Time.unscaledTime + 2f;
+					return;
+				}
+				Vector3 cpos = hit.point;
+				try { if (corpse.transform != null) cpos = corpse.transform.position; } catch { }
+				BackpackPanel.RequestLoot(corpse, cpos, true); // 1.4.10（用户定案）：尸包也同时开"选中单位"的背包
+				return;
+			}
+
+			// ---- 地上物品（走到这里 sol 必为 null：真正的掉落物）→ 多交互=菜单 / 单交互=拾取 ----
+			ItemObject item = null;
+			try { item = hit.collider.transform.GetComponentInParent<ItemObject>(); } catch { }
+			if (item == null) { try { item = hit.collider.transform.GetComponent<ItemObject>(); } catch { } }
+			if (item != null) { HandleGroundItemClick(item, hit.point); return; }
+
+			// ---- 尸体就近兜底（1.3.1；1.4.5 容错半径对齐 2.5m——远景点偏同样点不到尸体）----
+			Soldier corpseNear = null;
+			try { corpseNear = NearestDeadSoldier(hit.point, 2.5f); } catch { }
+			if (corpseNear != null)
+			{
+				if (SelTotal == 0)
+				{
+					cmdFlash = Ui.Tr("先框选/选中单位"); cmdFlashUntil = Time.unscaledTime + 2f;
+					return;
+				}
+				Vector3 cpos2 = hit.point;
+				try { if (corpseNear.transform != null) cpos2 = corpseNear.transform.position; } catch { }
+				BackpackPanel.RequestLoot(corpseNear, cpos2, true); // 1.4.10：尸包同时开选中单位的背包
+				return;
+			}
+
+			if (SelTotal == 0 && !HasPropSelection) return; // 0.7.86：无选中单位不响应右键指令（标记/驾驶都会穿帮）
+
+			// 1.2.5：可交互物（物品）选中时，右键给提示（派兵过去需先选单位）
+		if (HasPropSelection && SelTotal == 0)
+		{
+			cmdFlash = Ui.Tr("先选中要指挥的单位（当前选中的是可交互物）"); cmdFlashUntil = Time.unscaledTime + 2f;
+			return;
+		}
+
+			// ---- 火力点（TurretGun 无载具父级）→ 直接进入/上车 ----
 			Vehicle near = NearbyFriendlyVehicle(hit.point);
 			if (near != null)
 			{
-				OpenInteractionWheel(screenPos, veh: near);
+				BoardVehicle(near);
 				return;
+			}
+
+			// ---- 1.2.4：建筑/房屋 → 选中步兵进入并找掩体防守（用户要求）----
+			// ⑨ 修复：目标点用**地面投影**——原 hit.point 命中屋顶，标记会飘在房顶
+			if (IsBuildingHit(hit) && GetSelectedInfantry().Count > 0)
+			{
+				Vector3 groundPt = GroundPointUnder(hit.point);
+				if (Formation.AssaultCovers(groundPt, 18f) > 0) return;
 			}
 
 			// ---- 可标记对象（0.7.30 修复：仅限真实单位类对象——Creature/Vehicle 父级。
@@ -3651,6 +4353,19 @@ internal static class GodViewController
 				}
 			}
 
+			// ---- 1.4.5：右键点在友军身边 = 会合，不是移动。**用户实际操作模式**：高视角远景下兵很小，
+			//      "右键他"经常点偏命中地面 → 旧流程变成普通移动，兵走过去了但谁也不知道要开包
+			//      =「走过去了还不自动打开，还要再按一遍」。2.5m 内有徒步友军就按会合处理。----
+			Soldier nearFriend = null;
+			try { nearFriend = NearestFriendlySoldier(hit.point, 2.5f); } catch { }
+			if (nearFriend != null)
+			{
+				Vector3 spos = hit.point;
+				try { if (nearFriend.transform != null) spos = nearFriend.transform.position; } catch { }
+				BackpackPanel.RequestLoot(nearFriend, spos, true);
+				return;
+			}
+
 			// ---- 空白地面 → 移动 ----
 			if (SelTotal == 0)
 			{
@@ -3660,31 +4375,6 @@ internal static class GodViewController
 			MoveCommandTo(hit.point);
 		}
 		catch (Exception ex) { SquadCmdLogic.Log("[SquadCmd] 右键指令失败: " + ex.Message); }
-	}
-
-	/// <summary>1.0.2：朝向拖动松开——把选中载具转向当前鼠标落点（原生 AIVehicle.faceDirWhenStopped 通道，详见 VehicleFacing）。</summary>
-	private static void IssueFacingFromMouse()
-	{
-		Camera cam = MainCam();
-		if (cam == null) return;
-		try
-		{
-			if (!Physics.Raycast(cam.ScreenPointToRay(Input.mousePosition), out RaycastHit hit, 1500f))
-			{
-				cmdFlash = Ui.Tr("未命中地面"); cmdFlashUntil = Time.unscaledTime + 2f;
-				return;
-			}
-			int n = VehicleFacing.IssueFacing(selVehicleRefs, hit.point);
-			if (n > 0)
-			{
-				cmdFlash = string.Format(Ui.Tr("载具转向 → {0}"), n); cmdFlashUntil = Time.unscaledTime + 2f;
-			}
-			else
-			{
-				cmdFlash = Ui.Tr("无可转向载具（需有驾驶员的非飞机载具）"); cmdFlashUntil = Time.unscaledTime + 2f;
-			}
-		}
-		catch (Exception ex) { SquadCmdLogic.Log("[SquadCmd] 朝向命令失败: " + ex.Message); }
 	}
 
 	/// <summary>1.0.2：摘除某车的移动观察任务与待发移动重试（朝向命令接管时调用，防两组任务互相打架）。</summary>
@@ -3745,6 +4435,7 @@ internal static class GodViewController
 		if (squads > 0 || driven > 0)
 		{
 			RegisterMoveObservation(point, GetSelectedInfantry(), routeOnly: true); // 1.0.3：行进路线显示（不停火）
+			RecordCmdTarget(point); // 1.2.1：目标点标记与连线同源显示
 			SquadCmdLogic.LogAlways("[SquadCmd] 前往并防守 squads=" + squads + " vehicles=" + driven + " target=" + point.ToString("0.0"));
 		}
 	}
@@ -3758,7 +4449,8 @@ internal static class GodViewController
 		// 他们（本次移动命令已覆盖原生 boardVehicle，他们不会再上车）。
 		if (pendingBoardVeh != null && pendingBoardUnits != null)
 		{
-			List<Soldier> sel = GetSelectedInfantry();
+			// 1.4.9：只摘除**徒步**单位——车内乘员这次不会被移动命令覆盖（见下），登车判定该继续等他们
+			List<Soldier> sel = FilterOnFoot(GetSelectedInfantry(), out _);
 			int removed = pendingBoardUnits.RemoveAll(s =>
 			{
 				try
@@ -3780,7 +4472,12 @@ internal static class GodViewController
 		}
 		// 新的移动命令覆盖旧的集火目标；没有有效选中时不误清除已有任务。
 		ClearMark();
-		List<Soldier> infantry = GetSelectedInfantry();
+		// 1.4.9：只把**徒步**单位送进步行链路。车内乘员走的是载具（selVehicleRefs → DriveVehicleTo），
+		// 对他们下 moveTo 会被原生 AI 理解成「下车步行」= 用户实测「让单位上坦克后又会立刻下车」。
+		int embarked = 0;
+		List<Soldier> infantry = FilterOnFoot(GetSelectedInfantry(), out embarked);
+		if (embarked > 0)
+			SquadCmdLogic.Log("[SquadCmd] 移动：跳过车内乘员 " + embarked + " 名（车辆移动请点载具或用阵型转向）");
 		int movedInf;
 		SquadCmdLogVia = "";
 		if (SquadCmdLogic.TryIssueNativeMove(infantry, point, Plugin.radius.Value))
@@ -3831,80 +4528,45 @@ internal static class GodViewController
 		SquadCmdLogic.Log("[SquadCmd] 轮盘停止: " + n);
 	}
 
-	// ===== 交互命令环（上车/下车/修理/合并）=====
-	/// <summary>轮盘当前指向目标的可读描述（诊断日志用）。</summary>
-	private static string WheelTargetDesc()
-	{
-		try
-		{
-			if (wheelTargetVehicle != null) return "载具[" + SafeName(wheelTargetVehicle) + "]";
-			if (wheelTargetSoldier != null) return "士兵[" + SafeName(wheelTargetSoldier) + "]";
-			if (wheelTargetVehicleCrew != null) return "已选车组×" + selVehicles.Count;
-		}
-		catch { }
-		return "无";
-	}
-
-	private static string YN(bool v) { return v ? "Y" : "N"; }
-
-	/// <summary>开环公共收尾：记录开环输入（供豁免同一次按压）+ 打开 + 一条 OPEN 日志。</summary>
-	private static void FinishWheelOpen(string kindTag, string detail)
-	{
-		wheelOpenedAtTime = Time.unscaledTime;
-		wheelOpenedAtGuiPos = new Vector2(wheelScreenPos.x, Screen.height - wheelScreenPos.y);
-		showInteractionWheel = true;
-		SquadCmdLogic.Log("[SquadCmd] 轮盘 OPEN [" + kindTag + "] 目标=" + WheelTargetDesc() + " " + detail);
-	}
-
-	/// <summary>解析轮盘的修理目标：指向的载具，或已选车组对应的载具。</summary>
-	private static Vehicle WheelRepairTarget()
-	{
-		if (wheelTargetVehicle != null) return wheelTargetVehicle;
-		return VehicleOfCrew(wheelTargetVehicleCrew);
-	}
+	// ===== 交互（1.2.3：右键直接上车/进入；下车/修理走左下角信息面板）=====
 
 	/// <summary>原生判定：载具是否有可修的损坏部件（CanBeRepaired；调用异常视为不可修）。</summary>
-	private static bool VehicleCanBeRepaired(Vehicle v)
+	internal static bool VehicleCanBeRepaired(Vehicle v)
 	{
 		try { return v != null && v.CanBeRepaired(); } catch { return false; }
 	}
 
-	/// <summary>打开常驻命令环（选中单位后长按右键）：站起/蹲下/趴下/停止，作用于当前选择；环心=选中单位的屏幕质心。</summary>
-	private static void OpenCommandRing()
+	/// <summary>1.2.3：面板【修理】按钮 —— 对当前选中载具下原生修理订单（需选中步兵构成完整原生小队接单）。</summary>
+	internal static void RepairSelectedVehicle()
 	{
-		if (SelTotal == 0) { cmdFlash = Ui.Tr("先框选/选中单位"); cmdFlashUntil = Time.unscaledTime + 2f; return; }
-		Camera cam = MainCam();
-		Vector3 c = SelCenter() + Vector3.up * 1.2f;
-		if (cam != null)
+		Vehicle rv = null;
+		try { List<Vehicle> vs = GetVehicleRefsSnapshot(); if (vs.Count > 0) rv = vs[0]; } catch { }
+		if (rv == null) { cmdFlash = Ui.Tr("先选中要修理的载具"); cmdFlashUntil = Time.unscaledTime + 2f; return; }
+		Squad rsq = NativeRepairSquad();
+		if (rsq == null) { cmdFlash = Ui.Tr("修理需选中一支完整步兵小队"); cmdFlashUntil = Time.unscaledTime + 2.5f; return; }
+		if (!VehicleCanBeRepaired(rv)) { cmdFlash = Ui.Tr("该载具无需修理"); cmdFlashUntil = Time.unscaledTime + 2f; return; }
+		try
 		{
-			Vector3 sp = cam.WorldToScreenPoint(c);
-			wheelScreenPos = new Vector2(sp.x, sp.y);
+			SquadCmdLogic.RegisterControlledSquad(rsq);
+			rsq.OrderRepairVehicle(rv);
+			cmdFlash = Ui.Tr("修理 → ") + SafeName(rv); cmdFlashUntil = Time.unscaledTime + 2f;
+			SquadCmdLogic.LogAlways("[SquadCmd] 面板修理订单 " + rv.name + " 队 ptr=0x" + ((long)rsq.Pointer).ToString("X"));
 		}
-		wheelTargetVehicle = null;
-		wheelTargetVehicleCrew = null;
-		wheelTargetSoldier = null;
-		Camera cc = MainCam();
-		hasWheelAnchor = false;
-		if (cc != null)
+		catch (Exception ex)
 		{
-			try { Ray rr = cc.ScreenPointToRay(Input.mousePosition); if (Physics.Raycast(rr, out RaycastHit hh, 3000f)) { wheelAnchorWorld = hh.point + Vector3.up * 1.0f; hasWheelAnchor = true; } } catch { }
+			cmdFlash = Ui.Tr("修理失败: ") + ex.Message; cmdFlashUntil = Time.unscaledTime + 2f;
+			SquadCmdLogic.Log("[SquadCmd] OrderRepairVehicle 失败: " + ex.Message);
 		}
-		wheelKind = 2;
-		wheelItemCount = 8;
-		WheelItemLabels[0] = Ui.Tr("站起"); WheelItemLabels[1] = Ui.Tr("蹲下"); WheelItemLabels[2] = Ui.Tr("趴下"); WheelItemLabels[3] = Ui.Tr("停止");
-		WheelItemLabels[4] = Ui.Tr("掩体"); WheelItemLabels[5] = Ui.Tr("集合"); WheelItemLabels[6] = Ui.Tr("停火"); WheelItemLabels[7] = Ui.Tr("分散");
-		bool hasInf = GetSelectedInfantry().Count > 0;
-		WheelItemEnabled[0] = hasInf; WheelItemEnabled[1] = hasInf; WheelItemEnabled[2] = hasInf;
-		WheelItemEnabled[3] = true; // 停止对步兵+载具都有效
-		WheelItemEnabled[4] = hasInf; // 进入掩体：步兵小队原生 SendUnitsToCovers
-		WheelItemEnabled[5] = true;   // 集合：各小队向班长集结
-		WheelItemEnabled[6] = true;   // 停火/开火切换（原生 holdFire）
-		WheelItemEnabled[7] = hasInf; // 分散：各小队以自身中心就地散开找掩护
-		FinishWheelOpen("单位", "步兵=" + GetSelectedInfantry().Count + " 载具=" + selVehicles.Count
-			+ " 可用项=[站起" + YN(hasInf) + " 蹲下" + YN(hasInf) + " 趴下" + YN(hasInf) + " 停止Y 掩体" + YN(hasInf) + " 集合Y 停火Y 分散" + YN(hasInf) + "]");
 	}
 
-	/// <summary>对选中步兵应用姿态：站起=resetPose 归还 AI；蹲/趴=setPose 持久设置并记入还原名单。</summary>
+	/// <summary>1.2.3：面板【下车】按钮 —— 已选载具车组全部下车。</summary>
+	internal static void DismountSelectedVehicles()
+	{
+		DismountAllVehicles();
+	}
+
+	/// <summary>对选中步兵应用姿态：站起=resetPose 归还 AI；蹲/趴=setPose 持久设置并记入还原名单。
+	/// 1.2.0：入口从命令环改为快捷键（cfg Hotkeys）。</summary>
 	private static void ApplyPoseToSelection(SoldierPose pose)
 	{
 		int n = 0;
@@ -3927,6 +4589,12 @@ internal static class GodViewController
 	// setPose 是持久设置（实测：趴下后退出 RTS、玩家接管都无法自行站起）——
 	// 蹲/趴过的单位记入名单，退出上帝视角/接管前逐个 resetPose() 归还 AI 姿态控制
 	private static readonly List<Soldier> poseLockedUnits = new List<Soldier>();
+
+	/// <summary>1.2.1：Formation 掩体单位到位 setPose 后登记（退出 RTS/接管时随 RestoreAllPoses 还原）。</summary>
+	internal static void AddPoseLocked(Soldier s)
+	{
+		try { if (s != null && s.IsAlive && !poseLockedUnits.Contains(s)) poseLockedUnits.Add(s); } catch { }
+	}
 
 	private static void ResetPoseToSelection()
 	{
@@ -3993,282 +4661,91 @@ internal static class GodViewController
 		return sq;
 	}
 
-	private static string PoseName(SoldierPose p)
+	internal static string PoseName(SoldierPose p)
 	{
 		return p == SoldierPose.Idle ? Ui.Tr("站起") : p == SoldierPose.Crouch ? Ui.Tr("蹲下") : Ui.Tr("趴下");
 	}
 
-	/// <summary>打开交互轮盘：右键友军/中立载具、车内士兵时调用。记录开环输入，供 DrawInteractionWheel 豁免同一次按压。</summary>
-	private static void OpenInteractionWheel(Vector2 screenPos, Vehicle veh = null, Squad crew = null, Soldier sol = null)
+	// ===== 1.2.0：供 Formation / GhostPreview / InfoPanel 使用的内部访问器 =====
+
+	internal static bool EscMenuOpen => escMenuOpen;
+	internal static Color UiBase => uiBase;
+	internal static Color UiHover => uiHover;
+	internal static Color UiText => uiText;
+
+	/// <summary>1.3.0：外部面板（BackpackPanel）写左上反馈行。</summary>
+	internal static void Flash(string msg, float seconds = 2f)
 	{
-		wheelScreenPos = screenPos;
-		wheelTargetVehicle = veh;
-		wheelTargetVehicleCrew = crew;
-		wheelTargetSoldier = sol;
-		hasWheelAnchor = false; // 0.7.80：清除单位环遗留锚定，否则交互环被钉死在旧鼠标落点（不跟随载具）
-		wheelKind = 0;
-		wheelItemCount = 3;
-		WheelItemLabels[0] = Ui.Tr("上车"); WheelItemLabels[1] = Ui.Tr("下车"); WheelItemLabels[2] = Ui.Tr("修理");
-		bool hasSelInf = GetSelectedInfantry().Count > 0;
-		bool hasSelVeh = selVehicles.Count > 0;
+		cmdFlash = msg;
+		cmdFlashUntil = Time.unscaledTime + seconds;
+	}
+
+	// 1.2.5：MouseCursor 探测用（避免把 private 方法改成 internal 扩散面）
+	internal static Vector3 CamPosDiag => camPos; // 1.2.11：诊断用（拖动时比对相机实际位置）
+
+	internal static bool IsMouseOverGuiPublic() => IsMouseOverGui();
+	internal static bool VehicleHostilePublic(Vehicle v) => VehicleHostile(v);
+	internal static bool FriendlyUnitPublic(Soldier s) => FriendlyUnit(s);
+	internal static bool IsBuildingHitPublic(RaycastHit hit) => IsBuildingHit(hit);
+
+	internal static int SelInfantryCountPublic() => SelInfantryCount();
+
+	internal static int VehicleRefCountPublic() { PruneVehicleRefs(); return selVehicleRefs.Count; }
+
+	/// <summary>当前选中的载具真实引用快照（已剔除销毁项）。</summary>
+	internal static List<Vehicle> GetVehicleRefsSnapshot()
+	{
 		PruneVehicleRefs();
-		bool occupiedSel = AnySelRefOccupied(); // 0.7.43：实时占用判定（无缓存无滞后）
-		// 0.7.99：上车可用还需目标车有空位——满员车不再显示可用
-		Vehicle seatVeh = veh;
-		if (seatVeh == null && sol != null) { try { seatVeh = sol.GetComponentInParent<Vehicle>(); } catch { } }
-		int emptySeats = 99;
-		if (seatVeh != null) { try { emptySeats = new Lua_Vehicle(seatVeh).countEmptySeats(); } catch { } }
-		WheelItemEnabled[0] = emptySeats > 0 && (((veh != null || sol != null) && hasSelInf) || (veh != null && !occupiedSel)); // 上车：有空位，且有步兵可选或选中车已全空
-		WheelItemEnabled[1] = occupiedSel; // 下车：选中的车里确有乘员
-		// 修理：目标载具可修（原生 CanBeRepaired=部件损坏）且有 RTS 建队步兵接单
-		// （单击虚拟选择没有受控小队——原生 Squad 修理订单会牵动未选中队友，故不启用）
-		Vehicle repairTarget = veh != null ? veh : VehicleOfCrew(crew);
-		WheelItemEnabled[2] = repairTarget != null && NativeRepairSquad() != null && VehicleCanBeRepaired(repairTarget);
-		FinishWheelOpen("交互", "选择=步兵" + YN(hasSelInf) + "/载具" + YN(hasSelVeh)
-			+ " 可用项=[上车" + YN(WheelItemEnabled[0]) + " 下车" + YN(WheelItemEnabled[1]) + " 修理" + YN(WheelItemEnabled[2]) + "]");
+		return new List<Vehicle>(selVehicleRefs);
 	}
 
-	/// <summary>打开友军上下文环（右键徒步友军士兵；合并进目标所在小队）。</summary>
-	/// <summary>关闭交互轮盘（reason 仅用于诊断日志；目标描述在清理前记录）。同时吞掉当前左键手势的剩余部分。</summary>
-	private static void CloseInteractionWheel(string reason = "未知", bool swallowLeft = true)
+	/// <summary>1.2.1：填充到调用方提供的列表（零分配版本）。</summary>
+	internal static void GetVehicleRefsInto(List<Vehicle> list)
 	{
-		SquadCmdLogic.Log("[SquadCmd] 轮盘 CLOSE 原因=" + reason + " 目标=" + WheelTargetDesc());
-		showInteractionWheel = false;
-		wheelTargetVehicle = null;
-		wheelTargetVehicleCrew = null;
-		wheelTargetSoldier = null;
-		ResetRightGesture();
-		if (swallowLeft) swallowLeftGesture = true;
+		if (list == null) return;
+		list.Clear();
+		PruneVehicleRefs();
+		list.AddRange(selVehicleRefs);
 	}
 
-	/// <summary>执行轮盘选中的动作（按 wheelKind 映射：交互环 0/1/2=上车/下车/修理；命令环 4..10=站/蹲/趴/停止/掩体/集合/停火）。</summary>
-	private static void ExecuteWheelAction(int index)
+	/// <summary>新命令通用前置（Formation 下发用）：清移动观测/行军停火 + 摘除改令登车乘员 + 清集火标记。
+	/// 1.2.1：同步清 Formation 的待收尾队列（旧的到位姿态/到位转向随新命令作废）。</summary>
+	internal static void PrepareNewOrder(string reason)
 	{
-		string actionName = index >= 0 && index < wheelItemCount ? WheelItemLabels[index] : "?";
-		int actionId = index;                    // 默认=交互环槽位（上车/下车/修理）
-		if (wheelKind == 2) actionId = 4 + index; // 单位环槽0..3 = 站起/蹲下/趴下/停止
-		SquadCmdLogic.Log("[SquadCmd] 轮盘 EXECUTE 动作=" + actionName + " 目标=" + WheelTargetDesc());
-		switch (actionId)
+		Formation.OnNewOrder();
+		ClearFollow(reason, false);
+		if (pendingBoardVeh != null && pendingBoardUnits != null)
 		{
-			case 0: // 上车
-				if (wheelTargetVehicle != null) BoardVehicle(wheelTargetVehicle);
-				else if (wheelTargetSoldier != null)
-				{
-					Vehicle vIn = null;
-					try { vIn = wheelTargetSoldier.GetComponentInParent<Vehicle>(); } catch { }
-					if (vIn != null) BoardVehicle(vIn);
-					else
-					{
-						Vehicle near = NearbyFriendlyVehicle(wheelTargetSoldier.transform.position);
-						if (near != null) BoardVehicle(near);
-					}
-				}
-				break;
-			case 1: // 下车
-				DismountAllVehicles();
-				break;
-			case 2: // 修理：RTS 小队对目标载具下原生修理订单（士兵走去执行 VehicleRepairTask）
-				{
-					Vehicle rv = WheelRepairTarget();
-					Squad rsq = NativeRepairSquad();
-						if (rv != null && rsq != null)
-						{
-							try
-							{
-								SquadCmdLogic.RegisterControlledSquad(rsq);
-							rsq.OrderRepairVehicle(rv);
-							cmdFlash = Ui.Tr("修理 → ") + SafeName(rv); cmdFlashUntil = Time.unscaledTime + 2f;
-							SquadCmdLogic.Log("[SquadCmd] 修理订单 " + rv.name + " 队 ptr=0x" + ((long)rsq.Pointer).ToString("X"));
-						}
-						catch (Exception ex)
-						{
-							cmdFlash = Ui.Tr("修理失败: ") + ex.Message; cmdFlashUntil = Time.unscaledTime + 2f;
-							SquadCmdLogic.Log("[SquadCmd] OrderRepairVehicle 失败: " + ex.Message);
-						}
-					}
-				}
-				break;
-			// 0.7.96：载具轮盘"合并"已移除——合并只保留顶栏入口（与"合并上移顶栏"设计一致）
-			case 4: ResetPoseToSelection(); break;
-			case 5: ApplyPoseToSelection(SoldierPose.Crouch); break;
-			case 6: ApplyPoseToSelection(SoldierPose.Prone); break;
-			case 7: // 停止：取消当前 RTS 行为（移动/标记），作用于全部选中单位
-				ClearFollow("停止", false);
-				ClearMark();
-				StopSelected();
-				break;
-			// 0.8.00：进阶原生命令（命令环槽 4/5/6 → actionId 8/9/10）
-			case 8: // 进入掩体：原生 SendUnitsToCovers，按所属原生小队编组，以开环落点为中心
-				{
-					Vector3 p = hasWheelAnchor ? wheelAnchorWorld : SelCenter();
-					HashSet<long> doneC = new HashSet<long>();
-					int nC = 0;
-					foreach (Soldier s in GetSelectedInfantry())
-					{
-						try
-						{
-							if (s == null || !s.IsAlive) continue;
-							Squad sq = s.joinedSquad;
-							if (sq == null || !doneC.Add((long)sq.Pointer)) continue;
-							SquadCmdLogic.RegisterControlledSquad(sq);
-							sq.SendUnitsToCovers(p, Plugin.radius.Value);
-							nC++;
-						}
-						catch { }
-					}
-					if (nC > 0)
-					{
-						ClearFollow("进入掩体", false);
-						SquadCmdLogic.LogAlways("[SquadCmd] 进入掩体 squads=" + nC + " center=" + p.ToString("0.0"));
-					}
-					else { cmdFlash = Ui.Tr("无可用步兵小队"); cmdFlashUntil = Time.unscaledTime + 2f; }
-				}
-				break;
-			case 9: // 集合：各步兵小队向自己的班长（原生 getLeader）位置集结
-				{
-					HashSet<long> doneF = new HashSet<long>();
-					int nF = 0;
-					foreach (Soldier s in GetSelectedInfantry())
-					{
-						try
-						{
-							if (s == null || !s.IsAlive) continue;
-							Squad sq = s.joinedSquad;
-							if (sq == null || !doneF.Add((long)sq.Pointer)) continue;
-							Soldier leader = null;
-							try { leader = new Lua_Squad(sq).getLeader()?.connectedSoldier; } catch { }
-							if (leader == null || !leader.IsAlive || leader.transform == null) continue;
-							SquadCmdLogic.RegisterControlledSquad(sq);
-							new Lua_Squad(sq).moveTo(leader.transform.position, Plugin.radius.Value);
-							nF++;
-						}
-						catch { }
-					}
-					if (nF > 0) SquadCmdLogic.LogAlways("[SquadCmd] 集合（向班长集结） squads=" + nF);
-					else { cmdFlash = Ui.Tr("无可用小队（找不到班长）"); cmdFlashUntil = Time.unscaledTime + 2f; }
-				}
-				break;
-			case 10: // 停火/开火切换：有停火的小队→全部恢复开火；全部开火中→全部停火
-				{
-					HashSet<long> doneH = new HashSet<long>();
-					List<Squad> squads = new List<Squad>();
-					foreach (Soldier s in GetSelectedInfantry())
-					{
-						try
-						{
-							if (s == null || !s.IsAlive) continue;
-							Squad sq = s.joinedSquad;
-							if (sq == null || !doneH.Add((long)sq.Pointer)) continue;
-							squads.Add(sq);
-						}
-						catch { }
-					}
-					foreach (Squad csq in GetSelectedVehicleCrews())
-					{
-						try { if (csq != null && doneH.Add((long)csq.Pointer)) squads.Add(csq); } catch { }
-					}
-					if (squads.Count == 0) { cmdFlash = Ui.Tr("无可用小队"); cmdFlashUntil = Time.unscaledTime + 2f; break; }
-					bool anyHolding = false;
-					foreach (Squad sq in squads) { try { if (sq.holdFire) { anyHolding = true; break; } } catch { } }
-					bool hold = !anyHolding;
-					int nH = 0;
-					foreach (Squad sq in squads) { try { sq.holdFire = hold; nH++; } catch { } }
-					cmdFlash = (hold ? Ui.Tr("停火 → ") : Ui.Tr("开火 → ")) + nH + Ui.Tr(" 队"); cmdFlashUntil = Time.unscaledTime + 2f;
-					SquadCmdLogic.LogAlways("[SquadCmd] " + (hold ? "停火" : "开火") + " squads=" + nH);
-				}
-				break;
-			case 11: // 分散：各步兵小队以自身中心就地散开找掩护（原生 SendUnitsToCovers）
-				ScatterSelected();
-				break;
-		}
-		CloseInteractionWheel("执行动作:" + actionName);
-	}
-
-	/// <summary>绘制交互轮盘（IMGUI，鼠标位置为中心；每项独立底板+描边，不再画大面积背景方块）。</summary>
-	/// <summary>当前环心（IMGUI 坐标）：有载具目标时锚定其世界位置（随镜头/目标实时更新），否则用开环屏幕点；均做防出屏钳制。</summary>
-	private static Vector2 WheelCenterGui(Camera cam)
-	{
-		Vector2 c = wheelScreenPos;
-		c.y = Screen.height - c.y;
-		try
-		{
-			if (cam != null)
+			List<Soldier> sel = GetSelectedInfantry();
+			int removed = pendingBoardUnits.RemoveAll(s =>
 			{
-				Vector3 wp = hasWheelAnchor ? wheelAnchorWorld
-					: (wheelTargetVehicle != null && wheelTargetVehicle.transform != null ? wheelTargetVehicle.transform.position : Vector3.zero);
-				bool useW = hasWheelAnchor || (wheelTargetVehicle != null && wheelTargetVehicle.transform != null);
-				if (useW)
+				try
 				{
-					Vector3 sp = cam.WorldToScreenPoint(wp);
-					if (sp.z > 0f) c = new Vector2(sp.x, Screen.height - sp.y);
+					if (s == null) return true;
+					long k = (long)s.Pointer;
+					foreach (Soldier x in sel) { try { if (x != null && (long)x.Pointer == k) return true; } catch { } }
+					return false;
 				}
-			}
+				catch { return false; }
+			});
+			if (pendingBoardUnits.Count == 0) CancelBoardPending("玩家下达了新命令");
+			else if (removed > 0) SquadCmdLogic.Log("[BoardPending] 摘除 " + removed + " 名改令乘员（余 " + pendingBoardUnits.Count + " 人继续登车）");
 		}
-		catch { }
-		float mX = WheelRadius() + WheelBtnW * 0.5f + 6f;
-		float mY = WheelRadius() + WheelBtnH * 0.5f + 6f;
-		c.x = Mathf.Clamp(c.x, mX, Screen.width - mX);
-		c.y = Mathf.Clamp(c.y, mY, Screen.height - mY);
-		return c;
+		ClearMark();
 	}
 
-	/// <summary>当前环半径：>5 槽（命令环 7 项）时翻倍，保证相邻按钮中心距 ≥ 按钮宽。</summary>
-	private static float WheelRadius()
+	/// <summary>阵型下发后的目标登记（双击前往并防守的复用点 + 3D 标点）。</summary>
+	internal static void NoteFormationTarget(Vector3 p)
 	{
-		return wheelItemCount > 5 ? WheelItemDist * 2f : WheelItemDist;
+		lastMovePoint = p;
+		RecordCmdTarget(p);
 	}
 
-	private static Rect WheelButtonRect(int index, Vector2 center)
+	/// <summary>命令反馈（Formation 等外部类用，与 cmdFlash 同源）。</summary>
+	internal static void Flash(string msg)
 	{
-		float angle = -90f + index * (360f / Mathf.Max(1, wheelItemCount));
-		float rad = angle * Mathf.Deg2Rad;
-		Vector2 pos = center + new Vector2(Mathf.Cos(rad), Mathf.Sin(rad)) * WheelRadius();
-		return new Rect(pos.x - WheelBtnW * 0.5f, pos.y - WheelBtnH * 0.5f, WheelBtnW, WheelBtnH);
-	}
-
-	/// <summary>鼠标是否悬停在任一轮盘按钮上（HandleClick 左键路由用，与绘制共用同一几何源）。</summary>
-	private static bool MouseOverWheelButton(Vector2 guiPos)
-	{
-		if (!showInteractionWheel || wheelItemCount <= 0) return false;
-		Vector2 c = WheelCenterGui(MainCam());
-		for (int i = 0; i < wheelItemCount; i++)
-			if (WheelButtonRect(i, c).Contains(guiPos)) return true;
-		return false;
-	}
-
-	/// <summary>绘制轮盘（IMGUI）：环心锚定目标载具世界位置；每项独立底板+描边。</summary>
-	private static void DrawInteractionWheel(GUIStyle st)
-	{
-		if (!showInteractionWheel || st == null || wheelItemCount <= 0) return;
-		Event e = Event.current;
-		Vector2 center = WheelCenterGui(MainCam());
-		Vector2 mouse = e.mousePosition;
-		for (int i = 0; i < wheelItemCount; i++)
-		{
-			Rect btn = WheelButtonRect(i, center);
-			bool hover = btn.Contains(mouse) && WheelItemEnabled[i];
-			DrawUiButton(btn, WheelItemLabels[i], WheelItemEnabled[i], hover);
-			if (hover && e.type == EventType.MouseDown && e.button == 0)
-			{
-				e.Use();
-				ExecuteWheelAction(i);
-				return;
-			}
-		}
-		// 环心小标记
-		GUI.color = new Color(0.5f, 1f, 0.6f, 0.8f);
-		GUI.Label(new Rect(center.x - 6f, center.y - 10f, 12f, 12f), "◎", st);
-		// 右键关闭（豁免开环按压：开环的那次 MouseDown(1) 迟到进入 IMGUI 时，
-		// 处于豁免窗口内且未移出豁免半径 → 不视为"第二次右键"，只吞掉事件不关闭）
-		if (e.type == EventType.MouseDown && e.button == 1)
-		{
-			float sinceOpen = Time.unscaledTime - wheelOpenedAtTime;
-			bool withinGuard = sinceOpen < WheelOpenGuardSeconds
-				&& ((Vector2)e.mousePosition - wheelOpenedAtGuiPos).sqrMagnitude < WheelOpenGuardPixels * WheelOpenGuardPixels;
-			e.Use();
-			if (!withinGuard) CloseInteractionWheel("二次右键", false);
-		}
-		GUI.color = Color.white;
+		cmdFlash = msg;
+		cmdFlashUntil = Time.unscaledTime + 3f;
 	}
 
 }

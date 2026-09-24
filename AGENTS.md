@@ -1,6 +1,6 @@
 # ER2_Mods 工作区 — AI 记忆与工作流（第一轮必读）
 
-> **当前状态快照：2026-09-06（zcode 时代末次工作）**。本文件是**唯一每轮必读**的入口。
+> **当前状态快照：2026-09-24（UniGen 2.4.1：页签自适应字号修"Mod Vehicles"溢出压邻居 + 第三方内容改磁盘直扫修"Mod载具页签永久为空"；SquadCommand 1.4.17：地面菜单"拾起"改走走过去链路修武器隔空拾取）**。本文件是**唯一每轮必读**的入口。
 > 项目：Easy Red 2（Unity 2022.3.62f3 / IL2CPP）的 BepInEx 6 插件集合。
 > 详细机制/API/全部踩坑 → `ER2_mod_dev_guide.md`（编码规范/机制大全）、`ER2_mod_经验.md`（陷阱全集 + 会话复盘）。
 > 各 mod 现状与版本台账 → `ER2_projects_status.md`；zcode 时代成果 → `ER2_zcode_era.md`。
@@ -27,7 +27,7 @@
 
 1. **本文件**（`AGENTS.md`）—— 现况、陷阱、工作流契约
 2. `ER2_projects_status.md` —— 每个 mod 是什么/什么版本/什么状态（**别凭记忆猜版本号**）
-3. `ER2_mod_dev_guide.md` —— 完整机制/API/踩坑参考（按需查；§2 机制、§3 陷阱 1-49、§3.6 跨 mod UI 契约）
+3. `ER2_mod_dev_guide.md` —— 完整机制/API/踩坑参考（按需查；§2 机制、§3 陷阱 1-67、§3.6 跨 mod UI 契约）
 4. `ER2_mod_经验.md` —— 致命陷阱全集 + 逐会话复盘（**动手前尤其要读对应 mod 的复盘**）
 5. 目标 mod 的 `Plugin.cs`（**改动前通读**）
 
@@ -50,22 +50,21 @@ ER2_Mods/
 ├── ZoomAnywhere/         er2.zoomanywhere             任意姿态/移动中屏息与武器放大
 ├── HighValueTarget/      er2.highvaluetarget          Veteran HVT：老兵高危目标 + 叛徒机制
 ├── InventoryPause/       er2.inventorypause           背包暂停（开背包冻结世界）
-├── SquadCommand/         er2.squadcommand             Battlefield Commander：上帝视角 RTS 小队指挥（最大工程）
-├── UniversalGeneration/  er2.universalgeneration      RTS 内自定义生成单位/载具（作弊向，SquadCommand 附属）
+├── SquadCommand/         er2.squadcommand             Battlefield Commander：上帝视角 RTS 小队指挥（最大工程，v1.4.14）
+├── UniversalGeneration/  er2.universalgeneration      RTS 内自定义生成单位/载具/物品（含鼠标拖放，作弊向，SquadCommand 附属）
 ├── UnitCollision/        er2.morephysics.unitcollision 单位/尸体碰撞（MorePhysics 轻量保留版）
 ├── MorePhysics/          er2.morephysics                 完整物理化（v0.1.48 复活：源码自反编译重建 + 单位碰撞对齐轻量版）
 ├── UnitInfoOverlay/      er2.unitinfooverlay          单位状态悬浮显示（开发者调试工具）
 ├── HvtTestDriver/        er2.hvt.testdriver           HVT 自测工具（内部，不发布）
-├── Conquest/             er2.conquest                 ER2 Conquest：地狱之门征服模式移植（开发中；Core 为纯 C#，可离线验证）
-├── ConquestRecon/        er2.conquest.recon           M0 侦察工具（内部，不发布）
+├── Endless/              er2.endless                  ER2 Endless：无尽模式（**当前主项目**，方案见 ER2_无尽模式_设计方案.md；M0 战斗尖峰已实现待实测——F6/F7/F8）
 ├── FleshWoundsFixed/     ER2_FleshWounds              第三方 Flesh Wounds 重建修复（紫贴图 bug）
 ├── Shared/NoHintsHudLink.cs                           跨 mod F5 隐藏联动（反射，无编译期依赖）
 ├── scripts/build.ps1                                   一体化构建：编译+部署+清cfg+打包
-├── research_out/                                       反编译/解包研究（17.9 MB，259 文件）
+├── research_out/                                       反编译/解包研究 + conquest_salvage/（Conquest 源码快照，回收清单见其 README）
 └── *.md                                                知识文档（见 §1）
 ```
 
-**文档地图**：`ER2_mod_dev_guide.md`（工作流/机制/陷阱/各 mod 状态，102 KB）· `ER2_mod_经验.md`（陷阱全集 + 复盘，73 KB）· `ER2_mod_技能.md`（可复用技能）· `ER2_mod_工具.md`（工具速查）· `ER2_physics_system.md`（16 层碰撞矩阵解包）· `ER2_scene_objects_classification.md`（场景物分类体系）· `ER2_UI_design.md`（UI/IMGUI 机制）· `ER2_征服模式_设计方案.md`（征服模式方案 + 逐轮实测复盘）· **`ER2_征服模式_参考拆解.md`**（《地狱之门》征服模式 `.pak` 解包实证 + 《人间地狱》检索 + 机制映射表）。
+**文档地图**：`ER2_mod_dev_guide.md`（工作流/机制/陷阱/各 mod 状态，102 KB）· `ER2_mod_经验.md`（陷阱全集 + 复盘，73 KB）· `ER2_mod_技能.md`（可复用技能）· `ER2_mod_工具.md`（工具速查）· `ER2_physics_system.md`（16 层碰撞矩阵解包）· `ER2_scene_objects_classification.md`（场景物分类体系）· `ER2_UI_design.md`（UI/IMGUI 机制）· `ER2_征服模式_设计方案.md`（征服模式方案 + 逐轮实测复盘；**已终止**，资产回收见文首注记）· **`ER2_征服模式_参考拆解.md`**（《地狱之门》征服模式 `.pak` 解包实证 + 《人间地狱》检索 + 机制映射表）· `ER2_无尽模式_设计方案.md`（无尽模式方案，当前主项目）。
 
 **第三方游戏解包（2026-09-13 新增能力）**：《Call to Arms - Gates of Hell》装在
 `E:\SteamLibrary\steamapps\common\Call to Arms - Gates of Hell`，其 `resource\*.pak`
@@ -77,7 +76,7 @@ ER2_Mods/
 
 | 命令 | 用途 |
 |---|---|
-| `powershell -ExecutionPolicy Bypass -File scripts\build.ps1 -Mod <名字>` | **构建+部署+清cfg+打包一次完成**；`-SkipDeploy` 只打包；`-SkipPackage` 只部署；**`-Cn` 编译中文版并出 `_CN_` 包** |
+| `powershell -ExecutionPolicy Bypass -File scripts\build.ps1 -Mod <名字>` | **构建+部署+清cfg+打包一次完成**；`-SkipDeploy` 只打包；`-SkipPackage` 只部署；**`-Cn` 编译中文版并出 `_CN_` 包**。⚠️ 必须带 `-ExecutionPolicy Bypass -File`：本机执行策略 Restricted，直接 `& scripts\build.ps1` 会被**静默拒绝**（exit 0、无输出、无任何效果——部署时间戳不变是唯一线索） |
 | `dotnet build -c Release <proj>` | 仅编译（workdir 为 mod 目录；查错 `2>&1 \| Select-String "error"`） |
 | `Select-String <log> -Pattern "..."` | 查日志 / 过滤本 mod 日志（**每次实测后必查，不要猜**） |
 | `ilspycmd -t <Type> <dll> -o <dir>` | 反编译查 API；也可反编译已部署 plugins DLL 恢复源码 |
@@ -86,7 +85,7 @@ ER2_Mods/
 
 **禁止**：修改游戏原文件 · 删除 plugins 里其他 mod · `FindObjectsOfType` 类每帧全场景扫描（用 `Creature.allCreatures` / `Creature.aliveCreatures` 静态列表，或按需 `Physics.OverlapSphere`）。
 
-## 4. 致命陷阱（全部实测定案；完整 49 条见 guide §3）
+## 4. 致命陷阱（全部实测定案；完整 71 条见 guide §3）
 
 **写游戏状态类**
 1. **写血量必须整体赋值**：`soldier.life_total = new ProtectedInt(hp);`（getter 返回值类型副本，`.Value = x` 报 CS1612）
@@ -101,17 +100,38 @@ ER2_Mods/
 8. **interop 不存在的方法不能 patch**：先 `ilspycmd` 确认签名再写，否则 `Undefined target method` → 插件加载失败
 9. **跨 mod 补丁顺序用优先级**：`[HarmonyPriority(Priority.First)]` 先短路、`Priority.Last` 做清场（同方法多 Postfix 顺序由优先级决定）
 10. **`ref` 参数在 IL2CPP 下生效**：改的是托管 interop 桩，实测 before=6→after=60（CombatTweaks 弹药/伤害倍率实证）
+10b. **跳过原生方法 = 连同它的副作用一起没**（音效/计数/状态机）。`SettingsTabRight/Left` 自带点击音效 → 任何 `return false`（自己的或第三方的）都会静音；判据只有一条：**这次原生会不会执行**——会执行就一个字都别补，不会执行就全补上（含"让位给第三方但对方 return false"）
 
 **UI / 渲染类**
 11. **`new GUIStyle()` 默认 `normal.textColor` 是黑**，`GUI.color` 是乘法 tint → 必须显式 `normal.textColor = Color.white`；拷贝构造被 IL2CPP 裁剪
 12. **运行时创建的 Texture2D/AudioClip 必须 `hideFlags=(HideFlags)61`**：否则进战斗场景被 Unity 卸载 → "日志全绿但什么都看不见"（排查此症状先怀疑对象被销毁）
-13. **`GetWorldCorners(new Vector3[4])` 返回全零**：改用 `Il2CppStructArray<Vector3>` 或 `TransformPoint` 四角绕开
+13. **`GetWorldCorners(new Vector3[4])` 返回全零**：改用 `Il2CppStructArray<Vector3>` 或 `TransformPoint` 四角绕开。
+   **相关**：世界空间标记的「恒定屏占比」公式 `scale = dist×k` 观感会失真——数学上正确（世界尺寸∝距离抵消透视缩小），但实测成"近小远大"反直觉（FOV 动态变化 + 锚点偏移 + 屏高归一）。**要真实参照物直觉就用固定世界尺寸常量**（HVT v1.2.2 定为 `MarkerWorldSize=0.8f`）。详见 guide 陷阱 61
 
 **构建 / 流程类**
 14. **`[BepInPlugin]` 版本必须 `x.y.z`**，禁字母后缀（带后缀 = BepInEx 直接跳过插件）；**启动日志里的版本字符串也要同步改**（最容易漏）
 15. **DLL 文件名 ≠ 插件名**：按 BepInPlugin 元数据识别，别按文件名猜（`ER2_RecoilOverhaul.dll` 里是 Universal Recoil Control）
 16. **源码文件一律用 write/edit 工具**，不要用 PowerShell `Get-Content`/`Set-Content`（默认 ANSI/GBK 编解码 → 中文乱码 + CS1513）
 17. **别用字符串搜索验证构建语言**：元数据字符串堆编码反直觉，EN/CN 两种构建都含中文串；看 `ilspycmd -t ER2ModManager.Plugin` 的 `DefaultChinese` 常量
+17b. **`ilspycmd` 的 `-o` 绝不能指向 mod 目录内**：反编译出的 `.cs` 会被 SDK 通配符 glob 进编译 → `CS0101 类型已定义` + `CS0579 特性重复`（像源码错，实为产物）。**输出到项目外**（如 `%TEMP%`）用完即删。另：`Edit` 偶发"报成功但未生效"，改版本号等关键行后**必须 Read 复核 + 反编译复核**（陷阱 14 的实际执行方式）。详见 guide 陷阱 66
+17c. **`GetAllItemsOfType<T>` 返回 `Il2CppArrayBase<T>`**（不是 `Il2CppSystem...List<T>`），须用全名 `Il2CppInterop.Runtime.InteropTypes.Arrays.Il2CppArrayBase<PropData>`（否则 CS0029/CS0246）。
+17d. **等外部系统就绪，"非 null"不是有效判据**：`ItemsDatabase.GetAllItemsOfType` 在**数据库加载完成前返回非 null 的空数组**（不是 null、不抛异常）→ 用 `l != null` 当闸门会被骗过，一次跑死且永久放弃（UniGen 2.0.2 实证：整个物品生成功能不可用）。**正解 = 官方 `Loaded` 标志 + 实枚举非空双判据**（`ItemsDatabase.Loaded`），且就绪等待/零条都必须是**可重试的 attempt 循环**。详见 guide 陷阱 67
+17d-2. **⚠️ 协程判活：绝不能用"时间流逝"，要用"tick 计数"**（UniGen 物品功能**栽了四次**才定案）：判据迭代 150s 硬阈值(2.0.3) → 20s 心跳(2.0.4) → "不判死只续跑"(2.0.5) → **tick 计数(2.0.6)**。前三轮共同错误 = **拿时间流逝当协程死亡的判据**——场景加载期间主线程被占、协程停摆但**墙上时钟照走**，二者不等价，必然误判。2.0.5 更糟："不判死"等于**不检测**（协程真死时 `probeState` 永远卡 1，看门狗一次都不重启，症状 = 日志停在第一条后**再无任何输出**）。**正解**：协程每帧 `probeTicks++`；看门狗比对计数是否增长，**不涨即真死**（`watchdogLastTicks < 0` 首次只建基线）。这样两个矛盾需求同时成立——场景加载时看门狗自己也没被调用（不误杀），看门狗被调用时协程必须也在涨（真死必发现）。**通用律：判活要让"被检测者"自己产出与时间无关的存活信号，检测者只在"自己也在跑"时比对。** 另：**任何"后台补齐型"任务都不该有永久终态**（2.0.2 一次跑死 → 2.0.4 触顶放弃，两次教训）。详见 guide 陷阱 67
+17g. **⚠️ "流程永远走不到下一步"时，先怀疑"前置条件恒假"，别只查"循环活不活"**（UniGen 物品功能**栽了五轮**，前四轮全修错地方）：2.0.6 把 tick 判活做对后，诊断日志连续 154s 跨三场景打印 `Loaded=true 但 items 枚举 n=0` → **闸门条件永远不成立**（`ItemsDatabase.Loaded` 恒 true；`GetAllItemsOfType<PropData>(PropType.items)` 恒空）→ 协程健康、看门狗也正常重启，**但枚举代码一次都没执行**。同期发现更深的坑：该原生方法**按泛型 T 过滤**，库里存的是 **`ItemObject`**（`GetItemObject(id)` 返回的类型，带 `item_id`/`icon`），一直问 `PropData` 所以恒 0。**修法：把闸门删掉而不是换个条件**——`ProbeDatabaseReady`(返回 bool，阻塞) → `SampleCounts`(void，只写日志)，流程无条件开工 + 幂等重试。**通用律：① 排查顺序 = 先问"条件本身可能成立吗"，再问"等条件的循环还活着吗"；② 能观测就别决策（观测进日志，决策不依赖可能错的前提）；③ 无条件开工 + 去重，通常优于"等一个自认为正确的条件"。** 详见 guide 陷阱 67
+17e. **判断"UI 文字是否渲染"别靠缩略图肉眼**：UniGen 2.0.2 排查中曾把 346×531 截图里的火炮页签误判为"名称空白"（实为完全正常）。**两个硬手段：① 把 mod 自己的解析逻辑（正则/排序/分页）本地复现并与截图逐行比对；② 对截图做像素采样**（正常渲染的文字会留下成片的纯白像素，按行高分布）。
+17g2. **⚠️ 分类/子分类只准用"游戏自己的判定"，绝不用字符串启发式**（UniGen 2.1.0 定案）：2.0.2 曾用"文件名猜 item_id"→**大面积失效**（`ArisakaT38.prefab` 与运行时键不是同一套）。2.1.0 做物品子分类时改为**先反编译找官方字段**：`Weapon : HandheldItem : ItemObject` → 枚举到的实例可 `((Il2CppObjectBase)io).TryCast<Weapon>()`（陷阱 5：C# `as` 恒失败）取 `weaponPose`（`rifle=1/pistol=2`）；`Interagible.IsWerable()` 判可穿戴。**给物品分类先看 `IsWeapon()`/`IsWerable()`/`weaponPose`，比任何正则可靠。** 另 `WeaponPose` 只有两档，别指望更细的官方口径。
+17g3. **IL2CPP interop 下部分构造函数被裁剪**：`new RectOffset(int,int,int,int)` → **CS1729**（无此重载），改用 `GUIStyle.contentOffset = new Vector2(...)`；`new GUIStyle(GUIStyle)` 拷贝构造同样被裁（陷阱 5/11）。**"看起来该有的构造"报 CS1729，先怀疑被裁剪，找替代属性。** 另：自建 Texture2D 给 GUIStyle 用要 `hideFlags=(HideFlags)61`（陷阱 12），且**别复用 `SolidTexture` 这类单槽缓存**——会把别的样式一起换掉。
+17g11. **⚠️ IMGUI 固定面板高度必须与绘制逐项镜像——动态行数不计入高度就溢出**（UniGen 2.4.0 定案，用户报"菜单列表的选项都跑到菜单外了"）：`PanelRect()` 高度是固定求和，而 OnGUI 的 y 逐段累加——物品页签族/收藏子页签/物品子分类行/字母索引行/物品帮助行**全都不在公式里** → 物品页实际高 ~630px、面板背景 ~504px，下半段画到背景外（单位页只差 4px 所以没暴露）。**修法：高度按内容实算**——`ItemListHeight(bucket, favOnly)` 用与绘制**同一判据**（`ItemCatalog.SubsOf`/`LettersOf`）计算，`PanelRect` 镜像每一段累加。**通用律：IMGUI 的 rect 计算与绘制命令是同一份布局信息的两个消费者，加一行 UI 必须同笔提交改高度镜像。** 详见 guide 陷阱 75
+17g12. **⚠️ 定宽页签 + 固定字号 = 长标签溢出压邻居（IMGUI 按钮文字不裁剪）**（UniGen 2.4.1 定案，用户报"这个标签页有重叠，显示不完整"）：页签定宽网格每格 ≈72px、字号固定 12，英文 "Mod Vehicles" ≈78~84px 超宽，`GUI.Button` 文字 MiddleCenter 且**不按矩形裁剪** → 压到相邻页签；中文 "Mod载具" 放得下 → **只在英文版暴露**。**修法**：`DrawTabButton` 逐格算字号（CJK≈1.0em/拉丁≈0.56em 估宽，下限 8）；⚠️ 用**专用样式实例**（`tabStyle/tabActiveStyle`）逐次改写 `fontSize`——不能复用共享样式，也不能 `new GUIStyle(style)` 拷贝（陷阱 5 拷贝构造被裁剪）。**通用律：定宽容器 + 可变长文本，字号/换行/截断三选一必须在绘制前定案；本地化宽度按最长语言验证。** 详见 guide 陷阱 76
+17g13. **⚠️ 第三方内容发现不能挂运行时"已装列表"——主菜单恒空 + 一次性探测写终态 = 页签永久为空**（UniGen 2.4.1 定案，用户报"Mod载具页签是空的"）：`ModsLoader.mods_installed` **进战斗后才填充**，探测在主菜单等 30s 拿到 mod=0 后 `ready=true` 一锤定音（看门狗见 ready 直接 return）→ mod 内容（战斗时物品库 949→2107）永远进不来。**修法**：① 目录**磁盘直扫**（`<Steam库>/steamapps/workshop/content/<appid>/*/index.xml`，appid 读 `steam_appid.txt` 兜底 1324780；解析 `libraryfolders.vdf` 其他库；+ `<游戏>/Mods`；运行时列表只兜底）；② 解析与**校验**解耦——校验等 `ItemCatalog.Ready`，没就绪 15s 后再来；③ 空闲 60s 重扫，候选缓存复用 + `HashSet` 去重，载具校验失败 5 次放弃该条（打日志）。**通用律："扫完了"≠"扫到了东西"；扫完为空不是终态，是下一轮再扫；依赖运行时状态的数据源先在主菜单验证是否已填充。** 详见 guide 陷阱 77
+17g10. **⚠️ 原生 `Interaction.Call()` 没有距离校验——地面交互菜单里的"拾起"必须改走自己的走过去链路**（SquadCommand 1.4.17 定案，用户报"让单位拾取枪械时可以隔空拾取"）：地面物品右键按交互数分流（单交互 → `RequestItemPickup` 走过去捡；多交互 → 原生交互菜单，点条目 = 原样 `Call()`）。**`HandheldItem`（Weapon 父类）覆写了 `GetInteractions`** → 枪械天生多交互（"拾起置于右手"）→ 永远走菜单 → 原生交互为 FPS 玩家设计、无距离检查 → 隔空吸包。**修法**：菜单另存**未翻译原文**列表（`menuRaw`，与 `menuLabels` 严格等长——剪枝/合成"穿上"条目都要同步），`ExecuteInteraction` 里 `menuGroundItem != null` 且原文以**"拾起"**开头 → 改调 `RequestItemPickup`（联动半径内即时/超出走过去），其余交互（补充弹药等）保持 `Call()`。**通用律：替玩家执行原生交互前，先问它原生靠什么保证前置条件（距离/朝向/停稳）——上帝视角没有这些保证。** 详见 guide 陷阱 74
+17g9. **EN 漏中文有两种形态，自检日志只抓第一种**（UniGen 2.3.0 定案，用户截图"可穿戴"仍中文）：① **字典键漂移**——查了表但键对不上 → `Tr` 缺失自检能抓；② **调用点漏包 `Ui.Tr`**——`SubLabel` 返回中文原串直接上屏，根本没查表 → 自检抓不到。后者要扫"所有用户可见串的出口"（按钮/标签/徽标的字符串表达式）确认都过 `Tr`；2.3.0 全量核对过 `BucketLabel`/`favCatNames`/`catNames` 均已包，仅 `SubLabel` 调用点漏。
+17g8. **预览幽灵必须"先落位、再 `TrackGhost`"——顺序反了幽灵每帧被挪到世界原点附近**（UniGen 2.3.0 定案，用户报"物品的 3D 模型不显示"，2.2.0 起从未显示过）：`TrackGhost(g, anchor)` 记录的是 `g.transform.position − anchor`，而 `Instantiate(prefab)` 的克隆体在 **prefab 模板的原始坐标**（通常原点附近），不在锚点——先 TrackGhost 后落位 → 偏移=模板坐标−锚点（巨大）→ 下一帧 `MovePreviewTo` 每帧按错误偏移把幽灵挪走。单位/载具预览天然不踩坑（生成即在锚点，偏移≈0），**任何新预览类型（物品/空投/建筑）都要先把 `transform.position` 设到落点再 TrackGhost**。配套：失败路径（prefab null / 实例化失败 / Ghostify false）必须无条件 `LogWarning`；幽灵命名统一 `UniGenPreview_` 前缀以吃宿主 `IsGhostTransform` 射线豁免。
+17g7. **EN 字典的键必须与代码里 `Ui.Tr("…")` 的串逐字一致——措辞一改就静默回退中文**（UniGen 2.2.2 定案，用户报"英文版为什么还有中文"）：`Ui.Tr` 查不到就 `return cn`，**不会报错也不会有任何痕迹**（陷阱 17）。排查顺序：① 先反编译部署 DLL 的 `Ui` 证伪"部署成 CN 版"（CN 版 `Tr` 直接 `return cn`，EN 版有字典+查表）；② 用一次性脚本比对**全量 `Ui.Tr("字面量")` 串 vs 字典键**（注意：还有 `Ui.Tr(SubLabel(x))` 这类**变量传参**，字面量扫描扫不到，要单独核）。修完仍可能在**游戏数据**里看到中文——物品/小队/载具名称来自游戏库与 mod 自己的 index.xml，跟随游戏语言，不是 mod 文案。**长效防复发：`Ui.Tr` 查表失败时打一条日志点名该串（去重要只打一次），字典漂移立刻可见。**
+17g6. **mod/第三方内容：运行时数据库无法区分"官方"与"mod"，用 mod 自带清单 + 运行时校验**（UniGen 2.2.0 定案）：`GetAllItemsOfType<PropData>` 恒空（库按泛型 T 过滤，陷阱 67 同源）、`ItemObject` 上**没有 mod_id** → 运行时无法筛选 mod 条目。**正解：磁盘解析每个已装 mod 的 `index.xml`**（`ModsLoader.mods_installed` 给出 assetBundleFolder，向上找 index.xml；`Prefabs/RegisteredPrefab/{PrefabName,DisplayName,Type}`，Type=ModPropType 枚举序号 2=载具 3~7=物品类），条目 id 用游戏公开 API **`ModsLoader.GenerateModItemId(bundleName, prefabName)`** 计算，再逐一运行时校验（物品 `GetItemObject(id) != null`；载具 `VehicleSpawner.GetVehiclePrefabAsync`，**临时 spawner 不能提前销毁——会杀死内部协程导致回调不来**，等回调或超时再删）。委托用 `Il2CppInterop.Runtime.DelegateSupport.ConvertDelegate<T>` 转托管 lambda，失败要退化路径。另：mod 小队/自定义小队注册进 `SquadsArchive.squads` 后**已被全量 key 枚举覆盖**，别重复建桶，打诊断日志证实即可。
+17g5. **⚠️ IMGUI 里"某个控件一画，后面整块全空白"→ 先怀疑该控件原生方法被裁剪**（UniGen 2.1.1 定案，2.1.0 翻车）：症状是**子分类页签画出来了、下面的列表全空**，日志 `[UniGen] OnGUI 异常: Method unstripping failed` ×8 → **`GUI.TextField`（连带 `GUI.SetNextControlName`）在本游戏 IL2CPP 构建中被 Unity 裁剪**，一调用就抛，异常冒泡到 OnGUI 外层 catch，**整帧中断**，之后绘制的控件全部消失；**先于它绘制的控件幸存**——这正是"页签在、列表不在"的原因。**判据只有一个：日志里的 `Method unstripping failed`。** 修法：彻底弃用键盘输入，改**纯点击**方案（UniGen 用「首字母索引行」：只列当前桶/子分类实际出现过的字母 +「全部」，按钮 24px 宽按面板宽自动换行，30+ 字母也不挤）。**通用律：① 面板里能用按钮就别用输入框，IL2CPP 游戏的 `GUI.TextField`/`EditorGUI` 类方法风险极高；② 排查顺序 = 看异常发生在"哪一段绘制之后"，幸存/消失的分界线就是出事控件的位置。** 另：字母/筛选类按钮行**别按数量均分宽度**（字母多时窄到不可点），固定宽 + 自动换行。
+17g4. **两个模块写同一个 ConfigEntry 必须合并成单一写入点**：UniGen 单位收藏（`v:`/`i:`）与物品收藏（`t:`）同存 `Plugin.favorites` 一条字符串；两处各自 `Value = ...` 会**整条互相覆盖**（症状：收藏了物品，重开后单位收藏没了）。**只留一处写入，另一处提供 `FavIdsPrefixed()` 供拼接。**
+17f. **`Edit` 报"成功"不等于落盘——改版本号必须"回读 + 反编译"双复核**：UniGen 2.0.4 本轮 `[BepInPlugin]` 那行**首次 Edit 未落盘**，反编译才发现**特性还是 2.0.3、启动日志已是 2.0.4**（陷阱 14 经典形态）。若直接打包会产出"日志说新版、BepInEx 按旧版注册"的坏包。**流程：Edit → Read 回读确认 → 构建 → 反编译两处版本字符串比对。** 另：用户报"中文版没和英文版同步"时，先比对**部署 DLL 与构建产物的 sha256**（本轮逐字节一致 → 直接证伪该假设）。
 
 **游戏机制类（改功能前必查）**
 18. **AI 移动无法外部驱动**：`Soldier.Move()`/`NavMeshAgent.SetDestination` 都会被 AI 控制器覆盖——**唯一官方通道是 Lua API**（`Lua_Soldier/Lua_Squad.moveTo` + AI 三连释放，见 `ER2_zcode_era.md`）
@@ -119,6 +139,9 @@ ER2_Mods/
 20. **局内暂停时 `Time.time` 冻结**（timeScale=0）：所有节流/冷却/看门狗必须用 `Time.unscaledTime`，否则局内设置界面里永久停摆
 21. **投降单位血量被游戏接管**：外部扣血无效 → 用计时器 `Kill` 等效"流血而死"
 22. **背包添加物品会降级成基类**：`AddVirtualItem`/`AddItemToInventory` 都归一成 `VirtualItem` → 需要正确子类时**直接 `inv.items.Add(vi)`**
+22b. **"磁盘资源名"≠"运行时数据库键"**：按 `er2items.manifest` 文件名当 item_id 去查会大量返回 null（`Carcano`/`Syringe`/`ArisakaT38` 都查不到，`bar_1918`/`bandages` 才查得到）。**要列游戏内容就枚举运行时库**：`ItemsDatabase.GetAllItemsOfType<PropData>((PropData.PropType)t)`（`items=6/weapons=7/ammo=8/attachment=9`），取 `PropData.prefab_name` 作键。返回类型是 **`Il2CppArrayBase<T>`** 不是 `List<T>`。服装不是 ItemObject（是 `Loadout` 字段）。详见 guide 陷阱 65
+22b. **`InstantiatePrefab()` 在 `VirtualItem` 上，不在 `ItemObject` 上**：世界实体生成链 = `GetItemObject(id).ToVirtualItem().InstantiatePrefab()`；`ItemObject` 只有 `ToVirtualItem()`。**另：`Soldier` 没有 `inventory` 字段，它继承自 `Creature`**——`ilspycmd -t Soldier` 查不到继承成员，别误判"不存在"（先确认继承链）
+22c. **"松手即投放"判据必须 `leftUp` 优先**：松手那帧 `GetMouseButton(0)` 已 false，`if (!leftHeld && !leftUp) return;` 会吞掉唯一一次投放（UniGen v2.0.0 自查）。面板点条目起步的拖放还要先吞那次松手（`ignoreUntilRelease`，Placer 1.0.6 教训）
 23. **原生回调拒绝外部替换的 UI 数据**：`CircularMenu2.ShowCircle` 换数据后原生选择回调匹配不到（选了没反应）——能走原生管线就走原生
 24. **`BattleManager` 在主菜单也存在**：等场景实例（如 `DayNightCycle.instance`）就绪再操作
 25. **`SpawnManager.SpawnAI`/`SpawnAISquadGlobal` 返回的是原生协程对象**（`Il2CppSystem.Collections.IEnumerator`）——**必须显式 `StartCoroutine` 启动才会运行**，否则回调永不来（"调了但什么都没生成"）。范式见 `UniversalGeneration/GenRunner.cs` 的 `StartCoroutineNative`
@@ -188,8 +211,8 @@ if (ER2Shared.NoHintsHudLink.IsHidden("er2.你的modid", "显示名")) return; /
 - **已备案例外**：**无**（2026-09-18 曾把 `NativeFull` 列为例外，当天即被推翻并删除 —— 见下条）。
 - **⚠️ 自锁陷阱（2026-09-18 实测，最有价值的一条）**：ModManager 的 `NativeFull` 曾被判为"文案正常、功能可用"而保留。**但它是 er2.modmanager 自己的配置项 → 会出现在 ModManager 自己的 MODS 页上**：打开它就把那一页弄坏，而关掉它**只能靠那一页** → 用户"不小心打开"后管理器直接不可用，且无法从界面自救。**教训：任何会改变"你用来操作它的那个界面"的开关，默认关是不够的 —— 它必须不存在。** 判定时多问一句：**"这个开关打开后，我还有办法关掉它吗？"** 答不上来就删。
 - **判定标准（照这个判，别照"是不是开发开关"判）**：**「生 key / 空回调 / 点了没反应」= 必须从发布版删掉**；**「文案正常、功能可用、只是另一种实现」= 可保留，但必须默认关**；**「开关会影响操作它的界面」= 无条件删掉**。
-- 已接入：SquadCommand、UniversalGeneration、Conquest（节名 `Diagnostics`，历史遗留）、FleshWoundsFixed（键名 `Debug Logging`，历史遗留）、**ModManager（2026-09-18）**
-- **尚未接入（15 个）**：AIFood、CombatTweaks、ConquestRecon、HighValueTarget、HvtTestDriver、InventoryPause、LimbTweaks、MorePhysics、NoInteractionHints、ThrowableWheel、UnitCollision、UnitInfoOverlay、WeatherControl、ZoomAnywhere —— 后续改动这些 mod 时**顺手补上**
+- 已接入：SquadCommand、UniversalGeneration、Conquest（节名 `Diagnostics`，历史遗留）、FleshWoundsFixed（键名 `Debug Logging`，历史遗留）、**ModManager（2026-09-18）**、**HighValueTarget（2026-09-19）**
+- **尚未接入（13 个）**：AIFood、CombatTweaks、ConquestRecon、HvtTestDriver、InventoryPause、LimbTweaks、MorePhysics、NoInteractionHints、ThrowableWheel、UnitCollision、UnitInfoOverlay、WeatherControl、ZoomAnywhere —— 后续改动这些 mod 时**顺手补上**
 
 ## 8. 快速验证清单
 
@@ -203,7 +226,7 @@ if (ER2Shared.NoHintsHudLink.IsHidden("er2.你的modid", "显示名")) return; /
 
 ## 9. 历史教训（避免重走弯路）
 
-- **已删除并终止的项目**：`MorePhysics` 完整物理化（19 版迭代后废弃；**2026-09-13 以 v0.1.48 复活**——源码从 v0.1.47 反编译重建，单位碰撞模块对齐轻量版，见台账 §2.17）、`DirectControl` 单位接管、`SuperSoldiers` 精英单位、`HealthBars` 血条、`BattlefieldHud` 命中标记 —— **复盘全部保留在 `ER2_mod_经验.md`**，再碰同类需求先读。
+- **已删除并终止的项目**：`Conquest` 征服模式（2026-09-19 终止：战略层复杂度失控、战斗桥接未实测；**源码已删，快照在 `research_out/conquest_salvage/`**，已验证 UI 基建由 Endless 回收，见台账 §2.18）、`MorePhysics` 完整物理化（19 版迭代后废弃；**2026-09-13 以 v0.1.48 复活**——源码从 v0.1.47 反编译重建，单位碰撞模块对齐轻量版，见台账 §2.17）、`DirectControl` 单位接管、`SuperSoldiers` 精英单位、`HealthBars` 血条、`BattlefieldHud` 命中标记 —— **复盘全部保留在 `ER2_mod_经验.md`**，再碰同类需求先读。
 - **BattleJournal（勋章/战报 mod）已放弃**：做完全流程后被用户发现 Nexus 有平替 → **提新 mod 方向前先确认生态里没有现成方案**（先搜 Nexus/问用户），别再主动提"勋章/战报/生涯统计"方向。
 - **需求理解偏差的代价**：`DirectControl` 在错误理解（"接管单单位" vs 用户要的"框选多单位 RTS 指挥"）上做了 3 个版本才对齐 → **指挥/控制类需求先问清是「接管单个」还是「RTS 框选指挥」**（两者技术跨度天差地别）。
 - **功能减法比加法更难也更重要**：Hide Anything 从"F5 热键+锁定+保存按钮"演化到"勾选制"，三个概念全被砍掉——每个存废都来自实际使用体验。

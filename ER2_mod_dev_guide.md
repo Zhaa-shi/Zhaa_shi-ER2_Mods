@@ -102,6 +102,31 @@
 - `CircularMenu2.ShowCircle`（原生轮盘显示，替换内容）
 - `PlayerController.Update`（热键轮询）、`Soldier.Throw`（投掷拦截）
 
+### 生成系统（UniversalGeneration 用，2026-09-19 反编译补全）
+- **载具/火力点**：`new GameObject + AddComponent<VehicleSpawner>` → `vehiclePrefabID`（prefab 纯名）→ `SpawnVehicle()` 异步 → `GetSpawnedVehicle()` 轮询。prefab 清单在 `<game>/Easy Red 2_Data/StreamingAssets/CorvoBundles/*.manifest`，子目录=类目：`Vehicles/Tanks|Wheeled|Planes|Artillery|MGs|Special|Deprecated`——**`MGs/` 32 个 prefab 就是全部固定机枪火力点**（MG34/MG42/勃朗宁/马克沁/九二式/维克斯等 地面/三脚架/碉堡 形态 + 高射 + M45 四联装防空），管线与坦克完全相同
+- **步兵小队**：`ItemsDatabase.GetSquadLoadouts(type, overwriteSquadSize)` 有**两个重载**——`SquadType` 枚举与 **`string`**（任意 `SquadsArchive.squads` key）；返回 `SquadData`（本质 = `squadName + loadouts 字符串数组`），`new SquadData(name, loadoutIds)` 手工构造即为"自定义班"；`SpawnManager.SpawnAISquadGlobal(faction_id, script_file, SquadData, pos, radius, Vehicle spawnOnvehicle, Action<Squad>, int player_pos)` 返回**原生协程必须显式 StartCoroutine**；`SpawnAI(Loadout, Rank, Vehicle, pos, faction, script_file, Action<Soldier>)` 逐兵生成
+- **小队数据库三层**：`SquadsArchive.squads : Dictionary<string, SquadDataTable>`（静态，班型→{allowOverwriteSquadSize, squadTypeLabel, standardSquadSize, dlc, loadouts[]}）→ `LoadoutsArchive.loadouts : Dictionary<string, Loadout>`（静态，loadout id→物品清单）→ `Loadout.inventory_items : string[]`（直接给兵）。
+- **游戏自带自定义班**：`CustomSquad : SquadData`（`SquadEditorScene` 场景编辑器的数据模型，`AddMember(CustomSquadMember)`/`Duplicate()`）+ `CustomSquadMember`（loadout_type/uniform/vest/headgear/weap1+scope/bipod/bayonet/weap2/otherItems，`FixMember()`/`ToLoadout()`）；`SpawnManager` 实例有 `custom_squad` 属性 + `UsesCustomSquad()`——**原生管线原生支持自定义班**，GetLoadout/CountLoadouts 是虚方法，传 CustomSquad 进 SpawnAISquadGlobal 走多态。**落盘位置（实证）**：自定义班内嵌在任务编辑器战斗文件 `.mer2`（BinaryFormatter，内含 `customSquads: CustomSquad[]`），随战斗加载后挂在各出生点 `SpawnManager.custom_squad` 上（`SpawnManager.activeSpawns` 静态可枚举）；**战役里没有自定义班**（gamedata.er2 只有 settings/statistics/progresses）。另注意：`AiParams.followCustomSquadOrders()`/`followCustomDirectCommands()` 是**无参启用式**（Lua API 风格，没有 false 重载）——套了受控参数就"释放"不回去，敌方/需要原生 AI 的单位**从头就别套**
+- 乘员班型映射：`SquadType.ger_tankCrew/usa_tankCrew/eng_tankCrew/rus_tankCrew/jap_tankCrew/ita_tankCrew/eng_pol_tankCrew/aus_tankCrew/can_tankCrew`（按阵营 `_id` 前缀取）
+- **物品（2026-09-19 UniGen v2.0.0 补全）**：
+  - **目录清单**：`<game>/Easy Red 2_Data/StreamingAssets/CorvoBundles/er2items.manifest`，行格式
+    `- Assets/ER2 Assets/Prefabs/(Items|grenades|Uniforms)/<name>.prefab`（`Uniforms/` 下还有国别子目录）——
+    **item_id = prefab 纯文件名（去扩展名）**。实测 **Items 339 + grenades 48 + Uniforms 760 = 1,147 条**；
+    纯磁盘解析、零原生调用，启动时毫秒级（对比 §陷阱 1.2.0 的"逐 key 原生构建"卡顿教训）。
+  - **子类正确构造**：`ItemsDatabase.GetItemObject(id)` → `ItemObject.ToVirtualItem()`（**原生自产正确子类**）
+    → 退 `VirtualItem.Create(id)` → 退 `new VirtualItem(id)` 基类兜底。
+  - **进背包**：`InventoryManager.inventory.items.Add(vi)`（**直接注入**，见陷阱 23；`Inventory.items` = `List<VirtualItem>`）。
+    负重校验 `InventoryManager.GetWeightAndMaxWeight(out cur, out max)`；放进后应复核（`Add` 可能静默失效）。
+  - **落地成世界实体**：`prefab.ToVirtualItem().InstantiatePrefab()`（**`InstantiatePrefab` 在 `VirtualItem` 上**，见陷阱 63）。
+  - **背包定位**：`Creature.inventory`（**Soldier 继承而来**，类型 `InventoryManager`）；兜底
+    `InventoryManager.activeInventories` 逐个 `GetComponentInParent<Soldier>()` 按指针比对。
+  - **图标**：游戏图标是**图集子区域**，`Sprite` 直接持有会 "garbage collected in IL2CPP domain" →
+    必须**立刻光栅化成自建 `Texture2D`**（`RenderTexture.GetTemporary` + `Graphics.Blit` + `ReadPixels`）
+    + `hideFlags=(HideFlags)61`（陷阱 12）→ `GUI.DrawTexture`。解析链：
+    `prefab.icon` → `ItemsDatabase.cachedLoadedSprites` → `ItemsDatabase.LoadAndCacheSprite(name, "er2gui")`。
+  - **csproj 提示**：`UnityEngine.SpriteModule` 在本作 interop 里**不存在**（只有 SpriteMask/SpriteShape）——
+    别引用；`Sprite` 经 `Assembly-CSharp`/`CoreModule` 传递解析即可。
+
 ## 3. 踩坑记录（重要）
 
 1. **Ambiguous match**：`[HarmonyPatch(typeof(X), "Method")]` 无参数类型时遇到多重载会抛异常、PatchAll 中断——重载必须 `new Type[]{...}` 或 `new Type[0]`
@@ -153,6 +178,325 @@
 47. **PS 5.1 数组字面量解析坑**：脚本块里 `@(a, b, c, d * $var)` 的末元素 `*` 表达式不带括号 → 整个数组静默变空（像素函数返回 null 导致渲染全透明）；必须 `@(a, b, c, (d * $var))` 逐元素加括号
 48. **PS 5.1 中文注释坑**：无 BOM UTF-8 脚本被按 GBK 误读，含 `——` 等字符的注释行会破坏解析（报错指向下一行 `Unexpected token`）——脚本保持纯 ASCII 注释，或用 write 工具 + 手动加 BOM（edit 工具重写会丢 BOM）
 49. **PowerShell byte 位移截断**：`[byte]172 -shl 8` 按 byte 类型截断为 0 → 读二进制字段先 `[int]` 转换再移位；PNG/WAV 等二进制解析脚本全部踩过（validate_assets.ps1 已修）
+50. **状态机被"清场函数"顺手 Reset = 静默失效（最阴的一类）**：SquadCommand 1.4.8「派兵走过去开背包」——兵走到贴身仍不开窗且**全程零日志**。根因：`BackpackPanel.CloseAll()`（本来只管关窗口）里顺手 `ResetLoot()`，而**取消/更换选择链 `ClearSelection() → CloseAll()` 也走它** → 会合途中任何一次选择变动都静默清掉在途任务；walker 照走（moveTo 已下发），但再没人判定到达。**规矩**：清场/幂等函数只做名字说了的事，任务态另设 `CancelXxx(reason)` 显式取消（进/接管/退出这类**用户主动中断**才调）。**排查手法**：给每一处状态重置加 `重置（原因）` 的无条件日志——没有这条日志，永远分不清"没跑到"和"被清掉"（先加日志再改逻辑，比猜快 10 倍）。
+51. **调用点落在 early-return 门控之后 = 静默不执行**：同一个 `Tick` 里 `BackpackPanel.LootTick()` 写在 `if (!Active || flyingToSquad) return;`（"以下全属 RTS 界面/镜头/鼠标链"分界）之后，任何让该标志挂住的状态都会让后面整段静默停摆，而 `catch { }` 连异常都吞掉。**长期任务（会合/登车/完成观测）的驱动点要挑"全程验证存活"的主循环**——本 mod 是 OnGUI 的 `BackpackPanel.Draw()`（图标一直在画即证明它活着）；宁可在两处都调（自带 0.25s 节流 = 双调幂等），别赌那条早退路径。
+52. **"到达判定"要按用户语言做，别死磕距离阈值**：会合/走近类任务的体验判据是**"兵停下来了"**，不是"落进半径 R 的圈"。in-flight 任务里维护"位移 <0.2m 连续 0.8s = 停了"（任务开始后留 1.5s 宽限，防刚接令未起步）→ 停住即触发一次动作；半径只作为"停得太远不合理"的兜底（`max(packRange, 5m)`）。同时**别把容差半径当主修法**放大（用户 1.4.7 直接否决「单位的手长 10m？」）——先给日志证明兵真实停在哪，再决定判定方式。
+53. **车内乘员不是徒步单位（SquadCommand 1.4.10 实锤）**：`Creature.aliveCreatures` / `joinedSquad` / `GetSelectedInfantry()` 都**包含坐在载具里的乘员**。对他们下发 `Lua_Soldier.moveTo()` 或 `AiParams.allowMovements(true)` 不会"走过去"——原生 AI 的反应是**下车步行**。同一根因会造成三种表象：①「派兵走过去开背包」挑中车里的人 → 距离恒定（如 8.1m）纹丝不动，窗口永远不开；②「让单位上坦克后又会立刻下车」；③右键点偏容错/会合指令把乘员当步兵。**判定**：`GetComponentInParent<Vehicle>() != null` 或 `Lua_Soldier.isInsideVehicle()`（两者都要，见 `GodViewController.IsOnFoot`）。**规矩**：任何"走过去/下达移动/派兵拾取"的候选集都要先过滤徒步单位；全在车里就明确提示，别下指令。**代价**：过滤会让"完整原生小队"条件不成立 → 混合选择从 `via=LuaSquad` 降级为逐兵 `via=Fallback`，这是正确的取舍（安全优先）。
+54. **IMGUI `GUI.Label` 不裁剪**：给一个窄 Rect 画长字符串，文字会**溢出画到隔壁控件上**（SquadCommand 背包窗口标题压在负重数字上）。要么手动测量截断（`style.CalcSize(new GUIContent(s))`，结果按 (文本,宽度) 缓存，别每帧算），要么 `GUI.BeginClip`。别指望 Rect 能当裁剪框。
+55. **"点击自己把自己关掉"的 UI 会漏一帧松手 → 被当成战场点击**（SquadCommand 1.4.11 实锤）：宿主用 **raw Input**（`Input.GetMouseButtonDown/Up`，在 Update）做战场手势，而 UI 在 **OnGUI**。点背包窗口的 ✕ 时：按下帧鼠标在窗口上 → `guiNow=IsMouseOverGui()` 为 true → 不建立选择手势（安全）；**同一帧的 OnGUI 把窗口关掉**；下一帧松手时 `IsMouseOverGui()` 已经是 false → 松手被当成一次完整的空地点击 → `ClearSelection()` = 用户视角的「关个背包把我的选中单位也取消了」。**规矩**：任何"点击后自身消失"的 UI 元素（关闭按钮、模态菜单项、拖拽落地）在 `e.Use()` 之后必须**通知宿主吞掉整次左键手势**（SquadCommand 的做法：`Draw()` 末尾统一检查 `Event.current.type == EventType.Used` → `GodViewController.SwallowLeftGesture()`，复用既有的 `swallowLeftGesture` 收尾状态机）。同理适用于：模态菜单、确认弹窗、任何"点完即关闭"的面板。
+56. **给 NPC 士兵"穿戴装备"的原生入口（反编译 interop 确认 + 实测筛选）**——SquadCommand 连修三轮才找对：
+   - ❌ `Lua_Soldier.wearHeadgear/wearUniform/wearVest(id)`：能调用、不抛异常、**状态完全不变**（实测 `前[盔=-] 后[盔=-]`）——别再用它。
+   - ❌ 直写 `Soldier.headgear_ref/headgear_Obj/uniform_ref/uniform_Obj/vest_ref/vest_Obj` + `SetHelmetObject` + `TriggerClothingObjRefresh`：字段确实可写（都有 setter），但**单独写槽位不够**（见下）。
+   - ✅ 真正的入口（`Soldier` 上，反编译 `BepForEx/interop/Assembly-CSharp.dll` 得到）：
+     `SetWerable(VirtualItem virtualClothes, bool TriggerOnEquipmentChangedSync = false)`、
+     `SetWerableCR(...)`（同上的协程版，负责**异步加载 ItemObject prefab**）、
+     `PickUpItemFromInventory(VirtualItem, InventoryManager sourceInventory, int wearedItemIndex = 0)`、
+     验证用 `IsWearing(VirtualItem)` / `IsWearingClothesType(ItemObject)` / `GetHeldItemIndex(VirtualItem)`、
+     卸下用 `UnwearHelmet()` / `UnwearVest()` / `UpdateWearedItemsToInventory()` / `DropItemNow(idx)` / `GetAllHeldItems()`。
+   - **为什么单独写槽位没用**：穿戴记录 `WearedItem`（**struct**）只有两个字段 ——
+     `ItemObject itemInstance`（**活体物件**）+ `VirtualItem inventoryReference`。模型是挂在 `itemInstance` 上的；
+     背包里的 `VirtualItem` 常常 `IsInstance()==false`（没有活体物件），**拿 `GetItemPrefab()` 的共享 Prefab 去 `SetInstance()` 是错的**。
+     所以穿戴必须交给原生（它自己会实例化 prefab），不要自己拼。
+   - **正确姿势**：阶梯式尝试 + 每步验证（`WearSnapshot` 快照 或 `IsWearing` 翻转），第一个见效即停；把"生效级"打进日志，
+     确认后删掉无效的级。诊断一次到位，别一次只改一处。
+57. **排查期的诊断日志必须走"不受开关门控"的通道**：SquadCommand 的 `SquadCmdLogic.Log` 受 cfg `debugLog` 门控（发布默认关），
+   把 `合成穿戴项`/`会合任务重置` 这类关键诊断写成 `Log` 后，用户机器上 `debugLog=false` → **一条都没记下来**，
+   连续两轮排查等于摸黑。**规矩**：新加的诊断先用 `LogAlways`（或直接临时把开关默认打开）跑通定案，
+   定案后再统一改回受开关控制、并把"发布默认关闭"写进 README/cfg 描述。
+58. **interop 属性读是最大的隐性开销——先问"它会不会每帧/每兵每帧被调到"**：SquadCommand 1.4.14 实测定位到一批
+   "看起来无害"的 interop 读，累加起来就是大战场上的卡顿感：
+   - `PlayerController.currentController` + `pc.ControlledCharacter`（**每次两次 interop**）——被
+     `Soldier.GetBestVisibleEnemy` Postfix 与 `Vehicle.CurrentVisibleTarget` Postfix **每兵每帧**各调一次，
+     集火标记生效期间数百单位 × 60fps = **每秒上万次**；同类还有读 `.faction` 字符串（还带封送）。
+   - `ResourcesManager.ResolutionMult` —— 每次取 `GUIStyle` 都读一次，而 OnGUI 一帧多次事件 × 每帧十几处取样式。
+   - `Camera.main` —— 内部是 `FindGameObjectWithTag`；`ResourcesManager.mainCamera` 的兜底路径一旦走到就是全场景查找。
+   **修法**：给这些读加短周期缓存（0.5s–2s 按语义定）+ **显式失效入口**（`InvalidatePlayerSoldier()` 挂在
+   `SetPlayer` 三处调用点：进 RTS/退出/接管；`InvalidateMainCam()` 挂在切场景）。**要点：拿不到值时不要写缓存**，
+   否则会把"暂时取不到"固化成半秒的错误答案。缓存只做加速、不改语义 —— 判定仍要有实时兜底（见陷阱 59）。
+59. **给"列举型工具函数"加缓存，别让它被连续调用**：`SquadCmdLogic.CollectSquads()` 遍历**全场景所有 `Creature`**
+   并逐个 `TryCast<Soldier>`（大战场数百次 interop）+ 每次分配 `Dictionary`/`List`；而 `GetAllFriendlySquads()`
+   在「进 RTS / 接管 / 编组 / 死亡重挂」等流程里会被**连续多次**调用 → 一次操作几十毫秒起。
+   **修法**：加 0.3s 缓存，返回**缓存列表本身**并约定"调用方只读"；同时提供 `…Copy()` 给需要长期持有的调用方。
+   **改之前必须逐个核对调用点**——只要有一处 `Add`/`Remove`/排序，就不能返回共享实例。
+60. **改用缓存快路时，兜底判据不能删**：`IsSelectedUnit` 1.4.14 加了"先查 0.2s 选中指针集"的快路，
+   但**保留了原来的 interop 判定作为未命中兜底**。这样即便缓存因任何原因滞后/为空，结果依然正确（只是慢一点）。
+   反面教材：把缓存当成唯一真相 → 缓存刷新间隙里的行为差异会变成"偶尔失灵"的玄学 bug。
+   同理 `LootTick`/`Validate` 这类节流函数：节流只应省掉"重复计算"，绝不能省掉"最终状态的判定"。
+
+61. **世界空间标记「恒定屏占比」公式 `scale = dist × k` 观感会失真，别只看数学**（HVT v1.2.2 实测定案）：
+   该公式在理想针孔模型下确实能让屏上大小恒定（世界尺寸 ∝ 距离，恰好抵消透视 1/dist 缩小）。
+   但实测玩家观感是**反直觉的"近小远大"**——近处偏小、远处膨胀过度。成因：FOV/视场随倍镜或屏息动态变化、
+   锚点偏移（步兵 `+3.0m`，近距离时视角差显著）、以及屏幕投影需按**屏高**归一而非世界单位。
+   **定案**：想给玩家「真实参照物」的直觉时，用**固定世界尺寸**常量（HVT 取 0.8m，用户实测定稿——初版试 1.6m 偏大）——屏上大小完全交给透视，
+   近大远小。**判定法则：任何声称"屏上恒定"的设计，必须实机验证，公式正确 ≠ 观感正确。**
+
+62. **给标记挑尺寸常量时先想清"参照物"**：HVT 的 quad 定稿 0.8m（约人体小腿高度），屏上大小随距离纯透视变化。
+   取值改一处即可（HVT `MarkerWorldSize`），不必重编译逻辑。
+63. **`InstantiatePrefab()` 在 `VirtualItem` 上，不在 `ItemObject` 上**（UniGen v2.0.0 编译期 CS1061 实证）：
+   `ItemObject` 只有 `ToVirtualItem()`（`ItemObject.decompiled.cs:313`，`public virtual VirtualItem ToVirtualItem()`）。
+   世界实体生成链 = `ItemsDatabase.GetItemObject(id)` → `prefab.ToVirtualItem()` → `vi.InstantiatePrefab()`；
+   裸 `Object.Instantiate(prefab.gameObject)` 只能当兜底（拿不到弹药/弹匣容量等运行期子类字段）。
+   **同族坑**：`Soldier` 自身没有 `inventory` 字段——它继承自 `Creature`（`Soldier : Creature`，
+   `Creature.inventory` 类型 `InventoryManager`）。**用 `ilspycmd -t Soldier` 查不到继承成员，别误判"不存在"**；
+   查字段前先确认类继承链。
+64. **"松手即投放"状态机的时序陷阱**：松手那一帧 `Input.GetMouseButton(0)` **已经为 false**，
+   所以 `if (!leftHeld && !leftUp) return;` 这种"都没按就返回"的写法会**吞掉唯一一次投放判定**
+   （UniGen `ItemDragger` v2.0.0 自查发现）。判据必须 **`leftUp` 优先、`leftHeld` 兜后**：
+   `if (leftUp) { Drop(); return; } if (!leftHeld) return;`。
+   **相关**：面板里点条目起步的拖放，必须先吞掉那次按压的松开（`ignoreUntilRelease`，Placer 1.0.6 教训），
+   否则"点一下就直接丢出去"。
+65. **"磁盘资源名"≠"运行时数据库键"——别用磁盘清单猜 id**（UniGen v2.0.2 实证，代价是两轮返工）：
+   从 `CorvoBundles/er2items.manifest` 解析出的 `Items/Carcano.prefab` → 文件名 `Carcano`，
+   去 `ItemsDatabase.GetItemObject("Carcano")` **返回 null**；而 `bar_1918` / `bandages` / `ToolBox` 这类
+   两套命名恰好一致的才查得到。**症状极隐蔽**：`ItemObject.icon` 是物品对象自带字段，
+   于是"有图标"无意中成了"这条 id 真的存在"的标志物（用户看到的就是"只有带图标的能生成"）。
+   **正解 = 直接枚举运行时数据库**：`ItemsDatabase.GetAllItemsOfType<PropData>((PropData.PropType)t)`，
+   取 `PropData.prefab_name` 作键、`PropData.name` 作显示名，分类直接用游戏自己的 `PropType`
+   （`items=6 / weapons=7 / ammo=8 / attachment=9`），过滤 `deprecated` 与 `mod_id != 0`。
+   **附带**：`Uniforms/` 全部无效——服装是 `Loadout`/`CustomSquadMember.uniform` 字段，**不是 ItemObject**。
+   编译细节：`GetAllItemsOfType<T>` 返回 **`Il2CppArrayBase<T>`**（不是 `Il2CppSystem...List<T>`），
+   须用全名 `Il2CppInterop.Runtime.InteropTypes.Arrays.Il2CppArrayBase<PropData>`（CS0029 实证）。
+66. **`ilspycmd` 的反编译产物绝不能落在项目目录内**（本次新踩，会直接让构建崩）：
+   `-o <mod目录>` 时 `.cs` 会被 SDK 的隐式通配符 glob 进编译 → **`CS0101` 类型已定义** +
+   **`CS0579` 特性重复**（表现像源码写错，实际是产物的锅）。
+   **反编译一律输出到项目目录之外**（如 `%TEMP%`）；事后顺手删除。
+   **同族**：`Edit` 工具偶发"返回成功但文件未变"——改版本号等关键行后**必须 Read 复核**，
+   且 `[BepInPlugin]` 版本要以**反编译结果**为准（陷阱 14 的实际执行方式）。
+67. **"非 null 空数组"会骗过就绪判据——等数据库要用官方 `Loaded` 标志 + 非空双判据**（UniGen v2.0.3 实证，代价是整功能不可用）：
+   2.0.2 的闸门写作 `return l != null;`（`l = ItemsDatabase.GetAllItemsOfType<PropData>(...)`）。
+   数据库**加载完成前**该方法返回**非 null 的空数组**（不是 null、不抛异常）→ 闸门瞬间放行 →
+   枚举到 0 条 → 把自己标记为 `Failed` **永久放弃** → 物品页签一个都建不起来，
+   **整个物品生成功能是死的**。日志特征：报错发生在 `Plugin.Load()`（主菜单），此后**再无任何重试行**。
+   - **正解（双判据，缺一不可）**：
+     ① `ItemsDatabase.Loaded`（`public unsafe static bool Loaded`，**官方就绪标志**，反编译
+     `ItemsDatabase.decompiled.cs:1705` 确认存在；用 try 包裹以便属性不可用时退化）；
+     ② 实枚举 `Count > 0`（空数组不算就绪）。
+   - **结构也要改**：就绪等待与"收到 0 条"都必须是**可重试**的 attempt 循环
+     （`for (attempt < 60)` + `WaitForSeconds(2f)`，对齐 `GenCatalog.StartupProbeCR` 的
+     `if (enumCount > 0) break;`），**绝不能一锤子跑死**。
+   - **看门狗阈值要跟着放宽**：attempt 循环会**合法等待**最长约 2 分钟，原 20s 判死会把
+     "正常等待"误判成"协程被场景切换杀死"并反复重启、白白耗尽 `probeRestarts`。
+     v2.0.3 改为 150s + **进度基线**（条目数在增长即视为存活）。
+   - **⚠️ 但 2.0.3 实测仍失败——阈值/轮询节奏是第二个坑（v2.0.4 定案，同一条陷阱的延伸）**：
+     `for (attempt < 60)` + `WaitForSeconds(2f)` 里的 **2 秒等待本身会输给场景切换**。
+     实测时间线：主菜单打印"未就绪，2s 后重试"→ 协程卡在 `WaitForSeconds` 里 →
+     游戏切进战斗场景（**物品数据库正是那时才加载完**）→ **运行中的协程随场景切换被静默杀死**
+     （宿主 `DontDestroyOnLoad` 活着，**但运行中的协程不活**）→ 150s 看门狗才重启，
+     此时 60 次 × 2s 预算已在主菜单空耗光 → **再也没有任何 ItemCatalog 日志**。
+     同一时刻 `GenCatalog` 用 `if (enumCount > 0) break;` + 60×2s **却成功了**，
+     差别在于它重启后**立刻**拿到结果，而 ItemCatalog 重启后仍要先等 2s——窗口正好落在场景切换上。
+     **正解（v2.0.4）**：
+     ① **就绪等待改为逐帧轮询**：`while (!Ready()) { ...; yield return null; }`——
+     成本极低（一次 bool 读 + 一次数组长度检查），**数据库一就绪当帧开始枚举**，
+     等待窗口 < 1 帧，场景切换再无处截断；**慢轮询（≥0.5s 量级）是竞态面的来源**。
+     ② **看门狗改「心跳判活」**，不要用"无进展 N 秒"硬阈值：
+     新增 `lastHeartbeat`，在 `Begin()` / 每帧轮询 / `EnumerateAll` 时间片**三处刷新**；
+     判死条件改为 `Time.unscaledTime - lastHeartbeat > 20f`——
+     既不把"数据库确实还没加载"的**合法等待**误判为死亡，也不放过真死的协程。
+     ③ **预算只在"目标系统就绪之后"起算**：主菜单阶段的等待不消耗枚举时间片预算。
+     ④ **重启后必须重置"已打印"日志标志**（`loggedDbWait`/`loggedDbReady`），
+     否则新协程全程静默，日志上根本看不出它是否在跑（2.0.3 就栽在这里）。
+   - **⚠️ 但 2.0.4 实测**仍失败**——"自动放弃"是第三个坑，也是最贵的一个（v2.0.5 定案）**：
+     2.0.4 已改成逐帧轮询（日志有 `逐帧轮询等待`，方向对），但看门狗**误判"心跳停跳"并重启**，
+     每次重启 `probeRestarts++`，**6 次触顶后 `probeState=3` 永久放弃** → 此后即进入了战斗场景、
+     数据库早已就绪，也**永不重试，物品页签永远建不起来**。
+     **误杀机理**：加载战斗场景期间**主线程被 Unity 占住** → 协程拿不到 tick、**心跳无法刷新**；
+     而 `Time.unscaledTime` 是**墙上时钟、照常前进** → "停跳"是**假象**。
+     **无论是 2.0.3 的 150s 硬阈值还是 2.0.4 的 20s 心跳判活，本质是同一个错误：
+     用"时间流逝"当"协程死亡"的判据——而二者都不可靠。**
+     **正解（v2.0.5）**：
+     ① **长时后台任务绝不能有"放弃"分支**——`probeState` 只保留 未开始/进行中/完成 三态，
+     看门狗改"**不判死、只续跑**"：`if (Ready||Failed) return; if (probeState==1) return; if (probeState==0) Begin();`
+     **删除全部时间阈值与次数上限**（重启幂等 ⇒ 无限次重启是安全的）。
+     ② "枚举到 0 条"也别 `Failed=true`，复位重试。
+     ③ **"是否卡死"靠诊断日志判断，不能靠猜阈值**——加 `LogProbeDiag()`，
+     把闸门每条失败路径的**原始值**（`Loaded=false` / 抛异常 / 枚举 n=0）**每 5s 节流**打一条，
+     附已等待秒数 + 当前场景名。前两轮都卡在"闸门永不放行却不知为何"。
+   - **⚠️ 2.0.5 又翻车——"不判死"等于"不检测"（第四次迭代才定案，v2.0.6）**：
+     2.0.5 为移除放弃路径，把看门狗写成 `if (probeState == 1) return;`（"在跑就别动它"）——
+     **但协程被场景切换杀死时，没有任何代码复位 `probeState`**（该复位的是已死的协程自己），
+     `probeState` **永远卡在 1** → 看门狗永远认为"它在跑"，**一次都不重启**。
+     症状极隐蔽：日志停在第一条"未就绪…"之后**再无任何输出**（连诊断行都没有）。
+     **正解（v2.0.6）：让被检测者产出与时间无关的存活信号 —— tick 计数。**
+     ```csharp
+     // 协程侧：每跑一帧 +1（就绪等待循环 + 时间片两处）
+     probeTicks++;
+     yield return null;
+
+     // 看门狗侧（也在主线程，每秒一次）
+     if (probeState == 1) {
+         if (watchdogLastTicks < 0 || probeTicks != watchdogLastTicks) {
+             watchdogLastTicks = probeTicks;   // 计数涨了（或首次建基线）→ 活着
+             return;
+         }
+         // 计数与上次完全相同 = 协程一帧都没跑 = 真死 → 重启
+         probeState = 0; Begin();
+     }
+     ```
+     **为什么这个判据是对的**：它同时满足两个看似矛盾的需求——
+     ① 场景加载期间看门狗**自己也没被调用**，不会去比对 → 不误杀合法停摆；
+     ② 看门狗被调用时协程**必须也在涨** → 真死必被发现。
+     `Time.timeScale`、场景加载、墙上时钟全都骗不过它。
+   - **⚠️ 判据四次迭代的全景（这个坑本 mod 栽了四次，务必读完再动手）**：
+     2.0.3 `Time.unscaledTime - probeStartedAt > 150s` → 合法等待被误杀；
+     2.0.4 `unscaledTime - lastHeartbeat > 20s` → **同一错误**（仍是时间判据），且误杀会累积
+     `probeRestarts`，6 次触顶**永久放弃**；
+     2.0.5 干脆"不判死只续跑" → **等于不检测**，协程真死时永不重启；
+     2.0.6 **tick 计数** → 对（但仍失败，因为闸门条件恒假）；
+     2.0.7 **删掉闸门 + 改用 `ItemObject`** → 才真正解决。
+     **前三轮共同错误 = 拿"时间流逝"当"协程死亡"的判据**——而场景加载期间主线程被占、
+     协程停摆但**时钟照走**，两者根本不等价。**通用结论：判活要让"被检测者"自己产出
+     与时间无关的存活信号（帧计数 / 递增序号），"检测者"只在"自己也在跑"的时刻比对。**
+   - **⚠️ 第五次迭代（v2.0.7）——前四轮全修错了地方：病根不是协程，是闸门条件本身**。
+     v2.0.6 把 tick 计数做对之后，日志终于说话了，给出的答案是：
+     `物品库就绪探测: Loaded=true 但 items 枚举 n=0（null=-1）（已等 153.9s, scene=Aberdeen）`
+     ——**连续 154 秒、跨三个场景，条件恒不满足**。即 `ItemsDatabase.Loaded` **恒为 true**，
+     而 `GetAllItemsOfType<PropData>(PropType.items)`(=6) **永远返回空数组**。
+     于是：**协程活得好、看门狗重启也正常，但闸门永远不放行，枚举代码一次都没跑到。**
+     **更深的病灶（同轮发现）**：该原生方法极可能**按泛型实参 T 过滤**——
+     库里真正存的是 **`ItemObject`**（`GetItemObject(id)` 返回的类型，带 `item_id`/`icon`），
+     而代码从头到尾问的是 `PropData`，所以恒为 0。现以 `ItemObject` 为主、`PropData` 兜底。
+     **修法不是"再猜一个更好的条件"，而是把闸门删掉**：`ProbeDatabaseReady` → `SampleCounts`
+     （只观测、返回 void、不参与决策），`ProbeCR` **无条件枚举**，拿不到就下一轮重试。
+     **通用结论（比上一次更根本）：
+     排查"流程永远走不到下一步"时，先问「前置条件本身是否可能成立」，再问「等条件的循环还活着吗」。
+     本 mod 前四轮只查了后者。一个永不成立的条件，配上再健壮的重试也是零次执行。**
+     **判据选择原则**：能让程序"观测"的就别让它"决策"——观测写进日志给人看，决策不依赖可能错的前提。
+   - **⚠️ 同型总结**：2.0.2 一次跑死 → 2.0.3/2.0.4 时间判据误杀 → 2.0.5 不检测 → 2.0.6 tick 计数
+     → **2.0.7 才发现闸门条件恒假 + 泛型问错类型**。
+     **凡是"后台补齐型"任务，设计时先问三个问题：
+     ① 有没有任何路径能让它永久停止？（有就删掉）
+     ② 我怎么知道它还活着？——答案不能依赖时间。
+     ③ 它要等的那个条件，有没有可能被证明永远不成立？——不要用"看起来合理"的前提阻塞流程，
+        能无条件开干就无条件开干（配合幂等去重），把前提降级成日志观测项。**
+   - **通用教训**：任何"等外部系统就绪"的闸门，**"非 null"都不是有效判据**；
+     优先找官方 `Loaded`/`IsReady` 标志，退而求其次也要"实数据非空"。
+     **并且轮询间隔必须远小于"最坏情况下的状态变化间隔"**——场景切换是毫秒级的，
+     秒级轮询注定输；能用 `yield return null` 就别用 `WaitForSeconds`。
+   - **诊断方法论（同一轮踩到，值得记）**：判断"UI 文字是否渲染"**别靠缩略图肉眼**——
+     本轮曾把 346×531 截图里的火炮页签误判为"名称空白"，实则**完全正常**：
+     把 mod 自己的 manifest 正则做本地复现，排序 + 按同样 10 行分页后**与截图 10/10 精确匹配**；
+     再对截图采样，列表区有 **1704 个纯白 (255,255,255) 文字像素**且按 10 条 y 带分布。
+     **像素采样 + 逻辑复现**是被误判时的两个硬手段。
+
+68. **⚠️ IMGUI 里"某个控件一画，后面整块全空白" → 先怀疑该控件的原生方法被 IL2CPP 裁剪**（UniGen v2.1.1 定案，v2.1.0 就是这么翻的车）：
+   症状极具误导性：**子分类页签（全部/步枪/手枪/可穿戴）画出来了，其下的过滤框与整个物品列表全空白**。
+   日志是 `[Error :ER2 Universal Generation] [UniGen] OnGUI 异常: Method unstripping failed` ×8。
+   - **根因**：`GUI.TextField`（连带 `GUI.SetNextControlName`）在本游戏的 IL2CPP 构建里**被 Unity 裁剪**，
+     一调用就抛 `Method unstripping failed`；异常冒泡到面板外层 try/catch → **整帧 OnGUI 中断** →
+     之后绘制的控件全部消失。**先于它绘制的控件幸存**——"页签在、列表不在"的分界线就是出事控件的位置，
+     这也是定位时最有用的线索。
+   - **唯一判据是日志里的 `Method unstripping failed`**。与 17g3 的 `RectOffset`（CS1729，编译期报错）
+     同类，但**运行期才炸的 stripped method 更隐蔽**——编译 0 error、部署成功、只在实际绘制到那一行时炸。
+   - **修法**：彻底放弃键盘输入。`ItemCatalog` 删 `Matches()`，加
+     `LettersOf(bucket, sub, favOnly)` / `LetterOf(e)` / `HasLetter(e, letter)`，`Query` 的 `filter` 参数改 `letter`；
+     UI 改**纯点击的首字母索引行**：只列当前桶/子分类**实际出现过的字母** +「全部」，
+     按钮固定 **24px 宽、按面板宽度自动换行**（字母最多 30+，按数量均分单行会窄到不可点）；
+     子分类/桶切换后若字母行消失则自动复位 `letterFilter`，避免空列表。
+     同时删掉 `fieldStyle` 及其自建底图 Texture2D、`GUI.SetNextControlName`。
+   - **通用律**：
+     ① IL2CPP 游戏的面板**能用按钮就别用输入框**，`GUI.TextField` / `EditorGUI` 这类方法风险极高；
+        要输入就用 `Input.inputString` / `Event.current.character` 自己攒字符串（纯托管，不碰被裁剪的原生方法）。
+     ② 排查顺序 = 看异常发生在"哪一段绘制之后"，**幸存/消失的分界线就是出事控件的位置**。
+     ③ 字母/筛选类按钮行**别按数量均分宽度**，固定宽 + 自动换行。
+     ④ 面板绘制整体应**分段 try/catch**，避免一处炸掉整个面板（本轮就是靠外层一处 catch 才只丢列表而非黑屏）。
+
+69. **⚠️ 第三方 mod 抢同一个方法：谁先跑 = 加载顺序（DLL 字母序）+ `[HarmonyPriority]`**（2026-09-24，Advanced Combat Movement 兼容定案）：
+   - **事实**：同一方法的多个 Prefix，默认优先级下**按 patch 应用顺序执行**，而 patch 顺序 = 插件加载顺序 ≈ **DLL 文件名字母序**。
+     `AdvancedCombatMovement_*.dll`（A）先于 `ER2_ModManager.dll`（E）→ 它的 Prefix 先跑；只要它 `return false`，
+     我们同方法的 Prefix **根本不会执行**（Harmony 一旦有 Prefix 返回 false，后续 Prefix/原方法/Postfix 全跳过）。
+     表现就是"我们的功能莫名其妙完全不生效，且没有任何报错"。
+   - **要抢回执行权就显式 `[HarmonyPriority(Priority.First)]`**；但要抢回**之后**必须自己处理让位，
+     否则会把对方的功能顶掉（见下条）。
+   - **判定是否被抢**：先看该方法的全部 patch（`Harmony.GetPatchInfo(method)` 或反编译对方 DLL 看 `[HarmonyPatch]`），
+     再确认对方是否无条件 `return false`。
+70. **被别人的 Prefix 吞掉原生方法调用 → 用「调用 → 回读校验 → 直写字段」兜底**（SquadCommand 1.4.15）：
+   - **场景**：我们在 `Squad.SetHoldFireOrder(false, false, false, false)`（= 恢复开火）上被第三方 Prefix 吞掉
+     （它命中"队长 == 当前操控兵"就只记一次危险记忆后 `return false`）→ 小队**永久停火**，而我们这边零报错。
+   - **修法**：调用后回读状态（`sq.HoldFire` / `sq.holdFire`），若仍未生效就**直接写原生字段** `sq.holdFire = false`——
+     **字段写入不走方法，Harmony 的 Prefix/Postfix 拦不住**。这是绕开他人拦截的通用手段（前提是状态确实存在可写字段，
+     用 `ilspycmd -t <Type>` 确认字段有 setter）。
+   - **副作用为零**：没装对方 mod 时校验必然通过，不会触发直写；即使触发，写的也是原生状态字段本身。
+   - 同理，ModManager 侧对"设置页翻页被劫持"的处理是**反射桥 + 让位**（见陷阱 69）：
+     对方的假页停在末页时接我们的页、没到末页放行走它自己的翻页、停在它的入口页则让位，
+     交接时用一个 `Detach()` 把对方的 `IsOpen`/`CurrentFakePage` 复位（**注意：这两个是 public static 字段，必须 `GetField`，
+     `GetProperty` 会拿到 null → 探测失败 → 桥整体失效**）。
+71. **⚠️ 跳过原生方法 = 连同它的副作用一起消失（音效/计数/状态机），必须逐项补**（ModManager 1.5.4）：
+   - **事实**：`SettingsGUI_V2.SettingsTabRight/SettingsTabLeft` **自身会播点击音效**（v1.1.4 已实证：我们拦截翻页后
+     必须手动 `SoundManager.ClickSound()` 才不丢声）。所以**任何** Prefix 返回 false 都会连带吞掉音效 ——
+     不管是我们自己还是第三方（ACM 的假页代码 1629 行里零 `SoundManager` 调用 → 它的两页全程静音）。
+   - **通用规则**：拦截一个原生方法前，先问"这个原方法除了主逻辑还顺手做了什么"。
+     IL2CPP 下**看不到原生方法体**（interop 只有签名），只能靠行为实测 + 已有注释推断
+     → 一旦补过一次（如 v1.1.4 的 ClickSound），就要把"补副作用"写进该拦截点的**全部**分支。
+   - **判定表（可复用）**：**"这次原生会不会执行"** ——
+     会执行 → 一个字都别补（否则和原生叠成双击声）；不会执行 → 全部补上。
+     让位给第三方时，对方 `return false` 同样等于"原生不执行"，也要补。
+   - **可诊断性**：给每个分支打一行追踪日志（分支名 + 关键状态），否则"没音效"只能靠猜是哪条分支
+     （ModManager 的形如 `ModManager: tab <branch> cur=.. myIndex=.. thirdParty=open/2|closed|none`）。
+
+72. **⚠️ 预览幽灵必须"先落位、再 TrackGhost"——顺序反了，幽灵每帧被挪到世界原点附近**（UniGen 2.3.0 定案，用户报"物品的 3D 模型不显示"，2.2.0 起从未显示过）：
+   - **机制**：`GenRunner.TrackGhost(g, anchor)` 记录偏移 = `g.transform.position − anchor`，`MovePreviewTo` 每帧按"落点 + 偏移"摆放。
+     `Instantiate(prefab)` 的克隆体出生在 **prefab 模板的原始坐标**（通常世界原点附近），不在锚点——
+     2.2.0 的 `SpawnItemGhostCR` 先 `TrackGhost` 再写 `position = pos + up*0.25`，记录的偏移 = 模板坐标 − 锚点（巨大）→
+     **下一帧 MovePreviewTo 用错误偏移把幽灵挪走**，单帧的正确落位立刻被覆盖。
+   - **为什么单位/载具预览没踩中**：步兵由 `SpawnAISquadGlobal` 生成在锚点、载具在 Ghostify 前已 `transform.position = pos`
+     → 偏移天然 ≈0。**任何新预览类型（物品/空投/建筑）都必须先把 `transform.position` 设到落点，再 TrackGhost**。
+   - **配套**：① 失败路径（`GetItemObject` null / 实例化异常 / `Ghostify` false）**无条件 `LogWarning`**（Placer 1.0.11 规则，静默 false = 永远查不了）；② 幽灵命名统一 **`UniGenPreview_` 前缀**，吃宿主 `IsGhostTransform` 的相机地面射线豁免。
+
+73. **⚠️ "手势互斥全屏 Rect"会把宿主相机输入一起冻死——宿主要区分"手势互斥"与"UI 面板"**（SquadCommand 1.4.16 + UniGen 2.3.0 定案，用户报"预放置时不能滚动滚轮改变视角"）：
+   - **机制**：UniGen 放置/携带期间 `ExternalGuiBlockRect()` 返回全屏（防投放点击误触宿主框选/指令），而宿主
+     `UiPointerCapture()` 复用 `IsMouseOverGui()` → 同一个布尔既吞点击**又 gate `HandleHeight` 滚轮与 `HandleDrag` 中键**
+     → 全屏互斥期间滚轮/中键全死（键盘 WASD 不受影响，因为只 gate 鼠标驱动操作）。
+   - **修法（契约扩展，向后兼容）**：宿主新增 `internal static Func<bool> externalCameraPass`（附属 mod 反射赋值）——
+     `UiPointerCapture()` 命中 UI 后先问它：返回 true = "这次全屏是拖放手势，不是面板" → 相机放行（滚轮/中键照常），
+     **点击手势仍被 `externalGuiBlock` 吞掉**。未赋值（旧附属 mod / 宿主旧版）= 行为与旧版完全一致。
+   - **通用律**：给"全屏让位"类 Rect 注入语义时，想清楚它同时影响了宿主的哪些输入通道；
+     点击互斥和相机冻结是两个正交诉求，需要两条契约，不要共用一个布尔。
+
+74. **⚠️ 原生 `Interaction.Call()` 没有距离校验——地面交互菜单里的"拾起"必须改走自己的走过去链路**（SquadCommand 1.4.17 定案，用户报"拾取枪械可以隔空拾取"）：
+   - **机制**：地面物品右键按交互数分流——单交互 → `RequestItemPickup`（联动半径内即时 / 超出派兵走过去）；
+     多交互 → `OpenGroundMenu`，点条目 = **原样 `Interaction.Call()`**。原生交互是为 FPS 玩家设计的，
+     距离 proximity 由玩家自身保证，所以 `Call()` 本身**无距离检查** → 远处点击 = 隔空拾取。
+   - **为什么只有枪械中招**：`HandheldItem`（`Weapon` 父类）**覆写了 `GetInteractions`**（普通 `ItemObject` 不覆写）
+     → 枪械天生多交互（"拾起置于右手"等，见 Ui 词典既有条目）→ 永远走菜单路径；普通物品单交互走正确链路。
+   - **修法**：`FillMenuEntries` 另存一份**未翻译原文**（`menuRaw`，与 `menuLabels` 严格等长——剪枝与合成"穿上"
+     条目都要同步增删）；`ExecuteInteraction` 里 `menuGroundItem != null` 且原文以 **"拾起"** 开头
+     → 改调 `RequestItemPickup(item, item.transform.position)`，其余交互（补充弹药等）保持 `Call()`。
+   - **通用律**：凡是"替玩家执行原生交互"的地方，先问这个交互原生靠什么保证前置条件（距离/朝向/载具停稳）；
+     RTS 上帝视角没有这些保证，需要自己补齐或绕开。
+
+75. **⚠️ IMGUI 固定面板高度必须与绘制逐项镜像——动态行数（页签/索引行）不加进高度就溢出**（UniGen 2.4.0 定案，用户报"菜单列表的选项都跑到菜单外了"）：
+   - **机制**：`PanelRect()` 高度是固定求和（标题+阵营+页签两行+列表+分页+…），而 OnGUI 的 y 是**逐段累加**的：
+     物品页签族 `irows*(TabH+4)`、收藏子页签 `frows*(TabH+4)`、物品子分类行、字母索引行 `rows*22+2`、
+     物品帮助行——全都不在固定公式里 → 物品页内容实际高 ~630px、面板背景只有 ~504px，
+     下半段列表/分页/帮助画到背景外。单位页几乎不溢出（只差 4px 间隙），所以问题只在物品页暴露。
+   - **修法**：高度**按内容实算**——`PanelRect` 镜像 OnGUI 的每一段累加；物品列表高度由 `ItemListHeight(bucket, favOnly)`
+     用与绘制**同一判据**（`SubsOf` / `LettersOf` 的真实结果）计算，不重复猜。每帧多两次线性扫描成本可忽略。
+   - **通用律**：IMGUI 的 rect 计算和绘制命令是同一份布局信息的两个消费者，**改一处必改另一处**
+     （与陷阱 66"改版本号必须 Read 复核"同级的纪律）；新加一行 UI 时，把"高度镜像"当成同一笔提交的一部分。
+
+76. **⚠️ 定宽页签 + 固定字号 = 长标签溢出压邻居（IMGUI 按钮文字不裁剪）**（UniGen 2.4.1 定案，用户报"这个标签页有重叠，显示不完整"）：
+   - **机制**：页签是定宽网格（PanelW=320、4 列 → 每格 ≈72px），字号固定 12。英文 "Mod Vehicles"（12 个拉丁字符）
+     在 12 号下约 78~84px > 72px；IMGUI 的 `GUI.Button` 文字按 MiddleCenter 绘制、**不按按钮矩形裁剪** →
+     直接压到相邻页签上。中文 "Mod载具" 反而放得下 → **问题只在英文版暴露**（与陷阱 17g6"只测一种语言"同类）。
+   - **修法**：逐格算字号——按字符宽度系数估宽（CJK≈1.0em，拉丁≈0.56em），取能塞进 `(w-6)` 的最大字号（下限 8）。
+     ⚠️ 必须**专用样式实例**（`tabStyle/tabActiveStyle`）被逐次改写 `fontSize`，**绝不能复用共享样式**
+     （别处以固定 12 号使用）；也**不能 `new GUIStyle(style)` 拷贝**（陷阱 5：拷贝构造被 IL2CPP 裁剪）。
+   - **通用律**：凡是"定宽容器 + 可变长文本"，字号/换行/截断三选一必须在绘制前定案；
+     本地化串的宽度要在**最长的那个语言**下验证，不能只测中文。
+
+77. **⚠️ 第三方内容发现不能挂在"运行时已装列表"上——主菜单时它恒为空，且一次性探测会写终态**（UniGen 2.4.1 定案，用户报"Mod载具页签是空的"）：
+   - **机制**：`ModsLoader.mods_installed`（静态字典）**只在进入战斗后才被填充**；主菜单阶段探测等 30s
+     拿到 mod=0，然后 `ready=true` 一锤定音（看门狗见 ready 直接 return，永不重试）→ 用户进战斗后
+     物品库从 949 涨到 2107（mod 内容此时才可用），但「Mod载具」页签**整个会话都空着**。
+     日志实锤：`第三方内容: 已装 mod=0` → `目录就绪: mod=0 载具候选=0`（就绪≠有内容）。
+   - **修法**：① 目录**磁盘直扫**——`<游戏根>/../..` 推出 `<Steam库>/steamapps/workshop/content/<appid>/*/index.xml`
+     （appid 优先读 `steam_appid.txt`，兜底 1324780；另解析 `libraryfolders.vdf` 的其他库）+ `<游戏>/Mods`，
+     运行时 `mods_installed` 只作兜底；② 解析（读 index.xml）与**校验**（`GetItemObject`/`GetVehiclePrefabAsync`）
+     解耦——校验延后到 `ItemCatalog.Ready`，没就绪就本轮跳过、15s 后再来；③ 空闲每 60s 重扫
+     （新订阅的 mod 不重启也会出现），候选缓存复用、已通过的用 `HashSet` 去重不重复校验。
+   - **通用律**："探测→就绪"的闸门必须区分**"扫完了"**和**"扫到了东西"**；扫完但为空不是终态，是"下一轮再扫"。
+     凡依赖游戏运行时状态的数据源，先在**最早期场景（主菜单）**验证它是否已填充。
 
 ## 3.5 UI / IMGUI 设计（原生观感）
 
@@ -364,7 +708,7 @@ NoHintsHudLink.cs，`dotnet build` + 运行 `ER2HudCompatTestApp.exe`，34 项�
 - 踩坑备忘：Harmony prefix 里 `return false` 跳过原方法即拦截（对 void 方法不需 __result）；GetFaction/GetVehicleFaction 属实例方法带 try/catch 兜底
 
 ### ER2_VeteranHVT（ER2 Veteran HVT：老兵高危目标标记 + 叛徒机制）
-- 源码：`HighValueTarget/Plugin.cs`；版本：**1.1.26**（原名 ER2_HighValueTarget，v1.1.20 更名 ER2 Veteran HVT；双语 EN/CN，`build.ps1 -Mod HighValueTarget`）
+- 源码：`HighValueTarget/Plugin.cs`；版本：**1.2.2**（原名 ER2_HighValueTarget，v1.1.20 更名 ER2 Veteran HVT；双语 EN/CN，`build.ps1 -Mod HighValueTarget`；Assets 目录 `bf1_kill.wav` → 部署到 `plugins/ER2_VeteranHVT/`）
 - 2026-08-25 迭代要点：M 地图图标走"跟随游戏标记"（unitsContainer 匹配）、头顶标记固定深色/罗马数字居中/遮挡半透明、提示全改底部 toast、Hide Anything 联动（NoHintsHudLink）。详见《ER2_mod_经验.md》2026-08-25 会话总结。
 
 ### ER2_InventoryPause（ER2 Inventory Pause：背包暂停）
@@ -380,7 +724,8 @@ NoHintsHudLink.cs，`dotnet build` + 运行 `ER2HudCompatTestApp.exe`，34 项�
   5. **头盔是独立于士兵层级的 BodyPart**：`GetComponentInParent<Creature>` 为 null → 用 `ItemHelmet.User` 拿所属士兵
   6. **IL2CPP 托管 MonoBehaviour 必须先 `ClassInjector.RegisterTypeInIl2Cpp<T>()` 再 AddComponent**（否则 MethodInfoStoreGeneric 静态构造异常，tick 全灭）
   7. 击杀归属表 25s 窗口 + CountedDeaths 防 Kill/KillSynched 双计；玩家死亡清空自身标记（重新做人）
-- 配置：General（Enabled/ApplyInMultiplayer）/ Marking（KillsToMark=5/FriendlyKillsToMark=2/PlayerHitWindow=5s）/ Focus（FocusEnabled/FocusRadius=500/FocusChance 兼容保留）/ Buffs ×7 / Traitor.TraitorFeature / Visual ×3
+- 配置：General（Enabled/ApplyInMultiplayer）/ Veteran（KillsPerLevel=5/MaxLevel=5/PlayerHitWindow=5s/FriendlyKillsToMark=2/TraitorFeature/DmgTakenPerLevel=0.85/DmgDealtPerLevel=1.18/AccPerLevel=1.30/FireRatePerLevel=1.15/RaisePerLevel=1.15/SpeedPerLevel=1.05/SuppressionImmune/NeverSurrender）/ Focus（FocusEnabled/FocusRadius=500/FocusChance 兼容保留）/ Visual（ShowMarkers/MarkerRange=500/MiniMapIcons/PlayerWarnings/PlayerIndicator/KillFeedback/LevelUpFeedback）/ Debug（debugLog，v1.2.2 接入）
+- v1.2.2：3D 标记改**固定世界尺寸** `MarkerWorldSize=1.6f`（旧版 `scale = dist*MarkerDistScale(0.03)` 追求恒定屏占比，实测成"近小远大"反直觉 → 改为纯透视，真实近大远小）；接入 `Debug/debugLog` 统一调试开关。
 
 ### ~~ER2_SuperSoldiers~~（⚠️ 2026-08-24 已删除，用户测试前即删除；以下保留经验供"精英/难度增强"类 mod 参考）
 - 源码：`SuperSoldiers/Plugin.cs`；版本 1.0.0（双语 EN/CN，`DefaultChinese` 编译期常量）——构建/部署/打包全部完成但未进游戏验证

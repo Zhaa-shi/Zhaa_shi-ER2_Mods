@@ -22,22 +22,27 @@
 
 ---
 
-## 1. SquadCommand（Battlefield Commander）v1.1.0 — RTS 上帝视角指挥
+## 1. SquadCommand（Battlefield Commander）v1.2.19 — RTS 上帝视角指挥
 
-> 源码：`Plugin.cs`（16.9 KB，Harmony 装配）、`GodViewController.cs`（**157 KB，核心**）、`SquadCmdLogic.cs`、`SceneMarkers.cs`、`VehicleFacing.cs`、`Ui.cs`。
+> 源码：`Plugin.cs`（Harmony 装配）、`GodViewController.cs`（**核心**）、`SquadCmdLogic.cs`、`SceneMarkers.cs`、`VehicleFacing.cs`、`Formation.cs`（1.2.0 阵型）、`GhostPreview.cs`（1.2.0 幽灵预览）、`InfoPanel.cs`（1.2.0 信息面板）、`Ui.cs`。
 > 上下文文档：`SquadCommand/GPT_CONTEXT.md`（交接说明 + 铁律 1-37）、`ROADMAP.md`（完成度评估）、`README.txt`/`README_CN.txt`。
 
-### 1.1 功能全貌（1.1.0）
+### 1.1 功能全貌（1.1.0 → 1.2.0 增补见末尾）
 
 - **F9 进出上帝视角**（含全军覆没时紧急退出）；WASD 移动 / 滚轮缩放 / 中键旋转 / Q·E 升降 / 空格暂停（暂停时相机仍可动）
 - **选择**：左键单击（步兵=单人；载具=整个车组）/ 双击=整队 / Shift 追加 / **长按左键框选**（临时选择，**不拆原生小队**）/ 点空白取消。**左键只负责选择**
 - **右键短按 = 直接指令**（无菜单无轮盘）：地面→移动；敌人→**持久集火标记**（只给火力优先，不自动推进）；友军/中立载具→交互环
 - **右键双击**（同点 0.6s 内）= 原生「前往并防守」（`HoldArea`），每队一条原生命令
-- **右键长按 0.35s = 命令环**：空地→站/蹲/趴/停止/掩体/集合/停火切换/散开；按在单位上不开环（松手走短按指令）
-- **载具朝向拖动（1.0.2+，地狱之门式）**：选中载具后长按右键拖出 14px 即进朝向模式，箭头跟随光标，松手**车体原地转向**释放点；转向速率按车种；拖到单位上不触发
+- ~~右键长按 0.35s = 命令环~~（**1.2.0 删除**，改快捷键）→ **右键长按+拖动 = 阵型箭头**（见 1.7）
+- **载具朝向（1.0.2+）**：~~独立朝向拖动~~（**1.2.0 被阵型箭头上位替代**），机制保留：直驱车体 yaw，由阵型下发在载具到位后触发
 - **行进路线显示（1.0.3+）**：移动/登车后从每个行进单位到目标画**灰色半透明细虚线**（登车线实时跟随目标载具），全部到位后消失
 - **Ctrl+1~9 编组**（保存选择）、**1~9 召回**（阵亡自动剪枝）
 - **右下小队列表**（编号 + □装甲 ○步兵，□ 恒在 ○ 前），单击选中/双击飞过去
+- **左下信息面板 + 背包按钮（1.2.0/1.2.5，InfoPanel.cs）**：焦点单位姓名/职类/血量条/姿态/压制；【背包】按钮弹出分类列表（武器/弹药/爆炸物/医疗/装备工具/其他，取自 InventoryManager.inventory.items）；选中载具时另有下车/修理按钮；◀ ▶ 循环切换焦点
+- **自定义光标（1.2.5→1.2.7，MouseCursor.cs）**：改为 **IMGUI 自绘**（`Cursor.visible=false` + OnGUI 画十字；`Cursor.SetCursor` 与游戏光标管理打架）
+- **阵型箭头终点（1.2.6→1.2.7）**：屏幕空间映射，**起手冻结相机基向量**（全程不读相机，断开反馈回路）
+- **火力点/火炮转向（1.2.7）**：可移动性改用 `VehicleTank`/`VehicleWithWheels`/`VehiclePlane` 判定（炮位也带 `AIVehicle`，旧判定失效）
+- **驻守状态（1.2.7）**：`Formation.coverHolds` + 穿墙标记 + HUD「驻守 → x/y」
 - **顶部 [控制该小队]**：随机接管一名选中成员并退出 RTS
 - **RTS/FPS 共存**：下达的任务跨视角持续执行（登车完成检测、载具同步重试、持久集火）
 - **UI 主题 cfg 可配色**：`colorBase`/`colorHover`/`colorText`（hex），热生效
@@ -88,10 +93,27 @@
 | 1.0.3 | 托管驱动（日志实锤 `IsRotatedToward` 恒真 / `faceDir` 通道无效）→ C# 算夹角逐帧调 `RotateVehicleTowardEnemy`，<4° 判完成 | `RotateVehicleTowardEnemy` **外部直调无效** |
 | 1.0.4+ | **直驱车体 yaw**：绕世界 Y 按转向速率逼近，保留地形俯仰 | ✅ 现行方案 |
 | 1.0.5+ | 转向速率按各车 `rotationSpeed` 解析（`rotationSpeed` → 坦克 `curRotationSpeed` → 坦克 28/轮式 60 兜底，钳制 4-240 度/秒） | 原始读数随 issue 日志输出待校准 |
+| 1.2.0 | 独立"朝向拖动"手势删除；转向由阵型下发在载具**到位后**（距槽≤7m）触发 | 上位替代 |
+
+### 1.7 阵型箭头系统（1.2.0，2026-09-13）
+
+**手势**：右键长按 0.35s + 拖动 = 阵型箭头（锚点射线失败 = 长按消耗、松手不下令；拖动 <1m = 普通移动）。**语义（用户定案）**：阵型线中心 = 长按点 A、线方向垂直于 AB、线总长 = |AB|、单位面向 B。命令环 8 项全部改为 cfg 可改键快捷键（Z/X/C 站蹲趴、V 停止、B 停火、N 就近掩体、M 集合、F 分散）。
+
+**原生掩体系统（反编译确认，做掩体相关功能必读）**：
+- `CoverManager.GetCovers(Vector3 pos, float radius, string faction, Vector3 coverDirection, bool nearestToPos=false)`（静态）→ 按位置+半径+阵营+**受敌方向**查掩体点，返回 `Il2CppSystem.Collections.IEnumerable`（元素 `TryCast<AiDestination>()`）。带方向查 0 结果时用 `Vector3.zero` 兜底再自过滤。
+- 每个 `AiDestination`/`CombatCover` 暴露：`GetCoverPosition()`（站位）、`GetCoverPose()`（**建议姿态 SoldierPose**）、`IsCoverAvailable(shootDirection, faction)` / `IsCoverOccupied(faction)` / `IsCoverDestroyed()` / `IsVehicle()`。
+- **逐兵进掩体 = `new Lua_Soldier(s).findCover(pos, 1.6f)`**（半径收小让 AI 取我们指定的点；原生走到位后自动按建议姿态/朝向驻守）——全程原生，不下 moveTo。降级路径：moveTo(掩体点) + 到位 SetPose。
+- 沙袋等原版掩体与内容型道具包（Nexus **Combat Cover**）都注册进同一八叉树 → **无需兼容层**。
+
+**阵型下发**：掩体分配（就近贪心）+ 无掩体步兵/载具沿阵型线垂直排开（步兵 1.4m/载具 7m 间距，溢出第二排后退 3m；按横向投影排序减少交叉）；步兵 `MoveUnits` 逐兵、载具 `DriveVehicleTo` 逐车 + `pendingFacings` 到位补发转向；观测 `RegisterMoveObservation(routeOnly:true)`（**阵型不加行军停火**——进掩体需要自由行为）。
+
+**幽灵预览（GhostPreview.cs）**：克隆选中士兵整个 GameObject → 停用全部 Behaviour（保留 Renderer/Animator）+ Collider.enabled=false（不参与射线，不影响右键手势）→ 材质换共享 `Sprites/Default` 半透明白（hideFlags=61 陷阱 12）→ 尝试 `Animator.Play(crouch/prone clip)`；连续失败 2 次 cloneBroken 自动降级纯标记。
+
+**信息面板（InfoPanel.cs）**：左下角，焦点单位 = 选中步兵+载具快照循环切换；血量 `life_total.Value`（**无最大血量字段**，按"观察上限"字典画条，同 UnitInfoOverlay 方案）、姿态 `Soldier.Pose`、压制 `Lua_Soldier.getSuppressionValue()`、装备 `GetAllHeldItems()` + `wearedItems` 的 item_id 去重。Soldier 的 Animator/SkinnedMeshRenderer API 需要 csproj 加 `UnityEngine.AnimationModule` 引用。
 
 ---
 
-## 2. UniversalGeneration v1.0.0 — RTS 内自定义生成（作弊向）
+## 2. UniversalGeneration v1.0.14 — RTS 内自定义生成（作弊向）
 
 > 源码：`Plugin.cs`、`GenCatalog.cs`（条目枚举/缓存/搜索）、`GenPanel.cs`（IMGUI 面板）、`Placer.cs`（落点模式）、`GenRunner.cs`（生成执行）、`HostLink.cs`（反射读宿主）、`FactionData.cs`、`Ui.cs`。
 > 设计文档：`UniversalGeneration/DESIGN.md`（v1 草案，**部分已被 v1.0.0 实装超越**）。

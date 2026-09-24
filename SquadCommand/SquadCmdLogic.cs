@@ -342,20 +342,36 @@ internal static class SquadCmdLogic
 		catch { }
 	}
 
-	/// <summary>玩家阵营的全部存活小队（用于批量解除原生任务拉取等）。</summary>
+	/// <summary>1.4.14 性能：友军小队列表缓存（0.3s）。CollectSquads 要遍历**全场景所有 Creature**
+	/// 并逐个 TryCast&lt;Soldier&gt;（大战场上数百次 interop 调用）+ 分配 Dictionary/List。
+	/// 原本在进入 RTS、接管、编组等流程里会被连续多次调用（每次几百毫秒的卡顿感来源）。
+	/// 返回的是**缓存副本的只读视图**，调用方不得修改（现有调用方都只遍历）。</summary>
+	private static readonly List<Squad> friendlyCache = new List<Squad>();
+	private static float friendlyCacheNext = -10f;
+
+	/// <summary>玩家阵营的全部存活小队（用于批量解除原生任务拉取等）。
+	/// 1.4.14：带 0.3s 缓存；调用方**只读**。</summary>
 	internal static List<Squad> GetAllFriendlySquads()
 	{
-		List<Squad> res = new List<Squad>();
+		float now = Time.unscaledTime;
+		if (now < friendlyCacheNext && friendlyCache.Count > 0) return friendlyCache;
+		friendlyCacheNext = now + 0.3f;
+		friendlyCache.Clear();
 		string myFac = GetMyFaction();
 		List<Squad> all = CollectSquads();
 		for (int i = 0; i < all.Count; i++)
 		{
 			Squad sq = all[i];
 			if (sq == null) continue;
-			if (Friendly(GetSquadFaction(sq), myFac)) res.Add(sq);
+			// 1.4.14：CollectSquads 已经把"无存活成员的小队"过滤掉了（它只收存活兵所属小队），
+			// 这里不再需要额外的存活性检查。
+			if (Friendly(GetSquadFaction(sq), myFac)) friendlyCache.Add(sq);
 		}
-		return res;
+		return friendlyCache;
 	}
+
+	/// <summary>1.4.14：需要一份**可长期持有/可修改**的友军小队快照时用（缓存列表会被下次刷新覆盖）。</summary>
+	internal static List<Squad> GetAllFriendlySquadsCopy() => new List<Squad>(GetAllFriendlySquads());
 
 	internal static void LogAlways(string msg)
 	{
@@ -450,17 +466,28 @@ internal static class SquadCmdLogic
 		return btnStyle;
 	}
 
+	/// <summary>1.4.14 性能：分辨率倍率缓存（0.5s）。
+	/// 原实现每次 HudStyle/HudStyleSmall/ButtonStyle/InfoPanel/BackpackPanel 调用都读一次 interop 属性——
+	/// 而 OnGUI 一帧有多次事件、每帧又有十几处取样式 → 每秒上千次 interop 读。
+	/// 分辨率倍率在运行中几乎不变，0.5s 粒度完全够用（窗口尺寸变化最多晚半秒生效）。</summary>
+	private static float resMultCache = -1f;
+	private static float resMultNext = -10f;
+
 	private static float ResMult()
 	{
+		float now = Time.unscaledTime;
+		if (resMultCache > 0f && now < resMultNext) return resMultCache;
+		resMultNext = now + 0.5f;
 		try
 		{
 			float m = ResourcesManager.ResolutionMult;
-			return (m > 0f && !float.IsNaN(m)) ? m : 1f;
+			if (m > 0f && !float.IsNaN(m)) { resMultCache = m; return m; }
 		}
 		catch
 		{
-			return 1f;
 		}
+		resMultCache = 1f;
+		return 1f;
 	}
 
 	private static Font GetFont()

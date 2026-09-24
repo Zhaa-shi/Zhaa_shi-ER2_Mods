@@ -63,10 +63,6 @@
       <HintPath>E:\SteamLibrary\steamapps\common\Easy Red 2\BepInEx\interop\UnityEngine.PhysicsModule.dll</HintPath>
       <Private>false</Private>
     </Reference>
-    <Reference Include="UnityEngine.SpriteModule">
-      <HintPath>E:\SteamLibrary\steamapps\common\Easy Red 2\BepInEx\interop\UnityEngine.SpriteModule.dll</HintPath>
-      <Private>false</Private>
-    </Reference>
     <Reference Include="UnityEngine.TextRenderingModule">
       <HintPath>E:\SteamLibrary\steamapps\common\Easy Red 2\BepInEx\interop\UnityEngine.TextRenderingModule.dll</HintPath>
       <Private>false</Private>

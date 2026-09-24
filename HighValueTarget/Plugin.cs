@@ -22,9 +22,11 @@ namespace ER2VeteranHVT;
 //  · 仇恨聚焦：被标记单位的仇方 AI 优先攻击它（原生目标选择，无强制态副作用）
 //  · 分级标记：不同等级不同标记（尺寸/描边），敌我颜色区分，同时显示
 //  · 击杀反馈：玩家消灭高危目标 / 自己晋升时屏幕提示
+//  · 3D 标记：世界空间广告牌 quad（近大远小 + 遮挡半透明），替代 IMGUI 屏幕投影
+//  · 载具乘员：载具武器击杀计入全体乘员（等级同步提升），标记按载具合并为一枚
 // ─────────────────────────────────────────────────────────────
 
-[BepInPlugin("er2.highvaluetarget", "ER2 Veteran HVT", "1.1.26")]
+[BepInPlugin("er2.highvaluetarget", "ER2 Veteran HVT", "1.2.2")]
 [BepInProcess("Easy Red 2.exe")]
 public class Plugin : BasePlugin
 {
@@ -110,6 +112,13 @@ public class Plugin : BasePlugin
 	internal static ConfigEntry<bool> PlayerIndicator;
 	internal static ConfigEntry<bool> KillFeedback;
 	internal static ConfigEntry<bool> LevelUpFeedback;
+
+	// ── Debug ──
+
+	/// <summary>调试日志开关（AGENTS.md §7.1 统一约定：节名 Debug / 键名 debugLog / 默认 false）。</summary>
+	internal static ConfigEntry<bool> DebugLog;
+	/// <summary>门控后的调试输出判定；LogError/LogWarning 不受此门控。</summary>
+	internal static bool DebugOn => DebugLog != null && DebugLog.Value;
 
 	// ── Runtime state ──
 
@@ -228,7 +237,10 @@ public class Plugin : BasePlugin
 			clip.SetData(samples, 0);
 			clip.hideFlags = (HideFlags)61; // 陷阱 41：运行时资源防场景卸载
 			KillClip = clip;
-			ModLog.LogInfo($"[HVT] kill sound loaded (ch={channels} rate={sampleRate} len={sampleCount / (float)sampleRate:F2}s)");
+			if (DebugOn)
+			{
+				ModLog.LogInfo($"[HVT] kill sound loaded (ch={channels} rate={sampleRate} len={sampleCount / (float)sampleRate:F2}s)");
+			}
 		}
 		catch (Exception ex)
 		{
@@ -330,8 +342,8 @@ public class Plugin : BasePlugin
 			new AcceptableValueRange<float>(0.05f, 1f)));
 
 		ShowMarkers = Config.Bind("Visual", "ShowMarkers", true, T(
-			"在被标记单位头顶显示分级标记（罗马数字 I-V，敌浅红/友天蓝，等级越高色环越宽越深）。",
-			"Draw level-based markers above marked units (Roman numerals I-V, enemy light-red / friendly sky-blue; higher levels widen and deepen the color ring)."));
+			"在被标记单位/载具上方显示 3D 分级标记（世界空间广告牌，恒定屏占比，被遮挡时自然消失；载具乘员合并为载具单一标记，等级取乘员最高）。",
+			"Draw 3D level markers above marked units/vehicles (world-space billboard, constant on-screen size, naturally hidden when occluded; vehicle crew merge into one vehicle marker showing the highest crew level)."));
 		MarkerRange = Config.Bind("Visual", "MarkerRange", 500f, new ConfigDescription(T(
 			"高危目标标记显示距离（米）：超过该距离不显示标记。",
 			"Marker display range in meters: marked units beyond this range show no marker."),
@@ -352,6 +364,10 @@ public class Plugin : BasePlugin
 			"玩家晋升老兵等级时屏幕提示。",
 			"Screen hint when the player advances a veteran level."));
 
+		DebugLog = Config.Bind("Debug", "debugLog", false, T(
+			"输出调试日志（标记对账、击杀归属、叛徒判定等）。排查问题时临时开启。",
+			"Enable debug logging (marker reconciliation, kill attribution, traitor decisions). Turn on temporarily when troubleshooting."));
+
 		new Harmony("er2.highvaluetarget").PatchAll(GetType().Assembly);
 
 		try
@@ -368,7 +384,7 @@ public class Plugin : BasePlugin
 			ModLog.LogWarning($"ER2 Veteran HVT: behaviour init failed: {ex.Message}");
 		}
 
-		ModLog.LogInfo("ER2 Veteran HVT 1.1.26 loaded.");
+		ModLog.LogInfo("ER2 Veteran HVT 1.2.2 loaded.");
 		StartKillSoundLoad();
 	}
 
@@ -411,6 +427,55 @@ public class Plugin : BasePlugin
 		{
 			return false;
 		}
+	}
+
+	/// <summary>士兵当前所在载具（不在载具/异常返回 null）。</summary>
+	internal static Vehicle VehicleOf(Soldier s)
+	{
+		try
+		{
+			return s != null ? s.GetCurrentVehicle() : null;
+		}
+		catch
+		{
+			return null;
+		}
+	}
+
+	/// <summary>载具全体乘员（遍历 seats 的 unitSet，过滤空位与已死者）。</summary>
+	internal static List<Soldier> VehicleCrew(Vehicle veh)
+	{
+		List<Soldier> crew = new List<Soldier>();
+		try
+		{
+			if (veh == null)
+			{
+				return crew;
+			}
+			var seats = veh.seats;
+			if (seats == null)
+			{
+				return crew;
+			}
+			for (int i = 0; i < seats.Length; i++)
+			{
+				try
+				{
+					Soldier u = seats[i].unitSet;
+					if (u != null && !u.IsDead)
+					{
+						crew.Add(u);
+					}
+				}
+				catch
+				{
+				}
+			}
+		}
+		catch
+		{
+		}
+		return crew;
 	}
 
 	internal static string FactionOfPlayer()
@@ -540,8 +605,7 @@ public class Plugin : BasePlugin
 	internal static string RomanNumeral(int level)
 	{
 		switch (level)
-		{
-			case 1: return "I";
+		{			case 1: return "I";
 			case 2: return "II";
 			case 3: return "III";
 			case 4: return "IV";
@@ -800,6 +864,18 @@ public class Plugin : BasePlugin
 			{
 				return;
 			}
+			// 叛徒机制关闭时不记录同方命中：友军伤害本就被友军保护拦截（不掉血），
+			// 但归属记录若照写，友军稍后死于其他原因（炮击/AI 互射）会被误归到
+			// 玩家头上 → "友军伤害"计数 + 被标叛徒（v1.2.0 实测根因，源头堵住）
+			if (TraitorFeature == null || !TraitorFeature.Value)
+			{
+				Soldier vs = victim.TryCast<Soldier>();
+				if (vs != null && !string.IsNullOrEmpty(vs.faction) &&
+					SideOf(vs.faction) == SideOf(attacker.faction))
+				{
+					return;
+				}
+			}
 			LastHits[victim.GetInstanceID()] = new HitRecord { Attacker = attacker, Time = Time.unscaledTime };
 			if (IsPlayerUnit(attacker))
 			{
@@ -852,14 +928,45 @@ public class Plugin : BasePlugin
 				return; // 环境击杀/无归属
 			}
 
-			CreditKill(attacker, victim, victimLevel);
+			// 载具乘员共享击杀：射手在载具内（坦克炮/同轴机枪/载具机枪等）时，
+			// 击杀计入该载具全体乘员（等级同步提升，标记按载具合并显示）
+			List<Soldier> crew = new List<Soldier>();
+			HashSet<int> crewIds = new HashSet<int>();
+			Vehicle attVeh = VehicleOf(attacker);
+			if (attVeh != null)
+			{
+				foreach (Soldier c in VehicleCrew(attVeh))
+				{
+					if (c != null && crewIds.Add(c.GetInstanceID()))
+					{
+						crew.Add(c);
+					}
+				}
+			}
+			if (crewIds.Add(attacker.GetInstanceID()))
+			{
+				crew.Add(attacker);
+			}
+			if (crew.Count > 1)
+			{
+				foreach (Soldier c in crew)
+				{
+					CreditKill(c, victim, victimLevel);
+				}
+			}
+			else
+			{
+				CreditKill(attacker, victim, victimLevel);
+			}
 
 			// 玩家命中窗口兜底：玩家在窗口内命中过该目标，即使最后一发被抢也算玩家击杀
-			// 仅敌方击杀生效（防误伤窗口把友军误计为叛徒进度——叛徒只认玩家亲手击杀）
+			// 仅敌方击杀生效（防误伤窗口把友军误计为叛徒进度——叛徒只认玩家亲手击杀）；
+			// 玩家是该载具乘员时已通过共享获得击杀，不再重复兜底
 			Soldier player = ControlledSoldier();
 			if (player != null && PlayerHits.TryGetValue(vid, out float phTime) &&
 				Time.unscaledTime - phTime <= PlayerHitWindow.Value &&
-				SideOf(victim.faction) != SideOf(player.faction))
+				SideOf(victim.faction) != SideOf(player.faction) &&
+				!crewIds.Contains(player.GetInstanceID()))
 			{
 				PlayerHits.Remove(vid);
 				if (attacker != player)
@@ -900,6 +1007,14 @@ public class Plugin : BasePlugin
 			// 同方击杀：不升老兵等级；仅玩家累计叛徒进度（AI 击杀同方=误伤，不计）
 			if (friendly)
 			{
+				// 叛徒机制关闭：友军击杀完全不计数/不提示/不标记。伤害放行本就被
+				// ShouldAllowFriendlyDamage 拦住，被拦截命中的残留归属记录也不该结算
+				//（v1.2.0 实测：关掉机制仍被标叛徒 = 友军被拦截的命中记录 + 友军
+				// 后续死于其他原因被误归到玩家头上）
+				if (TraitorFeature == null || !TraitorFeature.Value)
+				{
+					return;
+				}
 				if (!IsPlayerUnit(attacker))
 				{
 					return;
@@ -922,7 +1037,10 @@ public class Plugin : BasePlugin
 					{
 						tst.Traitor = true;
 						tst.HatedBySides.Add(vSide); // 自己的阵营（=受害者阵营）反过来仇恨自己
-						ModLog.LogInfo($"[HVT] Marked TRAITOR: faction={attacker.faction}");
+					if (DebugOn)
+				{
+					ModLog.LogInfo($"[HVT] Marked TRAITOR: faction={attacker.faction}");
+				}
 						if (PlayerWarnings != null && PlayerWarnings.Value)
 						{
 							HvtBehaviour.FlashPlayer(new Color(1f, 0f, 0f, 0.22f), 1.0f);
@@ -1040,7 +1158,10 @@ public class Plugin : BasePlugin
 					markedCount++;
 				}
 			}
-			ModLog.LogInfo($"[HVT] Marked Lv.{level}: faction={fac} activeMarked={markedCount}");
+			if (DebugOn)
+			{
+				ModLog.LogInfo($"[HVT] Marked Lv.{level}: faction={fac} activeMarked={markedCount}");
+			}
 			// 玩家提示（红闪+toast）已合并进 CreditKill 的晋升反馈，避免同帧弹两条
 		}
 		catch
@@ -1067,6 +1188,220 @@ public class Plugin : BasePlugin
 		catch
 		{
 		}
+	}
+}
+
+// ═════════════════════════════════════════════════════════════
+//  对外老兵接口（VeteranApi）
+// ═════════════════════════════════════════════════════════════
+
+/// <summary>
+/// 老兵系统的**公开门面**，供其他 mod 读写老兵等级/击杀（目前消费者：ER2 Conquest 征服模式）。
+///
+/// 为什么要有这一层：HVT 内部的 <c>LevelOf</c>/<c>TryGetState</c>/<c>UnitStates</c> 都是
+/// <c>internal</c>，外部只能反射，而反射内部实现不稳定（HVT 一重构就断）。
+/// 把耦合点收敛到这一个 public 类里，内部怎么改都不影响消费者。
+///
+/// 语义约定：
+///   · 等级 0 = 普通单位，1..MaxLevel = 老兵（与 HVT 内部 <see cref="Plugin.LevelOf"/> 同源）
+///   · 等级由击杀数推导（<c>EnemyKills / KillsPerLevel</c>，封顶 MaxLevel）
+///   · **SetLevel 是"灌等级"**——把外部（如征服模式）持久化的等级写进刚生成的士兵，
+///     这是跨战斗养成的关键：战斗是临时的，军队是持久的。
+///   · 所有方法都自带 try/catch，**绝不抛异常给调用方**（对方 mod 不应因 HVT 内部问题而崩）
+/// </summary>
+public static class VeteranApi
+{
+	/// <summary>API 版本，供消费者做兼容判断。</summary>
+	public const int ApiVersion = 1;
+
+	/// <summary>老兵系统的等级上限。</summary>
+	public static int MaxLevel
+	{
+		get
+		{
+			try { return Plugin.MaxLevel != null ? Plugin.MaxLevel.Value : 5; }
+			catch { return 5; }
+		}
+	}
+
+	/// <summary>升一级所需击杀数。</summary>
+	public static int KillsPerLevel
+	{
+		get
+		{
+			try { return Plugin.KillsPerLevel != null ? Mathf.Max(1, Plugin.KillsPerLevel.Value) : 5; }
+			catch { return 5; }
+		}
+	}
+
+	/// <summary>老兵机制当前是否生效（受 HVT 总开关影响）。</summary>
+	public static bool IsActive
+	{
+		get
+		{
+			try { return Plugin.IsActive(); }
+			catch { return false; }
+		}
+	}
+
+	// ---------------- 读 ----------------
+
+	/// <summary>士兵当前老兵等级（0..MaxLevel）。</summary>
+	public static int GetLevel(Soldier s)
+	{
+		try { return s == null ? 0 : Plugin.LevelOf(s); }
+		catch { return 0; }
+	}
+
+	/// <summary>士兵累计击杀数。</summary>
+	public static int GetKills(Soldier s)
+	{
+		try
+		{
+			if (s == null) return 0;
+			Plugin.UnitState st;
+			return Plugin.TryGetState(s, out st) ? st.EnemyKills : 0;
+		}
+		catch { return 0; }
+	}
+
+	/// <summary>士兵是否已被标记为高危目标（等级 ≥ 1）。</summary>
+	public static bool IsMarked(Soldier s)
+	{
+		try { return s != null && Plugin.IsMarked(s); }
+		catch { return false; }
+	}
+
+	// ---------------- 写 ----------------
+
+	/// <summary>直接设定击杀数（等级随之重新推导）。</summary>
+	public static bool SetKills(Soldier s, int kills)
+	{
+		try
+		{
+			if (s == null) return false;
+			Plugin.UnitState st;
+			if (!Plugin.TryGetState(s, out st)) return false;
+			st.EnemyKills = Mathf.Max(0, kills);
+			return true;
+		}
+		catch { return false; }
+	}
+
+	/// <summary>
+	/// 灌入老兵等级（跨战斗养成的关键入口）：等级 → 反推击杀数写入。
+	/// 注意这会覆盖该士兵原有的击杀计数——只应在**单位刚生成、尚未参战**时调用。
+	/// </summary>
+	public static bool SetLevel(Soldier s, int level)
+	{
+		try
+		{
+			if (s == null) return false;
+			int max = MaxLevel;
+			int lv = Mathf.Clamp(level, 0, max);
+			return SetKills(s, lv * KillsPerLevel);
+		}
+		catch { return false; }
+	}
+
+	/// <summary>把一个班里的所有士兵都灌成指定老兵等级。返回成功处理的士兵数。</summary>
+	public static int ApplySquadLevel(Squad squad, int level)
+	{
+		int n = 0;
+		try
+		{
+			if (squad == null) return 0;
+			Il2CppSystem.Collections.Generic.List<Soldier> members = squad.units;
+			if (members == null) return 0;
+			for (int i = 0; i < members.Count; i++)
+			{
+				Soldier s = members[i];
+				if (s == null) continue;
+				// 先确保状态条目存在（未参战的新兵可能还没有 UnitStates 条目）
+				Plugin.GetState(s);
+				if (SetLevel(s, level)) n++;
+			}
+		}
+		catch
+		{
+		}
+		return n;
+	}
+
+	// ---------------- 班/队级汇总（战斗结束后回读） ----------------
+
+	/// <summary>一个班的击杀合计。</summary>
+	public static int GetSquadKills(Squad squad)
+	{
+		int sum = 0;
+		try
+		{
+			if (squad == null) return 0;
+			Il2CppSystem.Collections.Generic.List<Soldier> members = squad.units;
+			if (members == null) return 0;
+			for (int i = 0; i < members.Count; i++) sum += GetKills(members[i]);
+		}
+		catch
+		{
+		}
+		return sum;
+	}
+
+	/// <summary>一个班的最高老兵等级（用于把"班里打得最好的那个"带回战略层）。</summary>
+	public static int GetSquadMaxLevel(Squad squad)
+	{
+		int best = 0;
+		try
+		{
+			if (squad == null) return 0;
+			Il2CppSystem.Collections.Generic.List<Soldier> members = squad.units;
+			if (members == null) return 0;
+			for (int i = 0; i < members.Count; i++)
+			{
+				int lv = GetLevel(members[i]);
+				if (lv > best) best = lv;
+			}
+		}
+		catch
+		{
+		}
+		return best;
+	}
+
+	/// <summary>一个班的存活人数（用于战损回写）。</summary>
+	public static int GetSquadAliveCount(Squad squad)
+	{
+		int alive = 0;
+		try
+		{
+			if (squad == null) return 0;
+			Il2CppSystem.Collections.Generic.List<Soldier> members = squad.units;
+			if (members == null) return 0;
+			for (int i = 0; i < members.Count; i++)
+			{
+				Soldier s = members[i];
+				if (s == null) continue;
+				bool dead = false;
+				try { dead = s.IsDead; } catch { }
+				if (!dead) alive++;
+			}
+		}
+		catch
+		{
+		}
+		return alive;
+	}
+
+	/// <summary>一个班的编制人数（存活 + 阵亡，战损比例的分母）。</summary>
+	public static int GetSquadSize(Squad squad)
+	{
+		try
+		{
+			if (squad == null) return 0;
+			Il2CppSystem.Collections.Generic.List<Soldier> members = squad.units;
+			return members == null ? 0 : members.Count;
+		}
+		catch { return 0; }
 	}
 }
 
@@ -1189,6 +1524,10 @@ public class HvtBehaviour : MonoBehaviour
 				{
 					Plugin.ResetAll();
 				}
+				// 3D 标记与载具高度缓存随战斗重置
+				ClearWorldMarkers();
+				_vehicleTopOffset.Clear();
+				_displayEntries.Clear();
 			}
 			return;
 		}
@@ -1197,8 +1536,34 @@ public class HvtBehaviour : MonoBehaviour
 		Prune();
 		RebuildMarkedAlive();
 		RestoreCustomModeAi();
+		PardonTraitorsWhenDisabled();
+		RefreshDisplayEntries();
+		ReconcileMarkers();
 		MaintainMarked();
 		PursueTraitors();
+	}
+
+	/// <summary>叛徒机制关闭时赦免现有叛徒（关闭开关 = 立即生效，不再被友军集火/追猎；
+	/// v1.2.0 追加：同局内被标叛徒后关闭开关的残留状态）。</summary>
+	private void PardonTraitorsWhenDisabled()
+	{
+		try
+		{
+			if (Plugin.TraitorFeature != null && Plugin.TraitorFeature.Value)
+			{
+				return;
+			}
+			foreach (var st in Plugin.UnitStates.Values)
+			{
+				if (st != null && st.Traitor)
+				{
+					st.Traitor = false;
+				}
+			}
+		}
+		catch
+		{
+		}
 	}
 
 	/// <summary>叛徒死后把切到"自定义指令模式"的友军恢复常态（enableAiBehaviour(true)）。
@@ -1246,7 +1611,10 @@ public class HvtBehaviour : MonoBehaviour
 			}
 			if (Plugin.HintThrottle(3f))
 			{
+			if (Plugin.DebugOn)
+			{
 				Plugin.ModLog.LogInfo($"[HVT] pursuit: restored {_customModeAi.Count} AI to normal behavior");
+			}
 			}
 			_customModeAi.Clear();
 		}
@@ -1363,7 +1731,10 @@ public class HvtBehaviour : MonoBehaviour
 			}
 			if (issued > 0 && Plugin.HintThrottle(3f))
 			{
+			if (Plugin.DebugOn)
+			{
 				Plugin.ModLog.LogInfo($"[HVT] pursuit: chasing traitor, moveTo issued to {issued} allies");
+			}
 			}
 		}
 		catch
@@ -1629,7 +2000,10 @@ public class HvtBehaviour : MonoBehaviour
 	private static readonly Dictionary<int, Texture2D> LevelTexEnemy = new Dictionary<int, Texture2D>();
 	private static readonly Dictionary<int, Texture2D> LevelTexFriendly = new Dictionary<int, Texture2D>();
 
-	/// <summary>生成等级标记贴图：实底菱形（浅红/天蓝底，按等级加深）+ 中心白色罗马数字（烘焙进贴图）。</summary>
+	/// <summary>标记贴图边长（3D 标记近距离会放大到屏幕 200px+，128px + 3x3 超采样保证清晰）。</summary>
+	private const int MarkerTexSize = 128;
+
+	/// <summary>生成等级标记贴图：实底菱形（深红/深蓝底，3x3 超采样抗锯齿边缘）+ 中心白色罗马数字（烘焙进贴图）。</summary>
 	private static Texture2D GetLevelTexture(int level, int maxLevel, bool enemy)
 	{
 		Dictionary<int, Texture2D> cache = enemy ? LevelTexEnemy : LevelTexFriendly;
@@ -1639,18 +2013,30 @@ public class HvtBehaviour : MonoBehaviour
 		}
 		try
 		{
-			const int size = 32;
+			int size = MarkerTexSize;
 			tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
 			Color bg = Plugin.FixedMarkerColor(enemy); // 固定最深色（用户确认），等级靠罗马数字区分
 			for (int y = 0; y < size; y++)
 			{
 				for (int x = 0; x < size; x++)
 				{
-					float nx = (x + 0.5f) / size * 2f - 1f;
-					float ny = (y + 0.5f) / size * 2f - 1f;
-					float d = Mathf.Abs(nx) + Mathf.Abs(ny);
-					bool inside = d <= 0.88f;
-					tex.SetPixel(x, y, inside ? bg : new Color(0f, 0f, 0f, 0f));
+					// 3x3 超采样：边缘像素按覆盖率写 alpha（抗锯齿）
+					int inside = 0;
+					for (int sy = 0; sy < 3; sy++)
+					{
+						for (int sx = 0; sx < 3; sx++)
+						{
+							float nx = (x + (sx + 0.5f) / 3f) / size * 2f - 1f;
+							float ny = (y + (sy + 0.5f) / 3f) / size * 2f - 1f;
+							if (Mathf.Abs(nx) + Mathf.Abs(ny) <= 0.88f)
+							{
+								inside++;
+							}
+						}
+					}
+					tex.SetPixel(x, y, inside > 0
+						? new Color(bg.r, bg.g, bg.b, bg.a * inside / 9f)
+						: new Color(0f, 0f, 0f, 0f));
 				}
 			}
 			BakeNumeral(tex, level); // 白色罗马数字
@@ -1680,7 +2066,8 @@ public class HvtBehaviour : MonoBehaviour
 
 	/// <summary>把罗马数字（I-V）以粗线段烘焙进贴图中心（白色）。
 	/// 注意：Texture2D 的 y=0 在底部（SetPixel 原点左下），V/IV 的顶点必须在 y 小的一侧，
-	/// 否则画出来是倒的（实测根因）。</summary>
+	/// 否则画出来是倒的（实测根因）。线段坐标按 32px 基准定义，运行时缩放到实际贴图尺寸；
+	/// 边缘按覆盖率与底层（菱形底色）混合（抗锯齿）。</summary>
 	private static void BakeNumeral(Texture2D tex, int level)
 	{
 		float[][] segs;
@@ -1704,31 +2091,524 @@ public class HvtBehaviour : MonoBehaviour
 				segs = new float[][] { new float[] { 10.5f, 23f, 16f, 9f }, new float[] { 21.5f, 23f, 16f, 9f } };
 				break;
 		}
-		const int size = 32;
+		int size = MarkerTexSize;
+		float k = size / 32f;
+		float w = 1.1f * k;
 		for (int y = 0; y < size; y++)
 		{
 			for (int x = 0; x < size; x++)
 			{
-				float px = x + 0.5f;
-				float py = y + 0.5f;
-				bool hit = false;
-				foreach (float[] s in segs)
+				int hits = 0;
+				for (int sy = 0; sy < 3; sy++)
 				{
-					if (NearLine(px, py, s[0], s[1], s[2], s[3], 1.1f))
+					for (int sx = 0; sx < 3; sx++)
 					{
-						hit = true;
-						break;
+						float px = x + (sx + 0.5f) / 3f;
+						float py = y + (sy + 0.5f) / 3f;
+						foreach (float[] s in segs)
+						{
+							if (NearLine(px, py, s[0] * k, s[1] * k, s[2] * k, s[3] * k, w))
+							{
+								hits++;
+								break;
+							}
+						}
 					}
 				}
-				if (hit)
+				if (hits > 0)
 				{
-					tex.SetPixel(x, y, Color.white);
+					// 与底层颜色按覆盖率混合（底层是菱形底色/透明），不是直接覆盖
+					Color under = tex.GetPixel(x, y);
+					tex.SetPixel(x, y, Color.Lerp(under, Color.white, hits / 9f));
 				}
 			}
 		}
 	}
 
-	/// <summary>头顶分级标记（IMGUI 世界投影）：不随原生标记隐藏（用户实测 Marker3DGUI 会随原生隐藏一起消失）、
+	// ── 3D 世界空间标记（billboard quad，固定世界尺寸；替代 IMGUI 屏幕投影） ──
+
+	/// <summary>标记的世界空间边长（米）：固定尺寸，不做距离补偿 → 真实近大远小。
+	/// v1.2.2 改：旧版 scale = dist * MarkerDistScale 是"恒定屏占比"公式，用户实测观感
+	/// 反而成"近小远大"（近距离被投影放大不足、远距离世界尺寸膨胀过度），且不符合
+	/// 真实世界透视直觉。现改为固定世界尺寸，屏上大小 = 纯透视投影结果。
+	/// 0.8m 为用户实测定稿值（初版 1.6m 偏大）。</summary>
+	private const float MarkerWorldSize = 0.8f;
+
+	/// <summary>单个 3D 标记对象（锚点 = 步兵或载具）。</summary>
+	private sealed class WorldMarker
+	{
+		public GameObject Go;
+		public Material Mat;
+		public Soldier Soldier;    // 步兵个人标记（Vehicle == null 时有效）
+		public Vehicle Vehicle;    // 载具标记（乘员合并）
+		public int Level;
+		public bool Enemy;
+		public int TexKey;         // 已贴纹理的 (level, enemy) 键
+		public float AnchorHeight; // 锚点高度：步兵 3.0m，载具 = 顶面偏移
+	}
+
+	/// <summary>显示快照条目：个人标记或载具合并标记（RefreshDisplayEntries 每 tick 重建）。</summary>
+	private sealed class DisplayEntry
+	{
+		public int AnchorId;       // 锚点 InstanceID（士兵或载具）
+		public Soldier Soldier;    // 个人条目
+		public Vehicle Vehicle;    // 载具条目（乘员合并，等级取最高）
+		public int Level;
+		public bool Enemy;
+	}
+
+	private static Mesh MarkerQuad;
+	private static Material MarkerMatTemplate;
+	/// <summary>找不到可用 shader 时置位 → OnGUI 回退 IMGUI 屏幕投影绘制。</summary>
+	public static bool Marker3dUnavailable;
+
+	private readonly Dictionary<int, WorldMarker> _worldMarkers = new Dictionary<int, WorldMarker>();
+	private readonly Dictionary<int, float> _vehicleTopOffset = new Dictionary<int, float>();
+	private readonly List<DisplayEntry> _displayEntries = new List<DisplayEntry>();
+	private readonly List<WorldMarker> _markerSweep = new List<WorldMarker>();
+	private readonly List<int> _markerDead = new List<int>();
+
+	private static Mesh GetMarkerQuad()
+	{
+		if (MarkerQuad != null)
+		{
+			return MarkerQuad;
+		}
+		try
+		{
+			Mesh mesh = new Mesh();
+			mesh.vertices = new Vector3[]
+			{
+				new Vector3(-0.5f, -0.5f, 0f), new Vector3(0.5f, -0.5f, 0f),
+				new Vector3(-0.5f, 0.5f, 0f), new Vector3(0.5f, 0.5f, 0f)
+			};
+			mesh.uv = new Vector2[]
+			{
+				new Vector2(0f, 0f), new Vector2(1f, 0f), new Vector2(0f, 1f), new Vector2(1f, 1f)
+			};
+			mesh.triangles = new int[] { 0, 2, 1, 2, 3, 1 };
+			// 显式白色顶点色：Sprites/Default 的片元色 = 纹理 × 顶点色，缺省属性不可依赖
+			mesh.colors = new Color[]
+			{
+				Color.white, Color.white, Color.white, Color.white
+			};
+			mesh.hideFlags = (HideFlags)61; // 运行时资源防场景卸载
+			MarkerQuad = mesh;
+		}
+		catch
+		{
+		}
+		return MarkerQuad;
+	}
+
+	/// <summary>标记材质模板：Sprites/Default（片元 = 纹理 × 顶点色，rgb*=a 预乘后 One/OneMinusSrcAlpha
+	/// 混合，纹理 RGB 正确显示；ZTest LEqual → 遮挡由深度测试自然处理，被完全挡住时消失）。
+	/// 注意不能用 GUI/Text Shader——那是字体着色器（RGB 取材质色、纹理只出 alpha），
+	/// v1.2.0 首版实测深红/蓝底色全部变白。缺失按序回退；全缺则置 Marker3dUnavailable 走 IMGUI 回退。</summary>
+	private static Material GetMarkerMaterialTemplate()
+	{
+		if (MarkerMatTemplate != null)
+		{
+			return MarkerMatTemplate;
+		}
+		string[] candidates = { "Sprites/Default", "Unlit/Transparent" };
+		foreach (string n in candidates)
+		{
+			try
+			{
+				Shader sh = Shader.Find(n);
+				if (sh != null)
+				{
+					MarkerMatTemplate = new Material(sh);
+					MarkerMatTemplate.hideFlags = (HideFlags)61;
+					if (Plugin.DebugOn)
+					{
+						Plugin.ModLog.LogInfo($"[HVT] 3D marker material shader: {n}");
+					}
+					break;
+				}
+			}
+			catch
+			{
+			}
+		}
+		return MarkerMatTemplate;
+	}
+
+	/// <summary>载具标记锚点高度：载具全部碰撞体最高点 + 0.9m 余量（下限 2.6m），按载具缓存。</summary>
+	private float VehicleTopOffset(Vehicle veh)
+	{
+		int id = veh.GetInstanceID();
+		if (_vehicleTopOffset.TryGetValue(id, out float off))
+		{
+			return off;
+		}
+		off = 3.4f;
+		try
+		{
+			float top = float.MinValue;
+			var cols = veh.GetComponentsInChildren<Collider>();
+			if (cols != null)
+			{
+				for (int i = 0; i < cols.Length; i++)
+				{
+					try
+					{
+						Collider col = cols[i];
+						// 排除异常巨大的触发/交互碰撞体（防锚点被拉上天）
+						if (col != null && col.enabled && col.bounds.extents.magnitude < 30f)
+						{
+							top = Mathf.Max(top, col.bounds.max.y);
+						}
+					}
+					catch
+					{
+					}
+				}
+			}
+			if (top > float.MinValue && veh.transform != null)
+			{
+				off = Mathf.Max(2.6f, top - veh.transform.position.y + 0.9f);
+			}
+		}
+		catch
+		{
+		}
+		_vehicleTopOffset[id] = off;
+		return off;
+	}
+
+	/// <summary>显示快照：被标记单位 → 个人条目 / 载具合并条目（一载具一条，等级取乘员最高）。
+	/// 供 3D 标记对账与 M 大地图图标共用（大地图载具同步去重）。</summary>
+	private void RefreshDisplayEntries()
+	{
+		try
+		{
+			_displayEntries.Clear();
+			if (Plugin.UnitStates.Count == 0)
+			{
+				return;
+			}
+			string playerSide = Plugin.PlayerSide();
+			Dictionary<int, DisplayEntry> vehEntries = null;
+			foreach (var kv in Plugin.UnitStates)
+			{
+				try
+				{
+					Soldier s = FindAliveSoldierById(kv.Key);
+					if (s == null || s.transform == null || s.IsDead)
+					{
+						continue;
+					}
+					if (Plugin.IsTraitor(s))
+					{
+						continue; // 叛徒不显示标记
+					}
+					int lv = Plugin.LevelOf(s);
+					if (lv < 1)
+					{
+						continue;
+					}
+					if (Plugin.IsPlayerUnit(s))
+					{
+						continue; // 玩家用顶部指示条
+					}
+					bool enemy = string.IsNullOrEmpty(playerSide) || Plugin.SideOf(s.faction) != playerSide;
+					Vehicle veh = Plugin.VehicleOf(s);
+					if (veh != null && veh.transform != null)
+					{
+						// 载具乘员合并：一载具一条目，等级取乘员最高
+						int vid = veh.GetInstanceID();
+						if (vehEntries == null)
+						{
+							vehEntries = new Dictionary<int, DisplayEntry>();
+						}
+						if (vehEntries.TryGetValue(vid, out DisplayEntry ve) && ve != null)
+						{
+							if (lv > ve.Level)
+							{
+								ve.Level = lv;
+							}
+							continue;
+						}
+						ve = new DisplayEntry { AnchorId = vid, Vehicle = veh, Level = lv, Enemy = enemy };
+						vehEntries[vid] = ve;
+						_displayEntries.Add(ve);
+						continue;
+					}
+					_displayEntries.Add(new DisplayEntry { AnchorId = kv.Key, Soldier = s, Level = lv, Enemy = enemy });
+				}
+				catch
+				{
+				}
+			}
+		}
+		catch
+		{
+		}
+	}
+
+	/// <summary>3D 标记池对账（每 tick）：按显示快照补建/回收 quad 对象并更新纹理/锚高。</summary>
+	private void ReconcileMarkers()
+	{
+		try
+		{
+			bool want = Plugin.ShowMarkers != null && Plugin.ShowMarkers.Value && _displayEntries.Count > 0 &&
+				GetMarkerQuad() != null && GetMarkerMaterialTemplate() != null;
+			if (!want)
+			{
+				if (!Marker3dUnavailable && Plugin.ShowMarkers != null && Plugin.ShowMarkers.Value &&
+					_displayEntries.Count > 0)
+				{
+					Marker3dUnavailable = true;
+					Plugin.ModLog.LogWarning("[HVT] no usable shader for 3D markers; falling back to IMGUI overlay");
+				}
+				ClearWorldMarkers();
+				return;
+			}
+			// 补建/更新
+			_markerSweep.Clear();
+			foreach (DisplayEntry e in _displayEntries)
+			{
+				if (e == null)
+				{
+					continue;
+				}
+				if (!_worldMarkers.TryGetValue(e.AnchorId, out WorldMarker m) || m == null || m.Go == null)
+				{
+					m = CreateWorldMarker();
+					if (m == null)
+					{
+						continue;
+					}
+					_worldMarkers[e.AnchorId] = m;
+				}
+				m.Soldier = e.Soldier;
+				m.Vehicle = e.Vehicle;
+				m.Level = e.Level;
+				m.Enemy = e.Enemy;
+				m.AnchorHeight = e.Vehicle != null ? VehicleTopOffset(e.Vehicle) : 3.0f;
+				int texKey = m.Level * 2 + (m.Enemy ? 1 : 0);
+				if (m.Mat != null && m.TexKey != texKey)
+				{
+					m.Mat.mainTexture = GetLevelTexture(m.Level, Plugin.MaxLevel.Value, m.Enemy);
+					m.TexKey = texKey;
+				}
+				_markerSweep.Add(m);
+			}
+			// 回收不再需要的
+			_markerDead.Clear();
+			foreach (var kv in _worldMarkers)
+			{
+				if (!_markerSweep.Contains(kv.Value))
+				{
+					_markerDead.Add(kv.Key);
+				}
+			}
+			foreach (int id in _markerDead)
+			{
+				if (_worldMarkers.TryGetValue(id, out WorldMarker dead))
+				{
+					DestroyWorldMarker(dead);
+					_worldMarkers.Remove(id);
+				}
+			}
+		}
+		catch
+		{
+		}
+	}
+
+	private WorldMarker CreateWorldMarker()
+	{
+		try
+		{
+			GameObject go = new GameObject("HVT_Marker");
+			go.transform.SetParent(transform, false); // 挂 behaviour 根（DontDestroyOnLoad，跨场景存活）
+			MeshFilter mf = go.AddComponent<MeshFilter>();
+			mf.sharedMesh = GetMarkerQuad();
+			MeshRenderer rend = go.AddComponent<MeshRenderer>();
+			Material mat = new Material(MarkerMatTemplate);
+			mat.hideFlags = (HideFlags)61;
+			rend.sharedMaterial = mat;
+			go.SetActive(false);
+			return new WorldMarker { Go = go, Mat = mat, TexKey = -1 };
+		}
+		catch
+		{
+			return null;
+		}
+	}
+
+	private void DestroyWorldMarker(WorldMarker m)
+	{
+		try
+		{
+			if (m != null && m.Mat != null)
+			{
+				UnityEngine.Object.Destroy(m.Mat); // 实例材质单独销毁
+			}
+		}
+		catch
+		{
+		}
+		try
+		{
+			if (m != null && m.Go != null)
+			{
+				UnityEngine.Object.Destroy(m.Go);
+			}
+		}
+		catch
+		{
+		}
+	}
+
+	private void ClearWorldMarkers()
+	{
+		try
+		{
+			if (_worldMarkers.Count == 0)
+			{
+				return;
+			}
+			foreach (WorldMarker m in _worldMarkers.Values)
+			{
+				DestroyWorldMarker(m);
+			}
+			_worldMarkers.Clear();
+		}
+		catch
+		{
+		}
+	}
+
+	/// <summary>3D 标记每帧更新：跟随锚点、billboard 朝向相机、固定世界尺寸（真实近大远小）。
+	/// 遮挡由深度测试自然处理（ZTest LEqual，被完全挡住时消失）。
+	/// 暂停/隐藏万物/M 大地图/MarkerRange 关闭时全部隐藏（与旧 IMGUI 版门控一致）。</summary>
+	private void LateUpdate()
+	{
+		try
+		{
+			if (_worldMarkers.Count == 0)
+			{
+				return;
+			}
+			bool show = Plugin.IsActive() && Plugin.ShowMarkers != null && Plugin.ShowMarkers.Value && !Marker3dUnavailable;
+			Camera cam = null;
+			if (show)
+			{
+				cam = Camera.main;
+				show = cam != null;
+			}
+			if (show)
+			{
+				try
+				{
+					if (MiniMapGUI.MiniMapOpened)
+					{
+						show = false; // M 大地图打开时隐藏（旧版同款规则）
+					}
+				}
+				catch
+				{
+				}
+			}
+			if (show)
+			{
+				bool paused = false;
+				try
+				{
+					paused = Pause.isPaused || Time.timeScale <= 0.001f;
+				}
+				catch
+				{
+					paused = Time.timeScale <= 0.001f;
+				}
+				if (paused)
+				{
+					show = false;
+				}
+			}
+			if (show)
+			{
+				try
+				{
+					if (ER2Shared.NoHintsHudLink.IsHidden("er2.highvaluetarget", "ER2 Veteran HVT"))
+					{
+						show = false; // 隐藏万物联动
+					}
+				}
+				catch
+				{
+				}
+			}
+			float range = Plugin.MarkerRange != null ? Plugin.MarkerRange.Value : 500f;
+			float range2 = range * range;
+			Vector3 camPos = show ? cam.transform.position : Vector3.zero;
+			Quaternion camRot = show ? cam.transform.rotation : Quaternion.identity;
+			foreach (WorldMarker m in _worldMarkers.Values)
+			{
+				try
+				{
+					if (!show || m == null || m.Go == null)
+					{
+						if (m != null && m.Go != null && m.Go.activeSelf)
+						{
+							m.Go.SetActive(false);
+						}
+						continue;
+					}
+					Vector3 anchor;
+					if (m.Vehicle != null && m.Vehicle.transform != null)
+					{
+						anchor = m.Vehicle.transform.position + Vector3.up * m.AnchorHeight;
+					}
+					else if (m.Soldier != null && m.Soldier.transform != null && !m.Soldier.IsDead)
+					{
+						anchor = m.Soldier.transform.position + Vector3.up * 3.0f;
+					}
+					else
+					{
+						if (m.Go.activeSelf)
+						{
+							m.Go.SetActive(false);
+						}
+						continue;
+					}
+					Vector3 toAnchor = anchor - camPos;
+					float dist2 = toAnchor.sqrMagnitude;
+					if (dist2 > range2)
+					{
+						if (m.Go.activeSelf)
+						{
+							m.Go.SetActive(false);
+						}
+						continue;
+					}
+					float dist = Mathf.Sqrt(dist2);
+					// 固定世界尺寸：真实近大远小（屏上大小 = 纯透视投影，不做距离补偿）
+					float scale = MarkerWorldSize;
+					m.Go.transform.position = anchor;
+					m.Go.transform.rotation = camRot; // billboard 正对相机
+					m.Go.transform.localScale = new Vector3(scale, scale, 1f);
+					if (!m.Go.activeSelf)
+					{
+						m.Go.SetActive(true);
+					}
+				}
+				catch
+				{
+				}
+			}
+		}
+		catch
+		{
+		}
+	}
+
+	/// <summary>IMGUI 屏幕投影标记（回退路径：3D shader 缺失时才启用）。
+	/// 原主路径——不随原生标记隐藏（用户实测 Marker3DGUI 会随原生隐藏一起消失）、
 	/// 无近距离消失问题；标记在 +3.0m（原生姓名标签之上）；MarkerRange 限制显示距离。</summary>
 	private void DrawMarkersScreen()
 	{
@@ -1840,7 +2720,7 @@ public class HvtBehaviour : MonoBehaviour
 	{
 		try
 		{
-			if (Plugin.MiniMapIcons == null || !Plugin.MiniMapIcons.Value || Plugin.UnitStates.Count == 0)
+			if (Plugin.MiniMapIcons == null || !Plugin.MiniMapIcons.Value || _displayEntries.Count == 0)
 			{
 				return;
 			}
@@ -1890,30 +2770,25 @@ public class HvtBehaviour : MonoBehaviour
 			{
 				return; // 拿不到游戏标记就不画（比乱标好）
 			}
-			string playerSide = Plugin.PlayerSide();
-			foreach (var kv in Plugin.UnitStates)
+			// 遍历显示快照（RefreshDisplayEntries 已把载具乘员合并为单条目 → 大地图一载具一图标）
+			foreach (DisplayEntry e in _displayEntries)
 			{
 				try
 				{
-					Soldier s = FindAliveSoldierById(kv.Key);
-					if (s == null || s.transform == null || s.IsDead)
+					Vector3 worldPos;
+					if (e.Vehicle != null && e.Vehicle.transform != null)
+					{
+						worldPos = e.Vehicle.transform.position;
+					}
+					else if (e.Soldier != null && e.Soldier.transform != null)
+					{
+						worldPos = e.Soldier.transform.position;
+					}
+					else
 					{
 						continue;
 					}
-					if (Plugin.IsTraitor(s))
-					{
-						continue;
-					}
-					int lv = Plugin.LevelOf(s);
-					if (lv < 1)
-					{
-						continue;
-					}
-					if (Plugin.IsPlayerUnit(s))
-					{
-						continue;
-					}
-					Vector2 want = mm.GetPositionInContainer(s.transform.position, false);
+					Vector2 want = mm.GetPositionInContainer(worldPos, false);
 					// 2) 匹配 localPosition 最近的游戏 marker
 					MmMarker best = null;
 					float bestD = float.MaxValue;
@@ -1939,8 +2814,7 @@ public class HvtBehaviour : MonoBehaviour
 					{
 						continue;
 					}
-					bool enemy = string.IsNullOrEmpty(playerSide) || Plugin.SideOf(s.faction) != playerSide;
-					Texture2D tex = GetLevelTexture(lv, Plugin.MaxLevel.Value, enemy);
+					Texture2D tex = GetLevelTexture(e.Level, Plugin.MaxLevel.Value, e.Enemy);
 					if (tex == null)
 					{
 						continue;
@@ -2017,10 +2891,14 @@ public class HvtBehaviour : MonoBehaviour
 				}
 			}
 
-			// 头顶分级标记 + 小地图图标（不随原生标记隐藏；暂停时隐藏）
+			// 头顶分级标记：3D 世界空间（LateUpdate 驱动）；shader 缺失时回退 IMGUI 投影。
+			// M 大地图图标仍走 IMGUI。暂停时都隐藏。
 			if (!paused)
 			{
-				DrawMarkersScreen();
+				if (Marker3dUnavailable)
+				{
+					DrawMarkersScreen();
+				}
 				DrawMinimapIcons();
 			}
 

@@ -10,6 +10,10 @@ research_out/ai_*/
 research_out/deployed_dump/
 research_out/thirdparty/
 research_out/killfeed_ref/
+research_out/goh_conquest/
+research_out/goh_unpack/
+research_out/conquest_recon/
+research_out/conquest_salvage/
 
 # 临时文件
 *.tmp

@@ -1,6 +1,6 @@
-﻿param(
+param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet("LimbTweaks", "WeatherControl", "AIFood", "NoInteractionHints", "ModManager", "ThrowableWheel", "ZoomAnywhere", "CombatTweaks", "UnitCollision", "UnitInfoOverlay", "HighValueTarget", "InventoryPause", "SquadCommand", "UniversalGeneration")]
+    [ValidateSet("LimbTweaks", "WeatherControl", "AIFood", "NoInteractionHints", "ModManager", "ThrowableWheel", "ZoomAnywhere", "CombatTweaks", "UnitCollision", "UnitInfoOverlay", "HighValueTarget", "InventoryPause", "SquadCommand", "UniversalGeneration", "MorePhysics", "Conquest", "ConquestRecon")]
     [string]$Mod,
     [switch]$SkipDeploy,
     [switch]$SkipPackage,
@@ -29,6 +29,10 @@ switch ($Mod) {
     "InventoryPause" { $proj = "InventoryPause.csproj"; $dll = "ER2_InventoryPause.dll"; $cfg = "er2.inventorypause.cfg"; $pkg = "ER2_InventoryPause"; $assetsDir = "" }
     "SquadCommand" { $proj = "SquadCommand.csproj"; $dll = "ER2_BattlefieldCommander.dll"; $cfg = "er2.squadcommand.cfg"; $pkg = "ER2_BattlefieldCommander"; $assetsDir = "" }
     "UniversalGeneration" { $proj = "UniversalGeneration.csproj"; $dll = "ER2_UniversalGeneration.dll"; $cfg = "er2.universalgeneration.cfg"; $pkg = "ER2_UniversalGeneration"; $assetsDir = "" }
+    "MorePhysics" { $proj = "MorePhysics.csproj"; $dll = "ER2_MorePhysics.dll"; $cfg = "er2.morephysics.cfg"; $pkg = "ER2_MorePhysics"; $assetsDir = "" }
+    "Conquest" { $proj = "Conquest.csproj"; $dll = "ER2_Conquest.dll"; $cfg = "er2.conquest.cfg"; $pkg = "ER2_Conquest"; $assetsDir = "" }
+    # 内部侦察工具（M0），不发布
+    "ConquestRecon" { $proj = "ConquestRecon.csproj"; $dll = "ER2_ConquestRecon.dll"; $cfg = "er2.conquest.recon.cfg"; $pkg = "ER2_ConquestRecon"; $assetsDir = "" }
 }
 
 Write-Host "[1/4] Building $Mod ..."

@@ -1,4 +1,4 @@
-ER2 More Physics - Unit Collision v1.0.6
+ER2 More Physics - Unit Collision v1.0.8
 =========================================
 
 【中文】
@@ -10,6 +10,25 @@ ER2 More Physics 的轻量附属模组：只保留"单位/尸体碰撞"功能，
   玩家/AI 不再互相穿过（零新增体积）。
 - 尸体不挡活人：士兵/玩家撞到尸体时把它推开，不会从尸体上直接走过。
 - 独立开关：士兵互碰（UnitCollision）与推开尸体（PushCorpses）可分别关闭。
+
+v1.0.8 改动
+-----------
+- 修复（重要）：碰撞矩阵改双向——此前只开不关，在 Mod Manager 里关闭
+  开关后本局已打开的矩阵仍保留（表现为"关了还有碰撞"）。现在任一开关
+  （总开关/士兵互碰/推开尸体）从开→关时，立即把本 mod 打开过的矩阵对
+  恢复成游戏默认状态，无需重启游戏。
+- 修复：士兵互碰的位置级防重叠此前只要"推开尸体"开着就会生效；现在
+  严格挂在 UnitCollision 下，AI-尸体交互严格挂在 PushCorpses 下。
+- 尸体物理（刚体动态化/推尸组件挂载）也改为仅在 PushCorpses 开启时执行。
+
+v1.0.7 改动
+-----------
+- 诊断增强：战斗开局单位未生成时 CC 层探测会锁进兜底固定层 1——兜底后
+  保持重探，拿到真实 CharacterController 层自动改判（层矩阵开错一对的
+  话玩家照样穿过 AI）。
+- 诊断模式（UnitCollisionLayer=-2）新增活体受击碰撞体状态 dump：活体
+  士兵的 CC 层/启用状态 + 受击碰撞体的 层/是否触发器/是否启用 聚合
+  计数（10 秒一条），用于排查"还能穿过 AI"类反馈。
 
 v1.0.6 改动
 -----------
@@ -90,7 +109,7 @@ Collision：
 
 =======================================================================
 
-ER2 More Physics - Unit Collision v1.0.6
+ER2 More Physics - Unit Collision v1.0.8
 =========================================
 
 A lightweight companion mod to ER2 More Physics that ONLY keeps the
@@ -103,6 +122,31 @@ knockback and impact damage are all removed).
   instead of walking over them.
 - Independent toggles: UnitCollision (unit blocking) and PushCorpses
   (corpse shoving) can be turned off separately.
+
+v1.0.8 changes
+--------------
+- Fix (important): the collision matrix is now two-way - previously it was
+  only ever opened, so disabling the toggles in the Mod Manager left the
+  already-open matrix in place for the rest of the session ("turned it off
+  but units still collide"). Any switch (master / unit blocking / corpse
+  shoving) going off now immediately restores the vanilla collision matrix -
+  no game restart needed.
+- Fix: the position-level living-unit separation previously ran whenever
+  corpse shoving was on; it is now strictly tied to UnitCollision, and the
+  AI-corpse interaction is strictly tied to PushCorpses.
+- Corpse physics (rigidbody activation / pusher component mounting) now only
+  runs while PushCorpses is on.
+
+v1.0.7 changes
+--------------
+- Diagnostics: the CC-layer probe could lock onto the fallback layer (1)
+  when probed before any unit had spawned; it now keeps re-probing after a
+  fallback lock and re-judges once a real CharacterController layer shows
+  up (a wrong matrix pair would let units pass through each other).
+- Diagnostics mode (UnitCollisionLayer=-2) now dumps living units' hit
+  collider state (CC layer/enabled plus per-collider layer/trigger/enabled
+  aggregates, throttled to one line per 10s) to troubleshoot "can still
+  pass through AI" reports.
 
 v1.0.6 changes
 --------------

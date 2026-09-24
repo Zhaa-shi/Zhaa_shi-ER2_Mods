@@ -1,4 +1,8 @@
-# ER2 Mod Manager v1.5.2
+# ER2 Mod Manager v1.5.4
+
+> **v1.5.4:** fixed the missing click sound while tabbing through a third-party settings page. The native tab methods play their own click sound, so any patch that skips the original call also kills the sound; Advanced Combat Movement's page never plays one of its own, which left its pages silent. The click sound is now played on every branch where the native method will not run.
+
+> **v1.5.3:** fixed coexistence with third-party mods that add their own page to the native settings menu, starting with Advanced Combat Movement (Responsive Orders). Its page hijacks the right arrow, which used to make the MODS page unreachable by tabbing; the two pages now share one tab chain and both stay reachable.
 
 > **v1.5.2:** removed the last leftover developer switch (NativeFull) together with the alternative page renderer behind it. It was self-locking - it is a setting of this mod, so it showed up as a toggle on the MODS page itself, and turning it on broke that page while turning it back off was only possible from that same page. The MODS page now has exactly one code path.
 

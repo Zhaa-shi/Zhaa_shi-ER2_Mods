@@ -15,7 +15,7 @@ using UnityEngine.UI;
 
 namespace ER2ModManager;
 
-[BepInPlugin("er2.modmanager", "ER2 Mod Manager", "1.5.2")]
+[BepInPlugin("er2.modmanager", "ER2 Mod Manager", "1.5.4")]
 public class Plugin : BasePlugin
 {
 	/// <summary>构建语言：CN_BUILD 编译符号 = 中文版（标签中文、页标题"模组"）；否则英文版。</summary>
@@ -57,7 +57,7 @@ public class Plugin : BasePlugin
 		debugLog = Config.Bind("Debug", "debugLog", false, "Debug logging (keep OFF in release). Prints page-build / template / value diagnostics.");
 		HarmonyInstance = new Harmony("er2.modmanager");
 		HarmonyInstance.PatchAll(GetType().Assembly);
-		ModLog.LogInfo((object)"ER2 Mod Manager 1.5.2 loaded.");
+		ModLog.LogInfo((object)"ER2 Mod Manager 1.5.4 loaded.");
 	}
 }
 
@@ -556,6 +556,35 @@ public static class ModRegistry
 		try
 		{
 			SoundManager.ClickSound();
+		}
+		catch
+		{
+		}
+	}
+
+	/// <summary>v1.5.4：翻页音效兜底 + 分支诊断。
+	/// 原生 SettingsTabRight/TabLeft 自身会播点击音效；但第三方 mod 的 Prefix 返回 false 会把
+	/// 原生一起吞掉，而它自己又不播（ACM 的假页代码全文无 SoundManager 调用）→ 整条翻页链静音。
+	/// 规则：**凡是"这次原生不会执行"的分支，都由我们补一声**。会在原生执行的分支绝不能补，
+	/// 否则和原生音效叠成双击声。</summary>
+	internal static void TabSound(string where)
+	{
+		PlayClick();
+		TabTrace(where + " [sound]");
+	}
+
+	/// <summary>v1.5.4：翻页分支追踪（把走的哪条分支打进日志，实测时不用猜）。</summary>
+	internal static void TabTrace(string where)
+	{
+		try
+		{
+			string tp = "none";
+			if (ThirdPartyPage.Present)
+			{
+				tp = ThirdPartyPage.IsOpen ? ("open/" + ThirdPartyPage.FakePage) : "closed";
+			}
+			Plugin.ModLog.LogInfo((object)("ModManager: tab " + where + " cur=" + SettingsGUI_V2.currentOpenedMenu
+				+ " myIndex=" + myIndex + " thirdParty=" + tp));
 		}
 		catch
 		{
@@ -4956,31 +4985,146 @@ public class WatchdogPatch
 	}
 }
 
+/// <summary>v1.5.3：第三方"假页"式原生设置页共存桥（Advanced Combat Movement / Responsive Orders）。
+/// 该 mod 在原生第 3 页劫持 SettingsTabRight 并**恒返回 false**，而它的 DLL 按字母序
+/// （A < E）先于我们加载、同优先级下先执行 → 从最后一页往右翻永远停在它的页面上，
+/// 我们的 MODS 页（追加在最末）翻不到（只剩"第一页往左翻绕回"这一条旁路）。
+/// 桥接方式：我们的 TabRight 提到 Priority.First 先判定它的页面状态——
+/// · 它的末页再右翻 → 接我们的 MODS 页；
+/// · 它还没到末页 → 放行走它自己的翻页；
+/// · 停在它的入口页（第 3 页）→ 让位，否则我们抢先进入 MODS 页、它的页永远打不开。
+/// 全部反射（无编译期依赖），未安装时 Present=false，原有行为一字不变。</summary>
+internal static class ThirdPartyPage
+{
+	private const string TypeName = "ResponsiveOrdersNativeSettingsPage";
+
+	/// <summary>该 mod 在 SettingsTabRight 里写死的锚定原生页。</summary>
+	internal const int AnchorPage = 3;
+	/// <summary>它的假页序号：1=主设置页，2=续页（续页右翻它自己什么都不做）。</summary>
+	internal const int LastFakePage = 2;
+
+	private static bool probed;
+	private static bool present;
+	private static FieldInfo fiIsOpen;
+	private static FieldInfo fiFakePage;
+
+	private static void Probe()
+	{
+		probed = true;
+		present = false;
+		try
+		{
+			foreach (Assembly asm in AppDomain.CurrentDomain.GetAssemblies())
+			{
+				Type t = asm.GetType(TypeName, false, false);
+				if (t == null) continue;
+				// 注意：这两个都是 **public static 字段**（不是属性），必须用 GetField。
+				fiIsOpen = t.GetField("IsOpen", BindingFlags.Public | BindingFlags.Static);
+				fiFakePage = t.GetField("CurrentFakePage", BindingFlags.Public | BindingFlags.Static);
+				present = fiIsOpen != null && fiFakePage != null;
+				if (present) Plugin.ModLog.LogInfo((object)("ModManager: third-party native settings page detected (" + TypeName + ") — tab chain shared."));
+				break;
+			}
+		}
+		catch (Exception ex)
+		{
+			Plugin.ModLog.LogError((object)("ModManager third-party page probe error: " + ex.Message));
+		}
+	}
+
+	internal static bool Present { get { if (!probed) Probe(); return present; } }
+
+	internal static bool IsOpen
+	{
+		get
+		{
+			try { return Present && fiIsOpen != null && (bool)fiIsOpen.GetValue(null); }
+			catch { return false; }
+		}
+	}
+
+	/// <summary>它的假页序号（0 = 未知/未开）。</summary>
+	internal static int FakePage
+	{
+		get
+		{
+			try { return (Present && fiFakePage != null) ? Convert.ToInt32(fiFakePage.GetValue(null)) : 0; }
+			catch { return 0; }
+		}
+	}
+
+	/// <summary>是否停在它的最后一个假页（再右翻应交给我们的 MODS 页）。</summary>
+	internal static bool OnLastPage => IsOpen && FakePage >= LastFakePage;
+
+	/// <summary>翻页权交还原生/交给我们时，清掉它的"我的假页还开着"状态。
+	/// 不清会有两个后果：① 它的 TabLeft 会抢走我们从 MODS 页的左翻；
+	/// ② 下次翻到它的入口页时我们误判"还在它的末页"，直接跳过它的页面。</summary>
+	internal static void Detach()
+	{
+		try
+		{
+			if (!Present) return;
+			fiIsOpen.SetValue(null, false);
+			fiFakePage.SetValue(null, 0);
+		}
+		catch { }
+	}
+}
+
 /// <summary>翻到最后一页（我们的 MODS 页）时接管填充；v1.1.4 在 MODS 页再右翻绕回第一页
-///（与左翻绕回 MODS 页呼应，两个方向都能循环）。</summary>
+///（与左翻绕回 MODS 页呼应，两个方向都能循环）。v1.5.3：与第三方假页共享翻页链。</summary>
 [HarmonyPatch(typeof(SettingsGUI_V2), "SettingsTabRight")]
 public class TabRightPatch
-{	private static bool Prefix()
+{
+	[HarmonyPriority(Priority.First)]
+	private static bool Prefix()
 	{
 		try
 		{
 			SettingsGUI_V2 s = SettingsGUI_V2.instance;
+			int cur = SettingsGUI_V2.currentOpenedMenu;
+			if (s != null && ModRegistry.myIndex > 0 && cur == ModRegistry.myIndex)
+			{
+				// 已是 MODS 页（末页）：右翻绕回第一页（走原生 UpdateOpenedMenu 恢复原生气/行为）
+				ModRegistry.TabTrace("right:wrap-first [sound]"); // WrapToFirstPage 内含 ClickSound
+				ModRegistry.WrapToFirstPage(s);
+				ThirdPartyPage.Detach(); // 翻页链已交还原生，顺手清掉第三方残留的"我的页还开着"
+				return false;
+			}
+			// v1.5.3：第三方假页链（见 ThirdPartyPage 注释）
+			// v1.5.4：让位给它的两个分支里，它的 Prefix 会 return false 吞掉原生（原生音效随之
+			// 消失），而它自己不播 → 必须在这里补一声，否则第 3 页→它的假页整段翻页无音效。
+			if (ThirdPartyPage.Present)
+			{
+				if (ThirdPartyPage.IsOpen)
+				{
+					if (ThirdPartyPage.OnLastPage && s != null && ModRegistry.myIndex > 0)
+					{
+						ThirdPartyPage.Detach(); // 它的页面不再显示 → 交出翻页权
+						ModRegistry.EnterMyPage(s); // 内含 ClickSound，这里不重复补
+						return false;
+					}
+					ModRegistry.TabSound("right:yield-thirdparty-next"); // 它的假页 1→2，原生不执行
+					return true; // 还没到它的末页 → 放行走它自己的翻页
+				}
+				// 停在它的入口页：让位（否则我们抢先接管，它的页面永远打不开）
+				if (cur == ThirdPartyPage.AnchorPage)
+				{
+					ModRegistry.TabSound("right:yield-thirdparty-open"); // 打开它的首页，原生不执行
+					return true;
+				}
+			}
 			if (s == null || ModRegistry.myIndex <= 0)
 			{
 				return true;
 			}
-			int cur = SettingsGUI_V2.currentOpenedMenu;
-			if (cur == ModRegistry.myIndex)
-			{
-				// 已是 MODS 页（末页）：右翻绕回第一页（走原生 UpdateOpenedMenu 恢复原生气/行为）
-				ModRegistry.WrapToFirstPage(s);
-				return false;
-			}
 			if (cur + 1 == ModRegistry.myIndex)
 			{
+				ModRegistry.TabTrace("right:enter-mods [sound]"); // EnterMyPage 内含 ClickSound
 				ModRegistry.EnterMyPage(s);
 				return false;
 			}
+			ModRegistry.TabTrace("right:pass-native"); // 交给原生，音效由原生播
 		}
 		catch (Exception ex)
 		{
@@ -4995,26 +5139,45 @@ public class TabRightPatch
 [HarmonyPatch(typeof(SettingsGUI_V2), "SettingsTabLeft")]
 public class TabLeftPatch
 {
+	// v1.5.3：必须排在第三方假页补丁之前——否则从 MODS 页左翻会被它的 TabLeft 抢走
+	//（它还以为自己的页面开着，会关掉页面并把我们丢回原生第 3 页）。
+	[HarmonyPriority(Priority.First)]
 	private static bool Prefix()
 	{
 		try
 		{
 			SettingsGUI_V2 s = SettingsGUI_V2.instance;
+			int cur = SettingsGUI_V2.currentOpenedMenu;
+			if (ThirdPartyPage.Present && ThirdPartyPage.IsOpen && ModRegistry.myIndex > 0 && cur == ModRegistry.myIndex)
+			{
+				ThirdPartyPage.Detach(); // 从 MODS 页离开 → 摘掉它的残留状态，原生翻页照常
+			}
 			if (s == null || ModRegistry.myIndex <= 0)
 			{
 				return true;
 			}
-			int cur = SettingsGUI_V2.currentOpenedMenu;
 			if (cur == ModRegistry.myIndex + 1)
 			{
+				ModRegistry.TabTrace("left:enter-mods [sound]"); // EnterMyPage 内含 ClickSound
 				ModRegistry.EnterMyPage(s);
 				return false;
 			}
 			if (cur == 0)
 			{
 				// 第一页左翻 → 绕回最后一页（MODS）
+				ModRegistry.TabTrace("left:wrap-mods [sound]"); // EnterMyPage 内含 ClickSound
 				ModRegistry.EnterMyPage(s);
 				return false;
+			}
+			// v1.5.4：第三方假页还开着时，它的 TabLeft 会 return false 吞掉原生（含原生音效），
+			// 而它自己不播 → 这里补一声；否则从它的假页往左翻全程静音。
+			if (ThirdPartyPage.Present && ThirdPartyPage.IsOpen)
+			{
+				ModRegistry.TabSound("left:yield-thirdparty");
+			}
+			else
+			{
+				ModRegistry.TabTrace("left:pass-native"); // 交给原生，音效由原生播
 			}
 		}
 		catch (Exception ex)

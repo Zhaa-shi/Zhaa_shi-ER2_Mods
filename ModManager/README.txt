@@ -1,6 +1,6 @@
 ER2 Mod Manager - In-Game Mod Settings Manager
 ===============================================
-Version 1.5.2 | Easy Red 2 (BepInEx 6 / IL2CPP)
+Version 1.5.4 | Easy Red 2 (BepInEx 6 / IL2CPP)
 
 WHAT IT DOES
 ------------
@@ -45,6 +45,25 @@ FEATURES
   arrow on the MODS page returns to the first page. Native click sounds are kept.
 - Auto-save staged changes; per-mod master switches honored.
 - Compatible with the game 2.1.x settings rework (async page filling is handled).
+
+v1.5.4 changelog
+----------------
+- Restored the click sound while tabbing through a third-party page. The native tab methods play
+  their own click sound, so any Prefix that returns false kills the sound along with the original
+  call. Advanced Combat Movement's page code never plays a sound of its own, so the whole stretch
+  from vanilla page #3 to its two pages was silent. Every branch where we know the native method
+  will not run now plays the click sound ourselves; branches that do reach the native method stay
+  untouched so the sound is never doubled. Tab navigation also logs the branch it took
+  ("ModManager: tab <branch> cur=.. myIndex=.. thirdParty=..") to make this diagnosable.
+
+v1.5.3 changelog
+----------------
+- Shares the settings tab chain with third-party "fake page" mods, starting with Advanced Combat
+  Movement (Responsive Orders). That mod hijacks the right-arrow on the native page #3 and always
+  returns false; since its DLL loads before ours (A < E) it used to run first, so the MODS page -
+  which is appended after the last vanilla page - could no longer be reached by tabbing right.
+  The MODS page is now reached from that mod's last page, and our own navigation no longer steals
+  its page in return. Detection is reflection-only: with the other mod absent nothing changes.
 
 v1.5.2 changelog
 ----------------
