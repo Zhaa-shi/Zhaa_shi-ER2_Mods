@@ -1,7 +1,15 @@
-ER2 Battlefield Commander v1.4.37
+ER2 Battlefield Commander v1.4.38
 =================================
 
 A BepInEx plugin for Easy Red 2 that adds an "RTS god-view squad command" layer — mouse operations inspired by Gates of Hell: Ostfront.
+
+[1.4.38 Correction: the background-free style applies to the hint bar, not the info panel]
+* **Info panel background restored** - I misread your last message: "make it look like the top-left
+  readout, no background" was about the **bottom hint bar**, not the info panel. The panel's plate is back.
+* **The bottom hint bar lost its background instead**: white text with a shadow drawn straight over the
+  terrain, same look as the top-left selection readout. The visibility rule (panel and hint bar take
+  turns) is unchanged.
+
 
 [1.4.37 Last grey text found and fixed; unit info goes background-free]
 * **The hint bar text was the last grey holdout.** `HudStyleSmall()` and the backpack `tipStyle` still

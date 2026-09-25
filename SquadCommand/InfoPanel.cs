@@ -74,10 +74,12 @@ internal static class InfoPanel
 			Color hoverC = GodViewController.UiHover;
 			smallStyle = smallStyle ?? MakeSmall();
 			if (smallStyle != null) styleScale = ER2Shared.Er2Ui.Scale;
-			// 1.4.37：**去掉底板**（用户："既然都可以隐藏了干脆做成左上角显示的样子，不要背景了"）——
-			// 与游戏原生的左上角选中信息同款：白字 + 阴影直接叠在场景上，不再画 DrawHudPlate。
-			// pr 仍由 PanelRect() 提供（命中判定/实测回写都用它）。
+			// 1.4.32：**整块背景**（原来只有零散控件底，文字直接叠在战场上，与右侧小队列表不一致）。
+			// 底色用 `Er2Ui.Scrim` —— 就是玩家说"喜欢"的那条底部提示条的背景（纯黑）。
+			// 1.4.38：**恢复底板**——1.4.37 误读了用户的话（"做成左上角显示的样子，不要背景了"
+			// 指的是【屏幕底的提示条】，不是信息面板），这里回滚。
 			Rect pr = PanelRect();
+			GodViewController.DrawHudPlate(pr);
 
 			float x = LeftX;
 			float y = pr.y + 4f * ER2Shared.Er2Ui.Scale;

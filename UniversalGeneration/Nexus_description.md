@@ -51,6 +51,11 @@ Items go into backpacks as their **proper subclass** — magazines hold the righ
 
 ## Changelog
 
+**2.5.19**
+- No change on this mod's side; the correction (info panel plate restored, hint bar background-free)
+  lives in the commander mod.
+
+
 **2.5.18**
 - No change on this mod's side; the last grey text fixes live in the commander mod (its own side-scanned
   styles) and the shared toolkit. A project-wide scan confirmed every text source in Universal Generation

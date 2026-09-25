@@ -4045,13 +4045,14 @@ internal static class GodViewController
 			float hintH = 22f * s;
 			float hintX = (Screen.width - hintW) * 0.5f;
 			float hintY = Screen.height - 30f * s;
-			// 1.4.32：提示条 = HUD 统一底板（它本来就是玩家指定的"基准背景"）
 			// 1.4.36：与左下信息面板互斥（用户："不希望信息栏与下面的提示在竖轴上同时存在"）——
-			// 有选中时信息面板占这块竖向空间，提示条整条让位（底板 + 文字都不画）。
+			// 有选中时信息面板占这块竖向空间，提示条整条让位（不画）。
+			// 1.4.38：**去掉提示条的底板**（用户："既然都可以隐藏了干脆做成左上角显示的样子，
+			// 不要背景了"——指的是【提示条】；1.4.37 误改成了信息面板，已回滚）。
+			// 白字 + 阴影直接叠在场景上，与左上角原生选中信息同款（DrawShadowLabel）。
 			if (!InfoPanel.Visible)
 			{
-				DrawHudPlate(new Rect(hintX, hintY, hintW, hintH));
-				GUI.Label(new Rect(hintX, hintY - 1f * s, hintW, hintH), hint, hs);
+				DrawShadowLabel(new Rect(hintX, hintY - 1f * s, hintW, hintH), hint, hs, Color.white);
 			}
 
 			// 左上角：暂停 + 选择信息

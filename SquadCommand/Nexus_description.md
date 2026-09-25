@@ -6,7 +6,7 @@ Adds an "RTS god-view squad command" layer to Easy Red 2, with mouse operations 
 ## Installation instructions
 1. Install BepInEx (IL2CPP build) into the game root folder.
 2. Put `ER2_BattlefieldCommander.dll` into `Easy Red 2\BepInEx\plugins\`.
-3. Launch the game — `Loading [ER2 Battlefield Commander 1.4.37]` in the BepInEx log means success.
+3. Launch the game — `Loading [ER2 Battlefield Commander 1.4.38]` in the BepInEx log means success.
 
 ## Main features
 - **God-view command**: F9 to enter free camera, WASD move, wheel zoom, MMB rotate, Q/E height, Space to pause/resume the world.
@@ -38,6 +38,14 @@ Adds an "RTS god-view squad command" layer to Easy Red 2, with mouse operations 
 Thanks to the Easy Red 2 community and the BepInEx / Harmony ecosystem, and to all authors whose IL2CPP modding work paved the way.
 
 ## Recent changes
+**1.4.38**
+* **Info panel background restored** - I misread your last message: "make it look like the top-left
+  readout, no background" was about the **bottom hint bar**, not the info panel. The panel's plate is back.
+* **The bottom hint bar lost its background instead**: white text with a shadow drawn straight over the
+  terrain, same look as the top-left selection readout. The visibility rule (panel and hint bar take
+  turns) is unchanged.
+
+
 **1.4.37**
 * **The hint bar text was the last grey holdout.** `HudStyleSmall()` and the backpack `tipStyle` still
   used a hard-coded military-green-era colour `(0.85, 0.9, 0.85)` - they never went through `uiText`,

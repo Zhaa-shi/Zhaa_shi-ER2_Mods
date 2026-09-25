@@ -1,4 +1,4 @@
-ER2 Universal Generation v2.5.18
+ER2 Universal Generation v2.5.19
 ================================
 
 在战场指挥官（ER2 Battlefield Commander）的 RTS 上帝视角内，按你的意愿生成任何单位、载具与物品。
@@ -41,6 +41,10 @@ ER2 Universal Generation v2.5.18
 
 更新日志（Changelog）
 --------------------------------
+2.5.19
+- 本 mod 侧无变化；纠正（信息面板底板恢复、提示条去背景）在指挥官 mod。
+
+
 2.5.18
 - 本 mod 侧无变化；最后两处灰色文字修复在指挥官 mod（旁路样式）。
   全项目扫描确认通用生成的所有文字色源已是纯白。
