@@ -546,12 +546,12 @@ internal static class Er2Ui
 			st.fontSize = FitSize(st, labels[i], cw - 19f * Scale, FontTabMax, FontTabMin);
 			// 1.4.30：空按钮画底 + **描边文字**（`FontStyle.Bold` 在游戏字体上不生效，
 			// 描边不依赖字体变体；fg 传纯白让 st.textColor 完全决定颜色）
-			// 1.4.32：用 `new GUIContent("", label)` 而不是 `GUIContent.none`——
-			// 空文本不画字（正文由 LabelOutlined 描边绘制），但**保留了 tooltip 通道**，
-			// 调用方可在本帧末尾读 `GUI.tooltip` 自绘提示框。
-			if (GUI.Button(r, new GUIContent(string.Empty, null, labels[i]), st)) clicked = i;
+			// 1.4.34：悬停反馈 = **文字变暗**（用户指明）——描边文字不感知 GUI 样式的 hover，
+			// 所以这里手动判一次鼠标是否在本页签内；tooltip 框已按用户要求删除。
+			bool hov = r.Contains(Event.current.mousePosition);
+			if (GUI.Button(r, GUIContent.none, st)) clicked = i;
 			LabelOutlined(new Rect(r.x + 3f * Scale, r.y, r.width - 6f * Scale, r.height),
-				labels[i], st, Color.white, Mathf.Max(1f, Scale));
+				labels[i], st, hov ? TextDim : Color.white, Mathf.Max(1f, Scale));
 			// 1.4.22：**每个页签都描边**——未选中用暖棕 Edge、选中用暖白 Accent。
 			// 用户反馈"UI 各元素区分不明显"：此前页签只有填充色差，在亮背景上读不出边界。
 			Frame(r, on ? Accent : Edge, Mathf.Max(1f, Scale));

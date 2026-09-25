@@ -6,7 +6,7 @@ Adds an "RTS god-view squad command" layer to Easy Red 2, with mouse operations 
 ## Installation instructions
 1. Install BepInEx (IL2CPP build) into the game root folder.
 2. Put `ER2_BattlefieldCommander.dll` into `Easy Red 2\BepInEx\plugins\`.
-3. Launch the game — `Loading [ER2 Battlefield Commander 1.4.33]` in the BepInEx log means success.
+3. Launch the game — `Loading [ER2 Battlefield Commander 1.4.34]` in the BepInEx log means success.
 
 ## Main features
 - **God-view command**: F9 to enter free camera, WASD move, wheel zoom, MMB rotate, Q/E height, Space to pause/resume the world.
@@ -38,6 +38,16 @@ Adds an "RTS god-view squad command" layer to Easy Red 2, with mouse operations 
 Thanks to the Easy Red 2 community and the BepInEx / Harmony ecosystem, and to all authors whose IL2CPP modding work paved the way.
 
 ## Recent changes
+**1.4.34**
+* **Removed the tooltip box** (you asked for that) and restored the original hover feedback instead:
+  hovering a tab or a list row now **dims its text** - that was the old behaviour, lost when the
+  outlined-text refactor stopped the labels from seeing hover state. Hover is detected per row now.
+* **The bottom-left unit info panel is dynamic now.** It had a fixed 190 px height, so with only a few
+  lines of content there was a large empty block underneath (your screenshot). The panel now measures
+  its content every frame and resizes to fit, and its bottom edge sits 14 px above the screen edge -
+  the same as the squad list on the right, so the two blocks are symmetric.
+
+
 **1.4.33**
 * **Why the UI looked half-converted: your config file.** BepInEx writes a `.cfg` on first run and
   never rewrites it when the code default changes - so `colorBase` / `colorHover` in your file were

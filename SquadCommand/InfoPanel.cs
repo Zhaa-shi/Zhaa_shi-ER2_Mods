@@ -19,7 +19,8 @@ internal static class InfoPanel
 	// 2.5.1：改为属性，随 Er2Ui.Scale 自适应（原本 const → 分辨率变化时 UI 尺寸钉死）
 	private static float W => 352f * ER2Shared.Er2Ui.Scale;
 	private static float H => 190f * ER2Shared.Er2Ui.Scale;
-	private static float BottomGap => 34f * ER2Shared.Er2Ui.Scale;
+	// 1.4.34：34 → 14，与右下小队列表同——左右两块贴底位置一致（用户："让他们对称啊"）
+	private static float BottomGap => 14f * ER2Shared.Er2Ui.Scale;
 	private static float LeftX => 12f * ER2Shared.Er2Ui.Scale;
 	// 1.4.32：面板左边缘。原来 x=0（贴屏幕边），而右侧小队列表是"离右边缘 10*Scale"——
 	// 用户要求"与右边的小队列表对齐"，这里取同样的 10*Scale 做**左右对称**。
@@ -32,7 +33,10 @@ internal static class InfoPanel
 	private static float styleScale = 1f;   // 2.5.1：建样式时的 Scale（变了就重建）
 
 
-	internal static Rect PanelRect() => new Rect(PanelPad, Screen.height - H - BottomGap, W, H);
+	// 1.4.34：**高度按内容动态**——原来固定 190*Scale，内容少时下方大片空白
+	//（用户："信息显示也不会动态调整，下面空这么多"）。Draw() 每帧实测内容底部回写 contentH。
+	private static float contentH = 120f;
+	internal static Rect PanelRect() => new Rect(PanelPad, Screen.height - contentH - BottomGap, W, contentH);
 
 	/// <summary>宿主 IsMouseOverGui 用：鼠标在面板上时吞掉战场手势。
 	/// 1.3.0：背包格子窗口的命中判定移到 BackpackPanel.WantsMouse()（含拖拽中全屏吞手势）。</summary>
@@ -68,7 +72,7 @@ internal static class InfoPanel
 			GodViewController.DrawHudPlate(pr);
 
 			float x = LeftX;
-			float y = Screen.height - H - BottomGap + 4f * ER2Shared.Er2Ui.Scale;
+			float y = pr.y + 4f * ER2Shared.Er2Ui.Scale;
 			float w = W - 8f * ER2Shared.Er2Ui.Scale;
 
 			// ── 行1：选择统计 + 焦点切换 ──
@@ -98,6 +102,11 @@ internal static class InfoPanel
 
 			// ── 背包/货舱按钮（1.3.0：改开 BackpackPanel 格子窗口；1.3.2 起尸体走右键开窗，不再有尸体行）──
 			y = DrawPackButton(x, y, textC, hoverC);
+
+			// 1.4.34：**实测内容底部回写面板高度**——内容多则面板长、少则短，不再留大片空白。
+			// 上下限：最少装下标题+一行，最多到屏幕中部（防异常情况无限长）。
+			float measured = (y + 10f * ER2Shared.Er2Ui.Scale) - pr.y;
+			contentH = Mathf.Clamp(measured, 96f * ER2Shared.Er2Ui.Scale, 340f * ER2Shared.Er2Ui.Scale);
 		}
 		catch { }
 	}

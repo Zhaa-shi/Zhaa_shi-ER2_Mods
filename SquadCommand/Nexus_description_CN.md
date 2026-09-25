@@ -6,7 +6,7 @@
 ## Installation instructions
 1. 安装 BepInEx（IL2CPP 版）到游戏根目录。
 2. 将 `ER2_BattlefieldCommander.dll` 放入 `Easy Red 2\BepInEx\plugins\`。
-3. 启动游戏，BepInEx 日志出现 `Loading [ER2 Battlefield Commander 1.4.33]` 表示加载成功。
+3. 启动游戏，BepInEx 日志出现 `Loading [ER2 Battlefield Commander 1.4.34]` 表示加载成功。
 
 ## Main features
 - **上帝视角指挥**：F9 进入自由视角，WASD 移动、滚轮缩放、中键旋转、Q/E 升降，空格暂停/继续世界。
@@ -38,6 +38,15 @@
 感谢 Easy Red 2 社区与 BepInEx / Harmony 生态，以及所有为 IL2CPP modding 提供思路的作者。
 
 ## 近期更新
+**1.4.34**
+· **删掉了那个悬停提示框**（按你的要求），并把悬停反馈恢复为原样：
+  悬停在页签或列表条目上时，**文字变暗**——这是描边重构时丢掉的老行为
+  （描边画的字感知不到 GUI 样式的 hover，现在逐行手动判定）。
+· **左下角单位信息面板改为动态高度**。原来固定 190px 高，内容只有几行时下面是一大片空白
+  （你的截图）。现在每帧实测内容底部并自适应面板高度，且**底边距屏幕 14px**——
+  与右下角小队列表相同，左右两块对称。
+
+
 **1.4.33**
 · **"UI 没改完"的原因在你的配置文件里。** BepInEx 首次运行写下 `.cfg` 后，**不会**因为代码里
   默认值改变而重写它——所以你这个文件里的 `colorBase` / `colorHover` 还是很多版本前的旧值
