@@ -66,6 +66,8 @@ internal static class GenPanel
 	// 2.4.2：页签专用样式（**只给页签用**，字号会被逐次改写以适配定宽按钮；
 	// 不能复用 buttonStyle/activeButtonStyle——它们被别处以固定 12 号使用）
 	private static GUIStyle tabStyle, tabActiveStyle;
+	// 1.4.27：帮助行**专用**样式——它需要按可用宽度单独缩字号（陷阱 76 同源）
+	private static GUIStyle helpStyle;
 
 	// 2.0.0：物品页签族缓存（"item:weapons" → 显示名）；库存/收藏页签数变化时重建
 	private static readonly List<string> itemCats = new();
@@ -353,7 +355,13 @@ internal static class GenPanel
 				case RowKind.Crew: DrawCrewRow(rect); break;
 				case RowKind.Preview: DrawPreviewRow(rect); break;
 				case RowKind.ItemHelp:
-					GUI.Label(rect, Ui.Tr("点击条目拿起 → 拖到单位身上放入背包，拖到地上则生成实体"), textStyle);
+					{
+						// 1.4.27：**按可用宽度自缩字号**——英文文案（~99 字符）在 12 号下约 570px，
+						// 而面板内宽只有 ~450px，原来直接横向溢出被裁（用户："下面的文字超出了"）。
+						string helpTxt = Ui.Tr("点击条目拿起 → 拖到单位身上放入背包，拖到地上则生成实体");
+						helpStyle.fontSize = Er2Ui.FitSize(helpStyle, helpTxt, rect.width, Er2Ui.FontBody, Er2Ui.FontSmall);
+						GUI.Label(rect, helpTxt, helpStyle);
+					}
 					break;
 			}
 			if (stop) return;      // 点条目进入放置/携带 → 本帧到此为止（原 return 语义）
@@ -894,7 +902,7 @@ internal static class GenPanel
 		BuildRows();
 		// 1.4.25：底部留白 8 → 18（原 16 均分时最后一行 ItemHelp 紧贴下边框，
 		// 用户反馈"最下面的字都超出菜单了"——贴边在视觉上就读作溢出）
-		float h = 26f * Er2Ui.Scale;       // 顶部 8 + 底部 18
+		float h = 30f * Er2Ui.Scale;       // 顶部 8 + 底部 22
 		for (int i = 0; i < rows.Count; i++)
 			h += rows[i].H + (i + 1 < rows.Count ? Er2Ui.Gap : 0f);   // 与 DrawRows 同一份间距规则
 		return new Rect(panelPos.x, panelPos.y, PanelW, h);
@@ -991,6 +999,7 @@ internal static class GenPanel
 		for (int i = 0; i < UnitCats.Length; i++) UnitCatNames[i] = Ui.Tr(UnitCatRaw[i]);
 		titleStyle = Er2Ui.MakeLabel(Er2Ui.FontTitle, TextAnchor.MiddleLeft, Er2Ui.Text, FontStyle.Bold);
 		textStyle = Er2Ui.MakeLabel(Er2Ui.FontBody, TextAnchor.MiddleLeft, Er2Ui.Text);
+		helpStyle = Er2Ui.MakeLabel(Er2Ui.FontBody, TextAnchor.MiddleLeft, Er2Ui.Text);
 
 		// 宿主同款主题：#0E1C0EB4 底 / #3E703EE0 选中 / #DFF0DF 文字
 		buttonStyle = Er2Ui.MakeButton(Er2Ui.FontBody, Er2Ui.Surface, Er2Ui.Text);
@@ -1007,7 +1016,9 @@ internal static class GenPanel
 
 		// 收藏星标：透明底（无底色贴图），仅文字颜色随状态
 		int starSize = Mathf.Max(8, Mathf.RoundToInt(14 * Er2Ui.Scale));
-		starStyle = Er2Ui.MakeLabel(starSize, TextAnchor.MiddleCenter, Er2Ui.TextDim);
+		// 1.4.27：**textColor 必须纯白**——GUI.contentColor 与 style.normal.textColor 是**相乘**关系，
+		// 原来用 TextDim(#CACAD0) → ★ 的金色被乘暗成 #CAA84D（用户："收藏的黄色星星也太暗了"）。
+		starStyle = Er2Ui.MakeLabel(starSize, TextAnchor.MiddleCenter, Color.white);
 		starStyle.hover.textColor = Color.white;
 		starStyle.active.textColor = Color.white;
 		starStyle.focused.textColor = Color.white;

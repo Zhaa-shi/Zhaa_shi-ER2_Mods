@@ -1,7 +1,22 @@
-ER2 Battlefield Commander v1.4.26
+ER2 Battlefield Commander v1.4.27
 =================================
 
 A BepInEx plugin for Easy Red 2 that adds an "RTS god-view squad command" layer — mouse operations inspired by Gates of Hell: Ostfront.
+
+[1.4.27 White foreground + fixed bottom text overflow]
+* **Translucency now applies to the background only.** Previously the border and divider alpha was
+  driven by the panel-opacity setting too - so raising transparency also faded the outlines, which is
+  where the contrast went. Faces (panel / title bar / rows / selected) follow `uiPanelAlpha`; text and
+  lines are fully opaque.
+* **Text and lines are white now** (#FFFFFF text, white borders and hairline dividers) instead of
+  near-white grey, so they read clearly against the dark panel over any terrain.
+* **Favourite stars were too dark** - cause found: `GUI.contentColor` and `GUIStyle.normal.textColor`
+  **multiply**, and the star style used a grey text colour, turning the gold into a muddy #CAA84D.
+  The style is pure white now, so the gold is exact (and brightened to #FFD800).
+* **The help line at the bottom no longer overflows.** The real cause was horizontal, not vertical:
+  the English string is ~99 characters, about 570 px at 12 pt, against ~450 px of panel width. It now
+  uses a shorter string plus a dedicated style that auto-shrinks to fit the available width.
+
 
 [1.4.26 Marker line width back to world space (natural near-big / far-small)]
 * **Root cause of the "close = small, far = big disc" look found.** Marker radii are **fixed world

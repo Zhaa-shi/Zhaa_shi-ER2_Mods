@@ -6,7 +6,7 @@
 ## Installation instructions
 1. 安装 BepInEx（IL2CPP 版）到游戏根目录。
 2. 将 `ER2_BattlefieldCommander.dll` 放入 `Easy Red 2\BepInEx\plugins\`。
-3. 启动游戏，BepInEx 日志出现 `Loading [ER2 Battlefield Commander 1.4.26]` 表示加载成功。
+3. 启动游戏，BepInEx 日志出现 `Loading [ER2 Battlefield Commander 1.4.27]` 表示加载成功。
 
 ## Main features
 - **上帝视角指挥**：F9 进入自由视角，WASD 移动、滚轮缩放、中键旋转、Q/E 升降，空格暂停/继续世界。
@@ -38,6 +38,18 @@
 感谢 Easy Red 2 社区与 BepInEx / Harmony 生态，以及所有为 IL2CPP modding 提供思路的作者。
 
 ## 近期更新
+**1.4.27**
+· **透明现在只作用于背景。** 此前边框与分隔线的不透明度也被面板透明度设置带着走——
+  调透明度会连轮廓一起变淡，对比度就是这么丢的。现在**面**（面板/标题条/行/选中）跟随
+  `uiPanelAlpha`，**文字与线条完全不透明**。
+· **文本与线条改成白色**（文字 #FFFFFF、边框与行分隔线纯白），在黑底上任何地形背景前都清晰。
+· **收藏星星太暗** —— 根因：`GUI.contentColor` 与 `GUIStyle.normal.textColor` 是**相乘**关系，
+  而星标样式用的是灰色文字色，把金色乘成了浑浊的 #CAA84D。现在样式改纯白，金色准确显示
+  （并提亮到 #FFD800）。
+· **底部帮助文字不再溢出。** 真正的原因是**横向**而非纵向：英文文案约 99 字符，
+  12 号字下约 570px，而面板内宽只有约 450px。现在同时缩短文案 + 用专用样式按可用宽度自动缩字号。
+
+
 **1.4.26**
 · **"近处小、远处成一坨大圆盘"的根因找到了。** 标记半径是**固定世界尺寸**
   （从各单位 Collider 量出，步兵夹在 0.35~1.1m、载具 1.6~4.2m），所以圆环本来就随距离自然缩小。

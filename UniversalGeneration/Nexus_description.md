@@ -51,6 +51,13 @@ Items go into backpacks as their **proper subclass** — magazines hold the righ
 
 ## Changelog
 
+**2.5.8**
+- **Translucency is background-only now.** Faces follow the panel-opacity setting; text and lines are fully opaque (previously the border/divider alpha was tied to it too, which killed contrast).
+- **Text and lines are white** (#FFFFFF text, white borders and dividers) instead of near-white grey.
+- **Favourite stars brightened** - `GUI.contentColor` multiplies with `GUIStyle.normal.textColor`, so a grey star style was darkening the gold; the style is pure white now and the gold is #FFD800.
+- **Fixed the bottom help line overflowing the panel** - the cause was horizontal (a ~99-character English string against ~450 px of width), not the vertical padding. Shortened the string and added width-aware font shrinking.
+
+
 **2.5.7**
 - **Marker line width now uses fixed world units** (shared toolkit), matching the marker radii which are also fixed world sizes. Previously width was constant in screen pixels, so its *world* width grew with distance and far-away rings filled into solid discs. Near is now thicker and far thinner, with a constant ratio - natural perspective.
 - `[Markers] markerLineWidth` still scales every marker line together.
