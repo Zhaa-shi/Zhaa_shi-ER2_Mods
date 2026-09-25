@@ -51,6 +51,12 @@ Items go into backpacks as their **proper subclass** — magazines hold the righ
 
 ## Changelog
 
+**2.5.5**
+- **Marker lines raised about 60%** again (infantry ring 1.5 -> 2.4, selection brackets -> 3.5/4.2, focus ring -> 4.8).
+- **Panel is neutral black now, not brown** - all surfaces are R=G=B and the leather noise texture lost its warm tint.
+- **Panel opacity is configurable:** `UI/uiPanelAlpha` (default 0.85, range 0.55-1.0); 1.0 = fully opaque. Translucency and darkness pull against each other, so the axis is exposed instead of guessed.
+
+
 **2.5.4**
 - **Marker lines raised about 40%** (they were too thin after the camera-distance fix).
 - **Near-black leather panel.** The panel used to read as "completely brown" because translucent panels get tinted by the brown terrain behind them - opacity is now 0.92 over a near-black base (#0C0906), with a 64x64 procedural leather noise overlay and a 1px lit top edge for the leather feel.

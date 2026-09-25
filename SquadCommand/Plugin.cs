@@ -9,7 +9,7 @@ using UnityEngine;
 
 namespace ER2SquadCommand;
 
-[BepInPlugin("er2.squadcommand", "ER2 Battlefield Commander", "1.4.23")]
+[BepInPlugin("er2.squadcommand", "ER2 Battlefield Commander", "1.4.24")]
 public class Plugin : BasePlugin
 {
 	internal static ManualLogSource ModLog;
@@ -36,6 +36,7 @@ public class Plugin : BasePlugin
 	internal static ConfigEntry<string> uiColorHover;
 	internal static ConfigEntry<string> uiColorText;
 	// 2.5.0：UI 单色系总开关 + 世界空间标记视觉开关（13 项，用户要求"都给 cfg"）
+	internal static ConfigEntry<float> uiPanelAlpha;   // 1.4.24：面板不透明度（透<->黑）
 	internal static ConfigEntry<bool> uiMono;
 	internal static ConfigEntry<bool> markersEnabled;
 	internal static ConfigEntry<bool> showFriendlyRing;
@@ -78,18 +79,23 @@ public class Plugin : BasePlugin
 
 		// 2.5.0：默认值改中性灰（原来深绿/中绿/淡绿是军绿主题）。uiMono 只管 Er2Ui 的面板令牌，
 		// 这三个是**世界空间与 HUD 按钮**的色源，必须同步换灰，否则"面板灰黑、按钮军绿"。
-		// 1.4.22：黑棕半透明（用户明确要求"黑棕色半透明的UI"）——与 Er2Ui Mono 预设同一色系。
-		uiColorBase = Config.Bind("UI", "colorBase", "#0F0B08EA", new ConfigDescription(Ui.Tr("HUD 按钮底板 / 小队列表行颜色（#RRGGBB 或 #RRGGBBAA）。默认近黑皮革色。")));
-		uiColorHover = Config.Bind("UI", "colorHover", "#2A2017F0", Ui.Tr("HUD 按钮悬停/选中颜色。默认深棕。"));
-		uiColorText = Config.Bind("UI", "colorText", "#F1EBE2", Ui.Tr("HUD 文字/描边颜色。默认暖白。"));
+		// 1.4.24：中性半透明黑（用户："把面板UI改成半透明黑色，不要棕色了"）——与 Er2Ui Mono 预设同一色系。
+		uiColorBase = Config.Bind("UI", "colorBase", "#0A0A0DEE", new ConfigDescription(Ui.Tr("HUD 按钮底板 / 小队列表行颜色（#RRGGBB 或 #RRGGBBAA）。默认半透明黑。")));
+		uiColorHover = Config.Bind("UI", "colorHover", "#2A2A31F5", Ui.Tr("HUD 按钮悬停/选中颜色。默认中性深灰。"));
+		uiColorText = Config.Bind("UI", "colorText", "#F0F0F2", Ui.Tr("HUD 文字/描边颜色。默认近纯白。"));
 		uiColorBase.SettingChanged += (s, e) => GodViewController.ApplyUiTheme();
 		uiColorHover.SettingChanged += (s, e) => GodViewController.ApplyUiTheme();
 		uiColorText.SettingChanged += (s, e) => GodViewController.ApplyUiTheme();
 		GodViewController.ApplyUiTheme();
 
 		// ===== 2.5.0：UI 单色系 =====
-		uiMono = Config.Bind("UI", "uiMono", true, Ui.Tr("黑棕半透明 UI（推荐，默认）。面板/列表/按钮走暖黑棕+半透明，靠明度与描边区分层次；关掉则回退旧版军绿配色。"));
+		uiMono = Config.Bind("UI", "uiMono", true, Ui.Tr("半透明黑 UI（推荐，默认）。面板/列表/按钮走中性黑+半透明，靠明度与描边区分层次；关掉则回退旧版军绿配色。"));
 		uiMono.SettingChanged += (s, e) => GodViewController.ApplyMarkerConfig();
+		// 1.4.24：面板不透明度——"透 ↔ 黑"这条矛盾轴交给玩家自己调
+		//（越低越能透出战场，但面板越容易被地形颜色带偏；见 guide 陷阱 96）
+		uiPanelAlpha = Config.Bind("UI", "uiPanelAlpha", 0.85f, new ConfigDescription(Ui.Tr("面板不透明度（0.55~1.0）。越低越能透出战场，但面板越容易被地形颜色带偏；1.0 = 完全不透明。"), new AcceptableValueRange<float>(0.55f, 1f)));
+		uiPanelAlpha.SettingChanged += (s, e) => ER2Shared.Er2Ui.SetPanelAlpha(uiPanelAlpha.Value);
+		ER2Shared.Er2Ui.SetPanelAlpha(uiPanelAlpha.Value);
 
 		// ===== 2.5.0：世界空间标记（全部可关）=====
 		markersEnabled = Config.Bind("Markers", "markersEnabled", true, Ui.Tr("3D 场景标记总开关。关掉后所有世界空间标记（脚环/角标/集火环/目标点/路线/阵型）都不再绘制。"));
@@ -125,7 +131,7 @@ public class Plugin : BasePlugin
 
 		new Harmony("er2.squadcommand").PatchAll(typeof(Plugin).Assembly);
 		FrameEndRunner.Ensure();
-		ModLog.LogInfo("ER2 Battlefield Commander 1.4.23 loaded. godKey=" + godKey.Value);
+		ModLog.LogInfo("ER2 Battlefield Commander 1.4.24 loaded. godKey=" + godKey.Value);
 		ThirdPartyCompat.LogCoexistenceHint(ModLog); // 1.4.15：第三方 mod 共存提示
 	}
 }

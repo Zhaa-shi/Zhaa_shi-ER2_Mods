@@ -16,7 +16,8 @@ internal static class Ui
 	{
 		// ===== 面板 =====
 		["通用生成"] = "Universal Generation",
-		["黑棕半透明 UI（推荐，默认）。面板/列表/按钮走暖黑棕+半透明，靠明度与描边区分层次；关掉则回退旧版军绿配色。"] = "Dark-brown translucent UI (recommended, default). Panels/lists/buttons use warm dark brown with translucency; hierarchy comes from lightness and outlines. Turn off to fall back to the old military-green palette.",
+		["半透明黑 UI（推荐，默认）。面板/列表/按钮走中性黑+半透明，靠明度与描边区分层次；关掉则回退旧版军绿配色。"] = "Translucent black UI (recommended, default). Panels/lists/buttons use neutral black with translucency; hierarchy comes from lightness and outlines. Turn off to fall back to the old military-green palette.",
+		["面板不透明度（0.55~1.0）。越低越能透出战场，但面板越容易被地形颜色带偏；1.0 = 完全不透明。"] = "Panel opacity (0.55-1.0). Lower shows more battlefield through the panel, but the panel then picks up the terrain colour; 1.0 = fully opaque.",
 		["点击条目拿起 → 拖到单位身上放入背包，拖到地上则生成实体"] = "Click an entry to pick it up - drop on a unit to put it in their backpack, drop on the ground to spawn it",
 		["生成的我方/敌方单位不主动攻击中立（Civilian）阵营（被打仍会还手；玩家手动标记的目标照打）。"] = "Spawned friendly/enemy units do not attack the neutral (Civilian) faction on their own (they still fight back if attacked; manually marked targets are engaged as usual).",
 		["生成的敌方单位走原生 AI（主动推进、随战役任务进攻）。关闭后敌方与我方单位一样原地驻守、只接战不移动。"] = "Spawned enemy units use native AI (they advance and attack with the battle objective). Off = enemies hold position like your own units and only fight when engaged.",

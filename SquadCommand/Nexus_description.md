@@ -6,7 +6,7 @@ Adds an "RTS god-view squad command" layer to Easy Red 2, with mouse operations 
 ## Installation instructions
 1. Install BepInEx (IL2CPP build) into the game root folder.
 2. Put `ER2_BattlefieldCommander.dll` into `Easy Red 2\BepInEx\plugins\`.
-3. Launch the game — `Loading [ER2 Battlefield Commander 1.4.23]` in the BepInEx log means success.
+3. Launch the game — `Loading [ER2 Battlefield Commander 1.4.24]` in the BepInEx log means success.
 
 ## Main features
 - **God-view command**: F9 to enter free camera, WASD move, wheel zoom, MMB rotate, Q/E height, Space to pause/resume the world.
@@ -38,6 +38,19 @@ Adds an "RTS god-view squad command" layer to Easy Red 2, with mouse operations 
 Thanks to the Easy Red 2 community and the BepInEx / Harmony ecosystem, and to all authors whose IL2CPP modding work paved the way.
 
 ## Recent changes
+**1.4.24**
+* **Marker lines raised again (~60%)** - infantry ring 1.5 -> 2.4, selection brackets 2.2/2.6 -> 3.5/4.2,
+  focus ring 3.0 -> 4.8, route/boarding dashes 1.7/1.8 -> 2.7/2.9, formation 2.4/2.5 -> 3.8/4.0.
+  Thickness stays resolution-independent.
+* **The panel is now neutral black, not brown.** The warm brown cast is gone entirely (all surfaces
+  are R=G=B now), and the leather noise texture lost its warm tint too - over a neutral black base a
+  warm overlay just reads as yellow.
+* **Panel opacity is now yours to tune:** `UI/uiPanelAlpha` (default 0.85, range 0.55-1.0).
+  Translucency and darkness pull against each other - a translucent panel over brown dirt inevitably
+  picks up the terrain colour - so instead of guessing at a compromise, the whole axis is exposed as
+  a config entry. 1.0 = fully opaque.
+
+
 **1.4.23**
 * **Marker lines were too thin after the distance fix** - base widths raised about 40%
   (infantry ring 1.1 -> 1.5, selection brackets 1.6/1.9 -> 2.2/2.6, focus ring 2.2 -> 3.0, etc.).

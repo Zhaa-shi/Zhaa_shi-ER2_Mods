@@ -159,51 +159,68 @@ internal static class Er2Ui
 	public static bool Mono = true;
 
 	// 结构色的两套预设（Mono / Legacy），下面用属性按 Mono 分派。
-	// 1.4.23 **近黑皮革**（用户："这完全就是棕色，黑色呢，我要皮革的那种感觉，然后更黑一点"）：
-	//   ① **α 0.82 → 0.92**：这是"变成棕色"的真正原因——半透明面板叠在棕色泥地地形上，
-	//      地形颜色会透上来染色，α 越低越像"棕玻璃"。面板要黑就必须压住背景。
-	//   ② 底色整体压到**近黑**（#0C0906 系，"更黑一点"），只保留极轻的暖调（R>G>B）。
-	//   ③ **皮革质感**由 `Leather()`（64×64 程序化噪声，0.10 透明度叠加）+ `PanelBase()` 的
-	//      顶部内高光边共同实现——单靠颜色调不出"皮"，质感来自**斑驳 + 受光边缘**。
-	//   元素区分靠三重：近黑底 + 深棕描边/分隔线 + 选中亮棕填充。
-	private static readonly Color MonoPanelBg = new Color(0x0C / 255f, 0x09 / 255f, 0x06 / 255f, 0.92f);
-	private static readonly Color MonoPanelBorder = new Color(0x46 / 255f, 0x38 / 255f, 0x2A / 255f, 0.95f);
-	private static readonly Color MonoTitleBar = new Color(0x14 / 255f, 0x0F / 255f, 0x0B / 255f, 0.94f);
-	private static readonly Color MonoSurface = new Color(0x1B / 255f, 0x15 / 255f, 0x0F / 255f, 0.90f);
-	private static readonly Color MonoSurfaceHover = new Color(0x2A / 255f, 0x20 / 255f, 0x17 / 255f, 0.94f);
-	private static readonly Color MonoSurfaceActive = new Color(0x3B / 255f, 0x2C / 255f, 0x1F / 255f, 0.97f);
-	private static readonly Color MonoRowBg = new Color(0x13 / 255f, 0x0F / 255f, 0x0B / 255f, 0.86f);
+	// 1.4.24 **中性半透明黑**（用户："把面板UI改成半透明黑色，不要棕色了"）：
+	//   ① **去掉色相**——R=G=B（纯中性灰黑），不再带暖棕。棕色是上一轮为了"协调泥土背景"
+	//      刻意加的，用户明确否掉。
+	//   ② **不透明度改由 cfg 驱动**：`PanelAlpha`（cfg UI/uiPanelAlpha，默认 0.85）。
+	//      半透明与"够黑"是一对矛盾轴——α 越低越透但越容易被地形染色（陷阱 96），
+	//      与其替玩家猜，不如把这一轴暴露成配置项，默认取折中的 0.85。
+	//   ③ 皮革纹理保留（用户上轮要的质感），但**去掉暖调**改中性灰——
+	//      在中性黑底上留暖色会重新泛黄。
+	//   元素区分靠三重：中性黑底 + 中性描边/分隔线 + 选中亮灰填充。
+	private static readonly Color MonoPanelBg = new Color(0x08 / 255f, 0x08 / 255f, 0x0A / 255f);
+	private static readonly Color MonoPanelBorder = new Color(0x3C / 255f, 0x3C / 255f, 0x42 / 255f);
+	private static readonly Color MonoTitleBar = new Color(0x10 / 255f, 0x10 / 255f, 0x13 / 255f);
+	private static readonly Color MonoSurface = new Color(0x1A / 255f, 0x1A / 255f, 0x1E / 255f);
+	private static readonly Color MonoSurfaceHover = new Color(0x28 / 255f, 0x28 / 255f, 0x2E / 255f);
+	private static readonly Color MonoSurfaceActive = new Color(0x3A / 255f, 0x3A / 255f, 0x42 / 255f);
+	private static readonly Color MonoRowBg = new Color(0x11 / 255f, 0x11 / 255f, 0x14 / 255f);
 	private static readonly Color MonoFavRow = new Color(1f, 1f, 1f, 0.10f);
-	private static readonly Color MonoText = new Color(0xF2 / 255f, 0xED / 255f, 0xE6 / 255f, 1f);
-	private static readonly Color MonoTextDim = new Color(0xBF / 255f, 0xB3 / 255f, 0xA3 / 255f, 0.92f);
-	private static readonly Color MonoTextDisabled = new Color(0x8A / 255f, 0x7F / 255f, 0x70 / 255f, 0.80f);
+	private static readonly Color MonoText = new Color(0xF0 / 255f, 0xF0 / 255f, 0xF2 / 255f, 1f);
+	private static readonly Color MonoTextDim = new Color(0xB8 / 255f, 0xB8 / 255f, 0xBE / 255f, 0.92f);
+	private static readonly Color MonoTextDisabled = new Color(0x85 / 255f, 0x85 / 255f, 0x8C / 255f, 0.80f);
 	private static readonly Color MonoTextOnActive = new Color(1f, 1f, 1f, 1f);
-	private static readonly Color MonoTextOnPlate = new Color(0xF5 / 255f, 0xF0 / 255f, 0xE8 / 255f, 1f);
-	private static readonly Color MonoStarHot = new Color(0.91f, 0.87f, 0.82f, 0.95f);
-	private static readonly Color MonoSurfaceDisabled = new Color(0x12 / 255f, 0x0E / 255f, 0x0A / 255f, 0.66f);
-	private static readonly Color MonoRowHover = new Color(0xE8 / 255f, 0xD9 / 255f, 0xC4 / 255f, 0.12f);
-	private static readonly Color MonoListBg = new Color(0f, 0f, 0f, 0.45f);
-	// 1.4.23：结构线——近黑底上要用**深棕**才读得出边界（纯灰会发脏）
-	private static readonly Color MonoEdge = new Color(0x3A / 255f, 0x2E / 255f, 0x22 / 255f, 0.92f);   // 分隔线
-	private static readonly Color MonoEdgeSoft = new Color(1f, 1f, 1f, 0.10f);                          // 极淡分隔（行间）
+	private static readonly Color MonoTextOnPlate = new Color(0xF5 / 255f, 0xF5 / 255f, 0xF7 / 255f, 1f);
+	private static readonly Color MonoStarHot = new Color(0.90f, 0.90f, 0.92f, 0.95f);
+	private static readonly Color MonoSurfaceDisabled = new Color(0x10 / 255f, 0x10 / 255f, 0x12 / 255f, 0.62f);
+	private static readonly Color MonoRowHover = new Color(1f, 1f, 1f, 0.10f);
+	private static readonly Color MonoListBg = new Color(0f, 0f, 0f, 0.40f);
+	// 1.4.24：结构线改中性灰——中性黑底上深棕会显脏
+	private static readonly Color MonoEdge = new Color(0x38 / 255f, 0x38 / 255f, 0x3E / 255f);   // 分隔线
+	private static readonly Color MonoEdgeSoft = new Color(1f, 1f, 1f, 0.10f);                    // 极淡分隔（行间）
 
-	// —— A 面板结构 ——
-	public static Color PanelBg => Mono ? MonoPanelBg : LegacyPanelBg;                        // 面板底
-	public static Color PanelBorder => Mono ? MonoPanelBorder : new Color(0.35f, 0.5f, 0.35f, 0.55f); // 面板描边
-	public static Color TitleBar => Mono ? MonoTitleBar : new Color(0.06f, 0.11f, 0.06f, 0.95f);     // 标题条
-	public static Color ListBg => Mono ? MonoListBg : new Color(0f, 0f, 0f, 0.35f);            // 列表区底
-	public static Color Surface => Mono ? MonoSurface : LegacySurface;                        // 控件底
-	public static Color SurfaceHover => Mono ? MonoSurfaceHover : new Color(0.2f, 0.32f, 0.2f, 0.95f); // 悬停底
-	public static Color SurfaceActive => Mono ? MonoSurfaceActive : LegacySurfaceActive;      // 选中底
+	/// <summary>
+	/// cfg UI/uiPanelAlpha → 面板**主不透明度**（0.55~1.0）。默认 0.85。
+	/// 这是"透 ↔ 黑"那条矛盾轴：α 越低越能透出战场，但越容易被地形颜色染色（陷阱 96）。
+	/// 各结构色的相对层次（标题条更实、行底更透）由下面属性按比例推出，玩家只调一个值。
+	/// </summary>
+	public static float PanelAlpha = 0.85f;
+
+	public static void SetPanelAlpha(float v)
+	{
+		if (float.IsNaN(v)) return;
+		PanelAlpha = Mathf.Clamp(v, 0.55f, 1f);
+	}
+
+	private static Color WithA(Color c, float a) => new Color(c.r, c.g, c.b, Mathf.Clamp01(a));
+
+	// —— A 面板结构（1.4.24：Mono 分支的 α 由 `PanelAlpha` 推出，玩家一个 cfg 控全局透明度）——
+	public static Color PanelBg => Mono ? WithA(MonoPanelBg, PanelAlpha) : LegacyPanelBg;                        // 面板底
+	public static Color PanelBorder => Mono ? WithA(MonoPanelBorder, PanelAlpha + 0.10f) : new Color(0.35f, 0.5f, 0.35f, 0.55f); // 面板描边
+	public static Color TitleBar => Mono ? WithA(MonoTitleBar, PanelAlpha + 0.05f) : new Color(0.06f, 0.11f, 0.06f, 0.95f);     // 标题条
+	public static Color ListBg => Mono ? MonoListBg : new Color(0f, 0f, 0f, 0.35f);            // 列表区底（内凹，不随 PanelAlpha）
+	public static Color Surface => Mono ? WithA(MonoSurface, PanelAlpha) : LegacySurface;                        // 控件底
+	public static Color SurfaceHover => Mono ? WithA(MonoSurfaceHover, PanelAlpha + 0.07f) : new Color(0.2f, 0.32f, 0.2f, 0.95f); // 悬停底
+	public static Color SurfaceActive => Mono ? WithA(MonoSurfaceActive, PanelAlpha + 0.13f) : LegacySurfaceActive;      // 选中底
 	public static Color SurfaceDisabled => Mono ? MonoSurfaceDisabled : new Color(0f, 0f, 0f, 0.55f); // 禁用底
-	public static Color RowBg => Mono ? MonoRowBg : LegacyRowBg;                              // 普通行底
+	public static Color RowBg => Mono ? WithA(MonoRowBg, PanelAlpha - 0.05f) : LegacyRowBg;                              // 普通行底
 	public static Color RowHover => Mono ? MonoRowHover : new Color(0.5f, 0.7f, 0.5f, 0.12f); // 行悬停覆盖
 	public static Color SurfaceRow => Surface;                                                // 兼容旧名（列表行底）
 	public static Color FavRow => Mono ? MonoFavRow : LegacyFavRow;                           // 收藏行底
 
 	// —— A2 结构线（2.5.2 新增：设计感靠"面 + 线 + 条"三维，不再只靠明度差）——
 	/// <summary>分隔线（标题条下、列表上下、面板内分区）。</summary>
-	public static Color Edge => Mono ? MonoEdge : new Color(0.35f, 0.5f, 0.35f, 0.55f);
+	public static Color Edge => Mono ? WithA(MonoEdge, PanelAlpha + 0.08f) : new Color(0.35f, 0.5f, 0.35f, 0.55f);
 	/// <summary>极淡分隔（列表行之间）——只在需要"分而不抢"时用。</summary>
 	public static Color EdgeSoft => Mono ? MonoEdgeSoft : new Color(0.5f, 0.7f, 0.5f, 0.10f);
 
@@ -215,11 +232,11 @@ internal static class Er2Ui
 	public static Color TextOnPlate => Mono ? MonoTextOnPlate : new Color(0.9f, 0.96f, 0.9f, 1f);      // 底板上的字
 
 	// —— C 指示 ——
-	public static Color Accent => new Color(0xF5 / 255f, 0xEF / 255f, 0xE6 / 255f, 1f);        // 强调（1.4.22 黑棕主题里=暖白）
+	public static Color Accent => new Color(0xF5 / 255f, 0xF5 / 255f, 0xF7 / 255f, 1f);        // 强调（1.4.24 中性主题里=近纯白）
 	public static Color Warn => new Color(0xE0 / 255f, 0xA3 / 255f, 0x3A / 255f, 0.98f);      // 警告（暂停等）
 	public static Color Danger => new Color(0xC4 / 255f, 0x45 / 255f, 0x3C / 255f, 0.95f);    // 危险（集火）
 	public static Color Success => new Color(0x6F / 255f, 0xA8 / 255f, 0x60 / 255f, 0.95f);   // 成功
-	public static Color Scrim => new Color(0x14 / 255f, 0x0F / 255f, 0x0A / 255f, 0.72f);     // 遮罩（1.4.22 暖黑半透，提示条/徽标底）
+	public static Color Scrim => new Color(0.02f, 0.02f, 0.025f, 0.72f);                       // 遮罩（1.4.24 中性黑半透，提示条/徽标底）
 	public static Color StarOn => new Color(1f, 0xD4 / 255f, 0x5E / 255f, 1f);                // ★
 	public static Color StarHot => Mono ? MonoStarHot : LegacyStarHot;                        // ☆ 悬停
 
@@ -428,7 +445,7 @@ internal static class Er2Ui
 				float n2 = Mathf.PerlinNoise(x * 0.37f + 31.7f, y * 0.37f + 11.3f); // 细粒
 				float v = Mathf.Clamp01(0.5f + (n1 - 0.5f) * 0.62f + (n2 - 0.5f) * 0.28f);
 				float g = Mathf.Lerp(0.34f, 0.66f, v);
-				px[y * S + x] = new Color(g, g * 0.96f, g * 0.90f, 1f);   // 略暖，与黑棕底同调
+				px[y * S + x] = new Color(g, g, g, 1f);   // 1.4.24：中性灰（去暖调，配中性黑底）
 			}
 		}
 		leatherTex.SetPixels(px);
