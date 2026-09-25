@@ -834,10 +834,10 @@ internal static class Formation
 			if (hasEnd && lineLen > 0.3f)
 			{
 				SceneMarkers.Arrow("FMA", anchor + Vector3.up * 0.3f, end + Vector3.up * 0.3f, ac,
-					ER2Shared.Er2Ui.LineWidth(2.5f, camDist), true);
+					ER2Shared.Er2Ui.LineWidth(0.060f, camDist), true);
 				SceneMarkers.Line("FML", anchor + perpDir * (lineLen * 0.5f) + Vector3.up * 0.25f,
 					anchor - perpDir * (lineLen * 0.5f) + Vector3.up * 0.25f, acLine,
-					ER2Shared.Er2Ui.LineWidth(1.7f, camDist), true, false);
+					ER2Shared.Er2Ui.LineWidth(0.030f, camDist), true, false);
 			}
 			else
 			{
@@ -854,14 +854,14 @@ internal static class Formation
 		i = 0;
 		foreach (LineSlot ls in vehSlots)
 		{
-			try { SceneMarkers.Bracket("FMV" + i, ls.pos + Vector3.up * 0.15f, 3.2f, ac, ER2Shared.Er2Ui.LineWidth(2.4f, camDist), true); } catch { }
+			try { SceneMarkers.Bracket("FMV" + i, ls.pos + Vector3.up * 0.15f, 3.2f, ac, ER2Shared.Er2Ui.LineWidth(0.048f, camDist), true); } catch { }
 			i++;
 		}
 		// 1.2.3：只转向的火力点/火炮——在自身位置画角括号（箭头已表示方向）
 		i = 0;
 		foreach (Vehicle v in facingOnly)
 		{
-			try { if (v != null && v.transform != null) SceneMarkers.Bracket("FMF" + i, v.transform.position + Vector3.up * 0.15f, 2.2f, acFacing, ER2Shared.Er2Ui.LineWidth(2.4f, camDist), true); } catch { }
+			try { if (v != null && v.transform != null) SceneMarkers.Bracket("FMF" + i, v.transform.position + Vector3.up * 0.15f, 2.2f, acFacing, ER2Shared.Er2Ui.LineWidth(0.048f, camDist), true); } catch { }
 			i++;
 		}
 	}

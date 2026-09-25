@@ -9,7 +9,7 @@ using UnityEngine;
 
 namespace ER2SquadCommand;
 
-[BepInPlugin("er2.squadcommand", "ER2 Battlefield Commander", "1.4.25")]
+[BepInPlugin("er2.squadcommand", "ER2 Battlefield Commander", "1.4.26")]
 public class Plugin : BasePlugin
 {
 	internal static ManualLogSource ModLog;
@@ -108,9 +108,9 @@ public class Plugin : BasePlugin
 		showNamePlates = Config.Bind("Markers", "showNamePlates", true, Ui.Tr("世界空间名签（集火目标名称，带深色底板）。"));
 		markerPulse = Config.Bind("Markers", "markerPulse", true, Ui.Tr("选中/目标指示的呼吸脉动效果。关掉为静态（性能略好，画面更稳）。"));
 		markerScale = Config.Bind("Markers", "markerScale", 1f, new ConfigDescription(Ui.Tr("标记整体尺寸倍率（角标/环/目标点半径同乘）。"), new AcceptableValueRange<float>(0.5f, 2f)));
-		// 1.4.21：线宽语义改为"1080p 基准像素宽"（见 Er2Ui.LineWidth），这里只是再乘的倍数
-		// 1.4.22：下限 0.5 → 0.25（用户"还是太粗"时能再细一半）
-		markerLineWidth = Config.Bind("Markers", "markerLineWidth", 1f, new ConfigDescription(Ui.Tr("标记线宽倍率（在 1080p 基准像素宽之上再乘）。1 = 细（约 1.1~2.2 像素），嫌粗可调到 0.5 以下。"), new AcceptableValueRange<float>(0.25f, 3f)));
+		// 1.4.26：线宽语义改为**世界空间米**（见 Er2Ui.LineWidth）——与标记半径同一尺度规则，
+		// 近大远小、比例与视距无关。这里只是再乘的倍数。
+		markerLineWidth = Config.Bind("Markers", "markerLineWidth", 1f, new ConfigDescription(Ui.Tr("标记线宽倍率（在世界空间基准线宽之上再乘）。1 = 默认；嫌细调大、嫌粗调小。"), new AcceptableValueRange<float>(0.25f, 3f)));
 		markerThroughWall = Config.Bind("Markers", "markerThroughWall", false, Ui.Tr("标记穿墙显示（不做深度测试）。开启后单位进建筑也能看到标记，但会糊在墙面上。"));
 		markerColorMode = Config.Bind("Markers", "markerColorMode", "Mono", new ConfigDescription(Ui.Tr("标记配色：Mono=灰阶单色（默认，配灰黑 UI；层次靠灰度值而非透明度）/ Semantic=集火红、降级橙（保留语义色）。"), new AcceptableValueList<string>("Mono", "Semantic")));
 		markersEnabled.SettingChanged += (s, e) => GodViewController.ApplyMarkerConfig();
@@ -131,7 +131,7 @@ public class Plugin : BasePlugin
 
 		new Harmony("er2.squadcommand").PatchAll(typeof(Plugin).Assembly);
 		FrameEndRunner.Ensure();
-		ModLog.LogInfo("ER2 Battlefield Commander 1.4.25 loaded. godKey=" + godKey.Value);
+		ModLog.LogInfo("ER2 Battlefield Commander 1.4.26 loaded. godKey=" + godKey.Value);
 		ThirdPartyCompat.LogCoexistenceHint(ModLog); // 1.4.15：第三方 mod 共存提示
 	}
 }

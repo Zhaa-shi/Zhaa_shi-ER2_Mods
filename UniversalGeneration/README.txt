@@ -1,4 +1,4 @@
-ER2 Universal Generation v2.5.6
+ER2 Universal Generation v2.5.7
 ================================
 
 Spawn any unit, vehicle, or item anywhere, right from Battlefield Commander's RTS god view.
@@ -41,6 +41,11 @@ How to use
 
 Changelog
 --------------------------------
+2.5.7
+- **Marker line width now uses fixed world units** (shared toolkit), matching the marker radii which are also fixed world sizes. Previously width was constant in screen pixels, so its *world* width grew with distance and far-away rings filled into solid discs. Near is now thicker and far thinner, with a constant ratio - natural perspective.
+- `[Markers] markerLineWidth` still scales every marker line together.
+
+
 2.5.6
 - **Marker lines reverted to the 1.4.23 widths** - the "too thin" impression came from a very close camera: marker radii are fixed world sizes, so up close the ring fills much of the screen while the line stays pixel-constant, dropping the line/hole ratio. Use `[Markers] markerLineWidth` if it still reads thin at close range.
 - **Fixed the bottom help text running past the panel edge** (bottom padding 8 -> 18px, help row 34 -> 38px).

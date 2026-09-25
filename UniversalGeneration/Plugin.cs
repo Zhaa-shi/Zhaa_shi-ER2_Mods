@@ -9,7 +9,7 @@ using UnityEngine;
 
 namespace ER2UniversalGeneration;
 
-[BepInPlugin("er2.universalgeneration", "ER2 Universal Generation", "2.5.6")]
+[BepInPlugin("er2.universalgeneration", "ER2 Universal Generation", "2.5.7")]
 public class Plugin : BasePlugin
 {
 	internal static ManualLogSource ModLog;
@@ -71,6 +71,6 @@ public class Plugin : BasePlugin
 		ItemCatalog.Ensure();
 		new Harmony("er2.universalgeneration").PatchAll(typeof(Plugin).Assembly); // Tick/Draw 驱动补丁
 
-		ModLog.LogInfo("ER2 Universal Generation 2.5.6 loaded. panelKey=" + panelKey.Value);
+		ModLog.LogInfo("ER2 Universal Generation 2.5.7 loaded. panelKey=" + panelKey.Value);
 	}
 }

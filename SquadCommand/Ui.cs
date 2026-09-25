@@ -147,7 +147,7 @@ internal static class Ui
 		["世界空间名签（集火目标名称，带深色底板）。"] = "World-space name plates (focus target name, dark backing).",
 		["选中/目标指示的呼吸脉动效果。关掉为静态（性能略好，画面更稳）。"] = "Breathing pulse on selection/target markers. Off = static (slightly faster, steadier image).",
 		["标记整体尺寸倍率（角标/环/目标点半径同乘）。"] = "Global marker size multiplier (applies to bracket/ring/target radius).",
-		["标记线宽倍率（在 1080p 基准像素宽之上再乘）。1 = 细（约 1.1~2.2 像素），嫌粗可调到 0.5 以下。"] = "Marker line width multiplier (on top of the 1080p base pixel width). 1 = thin (~1.1-2.2 px); lower it below 0.5 if still too thick.",
+		["标记线宽倍率（在世界空间基准线宽之上再乘）。1 = 默认；嫌细调大、嫌粗调小。"] = "Marker line width multiplier (on top of the world-space base width). 1 = default; raise if too thin, lower if too thick.",
 		["标记穿墙显示（不做深度测试）。开启后单位进建筑也能看到标记，但会糊在墙面上。"] = "Draw markers through walls (no depth test). Units inside buildings stay visible, but markers smear on wall surfaces.",
 		["标记配色：Mono=灰阶单色（默认，配灰黑 UI；层次靠灰度值而非透明度）/ Semantic=集火红、降级橙（保留语义色）。"] = "Marker palette: Mono = greyscale (default, matches the dark UI; hierarchy by lightness, not alpha) / Semantic = red focus, orange downgraded (keeps semantic colors).",
 		["半透明黑 UI（推荐，默认）。面板/列表/按钮走中性黑+半透明，靠明度与描边区分层次；关掉则回退旧版军绿配色。"] = "Translucent black UI (recommended, default). Panels/lists/buttons use neutral black with translucency; hierarchy comes from lightness and outlines. Turn off to fall back to the old military-green palette.",

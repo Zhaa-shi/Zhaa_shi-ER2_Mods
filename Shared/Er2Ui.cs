@@ -309,53 +309,29 @@ internal static class Er2Ui
 		}
 	}
 
-	// ══════════ 线宽：目标像素宽模型（1.4.21）══════════
-	// LineRenderer.widthMultiplier 是**世界单位**，不是像素。屏幕上的像素宽满足：
-	//     px = width_m × screenH / (2 × dist × tan(fov/2))
-	// 所以：
-	//   ① 直接写死世界单位 → 近粗远细（同一个环在脚下和 200m 外完全两种粗细）；
-	//   ② 用"经验倍率"补偿（如 dist/30）→ 与分辨率强耦合：1080p 调好的值，
-	//      1440p 下粗 1.33 倍、4K 下粗 2 倍（用户"线太粗"投诉的一大来源）。
-	// 现在调用点只写 **1080p 下的目标像素宽**，由 LineWidth 反算世界单位：
-	//     px1080 → px = px1080 × screenH / 1080
-	//     width_m = px × 2 × dist × tan(fov/2) / screenH = px1080 × 2 × dist × tan(fov/2) / 1080
-	// screenH 约掉 → 结果与分辨率无关（占屏比例恒定），且屏幕像素宽不随视距变化。
-	// 参考：60° 垂直 FOV 时 2 × tan(30°) / 1080 ≈ 0.001069 ⇒ width_m ≈ px × dist × 0.001069
-	//（dist=60m、px=1.6 ⇒ 0.103m；屏幕上看就是 1.6px/1080p。）
-
-	/// <summary>目标像素宽的参考分辨率。调用点写的像素值都以 1080p 为基准。</summary>
-	private const float RefScreenH = 1080f;
+	// ══════════ 线宽：固定世界单位（1.4.26）══════════
+	// 沿革（三段，都是被实测推着走的，别再回头）：
+	//   1.4.21 用"经验倍率"补偿 → 与分辨率强耦合（1440p 粗 1.33×、4K 粗 2×）；
+	//   1.4.22 改"距离取错"（position.magnitude 是到世界原点的距离）→ 线宽爆表；
+	//   1.4.24 改"1080p 目标像素宽"（width_m ∝ dist）→ 屏幕像素恒定，跨分辨率一致。
+	//   **1.4.26 定案：回到固定世界单位**——因为像素恒定与标记本身的尺度规则冲突：
+	//   标记半径 `UnitRingRadius` 是**固定世界值**（从 Collider 量出，clamp 0.35~1.1m），
+	//   圆环天然"近大远小"；而像素恒定让**线宽的世界值 ∝ 距离**，远处线宽被放大到逼近环半径
+	//   （60m 处 1.5px ≈ 0.10m，200m 处 ≈ 0.34m vs 环半径 0.6m）→ **环被糊成实心大圆盘**。
+	//   用户原话："这个标记近小圆大"——精确描述了这个现象。
+	//   定案：线宽也用固定世界米，与环一起近大远小，比例恒定、透视自然。
+	//   代价：极远处线会细到亚像素（那就是真实透视的表现），不再做人为补偿。
 
 	/// <summary>
-	/// 垂直 FOV（度）。GodView / Formation 取到相机时会顺手注入真实值；
-	/// 取不到时按 60° 走（不静默失效——失败可观测原则）。
+	/// 线宽总入口（1.4.26）：<paramref name="baseMeters"/> = **世界空间线宽（米）**，
+	/// 与标记半径同一尺度规则 → 近大远小，比例与视距无关。
+	/// 层次建议（米）：脚环 0.032 / 虚线 0.030~0.038 / 角标 0.042~0.060 / 强调环 0.065。
+	/// <paramref name="camDist"/> 保留在签名里（13 个调用点不必逐处改），当前**不参与换算**——
+	/// 这是有意的：线宽回到世界空间后，距离不再应该是它的输入。
 	/// </summary>
-	private static float camFovDeg = 60f;
-
-	/// <summary>当前用于线宽换算的垂直 FOV（度）。</summary>
-	public static float CamFovDeg => camFovDeg;
-
-	/// <summary>
-	/// 相机 FOV 注入点。传 0 / NaN / 越界值表示"这次没拿到"，保留上次的值（不打断渲染）。
-	/// </summary>
-	public static void SetCamFov(float deg)
+	public static float LineWidth(float baseMeters, float camDist)
 	{
-		if (float.IsNaN(deg) || deg < 15f || deg > 120f) return;
-		camFovDeg = deg;
-	}
-
-	/// <summary>
-	/// 线宽总入口：<paramref name="pxAt1080"/> = 1080p 下的目标像素宽 →
-	/// LineRenderer 要的世界单位。层次建议：背景脚环 1.1 / 虚线 1.2~1.3 /
-	/// 选中角标 1.6~1.9 / 强调环 2.2。
-	/// </summary>
-	public static float LineWidth(float pxAt1080, float camDist)
-	{
-		float d = (camDist > 0f && !float.IsNaN(camDist)) ? camDist : 60f;
-		float tanHalf = Mathf.Tan(camFovDeg * 0.5f * Mathf.Deg2Rad);
-		if (tanHalf <= 0.001f) tanHalf = 0.5773503f;   // 兜底 = tan(30°)
-		float wm = pxAt1080 * 2f * d * tanHalf / RefScreenH;
-		return Mathf.Clamp(wm, 0.003f, 3f);
+		return Mathf.Clamp(baseMeters, 0.003f, 3f);
 	}
 
 	/// <summary>cfg UI/uiMono → Mono。启动与 <c>SettingChanged</c> 时各调一次。</summary>

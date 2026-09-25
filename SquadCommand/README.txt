@@ -1,7 +1,21 @@
-ER2 Battlefield Commander v1.4.25
+ER2 Battlefield Commander v1.4.26
 =================================
 
 A BepInEx plugin for Easy Red 2 that adds an "RTS god-view squad command" layer — mouse operations inspired by Gates of Hell: Ostfront.
+
+[1.4.26 Marker line width back to world space (natural near-big / far-small)]
+* **Root cause of the "close = small, far = big disc" look found.** Marker radii are **fixed world
+  sizes** (measured from each unit's collider, clamped to 0.35-1.1 m for infantry and 1.6-4.2 m for
+  vehicles), so a ring naturally shrinks with distance. Line width, however, was constant in *screen
+  pixels* - which means its **world** width grew with distance: 1.5 px at 60 m is already about 0.10 m,
+  and around 200 m it reaches ~0.34 m against a 0.6 m ring radius. The ring fills in and reads as a
+  solid disc. Mixing a world-space size rule with a screen-space one is the actual bug.
+* **Line width now uses fixed world units too** (infantry ring 0.032 m, brackets 0.042/0.060 m,
+  focus ring 0.065 m, dashes 0.030-0.038 m, formation 0.048/0.060 m). Lines now scale with the markers
+  they belong to - near is thicker, far is thinner, and the ratio stays constant at any camera
+  distance. The trade-off is intentional: at extreme range a line thins below a pixel, which is what
+  real perspective looks like. `[Markers] markerLineWidth` still scales all of them.
+
 
 [1.4.25 Contrast pass + bottom padding]
 * **Marker line width reverted to the 1.4.23 values** (infantry ring 1.5, brackets 2.2/2.6, focus ring 3.0,
