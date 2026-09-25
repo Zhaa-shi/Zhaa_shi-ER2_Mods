@@ -394,7 +394,10 @@ internal static class GenPanel
 		// 1.4.22：全部 × Scale（原为硬编码 100/24/62/22——UI 缩放后标题与按钮错位）
 		// 2.5.27：三个矩形全部**整数对齐**（2.5.4 亚像素模糊根因——裸 GUI.Label/Button 不经过
 		// LabelShadowed 的对齐，Scale≈0.998 之类非整数倍率下坐标带小数 = 文字发灰）
+		// 2.5.28：**绘制前再强制复位一次 IMGUI 状态**——灰字终审发现污染可能发生在入口复位之后
+		//（同一帧内先画的行干净、后画的行灰 = 栈中间有未复原状态），裸 Label/Button 不再裸奔
 		float ts = Er2Ui.Scale;
+		GUI.color = Color.white; GUI.contentColor = Color.white; GUI.backgroundColor = Color.white;
 		Rect tr = new Rect(rect.x, rect.y, rect.width - 100f * ts, 24f * ts);
 		tr.x = Mathf.Round(tr.x); tr.y = Mathf.Round(tr.y);
 		GUI.Label(tr, Ui.Tr("通用生成"), titleStyle);
@@ -420,7 +423,15 @@ internal static class GenPanel
 		// 1.4.22：× Scale + 未选中项加暖棕描边（用户："UI 各元素区分不明显"）
 		// 2.5.27：按钮矩形**整数对齐**——third = 宽度/3 除不尽 → 阵营行文字亚像素模糊发灰
 		//（用户实测：Allies 整数位 255 纯白、Neutral 分数位 229 灰），文字描边由按钮样式自带白色
+		// 2.5.28：**连续探针 + 强制复位**——灰字若在此处仍出现，探针会把当时的 IMGUI 状态打进日志
 		float fs = Er2Ui.Scale;
+		GUI.color = Color.white; GUI.contentColor = Color.white; GUI.backgroundColor = Color.white;
+		if (Time.unscaledTime >= factionProbeNext)
+		{
+			factionProbeNext = Time.unscaledTime + 2f;
+			Plugin.ModLog?.LogInfo("[UniGen] 阵营行状态探针: GUI.color=" + GUI.color
+				+ " contentColor=" + GUI.contentColor + " enabled=" + GUI.enabled);
+		}
 		float third = (rect.width - 16f * fs) / 3f;
 		float fh = 30f * fs;
 		string[] labs = { Ui.Tr("我方"), Ui.Tr("敌方"), Ui.Tr("中立") };
@@ -1064,11 +1075,14 @@ internal static class GenPanel
 	}
 
 	/// <summary>RTS 的"生成"开关按钮（仅面板关闭时显示；点击=G）。
-	/// 1.1.1：从左下角移到左缘中段（用户要求：左下角让位给战场指挥官的选中单位信息面板）。</summary>
+	/// 1.1.1：从左下角移到左缘中段（用户要求：左下角让位给战场指挥官的选中单位信息面板）。
+	/// 2.5.29：**整数对齐**——Screen.height*0.42 是分数坐标，按钮文字亚像素模糊发灰（灰字同款根因）。</summary>
 	private static Rect ToggleButtonRect()
 	{
-		return new Rect(12f * Er2Ui.Scale, Screen.height * 0.42f,
+		Rect r = new Rect(12f * Er2Ui.Scale, Screen.height * 0.42f,
 			120f * Er2Ui.Scale, 26f * Er2Ui.Scale);
+		r.x = Mathf.Round(r.x); r.y = Mathf.Round(r.y);
+		return r;
 	}
 
 	public static void DrawToggleButton()
@@ -1077,6 +1091,7 @@ internal static class GenPanel
 		EnsureStyles();
 		Rect r = ToggleButtonRect();
 		bool clicked = GUI.Button(r, Ui.Tr("生成 [G]"), buttonStyle);
+		Er2Ui.Frame(r, Er2Ui.Edge, Mathf.Max(1f, Er2Ui.Scale));   // 2.5.29：描边与页签/阵营按钮同款
 		if (clicked)
 		{
 			Event.current.Use();
@@ -1162,4 +1177,6 @@ internal static class GenPanel
 	private static float styleScale = 1f;
 	// 2.5.3：UI 诊断快照只打一次（日志强制令）
 	private static bool uiDiagLogged;
+	// 2.5.28：阵营行状态探针节流（2s 一条）
+	private static float factionProbeNext;
 }

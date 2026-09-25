@@ -51,7 +51,7 @@ internal static class ItemDragger
 		hoverSoldier = null;
 		// 关闭面板 → 全屏让位给拖放（关掉才能看到落点，也避免面板吃掉松手事件）
 		GenPanel.SetOpen(false, false);
-		GenPanel.Flash(Ui.Tr("携带 ") + e.Title + Ui.Tr("：拖到单位身上放背包，拖到地上丢弃"));
+		GenPanel.Flash(Ui.Tr("携带 ") + e.Title + Ui.Tr("：拖到单位身上放背包，拖到地上丢弃 · Shift 连续"));
 	}
 
 	/// <summary>取消携带（右键/ESC/G/宿主退出）。幂等。</summary>
@@ -209,7 +209,20 @@ internal static class ItemDragger
 		{
 			// ② 落到地面 → 生成世界实体
 			GameObject go = ItemSpawner.DropAt(id, pos, out string msg);
-			if (go != null) GenPanel.Flash(Ui.Tr("已丢下 ") + title);
+			if (go != null)
+			{
+				// 2.5.29（用户："让通用生成mod也支持长按shift连续放置物品"）：
+				// **Shift 按住时丢地上后继续保持携带**——连点连放，右键/ESC/G 结束
+				//（与 Placer 单位放置的 Shift 连续同款体验）。放进背包不适用（物品已易主）。
+				bool shift = Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift);
+				if (shift)
+				{
+					GenPanel.Flash(Ui.Tr("已丢下 ") + title + Ui.Tr("（Shift 连续放置中，右键结束）"));
+					Plugin.ModLog.LogInfo("[UniGen] Shift 连续放置: " + id + " @ " + pos);
+					return;   // 不 Cancel：携带状态与幽灵模型原样保留，下一击继续放置
+				}
+				GenPanel.Flash(Ui.Tr("已丢下 ") + title);
+			}
 			else GenPanel.Flash(msg, true);
 			Cancel("投放完成");
 			return;

@@ -71,6 +71,8 @@ internal static class Ui
 			= "Click to pick up → drop on a unit for their backpack, or on the ground to spawn it",
 		["携带 "] = "Carrying ",
 		["：拖到单位身上放背包，拖到地上丢弃"] = ": drop on a unit for their backpack, or on the ground",
+		[" · Shift 连续"] = " - hold Shift to keep placing",
+		["（Shift 连续放置中，右键结束）"] = " (Shift held: keep placing - RMB to finish)",
 		["携带: "] = "Carrying: ",
 		["松手 → 放入 "] = "Release → put into ",
 		[" 的背包"] = "'s backpack",
