@@ -17,9 +17,11 @@ internal static class MouseCursor
 {
 	internal enum Shape { Default, Friendly, Enemy, Vehicle, Building, Emplacement, Cross, Interactable }
 
-	private const int TexSize = 32;
-	private const float RingRadius = 7f;         // 1.4.1（用户反馈太大）：10.5 → 7
-	private const float RingHalfWidth = 1.1f;
+	// 1.4.31：32 → 64。32×32 是 Windows 硬件光标的上限，一旦系统 DPI 缩放或游戏
+	// 全屏缩放把它拉伸，就会明显发糊。给 64 后 Unity 自动走**软件光标**，按屏幕坐标绘制，锐利。
+	private const int TexSize = 64;
+	private const float RingRadius = 14f;        // 1.4.31：随 TexSize 32→64 等比放大（原 7@32）
+	private const float RingHalfWidth = 2.2f;    // 同上（原 1.1@32）
 	private const float RingAlpha = 0.9f;        // 系统光标不参与场景混合，可以更实
 	private const float RingDarkAlpha = 0.5f;    // 外侧暗描边
 	private const float ReprobeInterval = 0.1f;
@@ -125,14 +127,17 @@ internal static class MouseCursor
 	{
 		switch (s)
 		{
-			case Shape.Friendly: return new Color(0.80f, 0.80f, 0.80f, 1f);   // 灰（友军，含大量单位，压低不抢眼）
-			case Shape.Enemy: return new Color(1f, 0.38f, 0.33f, 1f);         // 红（敌对，保留）
-			case Shape.Vehicle: return new Color(0.92f, 0.92f, 0.92f, 1f);    // 亮灰
-			case Shape.Building: return new Color(0.72f, 0.72f, 0.72f, 1f);   // 中灰
-			case Shape.Emplacement: return new Color(1f, 0.68f, 0.3f, 1f);    // 橙（可操作重武器，保留）
-			case Shape.Interactable: return new Color(1f, 1f, 1f, 1f);        // 纯白（当前可交互，最亮）
-			case Shape.Cross: return new Color(1f, 1f, 1f, 1f);               // 纯白
-			default: return new Color(1f, 1f, 1f, 1f);                        // 纯白
+			// 1.4.31：**恢复逐状态语义色**。1.4.19 为配合灰黑 UI 把光标整体压成灰阶，
+			// 结果只剩"敌军红 / 工事橙"两档，用户反馈"不能变色了"。
+			// 光标画在 3D 场景上（不是面板里），本来就不必跟着面板去色——恢复彩色反而更好辨认。
+			case Shape.Friendly: return new Color(0.35f, 0.95f, 0.55f, 1f);   // 青绿（友军）
+			case Shape.Enemy: return new Color(1f, 0.32f, 0.28f, 1f);         // 红（敌军）
+			case Shape.Vehicle: return new Color(0.35f, 0.85f, 1f, 1f);       // 亮青（可驾驶载具）
+			case Shape.Building: return new Color(0.78f, 0.78f, 0.80f, 1f);   // 灰白（建筑＝环境物）
+			case Shape.Emplacement: return new Color(1f, 0.68f, 0.28f, 1f);   // 橙（工事/重武器）
+			case Shape.Interactable: return new Color(1f, 0.92f, 0.35f, 1f);  // 黄（可交互物品）
+			case Shape.Cross: return new Color(1f, 1f, 1f, 1f);               // 纯白（精度十字）
+			default: return new Color(1f, 1f, 1f, 1f);                        // 纯白（默认）
 		}
 	}
 

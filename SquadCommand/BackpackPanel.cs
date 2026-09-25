@@ -109,7 +109,10 @@ internal static class BackpackPanel
     private static Rect menuRect;
     private static readonly List<Action> menuExec = new List<Action>();   // 统一执行列表：原生=Interaction.Call；合成=Lua 穿戴
     private static readonly List<string> menuLabels = new List<string>();
-    private static readonly List<string> menuRaw = new List<string>();    // 1.4.17：与 menuLabels 平行的**原文**（未翻译），供「拾起」前缀判定；合成条目压入同长占位保持对齐
+    private static readonly List<string> menuRaw = new List<string>();    // 1.4.17：与 menuLabels 平行的**原文**（未翻译），仅作兜底判定
+    // 1.4.31：与上面两者平行的**交互对象**。判定「拾起」类交互改用**结构**（classType）而非显示文本——
+    // 文本随语言变，`StartsWith("拾起")` 在 EN 版必然失效，那正是"捡枪又隔空了"的根因。
+    private static readonly List<Interaction> menuInts = new List<Interaction>();
     private static bool MenuOpen => menuExec.Count > 0;
 
     // ── 宿主接线 ──
@@ -247,6 +250,7 @@ internal static class BackpackPanel
                 menuExec.RemoveAt(i);
                 menuLabels.RemoveAt(i);
                 menuRaw.RemoveAt(i);
+                if (i < menuInts.Count) menuInts.RemoveAt(i);
                 pruned++;
             }
             if (pruned > 0) SquadCmdLogic.Log("[Backpack] 剪掉原生穿戴条目 " + pruned + " 个（对非玩家静默无效），改用合成通道");
@@ -264,7 +268,8 @@ internal static class BackpackPanel
             if (weapon != null)
             {
                 menuLabels.Add(Ui.Tr("穿上"));
-                menuRaw.Add("穿上"); // 1.4.17：合成条目压占位原文，保持三列表等长（剪枝/索引安全）
+                menuRaw.Add("穿上"); // 1.4.17：合成条目压占位原文，保持各列表等长（剪枝/索引安全）
+                menuInts.Add(null);
                 menuExec.Add(() =>
                 {
                     string bw = WearSnapshot(owner);
@@ -280,6 +285,7 @@ internal static class BackpackPanel
             {
                 menuLabels.Add(Ui.Tr("穿上"));
                 menuRaw.Add("穿上");
+                menuInts.Add(null);
                 menuExec.Add(() => WearItem(w, owner, id, 0));
                 SquadCmdLogic.Log("[Backpack] 合成穿戴项（盔）" + id);
             }
@@ -288,6 +294,7 @@ internal static class BackpackPanel
                 bool uniform = id.ToLowerInvariant().Contains("uniform");
                 menuLabels.Add(Ui.Tr("穿上"));
                 menuRaw.Add("穿上");
+                menuInts.Add(null);
                 menuExec.Add(() => WearItem(w, owner, id, uniform ? 1 : 2));
                 SquadCmdLogic.Log("[Backpack] 合成穿戴项（" + (uniform ? "衣" : "甲/挂") + "）" + id);
             }
@@ -474,6 +481,7 @@ internal static class BackpackPanel
                 menuExec.Add(() => it2.Call());
                 menuLabels.Add(txt);
                 menuRaw.Add(raw);
+                menuInts.Add(it);   // 1.4.31：结构判定的依据
             }
         }
         catch (Exception ex)
@@ -539,6 +547,55 @@ internal static class BackpackPanel
         // 点击不在条目循环里处理——菜单是模态的，Draw() 早在进格子前就裁决过（1.4.1）
     }
 
+    /// <summary>
+    /// 1.4.31：判断某个菜单条目是否为「拾起」类交互。**结构优先**：
+    /// `Interaction.classType` 是发起该交互的 MonoBehaviour（对地面物品就是那个 ItemObject/Item 组件），
+    /// 与显示语言无关；`text` 则随语言变（旧实现 `StartsWith("拾起")` 在 EN 版必然失效）。
+    /// 兜底再认中/英前缀（拾起 / Pick up / Take / Grab），两侧都做以保证稳健。
+    /// </summary>
+    private static bool IsPickupInteraction(int idx, string raw)
+    {
+        try
+        {
+            Interaction it = (idx >= 0 && idx < menuInts.Count) ? menuInts[idx] : null;
+            if (it != null && menuGroundItem != null)
+            {
+                MonoBehaviour ct = it.classType;
+                if (ct != null && ct.gameObject != null)
+                {
+                    GameObject itGo = ct.gameObject;
+                    GameObject itemGo = null;
+                    try { itemGo = menuGroundItem.gameObject; } catch { }
+                    if (itemGo != null)
+                    {
+                        if (itGo == itemGo) return true;
+                        try
+                        {
+                            if (itGo.transform != null && itGo.transform.IsChildOf(itemGo.transform)) return true;
+                        }
+                        catch { }
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            SquadCmdLogic.LogWarning("[Backpack] 拾起判定（结构）异常: " + ex.Message);
+        }
+        try
+        {
+            if (!string.IsNullOrEmpty(raw))
+            {
+                if (raw.StartsWith("拾起", StringComparison.Ordinal)) return true;
+                if (raw.StartsWith("Pick up", StringComparison.OrdinalIgnoreCase)) return true;
+                if (raw.StartsWith("Take ", StringComparison.OrdinalIgnoreCase)) return true;
+                if (raw.StartsWith("Grab", StringComparison.OrdinalIgnoreCase)) return true;
+            }
+        }
+        catch { }
+        return false;
+    }
+
     private static void ExecuteInteraction(int idx)
     {
         string txt = idx >= 0 && idx < menuLabels.Count ? menuLabels[idx] : "?";
@@ -553,7 +610,11 @@ internal static class BackpackPanel
         if (menuGroundItem != null && idx >= 0 && idx < menuRaw.Count)
         {
             string raw = menuRaw[idx] ?? "";
-            if (raw.StartsWith("拾起", StringComparison.Ordinal))
+            // 1.4.31：**判定不再依赖显示文本**。
+            // 主判据 = 结构：该交互的 `classType`（发起交互的 MonoBehaviour）是不是就是这个地面物品
+            //（或其子物体）——`Interaction.classType` 与显示语言无关，EN/CN 都成立。
+            // 兜底 = 中/英前缀（原文），防止个别交互把 classType 挂在别的组件上。
+            if (IsPickupInteraction(idx, raw))
             {
                 ItemObject gi = menuGroundItem;
                 Vector3 gpos = Vector3.zero;
@@ -604,6 +665,7 @@ internal static class BackpackPanel
         menuExec.Clear();
         menuLabels.Clear();
         menuRaw.Clear();
+        menuInts.Clear();
     }
 
     // ── 打开 / 关闭 ──
@@ -1167,6 +1229,8 @@ internal static class BackpackPanel
         GUI.color = Color.white;
         // 1.4.23：皮革质感（低透明度噪声叠加）——纯色底板永远只是"一块色板"
         Er2Ui.Leather(r, 0.10f);
+        // 1.4.31：顶部受光边——与 UniGen 的 PanelBase 同款（两个 mod 的面板要看起来是一套）
+        Er2Ui.HLine(new Rect(r.x, r.y, r.width, Mathf.Max(1f, k)), Er2Ui.EdgeSoft);
         // 2.5.2：标题条独立底色——把"标题/关闭/翻页"从格子区里分出来（设计感）
         Er2Ui.Fill(new Rect(r.x, r.y, r.width, TitleH), Er2Ui.TitleBar);
         Er2Ui.Leather(new Rect(r.x, r.y, r.width, TitleH), 0.14f);

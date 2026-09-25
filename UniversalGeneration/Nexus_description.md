@@ -51,6 +51,11 @@ Items go into backpacks as their **proper subclass** — magazines hold the righ
 
 ## Changelog
 
+**2.5.12**
+- **Shared panel style with the commander mod**: same colour tokens, same leather texture and top highlight edge; HUD button outlines use the shared border token.
+- No gameplay change.
+
+
 **2.5.11**
 - **Text is outlined instead of bold.** `FontStyle.Bold` is silently ignored when the font has no bold face (likely the case for the game font), which is why the previous attempt changed nothing. Row text and tab labels now draw a dark offset copy first, then the white text on top.
 - **Row text enlarged** to `FontBody + 3`.

@@ -3541,7 +3541,9 @@ internal static class GodViewController
 		Color txt = enabled ? uiText : ER2Shared.Er2Ui.TextDisabled;
 		GUI.color = fill;
 		GUI.DrawTexture(r, Texture2D.whiteTexture);
-		GUI.color = txt;
+		// 1.4.31：描边改用共享令牌 PanelBorder——原来用文字色，与 UniGen 面板的描边不是同一套，
+		// 两个 mod 摆在一起会有"两种边框"。
+		GUI.color = ER2Shared.Er2Ui.PanelBorder;
 		// 1.4.22：描边宽度随倍率（原 1.5f 硬编码——缩放后描边过细，按钮边界读不出）
 		float bw = Mathf.Max(1f, 1.5f * ER2Shared.Er2Ui.Scale);
 		GUI.DrawTexture(new Rect(r.x, r.y, r.width, bw), Texture2D.whiteTexture);

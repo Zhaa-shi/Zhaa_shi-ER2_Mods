@@ -296,6 +296,9 @@ internal static class InfoPanel
 		GUI.color = hover ? new Color(hoverC.r, hoverC.g, hoverC.b, 0.35f) : new Color(0f, 0f, 0f, 0.35f);
 		GUI.DrawTexture(r, Texture2D.whiteTexture);
 		GUI.color = Color.white;
+		// 1.4.31：与 UniGen 面板同款——皮革质感 + 顶部受光边（风格统一）
+		Er2Ui.Leather(r, 0.10f);
+		Er2Ui.HLine(new Rect(r.x, r.y, r.width, Mathf.Max(1f, Er2Ui.Scale)), Er2Ui.EdgeSoft);
 		ShadowLabel(r, label, textC);
 		if (hover && e != null && e.type == EventType.MouseDown && e.button == 0)
 		{

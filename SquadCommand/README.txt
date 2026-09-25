@@ -1,7 +1,26 @@
-ER2 Battlefield Commander v1.4.30
+ER2 Battlefield Commander v1.4.31
 =================================
 
 A BepInEx plugin for Easy Red 2 that adds an "RTS god-view squad command" layer — mouse operations inspired by Gates of Hell: Ostfront.
+
+[1.4.31 Ground pickup fixed for non-Chinese games, sharper cursor, unified UI]
+* **"Units still grab guns from across the map" - fixed properly this time, and the cause was language.**
+  The 1.4.17 fix detected pickup entries by checking whether the interaction label starts with the
+  Chinese word "拾起". In an English install the label is "Pick up ...", so the test always failed and
+  the entry fell back to the native `Call()` - which has no distance check at all. The detection now
+  uses **`Interaction.classType`** (the component that owns the interaction - for a ground item that is
+  the item itself), which is language-independent, with a bilingual prefix check as a fallback.
+* **Cursor is sharp now.** The cursor texture was 32x32 - the hardware-cursor size limit, so any system
+  DPI scaling or fullscreen scaling stretched it into a blur. It is 64x64 now, which makes Unity use a
+  software cursor drawn at screen resolution.
+* **Cursor colours are back.** The 1.4.19 pass flattened every cursor state to greyscale (only enemy
+  red and emplacement orange survived), which made it look like the cursor "stopped changing colour".
+  States are colour-coded again: ally green, enemy red, driveable vehicle cyan, building grey-white,
+  emplacement orange, interactable item yellow, default white.
+* **The commander mod and Universal Generation now share one panel style**: same panel colour tokens,
+  same warm-leather texture, same top highlight edge, and the HUD button outline now uses the shared
+  border token instead of the text colour.
+
 
 [1.4.30 Outlined text + panel colour matched to the HUD bar]
 * **The text is outlined now instead of relying on bold.** `FontStyle.Bold` only works if the font
