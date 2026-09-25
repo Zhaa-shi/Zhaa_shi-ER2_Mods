@@ -431,7 +431,9 @@ internal static class SquadCmdLogic
 			return smallStyle;
 		}
 		smallFontSize = fs;
-		smallStyle = Er2Ui.MakeLabel(fs, TextAnchor.MiddleCenter, new Color(0.85f, 0.9f, 0.85f, 0.95f), FontStyle.Normal, GetFont());
+		// 1.4.37：军绿时代的遗产色 (0.85,0.9,0.85) —— 提示条文字一直发灰的根源（不走 uiText 的旁路）。
+		// 陷阱 113 的又一实例：色源收编后逐处排查，所有文字统一 Er2Ui.Text 纯白。
+		smallStyle = Er2Ui.MakeLabel(fs, TextAnchor.MiddleCenter, ER2Shared.Er2Ui.Text, FontStyle.Normal, GetFont());
 		return smallStyle;
 	}
 

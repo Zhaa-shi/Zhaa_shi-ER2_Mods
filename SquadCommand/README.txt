@@ -1,7 +1,17 @@
-ER2 Battlefield Commander v1.4.36
+ER2 Battlefield Commander v1.4.37
 =================================
 
 A BepInEx plugin for Easy Red 2 that adds an "RTS god-view squad command" layer — mouse operations inspired by Gates of Hell: Ostfront.
+
+[1.4.37 Last grey text found and fixed; unit info goes background-free]
+* **The hint bar text was the last grey holdout.** `HudStyleSmall()` and the backpack `tipStyle` still
+  used a hard-coded military-green-era colour `(0.85, 0.9, 0.85)` - they never went through `uiText`,
+  so the 1.4.36 text unification missed them (trap 113's "side door" again). Both now use
+  `Er2Ui.Text`. A project-wide scan of every `MakeLabel`/`MakeButton` call confirms no non-white text
+  colour remains.
+* **The unit info panel lost its background**, matching the game's own top-left selection readout:
+  white text with a shadow drawn straight over the terrain, no plate.
+
 
 [1.4.36 Text colour unified to white; info panel and hint bar take turns]
 * **Why the text was still grey: the HUD text colour comes from the config**, and config files never

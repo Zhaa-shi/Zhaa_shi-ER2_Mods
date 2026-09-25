@@ -1,4 +1,4 @@
-ER2 Universal Generation v2.5.17
+ER2 Universal Generation v2.5.18
 ================================
 
 Spawn any unit, vehicle, or item anywhere, right from Battlefield Commander's RTS god view.
@@ -41,6 +41,12 @@ How to use
 
 Changelog
 --------------------------------
+2.5.18
+- No change on this mod's side; the last grey text fixes live in the commander mod (its own side-scanned
+  styles) and the shared toolkit. A project-wide scan confirmed every text source in Universal Generation
+  is already pure white.
+
+
 2.5.17
 - No change on this mod's side; the text colour unification and the info-panel / hint-bar exclusivity
   live in the shared toolkit and the commander mod.

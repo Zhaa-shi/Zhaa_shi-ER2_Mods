@@ -985,6 +985,13 @@
    - **通用律**：**"统一"不是"把默认值改一致"，是"让所有消费点读同一个源"**。
      只要还有消费点走旁路（cfg / 硬编码），就一定会在某个老用户/某台机器上掉队。
      同源陷阱 109（迁移）、78（单一数据源）。
+   - **1.4.37 补（色源收编的收尾动作）**：改完色源后，**必须全项目扫描**所有
+     `MakeLabel` / `MakeButton` / 样式工厂调用，找出**绕过令牌的硬编码色**——
+     本轮就扫出了两处军绿遗产 `(0.85, 0.9, 0.85)`（提示条 `HudStyleSmall` + 背包 `tipStyle`，
+     它们不经过 `uiText`，所以 1.4.36 的统一漏掉了）。扫描方法：
+     `grep MakeLabel|MakeButton` 过滤掉 `Er2Ui.Text / Color.white / TextOnActive / TextDisabled /
+     TextDim / TextHover / Warn / Danger / Accent` 后**剩多少就该修多少**。
+     **"色源收编"不是一次性动作，是"收编 + 扫尾"两步。**
 
 ## 3.5 UI / IMGUI 设计（原生观感）
 

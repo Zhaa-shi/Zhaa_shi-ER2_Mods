@@ -2001,7 +2001,8 @@ internal static class BackpackPanel
         Font f = null;
         try { f = SquadCmdLogic.HudStyleSmall().font; } catch { }
         textStyle = MakeStyle(f, Er2Ui.FontBody, TextAnchor.MiddleLeft, Color.white, false);
-        tipStyle = MakeStyle(f, Er2Ui.FontSmall, TextAnchor.MiddleCenter, new Color(0.85f, 0.9f, 0.85f, 0.95f), false);
+        // 1.4.37：军绿遗产色 → 纯白（同 HudStyleSmall，陷阱 113 排查）
+        tipStyle = MakeStyle(f, Er2Ui.FontSmall, TextAnchor.MiddleCenter, ER2Shared.Er2Ui.Text, false);
         badgeStyle = MakeStyle(f, Er2Ui.FontSmall, TextAnchor.MiddleCenter, Color.white, true);
     }
 
