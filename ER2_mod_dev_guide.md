@@ -837,6 +837,28 @@
    - **通用律**：**"语义正确"不等于"视觉一致"。** 分隔线的目的是"让每一项看起来被分开"，
      而不是"在数学上标记行与行的边界"。判断标准应该是**用户看到的每一项都有边界**。
 
+105. **⚠️ `FontStyle.Bold` 可能被**静默忽略**——想要"更醒目"就用描边，别赌字体有粗体变体**
+     （UniGen 2.5.11 定案，用户连续两轮："文字太暗……一点区别都没有"）：
+   - **机制**：IMGUI 的粗体有两种来源——① 字体资源自带 Bold 字形；② `Font.dynamic` 时引擎**合成**加粗。
+     游戏原生字体（`PhaseBarGUI.GetDefaultFont()` / `GUI.skin.font`）往往**只有一个字重且非 dynamic**
+     → `style.fontStyle = FontStyle.Bold` **不报错、不警告、完全没效果**。
+     我上一版"加粗 + 字号 +1"因此看起来毫无变化（用户反馈"一点区别都没有"）。
+   - **修法**：**描边双绘**——先画一圈暗色偏移副本（左上 + 右下各一次），再把正文压上去：
+     ```csharp
+     GUI.contentColor = new Color(0f, 0f, 0f, 0.9f);
+     GUI.Label(new Rect(r.x + o, r.y + o, w, h), text, style);
+     GUI.Label(new Rect(r.x - o, r.y - o, w, h), text, style);
+     GUI.contentColor = fg;      // 正文（fg 传纯白，让 style.textColor 决定颜色）
+     GUI.Label(r, text, style);
+     ```
+     描边**不依赖字体变体，一定生效**，且同时提升深底/亮底上的可读性（成本 3 次 Label，可接受）。
+     注意：Button 自带的文字**没法描边** → 改成「`GUI.Button(r, GUIContent.none, style)` 画底 +
+     `LabelOutlined` 单独画字」（见 `Er2Ui.LabelOutlined`）。
+   - **通用律**：**"看起来没变化"往往是"那条代码根本没被执行/被忽略"**，而不是"效果不够强"。
+     给视觉加参数（Bold / 阴影 / 描边）前，先确认该属性在当前渲染路径上**真的有效**；
+     不能确认时，选**不依赖可选资源**的实现方式（描边 > 粗体、几何形状 > 字体图标）。
+     同源陷阱 81（代码里有 ≠ 在生效）、102（代码写了 ≠ 代码在跑）。
+
 ## 3.5 UI / IMGUI 设计（原生观感）
 
 > 详细文档见 `ER2_UI_design.md`（含 API 清单、改造记录、踩坑）。要点速查：

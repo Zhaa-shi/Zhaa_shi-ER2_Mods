@@ -168,13 +168,13 @@ internal static class Er2Ui
 	//   ③ 皮革纹理保留（用户上轮要的质感），但**去掉暖调**改中性灰——
 	//      在中性黑底上留暖色会重新泛黄。
 	//   元素区分靠三重：中性黑底 + 中性描边/分隔线 + 选中亮灰填充。
-	private static readonly Color MonoPanelBg = new Color(0x1A / 255f, 0x1A / 255f, 0x22 / 255f);
+	private static readonly Color MonoPanelBg = new Color(0x10 / 255f, 0x10 / 255f, 0x10 / 255f);
 	private static readonly Color MonoPanelBorder = new Color(1f, 1f, 1f, 0.85f);
-	private static readonly Color MonoTitleBar = new Color(0x26 / 255f, 0x26 / 255f, 0x2F / 255f);
-	private static readonly Color MonoSurface = new Color(0x32 / 255f, 0x32 / 255f, 0x3C / 255f);
-	private static readonly Color MonoSurfaceHover = new Color(0x47 / 255f, 0x47 / 255f, 0x4F / 255f);
-	private static readonly Color MonoSurfaceActive = new Color(0x6E / 255f, 0x6E / 255f, 0x80 / 255f);
-	private static readonly Color MonoRowBg = new Color(0x24 / 255f, 0x24 / 255f, 0x2C / 255f);
+	private static readonly Color MonoTitleBar = new Color(0x1C / 255f, 0x1C / 255f, 0x1C / 255f);
+	private static readonly Color MonoSurface = new Color(0x28 / 255f, 0x28 / 255f, 0x28 / 255f);
+	private static readonly Color MonoSurfaceHover = new Color(0x3A / 255f, 0x3A / 255f, 0x3A / 255f);
+	private static readonly Color MonoSurfaceActive = new Color(0x58 / 255f, 0x58 / 255f, 0x58 / 255f);
+	private static readonly Color MonoRowBg = new Color(0x1E / 255f, 0x1E / 255f, 0x1E / 255f);
 	private static readonly Color MonoFavRow = new Color(1f, 1f, 1f, 0.10f);
 	private static readonly Color MonoText = new Color(1f, 1f, 1f, 1f);
 	private static readonly Color MonoTextDim = new Color(0xE4 / 255f, 0xE4 / 255f, 0xE8 / 255f, 1f);
@@ -190,14 +190,15 @@ internal static class Er2Ui
 	private static readonly Color MonoEdgeSoft = new Color(1f, 1f, 1f, 0.30f);                    // 行间分隔（白 30%）
 	// 1.4.28：列表**斑马纹**交替底色——行与行只靠 1px 分隔线在小字号下仍难跟读，
 	// 交替底色是列表可读性最有效的一招（用户："还是很暗"＝看不清层次）
-	private static readonly Color MonoRowBgAlt = new Color(0x2E / 255f, 0x2E / 255f, 0x38 / 255f);
+	private static readonly Color MonoRowBgAlt = new Color(0x2A / 255f, 0x2A / 255f, 0x2A / 255f);
 
 	/// <summary>
 	/// cfg UI/uiPanelAlpha → 面板**主不透明度**（0.55~1.0）。默认 0.85。
 	/// 这是"透 ↔ 黑"那条矛盾轴：α 越低越能透出战场，但越容易被地形颜色染色（陷阱 96）。
 	/// 各结构色的相对层次（标题条更实、行底更透）由下面属性按比例推出，玩家只调一个值。
 	/// </summary>
-	public static float PanelAlpha = 0.85f;
+	/// 1.4.30：默认 0.85 → **0.72**，与 HUD 提示条同款半透明度
+	public static float PanelAlpha = 0.72f;
 
 	public static void SetPanelAlpha(float v)
 	{
@@ -398,6 +399,27 @@ internal static class Er2Ui
 		Fill(new Rect(r.xMax - t, r.y, t, r.height), c);
 	}
 
+	/// <summary>
+	/// 1.4.30：**带描边的文字**——先画一圈暗色偏移副本，再画正文。
+	/// 为什么不用 `FontStyle.Bold`：IMGUI 的粗体依赖**字体带粗体字形**，
+	/// 而游戏原生字体很可能只有一个字重 → `fontStyle = Bold` 被**静默忽略、不报错、不生效**
+	/// （用户连续两轮："文字太暗……一点区别都没有"）。
+	/// 描边不依赖字体变体，**100% 生效**，且同时提升深底/亮底上的可读性。
+	/// 成本：每处 3 次 GUI.Label（左上 + 右下 + 正文），列表十几行完全可接受。
+	/// </summary>
+	public static void LabelOutlined(Rect r, string text, GUIStyle style, Color fg, float outline = 1f)
+	{
+		if (style == null || string.IsNullOrEmpty(text)) return;
+		Color keep = GUI.contentColor;
+		float o = Mathf.Max(1f, outline);
+		GUI.contentColor = new Color(0f, 0f, 0f, 0.9f);          // 描边（近黑，不透明度过低会糊）
+		GUI.Label(new Rect(r.x + o, r.y + o, r.width, r.height), text, style);
+		GUI.Label(new Rect(r.x - o, r.y - o, r.width, r.height), text, style);
+		GUI.contentColor = fg;                                    // 正文
+		GUI.Label(r, text, style);
+		GUI.contentColor = keep;
+	}
+
 	/// <summary>水平分隔线（标题条下、分区之间）。</summary>
 	public static void HLine(Rect r, Color c) => Fill(r, c);
 
@@ -518,7 +540,11 @@ internal static class Er2Ui
 			// ⚠️ 只改专用样式实例的字号（这两个样式归页签专用，别处不得复用）
 			// 1.4.22：内缩随 Scale（19px = 左右各留 ~6.5px 呼吸位 + 描边位），长标签不再贴边
 			st.fontSize = FitSize(st, labels[i], cw - 19f * Scale, FontTabMax, FontTabMin);
-			if (GUI.Button(r, labels[i], st)) clicked = i;
+			// 1.4.30：空按钮画底 + **描边文字**（`FontStyle.Bold` 在游戏字体上不生效，
+			// 描边不依赖字体变体；fg 传纯白让 st.textColor 完全决定颜色）
+			if (GUI.Button(r, GUIContent.none, st)) clicked = i;
+			LabelOutlined(new Rect(r.x + 3f * Scale, r.y, r.width - 6f * Scale, r.height),
+				labels[i], st, Color.white, Mathf.Max(1f, Scale));
 			// 1.4.22：**每个页签都描边**——未选中用暖棕 Edge、选中用暖白 Accent。
 			// 用户反馈"UI 各元素区分不明显"：此前页签只有填充色差，在亮背景上读不出边界。
 			Frame(r, on ? Accent : Edge, Mathf.Max(1f, Scale));

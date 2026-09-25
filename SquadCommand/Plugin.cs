@@ -9,7 +9,7 @@ using UnityEngine;
 
 namespace ER2SquadCommand;
 
-[BepInPlugin("er2.squadcommand", "ER2 Battlefield Commander", "1.4.29")]
+[BepInPlugin("er2.squadcommand", "ER2 Battlefield Commander", "1.4.30")]
 public class Plugin : BasePlugin
 {
 	internal static ManualLogSource ModLog;
@@ -93,7 +93,7 @@ public class Plugin : BasePlugin
 		uiMono.SettingChanged += (s, e) => GodViewController.ApplyMarkerConfig();
 		// 1.4.24：面板不透明度——"透 ↔ 黑"这条矛盾轴交给玩家自己调
 		//（越低越能透出战场，但面板越容易被地形颜色带偏；见 guide 陷阱 96）
-		uiPanelAlpha = Config.Bind("UI", "uiPanelAlpha", 0.85f, new ConfigDescription(Ui.Tr("面板不透明度（0.55~1.0）。越低越能透出战场，但面板越容易被地形颜色带偏；1.0 = 完全不透明。"), new AcceptableValueRange<float>(0.55f, 1f)));
+		uiPanelAlpha = Config.Bind("UI", "uiPanelAlpha", 0.72f, new ConfigDescription(Ui.Tr("面板不透明度（0.55~1.0）。越低越能透出战场，但面板越容易被地形颜色带偏；1.0 = 完全不透明。"), new AcceptableValueRange<float>(0.55f, 1f)));
 		uiPanelAlpha.SettingChanged += (s, e) => ER2Shared.Er2Ui.SetPanelAlpha(uiPanelAlpha.Value);
 		ER2Shared.Er2Ui.SetPanelAlpha(uiPanelAlpha.Value);
 
@@ -131,7 +131,7 @@ public class Plugin : BasePlugin
 
 		new Harmony("er2.squadcommand").PatchAll(typeof(Plugin).Assembly);
 		FrameEndRunner.Ensure();
-		ModLog.LogInfo("ER2 Battlefield Commander 1.4.29 loaded. godKey=" + godKey.Value);
+		ModLog.LogInfo("ER2 Battlefield Commander 1.4.30 loaded. godKey=" + godKey.Value);
 		ThirdPartyCompat.LogCoexistenceHint(ModLog); // 1.4.15：第三方 mod 共存提示
 	}
 }

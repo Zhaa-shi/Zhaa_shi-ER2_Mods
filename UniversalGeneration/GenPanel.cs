@@ -61,6 +61,8 @@ internal static class GenPanel
 	private static readonly string[] UnitCatNames = new string[UnitCats.Length];
 
 	private static GUIStyle titleStyle, textStyle, buttonStyle, activeButtonStyle, rowStyle, flashStyle, starStyle;
+	// 1.4.30：列表行**文字**专用样式（行底由 rowStyle 的空按钮画，文字单独描边双绘）
+	private static GUIStyle rowTextStyle;
 
 	// 2.4.2：页签专用样式（**只给页签用**，字号会被逐次改写以适配定宽按钮；
 	// 不能复用 buttonStyle/activeButtonStyle——它们被别处以固定 12 号使用）
@@ -468,8 +470,10 @@ internal static class GenPanel
 			GUI.backgroundColor = (i & 1) == 0 ? Er2Ui.RowBg : Er2Ui.RowBgAlt;
 			Rect rr = new Rect(rect.x + 6f * s, rowY, rect.width - 12f * s, RowH - 2f * s);
 			string label = "▸ " + favCatNames[i] + "   (" + FavCountOf(i) + ")";
-			bool hit = GUI.Button(rr, label, rowStyle);
+			bool hit = GUI.Button(rr, GUIContent.none, rowStyle);
 			GUI.backgroundColor = keep;
+			Er2Ui.LabelOutlined(new Rect(rr.x + 6f * s, rr.y, rr.width - 12f * s, rr.height),
+				label, rowTextStyle, Er2Ui.Text, Mathf.Max(1f, s));
 			// 1.4.29：文件夹列表也要有行分隔线（原来这里 0 处，与其他列表观感不一致）
 			Er2Ui.HLine(new Rect(rr.x, rowY + RowH - 2f * s, rr.width, Mathf.Max(1f, s)), Er2Ui.EdgeSoft);
 			if (hit)
@@ -606,8 +610,12 @@ internal static class GenPanel
 			// 1.4.28：**斑马纹**——偶数行换一档底色（用户"还是很暗"＝层次看不出）
 			GUI.backgroundColor = fav ? Er2Ui.FavRow : (((i - from) & 1) == 0 ? Er2Ui.RowBg : Er2Ui.RowBgAlt);
 			Rect rowRect = new Rect(rect.x + 6f * ls, rowY, rect.width - 38f * ls, RowH - 2f * ls);
-			if (GUI.Button(rowRect, e.Title, rowStyle)) clicked = e;
+			// 1.4.30：**空按钮画底 + 描边文字单独画**——Button 的文字没法做描边，
+			// 而 Bold 在游戏字体上不生效（见 Er2Ui.LabelOutlined 注释）。
+			if (GUI.Button(rowRect, GUIContent.none, rowStyle)) clicked = e;
 			GUI.backgroundColor = keep;
+			Er2Ui.LabelOutlined(new Rect(rowRect.x + 6f * ls, rowRect.y, rowRect.width - 12f * ls, rowRect.height),
+				e.Title, rowTextStyle, Er2Ui.Text, Mathf.Max(1f, ls));
 			// 2.5.2：收藏行左侧强调竖条——比"整行换底色"更像设计（底色只轻微提亮，靠竖条点名）
 			if (fav) Er2Ui.AccentBar(rowRect, Er2Ui.Accent, Mathf.Max(2f, 3f * ls));
 			// 1.4.22：行分隔线——行底与行底之间加一条极淡暖棕，元素边界一眼可辨
@@ -668,8 +676,10 @@ internal static class GenPanel
 			Color keep = GUI.backgroundColor;
 			GUI.backgroundColor = fav ? Er2Ui.FavRow : (((i - from) & 1) == 0 ? Er2Ui.RowBg : Er2Ui.RowBgAlt);
 			Rect itemRowRect = new Rect(tx, rowY, tw, RowH - 2f * isc);
-			if (GUI.Button(itemRowRect, e.Title, rowStyle)) clicked = e;
+			if (GUI.Button(itemRowRect, GUIContent.none, rowStyle)) clicked = e;
 			GUI.backgroundColor = keep;
+			Er2Ui.LabelOutlined(new Rect(itemRowRect.x + 6f * isc, itemRowRect.y, itemRowRect.width - 12f * isc, itemRowRect.height),
+				e.Title, rowTextStyle, Er2Ui.Text, Mathf.Max(1f, isc));
 			// 2.5.2：收藏行左侧强调竖条（与单位列表同款）
 			if (fav) Er2Ui.AccentBar(itemRowRect, Er2Ui.Accent, Mathf.Max(2f, 3f * isc));
 			Er2Ui.HLine(new Rect(itemRowRect.x, rowY + RowH - 2f * isc, itemRowRect.width, Mathf.Max(1f, isc)), Er2Ui.EdgeSoft);   // 1.4.29：每行都画
@@ -1080,6 +1090,8 @@ internal static class GenPanel
 		for (int i = 0; i < UnitCats.Length; i++) UnitCatNames[i] = Ui.Tr(UnitCatRaw[i]);
 		titleStyle = Er2Ui.MakeLabel(Er2Ui.FontTitle, TextAnchor.MiddleLeft, Er2Ui.Text, FontStyle.Bold);
 		textStyle = Er2Ui.MakeLabel(Er2Ui.FontBody, TextAnchor.MiddleLeft, Er2Ui.Text);
+		// 1.4.30：行文字再放大一号（FontBody+3 = 15px）——配合描边，深底上足够醒
+		rowTextStyle = Er2Ui.MakeLabel(Er2Ui.FontBody + 3, TextAnchor.MiddleLeft, Er2Ui.Text);
 		helpStyle = Er2Ui.MakeLabel(Er2Ui.FontBody, TextAnchor.MiddleLeft, Er2Ui.Text);
 		helpStyle.wordWrap = true;   // 1.4.28：允许换行（否则长文案只能溢出被裁）
 

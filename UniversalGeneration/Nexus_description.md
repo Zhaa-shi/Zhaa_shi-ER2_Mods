@@ -51,6 +51,12 @@ Items go into backpacks as their **proper subclass** — magazines hold the righ
 
 ## Changelog
 
+**2.5.11**
+- **Text is outlined instead of bold.** `FontStyle.Bold` is silently ignored when the font has no bold face (likely the case for the game font), which is why the previous attempt changed nothing. Row text and tab labels now draw a dark offset copy first, then the white text on top.
+- **Row text enlarged** to `FontBody + 3`.
+- **Panel colour matched to the bottom HUD bar:** all surfaces lost their blue cast and panel opacity now defaults to 0.72 (same as the HUD bar), so the panel picks up terrain colour the same way instead of looking cold.
+
+
 **2.5.10**
 - **Row text is bold and 1 pt larger.** White on #1A1A22 is already ~15:1 contrast - what was missing was stroke weight, not brightness. Bold + larger is the actual fix.
 - **Every row draws its separator now.** Lines were previously drawn only between rows, so a single-entry list showed none (which is why favourites appeared to have lost them), and the favourites folder list had none at all.

@@ -1,7 +1,19 @@
-ER2 Battlefield Commander v1.4.29
+ER2 Battlefield Commander v1.4.30
 =================================
 
 A BepInEx plugin for Easy Red 2 that adds an "RTS god-view squad command" layer — mouse operations inspired by Gates of Hell: Ostfront.
+
+[1.4.30 Outlined text + panel colour matched to the HUD bar]
+* **The text is outlined now instead of relying on bold.** `FontStyle.Bold` only works if the font
+  ships a bold face - the game's font very likely has a single weight, in which case IMGUI silently
+  ignores it (no error, no effect). That is why the previous "bold + bigger" pass looked identical.
+  Row text and tab labels are now drawn as: dark offset copies first, then the white text on top -
+  an outline does not depend on font variants and always takes effect. Row text also went up to
+  `FontBody + 3`.
+* **Panel colour now matches the bottom HUD bar, which is what you pointed at.** The surfaces lost
+  their blue cast (all channels equal now) and panel opacity defaults to **0.72** - the same as the
+  HUD bar - so the panel picks up the terrain the same way that bar does instead of looking cold.
+
 
 [1.4.29 Text weight + row separators + brighter still]
 * **Rows are bolder and one point larger.** Contrast was never the problem (white on #1A1A22 is

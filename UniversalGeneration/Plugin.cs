@@ -9,7 +9,7 @@ using UnityEngine;
 
 namespace ER2UniversalGeneration;
 
-[BepInPlugin("er2.universalgeneration", "ER2 Universal Generation", "2.5.10")]
+[BepInPlugin("er2.universalgeneration", "ER2 Universal Generation", "2.5.11")]
 public class Plugin : BasePlugin
 {
 	internal static ManualLogSource ModLog;
@@ -39,7 +39,7 @@ public class Plugin : BasePlugin
 		uiMono.SettingChanged += (s, e) => ER2Shared.Er2Ui.SetMono(uiMono.Value);
 		ER2Shared.Er2Ui.SetMono(uiMono.Value);
 		// 1.4.24：与 SquadCommand 同名同义（两个 mod 的面板要长得一样）
-		uiPanelAlpha = Config.Bind("UI", "uiPanelAlpha", 0.85f, new ConfigDescription(Ui.Tr("面板不透明度（0.55~1.0）。越低越能透出战场，但面板越容易被地形颜色带偏；1.0 = 完全不透明。"), new AcceptableValueRange<float>(0.55f, 1f)));
+		uiPanelAlpha = Config.Bind("UI", "uiPanelAlpha", 0.72f, new ConfigDescription(Ui.Tr("面板不透明度（0.55~1.0）。越低越能透出战场，但面板越容易被地形颜色带偏；1.0 = 完全不透明。"), new AcceptableValueRange<float>(0.55f, 1f)));
 		uiPanelAlpha.SettingChanged += (s, e) => ER2Shared.Er2Ui.SetPanelAlpha(uiPanelAlpha.Value);
 		ER2Shared.Er2Ui.SetPanelAlpha(uiPanelAlpha.Value);
 
@@ -71,6 +71,6 @@ public class Plugin : BasePlugin
 		ItemCatalog.Ensure();
 		new Harmony("er2.universalgeneration").PatchAll(typeof(Plugin).Assembly); // Tick/Draw 驱动补丁
 
-		ModLog.LogInfo("ER2 Universal Generation 2.5.10 loaded. panelKey=" + panelKey.Value);
+		ModLog.LogInfo("ER2 Universal Generation 2.5.11 loaded. panelKey=" + panelKey.Value);
 	}
 }
