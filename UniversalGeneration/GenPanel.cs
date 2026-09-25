@@ -1097,7 +1097,13 @@ internal static class GenPanel
 		if (!RtsActive || open || Placer.Placing) return;
 		EnsureStyles();
 		Rect r = ToggleButtonRect();
-		bool clicked = GUI.Button(r, Ui.Tr("生成 [G]"), buttonStyle);
+		// 2.5.32（用户："现在有白色描边了，但是背景还是灰色的"）：按钮直接贴在明亮泥地上，
+		// buttonStyle 的 0.55 半透明底会被洗成灰蒙蒙——加**纯黑 72% 底板**（与指挥官底部提示条
+		// 同款配方，用户点名的观感锚点），文字走阴影原语。按钮本体只当点击区。
+		GUI.color = Color.white; GUI.contentColor = Color.white; GUI.backgroundColor = Color.white;
+		Er2Ui.Fill(r, new Color(0f, 0f, 0f, 0.72f));
+		bool clicked = GUI.Button(r, GUIContent.none, buttonStyle);
+		Er2Ui.LabelShadowed(r, Ui.Tr("生成 [G]"), buttonStyle, Er2Ui.Text);
 		Er2Ui.Frame(r, Er2Ui.Edge, Mathf.Max(1f, Er2Ui.Scale));   // 2.5.29：描边与页签/阵营按钮同款
 		if (clicked)
 		{
