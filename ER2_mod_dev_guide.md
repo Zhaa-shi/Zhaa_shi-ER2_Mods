@@ -875,6 +875,35 @@
    - **附**：这条也说明**测试必须在目标语言下做**。用户用 EN 版，而我按中文串写判定，
      等于"测了一个不是用户环境的配置"。
 
+107. **⚠️ `GUIContent.none` 会清掉 tooltip 通道；IMGUI 的 tooltip 必须**在帧末统一读****
+     （UniGen 2.5.13 定案，用户："鼠标放在通用生成选项上会有提示，现在没了"）：
+   - **经过**：1.4.30 为了让文字能描边，把控件内容从 `GUI.Button(r, text, st)` 换成
+     `GUI.Button(r, GUIContent.none, st)`（文字改由 `LabelOutlined` 单独画）。
+     **副作用**：`GUIContent.none` 没有任何 tooltip → 悬停提示全部消失。
+   - **正确做法**：用 `new GUIContent(string.Empty, null, tooltip)`——**文本空（不重复画字）+ tooltip 保留**；
+     再在本帧**末尾**读一次 `GUI.tooltip` 自绘提示框（**必须最后读**，否则会被后面画的控件覆盖）。
+   - **⚠️ IL2CPP 只保留了三参构造**：`new GUIContent(string text, string tooltip)` 两参重载**被裁剪**，
+     编译报 `CS7036: 未提供与"GUIContent(string, Texture, string)"的所需参数"tooltip"对应的参数`。
+     必须写 `new GUIContent(text, null, tooltip)`（陷阱 5 家族：拷贝构造/重载被裁剪）。
+   - **通用律**：**替换控件的"内容"时要检查它顺带承载了什么**——tooltip、`enabled` 状态、图标、
+     富文本样式都挂在 `GUIContent` 上。把内容降级成 `none` 等于一次性丢掉这些。
+     同源陷阱 81（代码里有 ≠ 在生效）、102（写了 ≠ 在跑）。
+
+108. **⚠️ shader 的取样来源要查清——`Sprites/Default` 读**顶点色**，不读 `_Color`**
+     （SquadCommand 1.4.32 定案，用户："幽灵物体材质不好，太亮了，同时不够透明"）：
+   - **现象**：幽灵（Mesh 克隆体）渲染成**实心亮白**，`ghostMat.color = WGhost`（含 alpha 0.32）**毫无作用**。
+   - **机制**：内置 `Sprites/Default` 的片元是 `tex2D(_MainTex, uv) * IN.color` —— 颜色来自
+     **顶点色**（Sprite 渲染器会填）。而 `MeshRenderer` 用的是普通 Mesh，**没有顶点色**（等价于白），
+     于是输出纯白不透明；`_Color` 在该 shader 里**根本不存在**。
+   - **修法**：换成**明确使用 `_Color` 且支持 alpha** 的 shader —— `Particles/Standard Unlit`
+     （unlit + `_Color` + alpha），并**显式配置透明混合**（它默认 `_Mode = 0` Opaque）：
+     `_Mode=2`(Fade) + `_SrcBlend=SrcAlpha` + `_DstBlend=OneMinusSrcAlpha` + `_ZWrite=0` +
+     `EnableKeyword("_ALPHABLEND_ON")` + `renderQueue = Transparent`。URP 属性名（`_Surface`、
+     `_SURFACE_TYPE_TRANSPARENT`）一并设置，属性不存在时静默忽略，无副作用。
+   - **通用律**：**"设了颜色没反应"先怀疑 shader 的取样来源**——`_Color` / 顶点色 / `_BaseColor` /
+     `_TintColor` 各 shader 不同；`Sprites/*` 系一律走顶点色。选 shader 时先确认它读哪个属性，
+     别默认 `_Color` 通用。同族：陷阱 105（Bold 被忽略）、陷阱 12（资源被卸载）。
+
 ## 3.5 UI / IMGUI 设计（原生观感）
 
 > 详细文档见 `ER2_UI_design.md`（含 API 清单、改造记录、踩坑）。要点速查：

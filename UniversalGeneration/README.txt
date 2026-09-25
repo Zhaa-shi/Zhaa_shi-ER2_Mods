@@ -1,4 +1,4 @@
-ER2 Universal Generation v2.5.12
+ER2 Universal Generation v2.5.13
 ================================
 
 Spawn any unit, vehicle, or item anywhere, right from Battlefield Commander's RTS god view.
@@ -41,6 +41,11 @@ How to use
 
 Changelog
 --------------------------------
+2.5.13
+- **Hover tooltips restored** (the 1.4.30 control refactor had dropped the tooltip channel): tabs, list entries and the panel title carry tooltips again, drawn as a small box near the cursor.
+- No other change.
+
+
 2.5.12
 - **Shared panel style with the commander mod**: same colour tokens, same leather texture and top highlight edge; HUD button outlines use the shared border token.
 - No gameplay change.

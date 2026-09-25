@@ -3535,6 +3535,23 @@ internal static class GodViewController
 	}
 
 	/// <summary>0.9.0：统一按钮绘制——主题色底板+描边+居中文字。0.9.4：禁用态高对比（近黑底+暗淡文字）。</summary>
+	/// <summary>
+	/// 1.4.32：**HUD 统一底板**——就是玩家说"喜欢"的那条底部提示条的背景
+	///（`Er2Ui.Scrim` = 纯黑 72%）+ 皮革纹理 + 一圈 `PanelBorder` 描边。
+	/// HUD 各块（左下单位信息 / 右下小队列表 / 底部提示条）全部共用，保证整个 HUD 是一套视觉。
+	/// </summary>
+	internal static void DrawHudPlate(Rect r)
+	{
+		if (r.width <= 0f || r.height <= 0f) return;
+		try
+		{
+			ER2Shared.Er2Ui.Fill(r, ER2Shared.Er2Ui.Scrim);
+			ER2Shared.Er2Ui.Leather(r, 0.08f);
+			ER2Shared.Er2Ui.Frame(r, ER2Shared.Er2Ui.PanelBorder, Mathf.Max(1f, ER2Shared.Er2Ui.Scale));
+		}
+		catch { }
+	}
+
 	private static void DrawUiButton(Rect r, string label, bool enabled, bool hover)
 	{
 		Color fill = enabled ? (hover ? uiHover : uiBase) : ER2Shared.Er2Ui.SurfaceDisabled;
@@ -3973,10 +3990,8 @@ internal static class GodViewController
 			float hintH = 22f * s;
 			float hintX = (Screen.width - hintW) * 0.5f;
 			float hintY = Screen.height - 30f * s;
-			GUI.color = ER2Shared.Er2Ui.Scrim;
-			GUI.DrawTexture(new Rect(hintX, hintY, hintW, hintH), Texture2D.whiteTexture);
-			GUI.color = Color.white;
-			ER2Shared.Er2Ui.Leather(new Rect(hintX, hintY, hintW, hintH), 0.10f);   // 1.4.23：皮革
+			// 1.4.32：提示条 = HUD 统一底板（它本来就是玩家指定的"基准背景"）
+			DrawHudPlate(new Rect(hintX, hintY, hintW, hintH));
 			GUI.Label(new Rect(hintX, hintY - 1f * s, hintW, hintH), hint, hs);
 
 			// 左上角：暂停 + 选择信息
@@ -4173,9 +4188,15 @@ internal static class GodViewController
 			if (sq == null) continue;
 			Rect r = new Rect(startX, y, PanelW, PanelH);
 			bool isSel = mainSquad != null && sq.Pointer == mainSquad.Pointer;
-			// 0.9.3：行=编号单元格 + 符号区（符号在剩余宽度内居中，随数量动态调整）
-			GUI.color = isSel ? uiHover : new Color(uiBase.r, uiBase.g, uiBase.b, 0.82f);
-			GUI.DrawTexture(r, Texture2D.whiteTexture);
+			// 1.4.32：底板改为 HUD 统一底板（与左下信息面板、底部提示条同一套）
+			// 原来这里是 uiBase@0.82 的单层平涂，与别的 HUD 块不一致。
+			DrawHudPlate(r);
+			if (isSel)
+			{
+				GUI.color = new Color(uiHover.r, uiHover.g, uiHover.b, 0.55f);
+				GUI.DrawTexture(r, Texture2D.whiteTexture);
+				GUI.color = Color.white;
+			}
 			Rect numR = new Rect(r.x, r.y, 26f * ER2Shared.Er2Ui.Scale, r.height);
 			GUI.color = isSel ? new Color(1f, 1f, 1f, 0.55f) : new Color(uiHover.r, uiHover.g, uiHover.b, 0.4f);
 			GUI.DrawTexture(numR, Texture2D.whiteTexture);

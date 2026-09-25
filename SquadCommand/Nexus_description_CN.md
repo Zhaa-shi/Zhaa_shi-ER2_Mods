@@ -6,7 +6,7 @@
 ## Installation instructions
 1. 安装 BepInEx（IL2CPP 版）到游戏根目录。
 2. 将 `ER2_BattlefieldCommander.dll` 放入 `Easy Red 2\BepInEx\plugins\`。
-3. 启动游戏，BepInEx 日志出现 `Loading [ER2 Battlefield Commander 1.4.31]` 表示加载成功。
+3. 启动游戏，BepInEx 日志出现 `Loading [ER2 Battlefield Commander 1.4.32]` 表示加载成功。
 
 ## Main features
 - **上帝视角指挥**：F9 进入自由视角，WASD 移动、滚轮缩放、中键旋转、Q/E 升降，空格暂停/继续世界。
@@ -38,6 +38,21 @@
 感谢 Easy Red 2 社区与 BepInEx / Harmony 生态，以及所有为 IL2CPP modding 提供思路的作者。
 
 ## 近期更新
+**1.4.32**
+· **悬停提示回来了。** 1.4.30 那轮为了让文字能描边，把控件内容从文本换成了 `GUIContent.none`——
+  顺带把 tooltip 通道也清掉了，于是页签和条目悬停什么都不显示。现在控件改为携带
+  `new GUIContent("", tooltip)`（文本为空、tooltip 保留），面板在本帧末尾自绘提示框。
+· **幽灵预览修好了——原来渲染成了实心白。** 材质用的是 `Sprites/Default`，它的片元是
+  `纹理 × 顶点色`：读的是**顶点色**而不是 `_Color`。Mesh 没有顶点色，所以 `ghostMat.color`
+  完全不生效，幽灵一律变成不透明白色。现在 shader 优先链改为 `Particles/Standard Unlit`
+  （unlit、读 `_Color`、支持 alpha）并显式配置 Fade 混合；幽灵色调同时调得更暗更透。
+· **单位信息面板加了背景，并与小队列表对齐。** 左下角那块原本完全没有底板（文字直接叠在战场上）。
+  现在它的左边缘内缩量与右侧小队列表的内缩量一致，两块 HUD 左右对称。
+· **整个 HUD 统一成一块底板。** 你喜欢的底部提示条背景（纯黑 72%）抽成了共用函数
+  `DrawHudPlate`，底部提示条、小队列表、单位信息面板**共用同一套**（同样的填充 + 皮革纹理 + 描边）。
+  HUD 按钮默认色也统一成同一个纯黑 72%。
+
+
 **1.4.31**
 · **"士兵还是隔空捡枪"这次真正修好了，根因是语言。** 1.4.17 的修法靠判断交互文案是否以中文
   "拾起"开头；英文版里文案是 "Pick up ..."，判断**必然失败** → 该条目回落到原生 `Call()`，

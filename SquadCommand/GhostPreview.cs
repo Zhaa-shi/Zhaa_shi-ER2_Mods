@@ -178,13 +178,17 @@ internal static class GhostPreview
 	{
 		if (ghostMat != null) return;
 		// 候选按优先级：内置管线精灵/透明系 → URP Unlit → 顶点色
+		// 1.4.32：**顺序重排**。`Sprites/Default` 的片元是 `tex × IN.color`——它读**顶点色**，
+		// 而幽灵是 Mesh（没有顶点色，等价于白）→ `ghostMat.color/_Color` **完全不起作用**，
+		// 渲染出来是"实心亮白"（用户截图实证）。
+		// `Particles/Standard Unlit` 是 unlit + **读 `_Color`** + 支持 alpha → 放在首位。
 		string[] cands = {
-			"Sprites/Default",
+			"Particles/Standard Unlit",
 			"Legacy Shaders/Transparent/Diffuse",
 			"Unlit/Transparent",
-			"Particles/Standard Unlit",
+			"Sprites/Default",                       // 兜底：只在有顶点色的物体上表现正确
 			"Universal Render Pipeline/Unlit",
-			"Hidden/Internal-Colored",
+			"Hidden/Internal-Colored",               // 最后兜底（不透明，仅保证"看得见轮廓"）
 		};
 		try
 		{
@@ -201,9 +205,23 @@ internal static class GhostPreview
 				return;
 			}
 			ghostMat = new Material(sh);
-			// 用户反馈"虚影太亮"：无光照 shader 下高亮白几乎自发光 → 压到 0.20。
-			// 2.5.0：改为**中性灰**（原偏蓝的 0.58,0.64,0.72）并提到 0.35——
-			// 灰黑主题里蓝调会"跳"出来；同时 0.20 在深色战场上几乎看不见预览轮廓。
+			// 1.4.32：Particles/Standard Unlit 默认 `_Mode = 0`（Opaque）→ 必须显式切到 **Fade**，
+			// 否则 alpha 一样不生效。这一组设置对命中的多数 shader 无害（属性名不存在时静默忽略）。
+			try
+			{
+				ghostMat.SetFloat("_Mode", 2f);                     // 2 = Fade
+				ghostMat.SetOverrideTag("RenderType", "Transparent");
+				ghostMat.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.SrcAlpha);
+				ghostMat.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
+				ghostMat.SetInt("_ZWrite", 0);
+				ghostMat.SetFloat("_Surface", 1f);                  // URP 用语：Transparent
+				ghostMat.DisableKeyword("_ALPHATEST_ON");
+				ghostMat.EnableKeyword("_ALPHABLEND_ON");
+				ghostMat.DisableKeyword("_ALPHAPREMULTIPLY_ON");
+				ghostMat.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
+				ghostMat.renderQueue = (int)UnityEngine.Rendering.RenderQueue.Transparent;
+			}
+			catch { }
 			ghostMat.color = ER2Shared.Er2Ui.WGhost;
 			try { ghostMat.SetColor("_Color", ghostMat.color); } catch { }
 			ghostMat.hideFlags = (HideFlags)61; // 陷阱 12：运行时创建的资源防场景卸载

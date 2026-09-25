@@ -333,6 +333,7 @@ internal static class GenPanel
 		// 1.4.25：外框加粗到 ~2px——半透明面板在亮背景（石头/水泥地）上边界会被吃掉，
 		// 用户反馈"对比不明显"，一圈更亮的粗边框是最直接的"面板到此为止"信号
 		Er2Ui.Frame(r, Er2Ui.PanelBorder, Mathf.Max(1.5f, 2f * s));   // 最后画，不被内容覆盖
+		DrawHoverTip();                                                  // 1.4.32：悬停提示（读本帧 GUI.tooltip）
 	}
 
 	/// <summary>按行计划逐行取 Rect 绘制（每行只拿到自己的 Rect，不再自行累加 y）。</summary>
@@ -388,7 +389,8 @@ internal static class GenPanel
 	{
 		// 1.4.22：全部 × Scale（原为硬编码 100/24/62/22——UI 缩放后标题与按钮错位）
 		float ts = Er2Ui.Scale;
-		GUI.Label(new Rect(rect.x, rect.y, rect.width - 100f * ts, 24f * ts), Ui.Tr("通用生成"), titleStyle);
+		GUI.Label(new Rect(rect.x, rect.y, rect.width - 100f * ts, 24f * ts),
+			new GUIContent(Ui.Tr("通用生成"), null, Ui.Tr("通用生成：拖到单位身上放入背包，拖到地上则生成实体")), titleStyle);
 		if (GUI.Button(new Rect(panel.xMax - (34f + 62f) * ts, rect.y, 62f * ts, 22f * ts), Ui.Tr("清除"), buttonStyle))
 		{
 			int n = GenRunner.ClearAllSpawned();
@@ -470,7 +472,7 @@ internal static class GenPanel
 			GUI.backgroundColor = (i & 1) == 0 ? Er2Ui.RowBg : Er2Ui.RowBgAlt;
 			Rect rr = new Rect(rect.x + 6f * s, rowY, rect.width - 12f * s, RowH - 2f * s);
 			string label = "▸ " + favCatNames[i] + "   (" + FavCountOf(i) + ")";
-			bool hit = GUI.Button(rr, GUIContent.none, rowStyle);
+			bool hit = GUI.Button(rr, new GUIContent(string.Empty, null, label), rowStyle);   // 1.4.32：保留 tooltip
 			GUI.backgroundColor = keep;
 			Er2Ui.LabelOutlined(new Rect(rr.x + 6f * s, rr.y, rr.width - 12f * s, rr.height),
 				label, rowTextStyle, Er2Ui.Text, Mathf.Max(1f, s));
@@ -519,6 +521,37 @@ internal static class GenPanel
 		string name = idx >= 0 && idx < favCatNames.Count ? favCatNames[idx] : favCat;
 		GUI.Label(new Rect(back.xMax + 8f * s, rect.y, rect.width - back.width - 8f * s, Er2Ui.BtnH),
 			"▸ " + name, textStyle);
+	}
+
+	/// <summary>
+	/// 1.4.32：**悬停提示框**。用户反馈"鼠标放在选项上原本有提示，现在没了"——
+	/// 1.4.30 为给文字加描边，把控件内容由字符串换成了 `GUIContent.none`，
+	/// 顺带清掉了 tooltip 通道。现在各控件改传 `new GUIContent("", tooltip)`，
+	/// 这里在本帧末尾读一次 `GUI.tooltip` 并自绘（必须在最后读，否则会被后续控件覆盖）。
+	/// </summary>
+	private static void DrawHoverTip()
+	{
+		try
+		{
+			if (Event.current == null || Event.current.type != EventType.Repaint) return;
+			string tip = GUI.tooltip;
+			if (string.IsNullOrEmpty(tip)) return;
+			GUIStyle st = helpStyle != null ? helpStyle : textStyle;
+			if (st == null) return;
+			float s = Er2Ui.Scale;
+			Vector2 sz = st.CalcSize(new GUIContent(tip));
+			float w = Mathf.Min(sz.x + 14f * s, Screen.width - 16f * s);
+			float h = sz.y + 8f * s;
+			Vector2 m = Event.current.mousePosition;
+			float x = Mathf.Min(m.x + 16f * s, Screen.width - w - 6f * s);
+			float y = Mathf.Min(m.y + 20f * s, Screen.height - h - 6f * s);
+			Rect tr = new Rect(x, y, w, h);
+			Er2Ui.Fill(tr, Er2Ui.Scrim);
+			Er2Ui.Leather(tr, 0.08f);
+			Er2Ui.Frame(tr, Er2Ui.PanelBorder, Mathf.Max(1f, s));
+			GUI.Label(new Rect(tr.x + 7f * s, tr.y + 4f * s, tr.width - 14f * s, tr.height - 8f * s), tip, st);
+		}
+		catch { }
 	}
 
 	private static int IndexOfUnitCat(string cat)
@@ -612,7 +645,7 @@ internal static class GenPanel
 			Rect rowRect = new Rect(rect.x + 6f * ls, rowY, rect.width - 38f * ls, RowH - 2f * ls);
 			// 1.4.30：**空按钮画底 + 描边文字单独画**——Button 的文字没法做描边，
 			// 而 Bold 在游戏字体上不生效（见 Er2Ui.LabelOutlined 注释）。
-			if (GUI.Button(rowRect, GUIContent.none, rowStyle)) clicked = e;
+			if (GUI.Button(rowRect, new GUIContent(string.Empty, null, e.Title), rowStyle)) clicked = e;   // 1.4.32：保留 tooltip
 			GUI.backgroundColor = keep;
 			Er2Ui.LabelOutlined(new Rect(rowRect.x + 6f * ls, rowRect.y, rowRect.width - 12f * ls, rowRect.height),
 				e.Title, rowTextStyle, Er2Ui.Text, Mathf.Max(1f, ls));
@@ -676,7 +709,7 @@ internal static class GenPanel
 			Color keep = GUI.backgroundColor;
 			GUI.backgroundColor = fav ? Er2Ui.FavRow : (((i - from) & 1) == 0 ? Er2Ui.RowBg : Er2Ui.RowBgAlt);
 			Rect itemRowRect = new Rect(tx, rowY, tw, RowH - 2f * isc);
-			if (GUI.Button(itemRowRect, GUIContent.none, rowStyle)) clicked = e;
+			if (GUI.Button(itemRowRect, new GUIContent(string.Empty, null, e.Title), rowStyle)) clicked = e;   // 1.4.32：保留 tooltip
 			GUI.backgroundColor = keep;
 			Er2Ui.LabelOutlined(new Rect(itemRowRect.x + 6f * isc, itemRowRect.y, itemRowRect.width - 12f * isc, itemRowRect.height),
 				e.Title, rowTextStyle, Er2Ui.Text, Mathf.Max(1f, isc));

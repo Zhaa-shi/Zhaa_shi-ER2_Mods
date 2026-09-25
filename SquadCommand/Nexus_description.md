@@ -6,7 +6,7 @@ Adds an "RTS god-view squad command" layer to Easy Red 2, with mouse operations 
 ## Installation instructions
 1. Install BepInEx (IL2CPP build) into the game root folder.
 2. Put `ER2_BattlefieldCommander.dll` into `Easy Red 2\BepInEx\plugins\`.
-3. Launch the game — `Loading [ER2 Battlefield Commander 1.4.31]` in the BepInEx log means success.
+3. Launch the game — `Loading [ER2 Battlefield Commander 1.4.32]` in the BepInEx log means success.
 
 ## Main features
 - **God-view command**: F9 to enter free camera, WASD move, wheel zoom, MMB rotate, Q/E height, Space to pause/resume the world.
@@ -38,6 +38,24 @@ Adds an "RTS god-view squad command" layer to Easy Red 2, with mouse operations 
 Thanks to the Easy Red 2 community and the BepInEx / Harmony ecosystem, and to all authors whose IL2CPP modding work paved the way.
 
 ## Recent changes
+**1.4.32**
+* **Hover tooltips are back.** When the 1.4.30 pass switched controls from a text label to
+  `GUIContent.none` (so the label could be outlined), it also removed the tooltip channel - so tabs and
+  list entries showed nothing on hover. Controls now carry `new GUIContent("", tooltip)` (empty text,
+  tooltip intact) and the panel draws its own tooltip box at the end of the frame.
+* **Ghost preview fixed - it was rendering solid white.** The material used `Sprites/Default`, whose
+  fragment is `texture x vertex colour`: it reads the **vertex colour**, not `_Color`. A mesh has no
+  vertex colour, so `ghostMat.color` had no effect at all and every ghost came out opaque white. The
+  shader chain now prefers `Particles/Standard Unlit` (unlit, uses `_Color`, supports alpha) with
+  explicit Fade blending, and the ghost tint is darker and more transparent.
+* **Unit info panel got a background and now lines up with the squad list.** The bottom-left readout
+  had no plate at all (text straight over the terrain). Its left edge is now inset by the same amount
+  the squad list is inset from the right, so both HUD blocks are symmetric.
+* **One HUD plate for everything.** The bottom hint bar background you liked (solid black at 72%) is
+  now a shared helper (`DrawHudPlate`) used by the bottom bar, the squad list and the unit info panel -
+  same fill, same leather texture, same border. The HUD button colour default is the same black at 72%.
+
+
 **1.4.31**
 * **"Units still grab guns from across the map" - fixed properly this time, and the cause was language.**
   The 1.4.17 fix detected pickup entries by checking whether the interaction label starts with the

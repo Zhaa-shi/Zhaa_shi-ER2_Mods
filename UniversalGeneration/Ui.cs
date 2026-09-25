@@ -16,6 +16,7 @@ internal static class Ui
 	{
 		// ===== 面板 =====
 		["通用生成"] = "Universal Generation",
+		["通用生成：拖到单位身上放入背包，拖到地上则生成实体"] = "Universal Generation: drag onto a unit to put it in their backpack, or onto the ground to spawn it",
 		["◀ 收藏"] = "< Favourites",
 		["（还没有收藏：点条目右侧的 ☆ 添加）"] = "(No favourites yet - click the ☆ on the right of an entry to add)",
 		["半透明黑 UI（推荐，默认）。面板/列表/按钮走中性黑+半透明，靠明度与描边区分层次；关掉则回退旧版军绿配色。"] = "Translucent black UI (recommended, default). Panels/lists/buttons use neutral black with translucency; hierarchy comes from lightness and outlines. Turn off to fall back to the old military-green palette.",

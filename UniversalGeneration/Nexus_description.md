@@ -51,6 +51,11 @@ Items go into backpacks as their **proper subclass** — magazines hold the righ
 
 ## Changelog
 
+**2.5.13**
+- **Hover tooltips restored** (the 1.4.30 control refactor had dropped the tooltip channel): tabs, list entries and the panel title carry tooltips again, drawn as a small box near the cursor.
+- No other change.
+
+
 **2.5.12**
 - **Shared panel style with the commander mod**: same colour tokens, same leather texture and top highlight edge; HUD button outlines use the shared border token.
 - No gameplay change.

@@ -21,6 +21,9 @@ internal static class InfoPanel
 	private static float H => 190f * ER2Shared.Er2Ui.Scale;
 	private static float BottomGap => 34f * ER2Shared.Er2Ui.Scale;
 	private static float LeftX => 12f * ER2Shared.Er2Ui.Scale;
+	// 1.4.32：面板左边缘。原来 x=0（贴屏幕边），而右侧小队列表是"离右边缘 10*Scale"——
+	// 用户要求"与右边的小队列表对齐"，这里取同样的 10*Scale 做**左右对称**。
+	private static float PanelPad => 10f * ER2Shared.Er2Ui.Scale;
 
 	// 背包列表（1.2.5：分类列表，非网格）
 	private static int unitCycle;
@@ -29,7 +32,7 @@ internal static class InfoPanel
 	private static float styleScale = 1f;   // 2.5.1：建样式时的 Scale（变了就重建）
 
 
-	internal static Rect PanelRect() => new Rect(0f, Screen.height - H - BottomGap, W, H);
+	internal static Rect PanelRect() => new Rect(PanelPad, Screen.height - H - BottomGap, W, H);
 
 	/// <summary>宿主 IsMouseOverGui 用：鼠标在面板上时吞掉战场手势。
 	/// 1.3.0：背包格子窗口的命中判定移到 BackpackPanel.WantsMouse()（含拖拽中全屏吞手势）。</summary>
@@ -59,6 +62,11 @@ internal static class InfoPanel
 			Color hoverC = GodViewController.UiHover;
 			smallStyle = smallStyle ?? MakeSmall();
 			if (smallStyle != null) styleScale = ER2Shared.Er2Ui.Scale;
+			// 1.4.32：**整块背景**（原来只有零散控件底，文字直接叠在战场上，与右侧小队列表不一致）。
+			// 底色用 `Er2Ui.Scrim` —— 就是玩家说"喜欢"的那条底部提示条的背景（纯黑 72%）。
+			Rect pr = PanelRect();
+			GodViewController.DrawHudPlate(pr);
+
 			float x = LeftX;
 			float y = Screen.height - H - BottomGap + 4f * ER2Shared.Er2Ui.Scale;
 			float w = W - 8f * ER2Shared.Er2Ui.Scale;

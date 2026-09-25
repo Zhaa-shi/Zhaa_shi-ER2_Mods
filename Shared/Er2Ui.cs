@@ -244,7 +244,7 @@ internal static class Er2Ui
 	public static Color Warn => new Color(0xE0 / 255f, 0xA3 / 255f, 0x3A / 255f, 0.98f);      // 警告（暂停等）
 	public static Color Danger => new Color(0xC4 / 255f, 0x45 / 255f, 0x3C / 255f, 0.95f);    // 危险（集火）
 	public static Color Success => new Color(0x6F / 255f, 0xA8 / 255f, 0x60 / 255f, 0.95f);   // 成功
-	public static Color Scrim => new Color(0.02f, 0.02f, 0.025f, 0.72f);                       // 遮罩（1.4.24 中性黑半透，提示条/徽标底）
+	public static Color Scrim => new Color(0f, 0f, 0f, 0.72f);   // 1.4.32 归一为纯黑 72%（"底部提示条那个背景"的基准）                       // 遮罩（1.4.24 中性黑半透，提示条/徽标底）
 	public static Color StarOn => new Color(1f, 0xE8 / 255f, 0x1A / 255f, 1f);                // ★（1.4.29 再提亮）
 	public static Color StarHot => Mono ? MonoStarHot : LegacyStarHot;                        // ☆ 悬停
 
@@ -271,7 +271,7 @@ internal static class Er2Ui
 	public static Color WBoard => new Color(0xC6 / 255f, 0xCB / 255f, 0xD0 / 255f, 0.88f);      // 登车线（短虚线，亮）
 	public static Color WFormation => new Color(0xE2 / 255f, 0xE6 / 255f, 0xEA / 255f, 0.90f);  // 阵型拖动标记
 	public static Color WVehicle => new Color(0xCB / 255f, 0xCF / 255f, 0xD4 / 255f, 0.85f);    // 载具专用标记
-	public static Color WGhost => new Color(0xB8 / 255f, 0xBC / 255f, 0xC0 / 255f, 0.32f);      // 幽灵预览（保留半透）
+	public static Color WGhost => new Color(0x8C / 255f, 0x91 / 255f, 0x96 / 255f, 0.20f);      // 幽灵预览（1.4.32：更暗更透——用户"太亮了，同时不够透明"）
 	public static Color WLabelPlate => new Color(0x0A / 255f, 0x0C / 255f, 0x0E / 255f, 0.92f); // 名签底板
 
 	/// <summary>
@@ -542,7 +542,10 @@ internal static class Er2Ui
 			st.fontSize = FitSize(st, labels[i], cw - 19f * Scale, FontTabMax, FontTabMin);
 			// 1.4.30：空按钮画底 + **描边文字**（`FontStyle.Bold` 在游戏字体上不生效，
 			// 描边不依赖字体变体；fg 传纯白让 st.textColor 完全决定颜色）
-			if (GUI.Button(r, GUIContent.none, st)) clicked = i;
+			// 1.4.32：用 `new GUIContent("", label)` 而不是 `GUIContent.none`——
+			// 空文本不画字（正文由 LabelOutlined 描边绘制），但**保留了 tooltip 通道**，
+			// 调用方可在本帧末尾读 `GUI.tooltip` 自绘提示框。
+			if (GUI.Button(r, new GUIContent(string.Empty, null, labels[i]), st)) clicked = i;
 			LabelOutlined(new Rect(r.x + 3f * Scale, r.y, r.width - 6f * Scale, r.height),
 				labels[i], st, Color.white, Mathf.Max(1f, Scale));
 			// 1.4.22：**每个页签都描边**——未选中用暖棕 Edge、选中用暖白 Accent。

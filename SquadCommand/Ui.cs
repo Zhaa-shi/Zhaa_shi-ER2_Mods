@@ -152,7 +152,7 @@ internal static class Ui
 		["标记配色：Mono=灰阶单色（默认，配灰黑 UI；层次靠灰度值而非透明度）/ Semantic=集火红、降级橙（保留语义色）。"] = "Marker palette: Mono = greyscale (default, matches the dark UI; hierarchy by lightness, not alpha) / Semantic = red focus, orange downgraded (keeps semantic colors).",
 		["半透明黑 UI（推荐，默认）。面板/列表/按钮走中性黑+半透明，靠明度与描边区分层次；关掉则回退旧版军绿配色。"] = "Translucent black UI (recommended, default). Panels/lists/buttons use neutral black with translucency; hierarchy comes from lightness and outlines. Turn off to fall back to the old military-green palette.",
 		["面板不透明度（0.55~1.0）。越低越能透出战场，但面板越容易被地形颜色带偏；1.0 = 完全不透明。"] = "Panel opacity (0.55-1.0). Lower shows more battlefield through the panel, but the panel then picks up the terrain colour; 1.0 = fully opaque.",
-		["HUD 按钮底板 / 小队列表行颜色（#RRGGBB 或 #RRGGBBAA）。默认半透明黑。"] = "HUD button fill / squad list row color (#RRGGBB or #RRGGBBAA). Default: translucent black.",
+		["HUD 按钮底板 / 小队列表行颜色（#RRGGBB 或 #RRGGBBAA）。默认纯黑 72%（与底部提示条一致）。"] = "HUD button fill / squad list row color (#RRGGBB or #RRGGBBAA). Default: solid black at 72% (same as the bottom hint bar).",
 		["HUD 按钮悬停/选中颜色。默认中性深灰。"] = "HUD button hover/selection color. Default: neutral dark grey.",
 		["HUD 文字/描边颜色。默认近纯白。"] = "HUD text/border color. Default: near-white.",
 		["3D 场景标记总开关。关掉后所有世界空间标记（脚环/角标/集火环/目标点/路线/阵型）都不再绘制。"] = "Master switch for 3D scene markers. Off = no world-space markers at all (rings / brackets / focus ring / move target / routes / formation).",
