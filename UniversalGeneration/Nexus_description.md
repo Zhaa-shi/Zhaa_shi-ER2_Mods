@@ -51,6 +51,13 @@ Items go into backpacks as their **proper subclass** — magazines hold the righ
 
 ## Changelog
 
+**2.5.10**
+- **Row text is bold and 1 pt larger.** White on #1A1A22 is already ~15:1 contrast - what was missing was stroke weight, not brightness. Bold + larger is the actual fix.
+- **Every row draws its separator now.** Lines were previously drawn only between rows, so a single-entry list showed none (which is why favourites appeared to have lost them), and the favourites folder list had none at all.
+- **Favourite stars: 14 -> 17 px, bold, brighter gold (#FFE81A).**
+- **Surfaces lifted another step** (panel #1A1A22, control #32323C, rows #24242C / #2E2E38).
+
+
 **2.5.9**
 - **Favourites are now a two-level folder view.** Opening *Favourites* shows one **folder per category** (`> Name (count)`); clicking a folder opens its saved entries, with a breadcrumb `< Favourites / Name` to go back. The old row of category tabs is gone, and entering Favourites no longer jumps straight into the first category.
 - **Panel lifted one step** (panel #121218, title bar #1C1C24, control #26262E, row #1A1A20) and rows use **zebra striping** so list lines are easy to follow.

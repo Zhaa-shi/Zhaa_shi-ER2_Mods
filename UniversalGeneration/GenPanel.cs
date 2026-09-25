@@ -470,6 +470,8 @@ internal static class GenPanel
 			string label = "▸ " + favCatNames[i] + "   (" + FavCountOf(i) + ")";
 			bool hit = GUI.Button(rr, label, rowStyle);
 			GUI.backgroundColor = keep;
+			// 1.4.29：文件夹列表也要有行分隔线（原来这里 0 处，与其他列表观感不一致）
+			Er2Ui.HLine(new Rect(rr.x, rowY + RowH - 2f * s, rr.width, Mathf.Max(1f, s)), Er2Ui.EdgeSoft);
 			if (hit)
 			{
 				Event.current.Use();
@@ -609,7 +611,9 @@ internal static class GenPanel
 			// 2.5.2：收藏行左侧强调竖条——比"整行换底色"更像设计（底色只轻微提亮，靠竖条点名）
 			if (fav) Er2Ui.AccentBar(rowRect, Er2Ui.Accent, Mathf.Max(2f, 3f * ls));
 			// 1.4.22：行分隔线——行底与行底之间加一条极淡暖棕，元素边界一眼可辨
-			if (i + 1 < to) Er2Ui.HLine(new Rect(rowRect.x, rowY + RowH - 2f * ls, rowRect.width, Mathf.Max(1f, ls)), Er2Ui.EdgeSoft);
+			// 1.4.29：**每行都画底线**（原来只在"非最后一行"画 → 单行列表看起来完全没有横线，
+			// 用户："每个选项下不都有一个小横线吗，收藏里怎么没了"）
+			Er2Ui.HLine(new Rect(rowRect.x, rowY + RowH - 2f * ls, rowRect.width, Mathf.Max(1f, ls)), Er2Ui.EdgeSoft);
 			if (StarButton(new Rect(rect.x + rect.width - 30f * ls, rowY + 1f * ls, 26f * ls, RowH - 4f * ls), fav))
 			{
 				GenCatalog.ToggleFav(e);
@@ -668,7 +672,7 @@ internal static class GenPanel
 			GUI.backgroundColor = keep;
 			// 2.5.2：收藏行左侧强调竖条（与单位列表同款）
 			if (fav) Er2Ui.AccentBar(itemRowRect, Er2Ui.Accent, Mathf.Max(2f, 3f * isc));
-			if (i + 1 < to) Er2Ui.HLine(new Rect(itemRowRect.x, rowY + RowH - 2f * isc, itemRowRect.width, Mathf.Max(1f, isc)), Er2Ui.EdgeSoft);
+			Er2Ui.HLine(new Rect(itemRowRect.x, rowY + RowH - 2f * isc, itemRowRect.width, Mathf.Max(1f, isc)), Er2Ui.EdgeSoft);   // 1.4.29：每行都画
 			if (StarButton(new Rect(rect.x + rect.width - 28f * isc, rowY + 1f * isc, 26f * isc, RowH - 4f * isc), fav))
 			{
 				ItemCatalog.ToggleFav(e);
@@ -1082,7 +1086,9 @@ internal static class GenPanel
 		// 宿主同款主题：#0E1C0EB4 底 / #3E703EE0 选中 / #DFF0DF 文字
 		buttonStyle = Er2Ui.MakeButton(Er2Ui.FontBody, Er2Ui.Surface, Er2Ui.Text);
 		activeButtonStyle = Er2Ui.MakeButton(Er2Ui.FontBody, Er2Ui.SurfaceActive, Er2Ui.TextOnActive, FontStyle.Bold);
-		rowStyle = Er2Ui.MakeButton(Er2Ui.FontBody, Er2Ui.SurfaceRow, Er2Ui.Text, FontStyle.Normal, TextAnchor.MiddleLeft);
+		// 1.4.29：**Bold + 字号 +1**——12px Normal 在深底上「亮度感」不足，用户连续两轮反馈"文本太暗"。
+		// 加粗是提升深底白字可读性最直接的手段（对比度其实早就够了，缺的是笔画厚度）。
+		rowStyle = Er2Ui.MakeButton(Er2Ui.FontBody + 1, Er2Ui.SurfaceRow, Er2Ui.Text, FontStyle.Bold, TextAnchor.MiddleLeft);
 
 		// 页签样式（字号由页签原语逐次改写，故必须单独一份——不能与 buttonStyle 共用）
 		tabStyle = Er2Ui.MakeButton(Er2Ui.FontTabMax, Er2Ui.Surface, Er2Ui.Text);
@@ -1093,10 +1099,10 @@ internal static class GenPanel
 		flashStyle = Er2Ui.MakeLabel(flashSize, TextAnchor.MiddleLeft, Er2Ui.Text, FontStyle.Bold);
 
 		// 收藏星标：透明底（无底色贴图），仅文字颜色随状态
-		int starSize = Mathf.Max(8, Mathf.RoundToInt(14 * Er2Ui.Scale));
+		int starSize = Mathf.Max(10, Mathf.RoundToInt(17 * Er2Ui.Scale));   // 1.4.29：14 → 17（小号星形笔画太细显得暗）
 		// 1.4.27：**textColor 必须纯白**——GUI.contentColor 与 style.normal.textColor 是**相乘**关系，
 		// 原来用 TextDim(#CACAD0) → ★ 的金色被乘暗成 #CAA84D（用户："收藏的黄色星星也太暗了"）。
-		starStyle = Er2Ui.MakeLabel(starSize, TextAnchor.MiddleCenter, Color.white);
+		starStyle = Er2Ui.MakeLabel(starSize, TextAnchor.MiddleCenter, Color.white, FontStyle.Bold);
 		starStyle.hover.textColor = Color.white;
 		starStyle.active.textColor = Color.white;
 		starStyle.focused.textColor = Color.white;

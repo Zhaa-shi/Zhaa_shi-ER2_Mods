@@ -6,7 +6,7 @@ Adds an "RTS god-view squad command" layer to Easy Red 2, with mouse operations 
 ## Installation instructions
 1. Install BepInEx (IL2CPP build) into the game root folder.
 2. Put `ER2_BattlefieldCommander.dll` into `Easy Red 2\BepInEx\plugins\`.
-3. Launch the game — `Loading [ER2 Battlefield Commander 1.4.28]` in the BepInEx log means success.
+3. Launch the game — `Loading [ER2 Battlefield Commander 1.4.29]` in the BepInEx log means success.
 
 ## Main features
 - **God-view command**: F9 to enter free camera, WASD move, wheel zoom, MMB rotate, Q/E height, Space to pause/resume the world.
@@ -38,6 +38,19 @@ Adds an "RTS god-view squad command" layer to Easy Red 2, with mouse operations 
 Thanks to the Easy Red 2 community and the BepInEx / Harmony ecosystem, and to all authors whose IL2CPP modding work paved the way.
 
 ## Recent changes
+**1.4.29**
+* **Rows are bolder and one point larger.** Contrast was never the problem (white on #1A1A22 is
+  about 15:1) - at 12 px Normal the strokes were simply too thin to *feel* bright on a dark surface.
+  Bolding and enlarging the row text is what actually fixes that.
+* **Every row now draws its separator.** Previously a line was drawn only *between* rows, so a list
+  with a single entry showed none at all - which is why favourites looked like it had lost them.
+  The favourites folder list had no separators at all; it has them now.
+* **Favourite stars: 14 -> 17 px, bold, and a brighter gold (#FFE81A).** A small ★ glyph has very thin
+  strokes, so it read as dim even though the colour was correct.
+* **Surfaces lifted another step** (panel #1A1A22, title bar #26262F, control #32323C, row #24242C /
+  #2E2E38) and the list backing is less opaque.
+
+
 **1.4.28**
 * **Panel lifted one step.** Surfaces are brighter across the board (panel #121218, title bar #1C1C24,
   control #26262E, row #1A1A20) while staying neutral black, and text stays pure white.
