@@ -47,7 +47,6 @@ internal static class GenPanel
 	private const int VisibleRows = 10;
 	private const int TabsPerRow = 4;    // 1.2.0：8 个页签两行排（一行塞 7 个太挤）
 	private const int ItemTabsPerRow = 4; // 2.0.0：物品页签族同样两行排
-	private const int FavTabsPerRow = 4;  // 2.1.0：收藏分类子页签（最多 6 单位 + 6 物品 = 3 行）
 
 	// 2.5.1：字母索引行的尺寸原本在**两处各写一遍**（BuildRows 算高度 / DrawLetters 去画），
 	// 是陷阱 78 典型的"两处必须一致"——现在收成一份，自适应时也只改这里。
@@ -94,7 +93,7 @@ internal static class GenPanel
 	// 2.4.0 曾把"高度公式"与"绘制的 y 累加"逐项对齐——但那是靠人记住两处同步，
 	// 加一行 UI 就再踩一次。现在：**先排这一帧要画哪些行（BuildRows），高度 = 各行高之和**，
 	// 绘制只按计划逐行取 Rect —— 二者消费同一份列表，漂移在结构上不可能发生。
-	private enum RowKind { Title, Faction, UnitTabs, ItemTabs, FavTabs, SubTabs, Letters, List, Pager, Crew, Preview, ItemHelp }
+	private enum RowKind { Title, Faction, UnitTabs, ItemTabs, SubTabs, FavCrumb, Letters, List, Pager, Crew, Preview, ItemHelp }
 
 	private struct Row
 	{
@@ -123,8 +122,10 @@ internal static class GenPanel
 		rows.Add(new Row { Kind = RowKind.UnitTabs, H = Er2Ui.TabGridH(UnitCats.Length, TabsPerRow, TabH) });
 		if (itemCats.Count > 0)
 			rows.Add(new Row { Kind = RowKind.ItemTabs, H = Er2Ui.TabGridH(itemCats.Count, ItemTabsPerRow, TabH) });
-		if (category == "favorites" && favCats.Count > 0)
-			rows.Add(new Row { Kind = RowKind.FavTabs, H = Er2Ui.TabGridH(favCats.Count, FavTabsPerRow, TabH) });
+
+		// 1.4.28：收藏**条目**视图（已进子文件夹）时，插一行面包屑「◀ 收藏 / 分类名」
+		if (category == "favorites" && !string.IsNullOrEmpty(favCat))
+			rows.Add(new Row { Kind = RowKind.FavCrumb, H = Er2Ui.BtnH + Er2Ui.Gap });
 
 		if (ItemBranch(out string bucket, out bool favOnly))
 		{
@@ -145,7 +146,9 @@ internal static class GenPanel
 
 			rows.Add(new Row { Kind = RowKind.List, H = VisibleRows * RowH + 8f * Er2Ui.Scale });
 			rows.Add(new Row { Kind = RowKind.Pager, H = 26f * Er2Ui.Scale });
-			rows.Add(new Row { Kind = RowKind.ItemHelp, H = 38f * Er2Ui.Scale });   // 1.4.25：34 → 38（给提示文字更多呼吸）
+			// 1.4.28：**两行高**（38 → 56）+ 样式 wordWrap——文案再长也只换行，绝不横向溢出。
+		// 前两轮都在"缩字号/缩短文案"上打转，换行才是根治（窄面板 + 长英文的组合无法靠缩字号解决）。
+		rows.Add(new Row { Kind = RowKind.ItemHelp, H = 56f * Er2Ui.Scale });
 		}
 		else
 		{
@@ -238,8 +241,10 @@ internal static class GenPanel
 			if (ItemCatalog.Favs(b).Count > 0) { favCats.Add("item:" + b); favCatNames.Add(Ui.Tr(BucketLabel(b))); }
 		}
 
+		// 1.4.28：**不再自动跳进第一个分类**——favCat=="" 表示"停在主文件夹"，
+		// 用户要求"打开主文件夹后显示（各分类）子文件夹"。
 		if (favCats.Count == 0) { favCat = ""; return; }
-		if (string.IsNullOrEmpty(favCat) || !favCats.Contains(favCat)) favCat = favCats[0];
+		if (!string.IsNullOrEmpty(favCat) && !favCats.Contains(favCat)) favCat = "";
 	}
 
 	/// <summary>2.0.1：供物品校验完成后（协程回调）重建页签 —— 剔除无效条目后页签可能消失。</summary>
@@ -347,19 +352,23 @@ internal static class GenPanel
 				case RowKind.Faction: DrawFactionRow(rect); break;
 				case RowKind.UnitTabs: DrawUnitTabs(rect); break;
 				case RowKind.ItemTabs: DrawItemTabs(rect); break;
-				case RowKind.FavTabs: DrawFavTabs(rect); break;
 				case RowKind.SubTabs: DrawSubTabs(rect, bucket, favOnly); break;
 				case RowKind.Letters: DrawLetters(rect, bucket, favOnly); break;
-				case RowKind.List: stop = item ? DrawItemListBody(rect, bucket, favOnly) : DrawUnitListBody(rect); break;
+				case RowKind.FavCrumb: DrawFavCrumb(rect); break;
+				case RowKind.List:
+					// 1.4.28：**收藏主文件夹视图**——favCat 为空时列出各分类子文件夹，
+					// 而不是直接铺条目（用户："收藏改为每一个生成文件夹的子文件夹，在打开主文件夹后显示"）
+					if (category == "favorites" && string.IsNullOrEmpty(favCat)) stop = DrawFavFolderList(rect);
+					else stop = item ? DrawItemListBody(rect, bucket, favOnly) : DrawUnitListBody(rect);
+					break;
 				case RowKind.Pager: DrawPager(rect, item); break;
 				case RowKind.Crew: DrawCrewRow(rect); break;
 				case RowKind.Preview: DrawPreviewRow(rect); break;
 				case RowKind.ItemHelp:
 					{
-						// 1.4.27：**按可用宽度自缩字号**——英文文案（~99 字符）在 12 号下约 570px，
-						// 而面板内宽只有 ~450px，原来直接横向溢出被裁（用户："下面的文字超出了"）。
+						// 1.4.28：换行 + 中左对齐（原来是 MiddleLeft，两行时会整体偏下）
 						string helpTxt = Ui.Tr("点击条目拿起 → 拖到单位身上放入背包，拖到地上则生成实体");
-						helpStyle.fontSize = Er2Ui.FitSize(helpStyle, helpTxt, rect.width, Er2Ui.FontBody, Er2Ui.FontSmall);
+						helpStyle.alignment = TextAnchor.UpperLeft;
 						GUI.Label(rect, helpTxt, helpStyle);
 					}
 					break;
@@ -429,14 +438,81 @@ internal static class GenPanel
 		itemSub = ""; letterFilter = "";   // 2.1.0：同上
 	}
 
-	private static void DrawFavTabs(Rect rect)
+	/// <summary>
+	/// 1.4.28：收藏**主文件夹**视图——列出所有含收藏的分类（＝子文件夹）。
+	/// 用户要求："收藏改为每一个生成文件夹的子文件夹，在打开主文件夹后显示。"
+	/// 条目 `▸ 名称 (数量)`；点进去把 favCat 设为该分类，回到条目视图。
+	/// </summary>
+	private static bool DrawFavFolderList(Rect rect)
 	{
-		int hit = Er2Ui.TabGrid(rect.x, rect.y, rect.width, favCatNames, favCats.IndexOf(favCat),
-			FavTabsPerRow, TabH, tabStyle, tabActiveStyle);
-		if (hit < 0 || hit >= favCats.Count) return;
-		favCat = favCats[hit];
-		page = 0;
-		itemSub = "";
+		float s = Er2Ui.Scale;
+		curPages = 1;
+		curTotal = favCats.Count;
+
+		float listH = rect.height - Er2Ui.Gap;
+		Er2Ui.Fill(new Rect(rect.x, rect.y, rect.width, listH), Er2Ui.ListBg);
+		Er2Ui.Frame(new Rect(rect.x, rect.y, rect.width, listH), Er2Ui.Edge, Mathf.Max(1f, s));
+
+		if (favCats.Count == 0)
+		{
+			GUI.Label(new Rect(rect.x + 8f * s, rect.y + 6f * s, rect.width - 16f * s, 22f * s),
+				Ui.Tr("（还没有收藏：点条目右侧的 ☆ 添加）"), helpStyle);
+			return false;
+		}
+
+		int n = Mathf.Min(favCats.Count, VisibleRows);
+		for (int i = 0; i < n; i++)
+		{
+			float rowY = rect.y + 4f * s + i * RowH;
+			Color keep = GUI.backgroundColor;
+			GUI.backgroundColor = (i & 1) == 0 ? Er2Ui.RowBg : Er2Ui.RowBgAlt;
+			Rect rr = new Rect(rect.x + 6f * s, rowY, rect.width - 12f * s, RowH - 2f * s);
+			string label = "▸ " + favCatNames[i] + "   (" + FavCountOf(i) + ")";
+			bool hit = GUI.Button(rr, label, rowStyle);
+			GUI.backgroundColor = keep;
+			if (hit)
+			{
+				Event.current.Use();
+				favCat = favCats[i];
+				page = 0; itemSub = ""; letterFilter = "";
+				return true;   // 本帧到此（视图已切）
+			}
+		}
+		return false;
+	}
+
+	/// <summary>某个收藏分类下的条目数（单位走 favorites 表，物品走 ItemCatalog.Favs）。</summary>
+	private static int FavCountOf(int i)
+	{
+		if (i < 0 || i >= favCats.Count) return 0;
+		string c = favCats[i];
+		if (c.StartsWith("item:", StringComparison.Ordinal))
+		{
+			try { return ItemCatalog.Favs(c.Substring(5)).Count; } catch { return 0; }
+		}
+		int n = 0;
+		for (int k = 0; k < GenCatalog.favorites.Count; k++)
+			if (GenCatalog.favorites[k].Category == c) n++;
+		return n;
+	}
+
+	/// <summary>收藏条目视图的面包屑：「◀ 收藏」按钮 + 当前分类名。</summary>
+	private static void DrawFavCrumb(Rect rect)
+	{
+		float s = Er2Ui.Scale;
+		Rect back = new Rect(rect.x, rect.y, 92f * s, Er2Ui.BtnH);
+		if (GUI.Button(back, Ui.Tr("◀ 收藏"), buttonStyle))
+		{
+			Event.current.Use();
+			favCat = "";
+			page = 0; itemSub = ""; letterFilter = "";
+			RebuildFavTabs();
+			return;
+		}
+		int idx = favCats.IndexOf(favCat);
+		string name = idx >= 0 && idx < favCatNames.Count ? favCatNames[idx] : favCat;
+		GUI.Label(new Rect(back.xMax + 8f * s, rect.y, rect.width - back.width - 8f * s, Er2Ui.BtnH),
+			"▸ " + name, textStyle);
 	}
 
 	private static int IndexOfUnitCat(string cat)
@@ -525,7 +601,8 @@ internal static class GenPanel
 			float rowY = rect.y + 4f * ls + (i - from) * RowH;
 			bool fav = GenCatalog.IsFav(e.Id);
 			Color keep = GUI.backgroundColor;
-			GUI.backgroundColor = fav ? Er2Ui.FavRow : Er2Ui.RowBg;
+			// 1.4.28：**斑马纹**——偶数行换一档底色（用户"还是很暗"＝层次看不出）
+			GUI.backgroundColor = fav ? Er2Ui.FavRow : (((i - from) & 1) == 0 ? Er2Ui.RowBg : Er2Ui.RowBgAlt);
 			Rect rowRect = new Rect(rect.x + 6f * ls, rowY, rect.width - 38f * ls, RowH - 2f * ls);
 			if (GUI.Button(rowRect, e.Title, rowStyle)) clicked = e;
 			GUI.backgroundColor = keep;
@@ -585,7 +662,7 @@ internal static class GenPanel
 
 			bool fav = ItemCatalog.IsFav(e.Id);
 			Color keep = GUI.backgroundColor;
-			GUI.backgroundColor = fav ? Er2Ui.FavRow : Er2Ui.RowBg;
+			GUI.backgroundColor = fav ? Er2Ui.FavRow : (((i - from) & 1) == 0 ? Er2Ui.RowBg : Er2Ui.RowBgAlt);
 			Rect itemRowRect = new Rect(tx, rowY, tw, RowH - 2f * isc);
 			if (GUI.Button(itemRowRect, e.Title, rowStyle)) clicked = e;
 			GUI.backgroundColor = keep;
@@ -1000,6 +1077,7 @@ internal static class GenPanel
 		titleStyle = Er2Ui.MakeLabel(Er2Ui.FontTitle, TextAnchor.MiddleLeft, Er2Ui.Text, FontStyle.Bold);
 		textStyle = Er2Ui.MakeLabel(Er2Ui.FontBody, TextAnchor.MiddleLeft, Er2Ui.Text);
 		helpStyle = Er2Ui.MakeLabel(Er2Ui.FontBody, TextAnchor.MiddleLeft, Er2Ui.Text);
+		helpStyle.wordWrap = true;   // 1.4.28：允许换行（否则长文案只能溢出被裁）
 
 		// 宿主同款主题：#0E1C0EB4 底 / #3E703EE0 选中 / #DFF0DF 文字
 		buttonStyle = Er2Ui.MakeButton(Er2Ui.FontBody, Er2Ui.Surface, Er2Ui.Text);

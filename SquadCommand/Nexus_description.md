@@ -6,7 +6,7 @@ Adds an "RTS god-view squad command" layer to Easy Red 2, with mouse operations 
 ## Installation instructions
 1. Install BepInEx (IL2CPP build) into the game root folder.
 2. Put `ER2_BattlefieldCommander.dll` into `Easy Red 2\BepInEx\plugins\`.
-3. Launch the game — `Loading [ER2 Battlefield Commander 1.4.27]` in the BepInEx log means success.
+3. Launch the game — `Loading [ER2 Battlefield Commander 1.4.28]` in the BepInEx log means success.
 
 ## Main features
 - **God-view command**: F9 to enter free camera, WASD move, wheel zoom, MMB rotate, Q/E height, Space to pause/resume the world.
@@ -38,6 +38,14 @@ Adds an "RTS god-view squad command" layer to Easy Red 2, with mouse operations 
 Thanks to the Easy Red 2 community and the BepInEx / Harmony ecosystem, and to all authors whose IL2CPP modding work paved the way.
 
 ## Recent changes
+**1.4.28**
+* **Panel lifted one step.** Surfaces are brighter across the board (panel #121218, title bar #1C1C24,
+  control #26262E, row #1A1A20) while staying neutral black, and text stays pure white.
+* **Alternating row backgrounds (zebra striping).** With small text and a 1 px divider alone, rows were
+  hard to follow; adjacent rows now alternate between two shades, which is the single most effective
+  readability fix for a list.
+
+
 **1.4.27**
 * **Translucency now applies to the background only.** Previously the border and divider alpha was
   driven by the panel-opacity setting too - so raising transparency also faded the outlines, which is

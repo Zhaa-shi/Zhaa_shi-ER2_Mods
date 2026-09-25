@@ -168,13 +168,13 @@ internal static class Er2Ui
 	//   ③ 皮革纹理保留（用户上轮要的质感），但**去掉暖调**改中性灰——
 	//      在中性黑底上留暖色会重新泛黄。
 	//   元素区分靠三重：中性黑底 + 中性描边/分隔线 + 选中亮灰填充。
-	private static readonly Color MonoPanelBg = new Color(0x08 / 255f, 0x08 / 255f, 0x0A / 255f);
+	private static readonly Color MonoPanelBg = new Color(0x12 / 255f, 0x12 / 255f, 0x18 / 255f);
 	private static readonly Color MonoPanelBorder = new Color(1f, 1f, 1f, 0.85f);
-	private static readonly Color MonoTitleBar = new Color(0x10 / 255f, 0x10 / 255f, 0x13 / 255f);
-	private static readonly Color MonoSurface = new Color(0x18 / 255f, 0x18 / 255f, 0x1C / 255f);
-	private static readonly Color MonoSurfaceHover = new Color(0x32 / 255f, 0x32 / 255f, 0x3A / 255f);
-	private static readonly Color MonoSurfaceActive = new Color(0x52 / 255f, 0x52 / 255f, 0x5E / 255f);
-	private static readonly Color MonoRowBg = new Color(0x0E / 255f, 0x0E / 255f, 0x11 / 255f);
+	private static readonly Color MonoTitleBar = new Color(0x1C / 255f, 0x1C / 255f, 0x24 / 255f);
+	private static readonly Color MonoSurface = new Color(0x26 / 255f, 0x26 / 255f, 0x2E / 255f);
+	private static readonly Color MonoSurfaceHover = new Color(0x3E / 255f, 0x3E / 255f, 0x48 / 255f);
+	private static readonly Color MonoSurfaceActive = new Color(0x62 / 255f, 0x62 / 255f, 0x72 / 255f);
+	private static readonly Color MonoRowBg = new Color(0x1A / 255f, 0x1A / 255f, 0x20 / 255f);
 	private static readonly Color MonoFavRow = new Color(1f, 1f, 1f, 0.10f);
 	private static readonly Color MonoText = new Color(1f, 1f, 1f, 1f);
 	private static readonly Color MonoTextDim = new Color(0xE4 / 255f, 0xE4 / 255f, 0xE8 / 255f, 1f);
@@ -182,12 +182,15 @@ internal static class Er2Ui
 	private static readonly Color MonoTextOnActive = new Color(1f, 1f, 1f, 1f);
 	private static readonly Color MonoTextOnPlate = new Color(0xF5 / 255f, 0xF5 / 255f, 0xF7 / 255f, 1f);
 	private static readonly Color MonoStarHot = new Color(0.90f, 0.90f, 0.92f, 0.95f);
-	private static readonly Color MonoSurfaceDisabled = new Color(0x10 / 255f, 0x10 / 255f, 0x12 / 255f, 0.62f);
+	private static readonly Color MonoSurfaceDisabled = new Color(0x16 / 255f, 0x16 / 255f, 0x1A / 255f, 0.66f);
 	private static readonly Color MonoRowHover = new Color(1f, 1f, 1f, 0.10f);
 	private static readonly Color MonoListBg = new Color(0f, 0f, 0f, 0.50f);
 	// 1.4.24：结构线改中性灰——中性黑底上深棕会显脏
 	private static readonly Color MonoEdge = new Color(1f, 1f, 1f, 0.65f);   // 分隔线（白，不透明域）
 	private static readonly Color MonoEdgeSoft = new Color(1f, 1f, 1f, 0.30f);                    // 行间分隔（白 30%）
+	// 1.4.28：列表**斑马纹**交替底色——行与行只靠 1px 分隔线在小字号下仍难跟读，
+	// 交替底色是列表可读性最有效的一招（用户："还是很暗"＝看不清层次）
+	private static readonly Color MonoRowBgAlt = new Color(0x23 / 255f, 0x23 / 255f, 0x2A / 255f);
 
 	/// <summary>
 	/// cfg UI/uiPanelAlpha → 面板**主不透明度**（0.55~1.0）。默认 0.85。
@@ -216,6 +219,8 @@ internal static class Er2Ui
 	public static Color SurfaceActive => Mono ? WithA(MonoSurfaceActive, PanelAlpha + 0.13f) : LegacySurfaceActive;      // 选中底
 	public static Color SurfaceDisabled => Mono ? MonoSurfaceDisabled : new Color(0f, 0f, 0f, 0.55f); // 禁用底
 	public static Color RowBg => Mono ? WithA(MonoRowBg, PanelAlpha - 0.05f) : LegacyRowBg;                              // 普通行底
+	/// <summary>交替行底（斑马纹的偶数行）。</summary>
+	public static Color RowBgAlt => Mono ? WithA(MonoRowBgAlt, PanelAlpha - 0.05f) : LegacyRowBg;
 	public static Color RowHover => Mono ? MonoRowHover : new Color(0.5f, 0.7f, 0.5f, 0.12f); // 行悬停覆盖
 	public static Color SurfaceRow => Surface;                                                // 兼容旧名（列表行底）
 	public static Color FavRow => Mono ? MonoFavRow : LegacyFavRow;                           // 收藏行底

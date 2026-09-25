@@ -6,7 +6,7 @@
 ## Installation instructions
 1. 安装 BepInEx（IL2CPP 版）到游戏根目录。
 2. 将 `ER2_BattlefieldCommander.dll` 放入 `Easy Red 2\BepInEx\plugins\`。
-3. 启动游戏，BepInEx 日志出现 `Loading [ER2 Battlefield Commander 1.4.27]` 表示加载成功。
+3. 启动游戏，BepInEx 日志出现 `Loading [ER2 Battlefield Commander 1.4.28]` 表示加载成功。
 
 ## Main features
 - **上帝视角指挥**：F9 进入自由视角，WASD 移动、滚轮缩放、中键旋转、Q/E 升降，空格暂停/继续世界。
@@ -38,6 +38,13 @@
 感谢 Easy Red 2 社区与 BepInEx / Harmony 生态，以及所有为 IL2CPP modding 提供思路的作者。
 
 ## 近期更新
+**1.4.28**
+· **面板整体提亮一档**（面板 #121218、标题条 #1C1C24、控件 #26262E、行底 #1A1A20），
+  仍是中性黑，文字保持纯白。
+· **列表加斑马纹（交替行底）**：小字号 + 仅一条 1px 分隔线时，行与行很难跟读；
+  现在相邻行交替两种底色——这是列表可读性最有效的一招。
+
+
 **1.4.27**
 · **透明现在只作用于背景。** 此前边框与分隔线的不透明度也被面板透明度设置带着走——
   调透明度会连轮廓一起变淡，对比度就是这么丢的。现在**面**（面板/标题条/行/选中）跟随

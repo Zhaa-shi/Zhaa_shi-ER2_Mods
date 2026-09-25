@@ -1,7 +1,15 @@
-ER2 Battlefield Commander v1.4.27
+ER2 Battlefield Commander v1.4.28
 =================================
 
 A BepInEx plugin for Easy Red 2 that adds an "RTS god-view squad command" layer — mouse operations inspired by Gates of Hell: Ostfront.
+
+[1.4.28 Brighter panel + zebra rows]
+* **Panel lifted one step.** Surfaces are brighter across the board (panel #121218, title bar #1C1C24,
+  control #26262E, row #1A1A20) while staying neutral black, and text stays pure white.
+* **Alternating row backgrounds (zebra striping).** With small text and a 1 px divider alone, rows were
+  hard to follow; adjacent rows now alternate between two shades, which is the single most effective
+  readability fix for a list.
+
 
 [1.4.27 White foreground + fixed bottom text overflow]
 * **Translucency now applies to the background only.** Previously the border and divider alpha was

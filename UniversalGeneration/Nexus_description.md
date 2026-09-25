@@ -51,6 +51,12 @@ Items go into backpacks as their **proper subclass** — magazines hold the righ
 
 ## Changelog
 
+**2.5.9**
+- **Favourites are now a two-level folder view.** Opening *Favourites* shows one **folder per category** (`> Name (count)`); clicking a folder opens its saved entries, with a breadcrumb `< Favourites / Name` to go back. The old row of category tabs is gone, and entering Favourites no longer jumps straight into the first category.
+- **Panel lifted one step** (panel #121218, title bar #1C1C24, control #26262E, row #1A1A20) and rows use **zebra striping** so list lines are easy to follow.
+- **The bottom help line wraps now** (dedicated style with word-wrap and a two-line row height) - shortening the text alone could never fix a narrow panel plus a long English sentence.
+
+
 **2.5.8**
 - **Translucency is background-only now.** Faces follow the panel-opacity setting; text and lines are fully opaque (previously the border/divider alpha was tied to it too, which killed contrast).
 - **Text and lines are white** (#FFFFFF text, white borders and dividers) instead of near-white grey.
