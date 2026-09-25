@@ -169,25 +169,25 @@ internal static class Er2Ui
 	//      在中性黑底上留暖色会重新泛黄。
 	//   元素区分靠三重：中性黑底 + 中性描边/分隔线 + 选中亮灰填充。
 	private static readonly Color MonoPanelBg = new Color(0x08 / 255f, 0x08 / 255f, 0x0A / 255f);
-	private static readonly Color MonoPanelBorder = new Color(0x3C / 255f, 0x3C / 255f, 0x42 / 255f);
+	private static readonly Color MonoPanelBorder = new Color(0x55 / 255f, 0x55 / 255f, 0x60 / 255f);
 	private static readonly Color MonoTitleBar = new Color(0x10 / 255f, 0x10 / 255f, 0x13 / 255f);
-	private static readonly Color MonoSurface = new Color(0x1A / 255f, 0x1A / 255f, 0x1E / 255f);
-	private static readonly Color MonoSurfaceHover = new Color(0x28 / 255f, 0x28 / 255f, 0x2E / 255f);
-	private static readonly Color MonoSurfaceActive = new Color(0x3A / 255f, 0x3A / 255f, 0x42 / 255f);
-	private static readonly Color MonoRowBg = new Color(0x11 / 255f, 0x11 / 255f, 0x14 / 255f);
+	private static readonly Color MonoSurface = new Color(0x18 / 255f, 0x18 / 255f, 0x1C / 255f);
+	private static readonly Color MonoSurfaceHover = new Color(0x32 / 255f, 0x32 / 255f, 0x3A / 255f);
+	private static readonly Color MonoSurfaceActive = new Color(0x52 / 255f, 0x52 / 255f, 0x5E / 255f);
+	private static readonly Color MonoRowBg = new Color(0x0E / 255f, 0x0E / 255f, 0x11 / 255f);
 	private static readonly Color MonoFavRow = new Color(1f, 1f, 1f, 0.10f);
 	private static readonly Color MonoText = new Color(0xF0 / 255f, 0xF0 / 255f, 0xF2 / 255f, 1f);
-	private static readonly Color MonoTextDim = new Color(0xB8 / 255f, 0xB8 / 255f, 0xBE / 255f, 0.92f);
-	private static readonly Color MonoTextDisabled = new Color(0x85 / 255f, 0x85 / 255f, 0x8C / 255f, 0.80f);
+	private static readonly Color MonoTextDim = new Color(0xCA / 255f, 0xCA / 255f, 0xD0 / 255f, 0.94f);
+	private static readonly Color MonoTextDisabled = new Color(0x92 / 255f, 0x92 / 255f, 0x9A / 255f, 0.82f);
 	private static readonly Color MonoTextOnActive = new Color(1f, 1f, 1f, 1f);
 	private static readonly Color MonoTextOnPlate = new Color(0xF5 / 255f, 0xF5 / 255f, 0xF7 / 255f, 1f);
 	private static readonly Color MonoStarHot = new Color(0.90f, 0.90f, 0.92f, 0.95f);
 	private static readonly Color MonoSurfaceDisabled = new Color(0x10 / 255f, 0x10 / 255f, 0x12 / 255f, 0.62f);
 	private static readonly Color MonoRowHover = new Color(1f, 1f, 1f, 0.10f);
-	private static readonly Color MonoListBg = new Color(0f, 0f, 0f, 0.40f);
+	private static readonly Color MonoListBg = new Color(0f, 0f, 0f, 0.50f);
 	// 1.4.24：结构线改中性灰——中性黑底上深棕会显脏
-	private static readonly Color MonoEdge = new Color(0x38 / 255f, 0x38 / 255f, 0x3E / 255f);   // 分隔线
-	private static readonly Color MonoEdgeSoft = new Color(1f, 1f, 1f, 0.10f);                    // 极淡分隔（行间）
+	private static readonly Color MonoEdge = new Color(0x45 / 255f, 0x45 / 255f, 0x4E / 255f);   // 分隔线
+	private static readonly Color MonoEdgeSoft = new Color(1f, 1f, 1f, 0.15f);                    // 极淡分隔（行间）
 
 	/// <summary>
 	/// cfg UI/uiPanelAlpha → 面板**主不透明度**（0.55~1.0）。默认 0.85。

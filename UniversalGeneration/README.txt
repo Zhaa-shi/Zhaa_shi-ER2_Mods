@@ -1,4 +1,4 @@
-ER2 Universal Generation v2.5.5
+ER2 Universal Generation v2.5.6
 ================================
 
 Spawn any unit, vehicle, or item anywhere, right from Battlefield Commander's RTS god view.
@@ -41,6 +41,12 @@ How to use
 
 Changelog
 --------------------------------
+2.5.6
+- **Marker lines reverted to the 1.4.23 widths** - the "too thin" impression came from a very close camera: marker radii are fixed world sizes, so up close the ring fills much of the screen while the line stays pixel-constant, dropping the line/hole ratio. Use `[Markers] markerLineWidth` if it still reads thin at close range.
+- **Fixed the bottom help text running past the panel edge** (bottom padding 8 -> 18px, help row 34 -> 38px).
+- **Contrast pass:** brighter/thicker panel border (#555560, ~2px), brighter selected fill, darker row fills, row separators 10% -> 15%, more opaque list background.
+
+
 2.5.5
 - **Marker lines raised about 60%** again (infantry ring 1.5 -> 2.4, selection brackets -> 3.5/4.2, focus ring -> 4.8).
 - **Panel is neutral black now, not brown** - all surfaces are R=G=B and the leather noise texture lost its warm tint.

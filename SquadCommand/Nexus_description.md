@@ -6,7 +6,7 @@ Adds an "RTS god-view squad command" layer to Easy Red 2, with mouse operations 
 ## Installation instructions
 1. Install BepInEx (IL2CPP build) into the game root folder.
 2. Put `ER2_BattlefieldCommander.dll` into `Easy Red 2\BepInEx\plugins\`.
-3. Launch the game — `Loading [ER2 Battlefield Commander 1.4.24]` in the BepInEx log means success.
+3. Launch the game — `Loading [ER2 Battlefield Commander 1.4.25]` in the BepInEx log means success.
 
 ## Main features
 - **God-view command**: F9 to enter free camera, WASD move, wheel zoom, MMB rotate, Q/E height, Space to pause/resume the world.
@@ -38,6 +38,22 @@ Adds an "RTS god-view squad command" layer to Easy Red 2, with mouse operations 
 Thanks to the Easy Red 2 community and the BepInEx / Harmony ecosystem, and to all authors whose IL2CPP modding work paved the way.
 
 ## Recent changes
+**1.4.25**
+* **Marker line width reverted to the 1.4.23 values** (infantry ring 1.5, brackets 2.2/2.6, focus ring 3.0,
+  dashes 1.7/1.8, formation 2.4/2.5). The "too thin" impression came from having zoomed the camera in
+  very close: marker radii are fixed world sizes, so up close the ring fills a large part of the screen
+  while the line stays a constant pixel width - and the line/hole ratio drops. Pixel-constant width is
+  still correct across resolutions, but how thick it *feels* depends on the marker's own size on screen.
+  If it still reads thin at close range, `[Markers] markerLineWidth` scales all of them.
+* **Fixed the text at the very bottom running past the panel edge.** Mathematical padding was there,
+  but only ~8px - which reads as "outside". Bottom padding is now 18px (top stays 8) and the help row
+  grew from 34 to 38px.
+* **Contrast pass.** The panel border is brighter (#555560) and thicker (~2px) so the panel has a clear
+  edge even over bright stone/concrete; the selected fill is brighter (#52525E), row fills sit darker,
+  row separators went from 10% to 15% and the list background is more opaque - so text, rows and the
+  selected state each stand apart instead of blending into one grey field.
+
+
 **1.4.24**
 * **Marker lines raised again (~60%)** - infantry ring 1.5 -> 2.4, selection brackets 2.2/2.6 -> 3.5/4.2,
   focus ring 3.0 -> 4.8, route/boarding dashes 1.7/1.8 -> 2.7/2.9, formation 2.4/2.5 -> 3.8/4.0.

@@ -143,7 +143,7 @@ internal static class GenPanel
 
 			rows.Add(new Row { Kind = RowKind.List, H = VisibleRows * RowH + 8f * Er2Ui.Scale });
 			rows.Add(new Row { Kind = RowKind.Pager, H = 26f * Er2Ui.Scale });
-			rows.Add(new Row { Kind = RowKind.ItemHelp, H = 34f * Er2Ui.Scale });
+			rows.Add(new Row { Kind = RowKind.ItemHelp, H = 38f * Er2Ui.Scale });   // 1.4.25：34 → 38（给提示文字更多呼吸）
 		}
 		else
 		{
@@ -321,7 +321,9 @@ internal static class GenPanel
 		// 2.4.2：绘制**只消费行计划**——高度与绘制同源（见 BuildRows），加行只需改一处
 		DrawRows(r);
 
-		Er2Ui.Frame(r, Er2Ui.PanelBorder, Mathf.Max(1f, s));   // 最后画，不被内容覆盖
+		// 1.4.25：外框加粗到 ~2px——半透明面板在亮背景（石头/水泥地）上边界会被吃掉，
+		// 用户反馈"对比不明显"，一圈更亮的粗边框是最直接的"面板到此为止"信号
+		Er2Ui.Frame(r, Er2Ui.PanelBorder, Mathf.Max(1.5f, 2f * s));   // 最后画，不被内容覆盖
 	}
 
 	/// <summary>按行计划逐行取 Rect 绘制（每行只拿到自己的 Rect，不再自行累加 y）。</summary>
@@ -890,7 +892,9 @@ internal static class GenPanel
 	private static Rect PanelRect()
 	{
 		BuildRows();
-		float h = 16f * Er2Ui.Scale;       // 顶部 + 底部留白（1.4.22：随倍率）
+		// 1.4.25：底部留白 8 → 18（原 16 均分时最后一行 ItemHelp 紧贴下边框，
+		// 用户反馈"最下面的字都超出菜单了"——贴边在视觉上就读作溢出）
+		float h = 26f * Er2Ui.Scale;       // 顶部 8 + 底部 18
 		for (int i = 0; i < rows.Count; i++)
 			h += rows[i].H + (i + 1 < rows.Count ? Er2Ui.Gap : 0f);   // 与 DrawRows 同一份间距规则
 		return new Rect(panelPos.x, panelPos.y, PanelW, h);
