@@ -3542,10 +3542,12 @@ internal static class GodViewController
 		GUI.color = fill;
 		GUI.DrawTexture(r, Texture2D.whiteTexture);
 		GUI.color = txt;
-		GUI.DrawTexture(new Rect(r.x, r.y, r.width, 1.5f), Texture2D.whiteTexture);
-		GUI.DrawTexture(new Rect(r.x, r.yMax - 1.5f, r.width, 1.5f), Texture2D.whiteTexture);
-		GUI.DrawTexture(new Rect(r.x, r.y, 1.5f, r.height), Texture2D.whiteTexture);
-		GUI.DrawTexture(new Rect(r.xMax - 1.5f, r.y, 1.5f, r.height), Texture2D.whiteTexture);
+		// 1.4.22：描边宽度随倍率（原 1.5f 硬编码——缩放后描边过细，按钮边界读不出）
+		float bw = Mathf.Max(1f, 1.5f * ER2Shared.Er2Ui.Scale);
+		GUI.DrawTexture(new Rect(r.x, r.y, r.width, bw), Texture2D.whiteTexture);
+		GUI.DrawTexture(new Rect(r.x, r.yMax - bw, r.width, bw), Texture2D.whiteTexture);
+		GUI.DrawTexture(new Rect(r.x, r.y, bw, r.height), Texture2D.whiteTexture);
+		GUI.DrawTexture(new Rect(r.xMax - bw, r.y, bw, r.height), Texture2D.whiteTexture);
 		GUI.Label(r, label, SquadCmdLogic.ButtonStyle());
 		GUI.color = Color.white;
 	}
@@ -3819,20 +3821,54 @@ internal static class GodViewController
 	}
 
 	/// <summary>相机到世界原点的粗略距离——用于线宽距离补偿。取相机自身高度 ∝ 观察距离，够用且零分配。</summary>
-	private static float MarkerCamDist()
+	private static float markerGroundDistCache = -1f;
+	private static float markerGroundDistNext = -10f;
+
+	/// <summary>
+	/// 1.4.22：相机到**视线-地面交点**的距离（每帧一次，0.1s 缓存足够）。
+	/// 供 MarkerCamDist 与阵型标记共用——两处必须同一份语义（陷阱 78：单一数据源）。
+	/// </summary>
+	internal static float CameraGroundDist()
 	{
+		float now = Time.unscaledTime;
+		if (markerGroundDistCache > 0f && now < markerGroundDistNext) return markerGroundDistCache;
+		float d = 30f;
 		try
 		{
 			Camera cam = MainCam();
 			if (cam != null)
 			{
-				// 1.4.21：顺手把真实 FOV 注入线宽换算（变焦时线不会跟着变粗）
 				ER2Shared.Er2Ui.SetCamFov(cam.fieldOfView);
-				return cam.transform.position.magnitude;
+				bool got = false;
+				try
+				{
+					Ray ray = new Ray(cam.transform.position, cam.transform.forward);
+					if (Physics.Raycast(ray, out RaycastHit hit, 3000f))
+					{
+						d = Vector3.Distance(cam.transform.position, hit.point);
+						got = true;
+					}
+				}
+				catch { }
+				if (!got)
+					d = Mathf.Max(cam.transform.position.y, 2f); // 看天兜底：用高度近似
 			}
 		}
 		catch { }
-		return 30f; // 兜底 = 1.0 倍补偿
+		d = Mathf.Clamp(d, 1f, 500f);
+		markerGroundDistCache = d;
+		markerGroundDistNext = now + 0.1f;
+		return d;
+	}
+
+	private static float MarkerCamDist()
+	{
+		// 1.4.22 **关键修复**：原实现 `cam.transform.position.magnitude` 是相机到**世界原点**的距离！
+		// ER2 地图原点离战区可达数百米，GodView 每帧拿到的 dist 全是错的大数。
+		// 旧版有 Clamp(0.6, 2.5) 掩盖；1.4.21 改纯线性像素换算后直接爆表——
+		// 实测环被 ~0.4m 粗线填成实心圆盘、选中角标糊成粗 X（用户截图实证）。
+		// 现在取"相机到视线-地面交点"的真实距离（CameraGroundDist）。
+		return CameraGroundDist();
 	}
 
 	/// <summary>按 key 错相的脉动值。markerPulse 关掉时恒为 1（不呼吸）。</summary>

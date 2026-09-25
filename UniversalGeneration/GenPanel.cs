@@ -125,7 +125,7 @@ internal static class GenPanel
 		if (ItemBranch(out string bucket, out bool favOnly))
 		{
 			if (ItemCatalog.SubsOf(bucket, favOnly).Count > 0)
-				rows.Add(new Row { Kind = RowKind.SubTabs, H = TabH + Er2Ui.Gap });
+				rows.Add(new Row { Kind = RowKind.SubTabs, H = TabH });
 
 			List<string> letters = ItemCatalog.LettersOf(bucket, itemSub, favOnly);
 			if (letters.Count > 2)
@@ -139,13 +139,13 @@ internal static class GenPanel
 				letterFilter = "";   // 字母行消失时（如子分类变了）自动复位，避免空列表
 			}
 
-			rows.Add(new Row { Kind = RowKind.List, H = VisibleRows * RowH + 8f * Er2Ui.Scale + Er2Ui.Gap });
+			rows.Add(new Row { Kind = RowKind.List, H = VisibleRows * RowH + 8f * Er2Ui.Scale });
 			rows.Add(new Row { Kind = RowKind.Pager, H = 26f * Er2Ui.Scale });
 			rows.Add(new Row { Kind = RowKind.ItemHelp, H = 34f * Er2Ui.Scale });
 		}
 		else
 		{
-			rows.Add(new Row { Kind = RowKind.List, H = VisibleRows * RowH + 8f * Er2Ui.Scale + Er2Ui.Gap });
+			rows.Add(new Row { Kind = RowKind.List, H = VisibleRows * RowH + 8f * Er2Ui.Scale });
 			rows.Add(new Row { Kind = RowKind.Pager, H = 26f * Er2Ui.Scale });
 			rows.Add(new Row { Kind = RowKind.Crew, H = 32f * Er2Ui.Scale });
 			rows.Add(new Row { Kind = RowKind.Preview, H = 24f * Er2Ui.Scale });
@@ -284,7 +284,7 @@ internal static class GenPanel
 		Rect r = PanelRect();
 
 		// 标题栏拖动（IMGUI 标准模式；拖动区不含关闭按钮）
-		Rect titleHit = new Rect(r.x, r.y, r.width - 100f, 26f);
+		Rect titleHit = new Rect(r.x, r.y, r.width - 100f * Er2Ui.Scale, 26f * Er2Ui.Scale);
 		if (Event.current.type == EventType.MouseDown && titleHit.Contains(Event.current.mousePosition))
 		{
 			dragging = true;
@@ -325,7 +325,7 @@ internal static class GenPanel
 	{
 		BuildRows();
 		float x = r.x + Er2Ui.Pad, w = r.width - Er2Ui.Pad * 2f;
-		float y = r.y + 8f;
+		float y = r.y + 8f * Er2Ui.Scale;
 		bool item = ItemBranch(out string bucket, out bool favOnly);
 
 		for (int i = 0; i < rows.Count; i++)
@@ -351,7 +351,9 @@ internal static class GenPanel
 					break;
 			}
 			if (stop) return;      // 点条目进入放置/携带 → 本帧到此为止（原 return 语义）
-			y += row.H;
+			// 1.4.22：**行间统一间距**——此前只有部分行内嵌 Gap，Crew/Preview 贴在一起
+			//（用户反馈"背景与文字的重叠"）。间距只在行循环里加一处，行高定义保持纯粹。
+			y += row.H + (i + 1 < rows.Count ? Er2Ui.Gap : 0f);
 		}
 	}
 
@@ -359,13 +361,15 @@ internal static class GenPanel
 
 	private static bool DrawTitleRow(Rect rect, Rect panel)
 	{
-		GUI.Label(new Rect(rect.x, rect.y, rect.width - 100f, 24f), Ui.Tr("通用生成"), titleStyle);
-		if (GUI.Button(new Rect(panel.xMax - 96f, rect.y, 62f, 22f), Ui.Tr("清除"), buttonStyle))
+		// 1.4.22：全部 × Scale（原为硬编码 100/24/62/22——UI 缩放后标题与按钮错位）
+		float ts = Er2Ui.Scale;
+		GUI.Label(new Rect(rect.x, rect.y, rect.width - 100f * ts, 24f * ts), Ui.Tr("通用生成"), titleStyle);
+		if (GUI.Button(new Rect(panel.xMax - (34f + 62f) * ts, rect.y, 62f * ts, 22f * ts), Ui.Tr("清除"), buttonStyle))
 		{
 			int n = GenRunner.ClearAllSpawned();
 			Flash(Ui.Tr("已清除 ") + n + Ui.Tr(" 个生成物"));
 		}
-		if (GUI.Button(new Rect(panel.xMax - 30f, rect.y, 22f, 22f), "×", buttonStyle))
+		if (GUI.Button(new Rect(panel.xMax - 8f * ts - 22f * ts, rect.y, 22f * ts, 22f * ts), "×", buttonStyle))
 		{
 			SetOpen(false);
 			return true;
@@ -375,10 +379,19 @@ internal static class GenPanel
 
 	private static void DrawFactionRow(Rect rect)
 	{
-		float third = (rect.width - 16f) / 3f;
-		if (GUI.Button(new Rect(rect.x, rect.y, third, 30f), Ui.Tr("我方"), faction == "mine" ? activeButtonStyle : buttonStyle)) faction = "mine";
-		if (GUI.Button(new Rect(rect.x + third + 8f, rect.y, third, 30f), Ui.Tr("敌方"), faction == "enemy" ? activeButtonStyle : buttonStyle)) faction = "enemy";
-		if (GUI.Button(new Rect(rect.x + (third + 8f) * 2f, rect.y, third, 30f), Ui.Tr("中立"), faction == "neutral" ? activeButtonStyle : buttonStyle)) faction = "neutral";
+		// 1.4.22：× Scale + 未选中项加暖棕描边（用户："UI 各元素区分不明显"）
+		float fs = Er2Ui.Scale;
+		float third = (rect.width - 16f * fs) / 3f;
+		float fh = 30f * fs;
+		string[] labs = { Ui.Tr("我方"), Ui.Tr("敌方"), Ui.Tr("中立") };
+		string[] keys = { "mine", "enemy", "neutral" };
+		for (int i = 0; i < 3; i++)
+		{
+			bool on = faction == keys[i];
+			Rect br = new Rect(rect.x + (third + 8f * fs) * i, rect.y, third, fh);
+			if (GUI.Button(br, labs[i], on ? activeButtonStyle : buttonStyle)) faction = keys[i];
+			Er2Ui.Frame(br, on ? Er2Ui.Accent : Er2Ui.Edge, Mathf.Max(1f, fs));
+		}
 	}
 
 	private static void DrawUnitTabs(Rect rect)
@@ -484,7 +497,7 @@ internal static class GenPanel
 
 		if (bucket.Count == 0)
 		{
-			GUI.Label(new Rect(rect.x + 8f, rect.y + 6f, rect.width - 16f, 22f), Ui.Tr("（无匹配条目）"), textStyle);
+			GUI.Label(new Rect(rect.x + 8f * Er2Ui.Scale, rect.y + 6f * Er2Ui.Scale, rect.width - 16f * Er2Ui.Scale, 22f * Er2Ui.Scale), Ui.Tr("（无匹配条目）"), textStyle);
 			return false;
 		}
 
@@ -494,16 +507,19 @@ internal static class GenPanel
 		for (int i = from; i < to; i++)
 		{
 			GenEntry e = bucket[i];
-			float rowY = rect.y + 4f + (i - from) * RowH;
+			float ls = Er2Ui.Scale;
+			float rowY = rect.y + 4f * ls + (i - from) * RowH;
 			bool fav = GenCatalog.IsFav(e.Id);
 			Color keep = GUI.backgroundColor;
 			GUI.backgroundColor = fav ? Er2Ui.FavRow : Er2Ui.RowBg;
-			Rect rowRect = new Rect(rect.x + 6f, rowY, rect.width - 38f, RowH - 2f);
+			Rect rowRect = new Rect(rect.x + 6f * ls, rowY, rect.width - 38f * ls, RowH - 2f * ls);
 			if (GUI.Button(rowRect, e.Title, rowStyle)) clicked = e;
 			GUI.backgroundColor = keep;
 			// 2.5.2：收藏行左侧强调竖条——比"整行换底色"更像设计（底色只轻微提亮，靠竖条点名）
-			if (fav) Er2Ui.AccentBar(rowRect, Er2Ui.Accent, Mathf.Max(2f, 3f * Er2Ui.Scale));
-			if (StarButton(new Rect(rect.x + rect.width - 30f, rowY + 1f, 26f, RowH - 4f), fav))
+			if (fav) Er2Ui.AccentBar(rowRect, Er2Ui.Accent, Mathf.Max(2f, 3f * ls));
+			// 1.4.22：行分隔线——行底与行底之间加一条极淡暖棕，元素边界一眼可辨
+			if (i + 1 < to) Er2Ui.HLine(new Rect(rowRect.x, rowY + RowH - 2f * ls, rowRect.width, Mathf.Max(1f, ls)), Er2Ui.EdgeSoft);
+			if (StarButton(new Rect(rect.x + rect.width - 30f * ls, rowY + 1f * ls, 26f * ls, RowH - 4f * ls), fav))
 			{
 				GenCatalog.ToggleFav(e);
 				RebuildFavTabs();   // 收藏分类页签随之增减
@@ -536,7 +552,7 @@ internal static class GenPanel
 
 		if (snap.Length == 0)
 		{
-			GUI.Label(new Rect(rect.x + 8f, rect.y + 6f, rect.width - 16f, 22f), Ui.Tr("（无匹配条目）"), textStyle);
+			GUI.Label(new Rect(rect.x + 8f * Er2Ui.Scale, rect.y + 6f * Er2Ui.Scale, rect.width - 16f * Er2Ui.Scale, 22f * Er2Ui.Scale), Ui.Tr("（无匹配条目）"), textStyle);
 			return false;
 		}
 
@@ -546,21 +562,23 @@ internal static class GenPanel
 		for (int i = from; i < to; i++)
 		{
 			ItemEntry e = snap[i];
-			float rowY = rect.y + 4f + (i - from) * RowH;
+			float isc = Er2Ui.Scale;
+			float rowY = rect.y + 4f * isc + (i - from) * RowH;
 			Texture2D tex = IconTexFor(e.Id);
-			if (tex != null) DrawTexFit(tex, new Rect(rect.x + 6f, rowY + 1f, RowH - 4f, RowH - 4f), 0.95f);
-			float tx = rect.x + 6f + (tex != null ? RowH : 0f);
-			float tw = rect.width - 12f - (tx - rect.x) - 30f;   // 2.1.0：右侧让出星标位
+			if (tex != null) DrawTexFit(tex, new Rect(rect.x + 6f * isc, rowY + 1f * isc, RowH - 4f * isc, RowH - 4f * isc), 0.95f);
+			float tx = rect.x + 6f * isc + (tex != null ? RowH : 0f);
+			float tw = rect.width - 12f * isc - (tx - rect.x) - 30f * isc;   // 2.1.0：右侧让出星标位
 
 			bool fav = ItemCatalog.IsFav(e.Id);
 			Color keep = GUI.backgroundColor;
 			GUI.backgroundColor = fav ? Er2Ui.FavRow : Er2Ui.RowBg;
-			Rect itemRowRect = new Rect(tx, rowY, tw, RowH - 2f);
+			Rect itemRowRect = new Rect(tx, rowY, tw, RowH - 2f * isc);
 			if (GUI.Button(itemRowRect, e.Title, rowStyle)) clicked = e;
 			GUI.backgroundColor = keep;
 			// 2.5.2：收藏行左侧强调竖条（与单位列表同款）
-			if (fav) Er2Ui.AccentBar(itemRowRect, Er2Ui.Accent, Mathf.Max(2f, 3f * Er2Ui.Scale));
-			if (StarButton(new Rect(rect.x + rect.width - 28f, rowY + 1f, 26f, RowH - 4f), fav))
+			if (fav) Er2Ui.AccentBar(itemRowRect, Er2Ui.Accent, Mathf.Max(2f, 3f * isc));
+			if (i + 1 < to) Er2Ui.HLine(new Rect(itemRowRect.x, rowY + RowH - 2f * isc, itemRowRect.width, Mathf.Max(1f, isc)), Er2Ui.EdgeSoft);
+			if (StarButton(new Rect(rect.x + rect.width - 28f * isc, rowY + 1f * isc, 26f * isc, RowH - 4f * isc), fav))
 			{
 				ItemCatalog.ToggleFav(e);
 				RebuildFavTabs();
@@ -598,18 +616,22 @@ internal static class GenPanel
 	{
 		if (category == "infantry") return;
 		string crewLabel = crewMode == 0 ? Ui.Tr("乘员:专用") : crewMode == 1 ? Ui.Tr("乘员:兵班") : Ui.Tr("乘员:无");
-		if (GUI.Button(new Rect(rect.x, rect.y, 90f, 24f), crewLabel, crewMode != 2 ? activeButtonStyle : buttonStyle))
+		// 1.4.22：× Scale（原 90/24 硬编码——缩放后按钮与行高不匹配，文字压到相邻行上）
+		float cs = Er2Ui.Scale;
+		Rect crewBtn = new Rect(rect.x, rect.y, 90f * cs, 24f * cs);
+		if (GUI.Button(crewBtn, crewLabel, crewMode != 2 ? activeButtonStyle : buttonStyle))
 			crewMode = (crewMode + 1) % 3;
+		Er2Ui.Frame(crewBtn, Er2Ui.Edge, Mathf.Max(1f, cs));   // 1.4.22：描边，与页签/阵营按钮同款
 		if (crewMode == 1 && GenCatalog.crewPool.Count > 0)
 		{
 			// 兵班选择器：‹ 类型 ›（在官方步兵类型池里循环；自定义班不作乘员来源）
 			if (infantrySel == null || infantrySel.SpawnByKey) infantrySel = GenCatalog.crewPool[0];
 			int idx = GenCatalog.crewPool.FindIndex(e => e.Id == infantrySel.Id);
 			if (idx < 0) idx = 0;
-			if (GUI.Button(new Rect(rect.x + 94f, rect.y, 22f, 24f), "‹", buttonStyle))
+			if (GUI.Button(new Rect(rect.x + 94f * cs, rect.y, 22f * cs, 24f * cs), "‹", buttonStyle))
 				infantrySel = GenCatalog.crewPool[(idx - 1 + GenCatalog.crewPool.Count) % GenCatalog.crewPool.Count];
-			GUI.Label(new Rect(rect.x + 118f, rect.y + 3f, 110f, 20f), infantrySel.Title, textStyle);
-			if (GUI.Button(new Rect(rect.x + 230f, rect.y, 22f, 24f), "›", buttonStyle))
+			GUI.Label(new Rect(rect.x + 118f * cs, rect.y + 3f * cs, 110f * cs, 20f * cs), infantrySel.Title, textStyle);
+			if (GUI.Button(new Rect(rect.x + 230f * cs, rect.y, 22f * cs, 24f * cs), "›", buttonStyle))
 				infantrySel = GenCatalog.crewPool[(idx + 1) % GenCatalog.crewPool.Count];
 		}
 	}
@@ -632,7 +654,7 @@ internal static class GenPanel
 					? FactionData.OppositeOf(myFac) : GenRunner.EnemyFaction());
 			sideTag = FactionData.IsFriendly(previewFac, myFac) ? Ui.Tr("我方") : Ui.Tr("敌方");
 		}
-		GUI.Label(new Rect(rect.x, rect.y, rect.width, 20f), Ui.Tr("→ 生成 ") + previewFac + "（" + sideTag + "）", textStyle);
+		GUI.Label(new Rect(rect.x, rect.y, rect.width, 20f * Er2Ui.Scale), Ui.Tr("→ 生成 ") + previewFac + "（" + sideTag + "）", textStyle);
 	}
 
 
@@ -864,8 +886,9 @@ internal static class GenPanel
 	private static Rect PanelRect()
 	{
 		BuildRows();
-		float h = 8f + 8f;                 // 顶部 + 底部留白
-		for (int i = 0; i < rows.Count; i++) h += rows[i].H;
+		float h = 16f * Er2Ui.Scale;       // 顶部 + 底部留白（1.4.22：随倍率）
+		for (int i = 0; i < rows.Count; i++)
+			h += rows[i].H + (i + 1 < rows.Count ? Er2Ui.Gap : 0f);   // 与 DrawRows 同一份间距规则
 		return new Rect(panelPos.x, panelPos.y, PanelW, h);
 	}
 

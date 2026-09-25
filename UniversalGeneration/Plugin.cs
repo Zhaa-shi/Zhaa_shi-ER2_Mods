@@ -9,7 +9,7 @@ using UnityEngine;
 
 namespace ER2UniversalGeneration;
 
-[BepInPlugin("er2.universalgeneration", "ER2 Universal Generation", "2.5.2")]
+[BepInPlugin("er2.universalgeneration", "ER2 Universal Generation", "2.5.3")]
 public class Plugin : BasePlugin
 {
 	internal static ManualLogSource ModLog;
@@ -34,7 +34,7 @@ public class Plugin : BasePlugin
 		favorites = Config.Bind("General", "favorites", "", Ui.Tr("收藏的生成条目（自动维护，勿手改）。"));
 		// 2.5.0：与 SquadCommand 的 UI/uiMono 同名同义——两个 mod 的面板要长得一样，
 		// 玩家改一个就该两边都变（共享 Er2Ui 令牌，只有这一处开关各读各的 cfg）。
-		uiMono = Config.Bind("UI", "uiMono", true, Ui.Tr("灰黑单色 UI（推荐）。面板/列表/按钮走中性灰黑，靠明度区分层次；关掉则回退旧版军绿配色。"));
+		uiMono = Config.Bind("UI", "uiMono", true, Ui.Tr("黑棕半透明 UI（推荐，默认）。面板/列表/按钮走暖黑棕+半透明，靠明度与描边区分层次；关掉则回退旧版军绿配色。"));
 		uiMono.SettingChanged += (s, e) => ER2Shared.Er2Ui.SetMono(uiMono.Value);
 		ER2Shared.Er2Ui.SetMono(uiMono.Value);
 
@@ -66,6 +66,6 @@ public class Plugin : BasePlugin
 		ItemCatalog.Ensure();
 		new Harmony("er2.universalgeneration").PatchAll(typeof(Plugin).Assembly); // Tick/Draw 驱动补丁
 
-		ModLog.LogInfo("ER2 Universal Generation 2.5.2 loaded. panelKey=" + panelKey.Value);
+		ModLog.LogInfo("ER2 Universal Generation 2.5.3 loaded. panelKey=" + panelKey.Value);
 	}
 }

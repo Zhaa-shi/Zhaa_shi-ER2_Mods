@@ -869,17 +869,9 @@ internal static class Formation
 	/// <summary>2.5.0：Formation 侧取相机距离（与 GodViewController.MarkerCamDist 同义，但那边是 private）。</summary>
 	private static float MarkerCamDistForFormation()
 	{
-		try
-		{
-			Camera cam = GodViewController.MainCam();
-			if (cam != null)
-			{
-				ER2Shared.Er2Ui.SetCamFov(cam.fieldOfView);   // 1.4.21：与 GodView 同一个注入点
-				return cam.transform.position.magnitude;
-			}
-		}
-		catch { }
-		return 30f;
+		// 1.4.22：与 GodView 同一份实现（视线-地面交点距离，0.1s 缓存）。
+		// 原 position.magnitude 是到世界原点的距离 → 线宽爆表（陷阱 78：两处必须同一份数据源）。
+		return GodViewController.CameraGroundDist();
 	}
 
 	// ===== 工具 =====

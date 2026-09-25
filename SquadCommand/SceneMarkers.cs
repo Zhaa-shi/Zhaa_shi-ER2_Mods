@@ -24,16 +24,84 @@ internal static class SceneMarkers
 		public Material mat;         // Line 专用（虚线纹理实例）
 		public TextMesh text;
 		public MeshRenderer plate;   // 2.5.0：名签底板（Label 专用）
-		/// <summary>2.5.2：Bracket 专用——四段折线的顶点缓冲（复用，避免每帧分配）。</summary>
+		/// <summary>2.5.2：Bracket 专用——四段折线的顶点缓冲（复用，避免每帧分配）。1.4.22 起 Ring 也复用 [0]。</summary>
 		public Il2CppStructArray<Vector3>[] bracketPts;
+		/// <summary>1.4.22：Ring 上次写进顶点的半径（没变就不重写 48 个顶点）。</summary>
+		public float lastRadius = -1f;
 	}
 
 	private static readonly Dictionary<string, Mark> pool = new Dictionary<string, Mark>();
 	private static readonly HashSet<string> used = new HashSet<string>();
 	private static Material lineMat;
 	private static Font labelFont;
-	private const int Segments = 48;
+	private const int Segments = 64;   // 1.4.22：48 → 64（近距离下 48 段圆的折角肉眼可见）
 	private static bool shaderLogged;
+	private static Texture2D featherTex;   // 1.4.22：软边抗锯齿（宽度方向羽化）
+	private static Texture2D dotTex;       // 1.4.22：圆盘径向羽化
+
+	/// <summary>
+	/// 1.4.22 **软边抗锯齿**：LineRenderer/Mesh 不吃 MSAA（用户截图实证锯齿明显），
+	/// 给宽度方向做 alpha 羽化——LineRenderer 的 UV.y 正好跨宽度 0..1，
+	/// 一张 2×16 的竖向渐变（两侧 25% 平滑过渡到透明）＝手工抗锯齿边。
+	/// RGB 预乘 alpha（Sprites/Default 是 Blend One OneMinusSrcAlpha，非预乘会出黑边）。
+	/// </summary>
+	private static Texture2D FeatherTex()
+	{
+		if (featherTex != null) return featherTex;
+		const int H = 16;
+		featherTex = new Texture2D(2, H, TextureFormat.ARGB32, false);
+		featherTex.hideFlags = (HideFlags)61;   // 陷阱 12：防场景切换被卸载
+		featherTex.wrapMode = TextureWrapMode.Clamp;
+		featherTex.filterMode = FilterMode.Bilinear;
+		var px = new Color[2 * H];
+		for (int y = 0; y < H; y++)
+		{
+			float v = (y + 0.5f) / H;                                   // 0..1 跨宽度
+			float a = Mathf.Clamp01(Mathf.Min(v, 1f - v) / 0.25f);      // 两侧各 25% 羽化
+			a = Mathf.SmoothStep(0f, 1f, a);
+			px[y * 2] = new Color(a, a, a, a);                          // premultiplied
+			px[y * 2 + 1] = px[y * 2];
+		}
+		featherTex.SetPixels(px);
+		featherTex.Apply(false, true);
+		return featherTex;
+	}
+
+	/// <summary>1.4.22：圆盘（Dot）用**径向**羽化——边缘 30% 平滑过渡，与线条同一套软边思路。</summary>
+	private static Texture2D DotTex()
+	{
+		if (dotTex != null) return dotTex;
+		const int S = 32;
+		dotTex = new Texture2D(S, S, TextureFormat.ARGB32, false);
+		dotTex.hideFlags = (HideFlags)61;
+		dotTex.wrapMode = TextureWrapMode.Clamp;
+		dotTex.filterMode = FilterMode.Bilinear;
+		var px = new Color[S * S];
+		for (int y = 0; y < S; y++)
+		{
+			for (int x = 0; x < S; x++)
+			{
+				float dx = (x + 0.5f) / S * 2f - 1f;
+				float dy = (y + 0.5f) / S * 2f - 1f;
+				float r = Mathf.Sqrt(dx * dx + dy * dy);
+				float a = Mathf.Clamp01((1f - r) / 0.30f);              // 边缘 30% 羽化
+				a = Mathf.SmoothStep(0f, 1f, a);
+				px[y * S + x] = new Color(a, a, a, a);                  // premultiplied
+			}
+		}
+		dotTex.SetPixels(px);
+		dotTex.Apply(false, true);
+		return dotTex;
+	}
+
+	private static void ApplyFeather(Material m)
+	{
+		if (m == null) return;
+		Texture2D t = FeatherTex();
+		try { m.mainTexture = t; } catch { }
+		try { m.SetTexture("_MainTex", t); } catch { }
+		try { m.SetTexture("_BaseMap", t); } catch { }
+	}
 
 	private static Material LineMat()
 	{
@@ -47,6 +115,7 @@ internal static class SceneMarkers
 			if (sh != null)
 			{
 				lineMat = new Material(sh);
+				ApplyFeather(lineMat);   // 1.4.22：软边抗锯齿
 				if (!shaderLogged) { SquadCmdLogic.Log("[SceneMarkers] 线材质 shader=" + sn); shaderLogged = true; }
 				return lineMat;
 			}
@@ -70,6 +139,7 @@ internal static class SceneMarkers
 				lineMatNoDepth = new Material(sh);
 				try { lineMatNoDepth.SetInt("_ZTest", (int)UnityEngine.Rendering.CompareFunction.Always); } catch { }
 				try { lineMatNoDepth.renderQueue = 4000; } catch { } // Overlay：最后绘制
+				ApplyFeather(lineMatNoDepth);   // 1.4.22：软边抗锯齿（与实线材质同款）
 				return lineMatNoDepth;
 			}
 			catch { }
@@ -113,15 +183,8 @@ internal static class SceneMarkers
 		lr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
 		lr.receiveShadows = false;
 		lr.sharedMaterial = throughWall ? LineMatNoDepth() : LineMat();
-		// 单位半径 1m 的圆（XZ 平面），缩放 GO 控制大小
-		Il2CppStructArray<Vector3> pts = new Il2CppStructArray<Vector3>(Segments);
-		for (int i = 0; i < Segments; i++)
-		{
-			float a = (float)i / Segments * Mathf.PI * 2f;
-			pts[i] = new Vector3(Mathf.Cos(a), 0f, Mathf.Sin(a));
-		}
-		lr.SetPositions(pts);
-		m = new Mark { go = go, lrs = new[] { lr } };
+		// 1.4.22：顶点缓冲复用——半径在 Ring() 里写进顶点（父缩放会连带放大线宽，陷阱 90 同款）
+		m = new Mark { go = go, lrs = new[] { lr }, bracketPts = new[] { new Il2CppStructArray<Vector3>(Segments) } };
 		pool[key] = m;
 		return m;
 	}
@@ -315,19 +378,25 @@ internal static class SceneMarkers
 		mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
 		mr.receiveShadows = false;
 		Material mat = LineMat() != null ? new Material(LineMat().shader) : null;
-		// 圆盘网格（单位半径 1m），顶点色烘焙成目标色，避免依赖 shader _Color 通道
+		// 1.4.22：圆盘贴**径向羽化纹理**（边缘 30% 平滑过渡）——
+		// 28 段硬边 mesh 在无 MSAA 下锯齿明显（用户截图实证）。
+		// 顶点色保持白（目标色走 _Color 实例材质），UV 从中心 (0.5,0.5) 辐射到边缘。
+		if (mat != null) { try { mat.mainTexture = DotTex(); } catch { } try { mat.SetTexture("_MainTex", DotTex()); } catch { } }
 		Mesh mesh = new Mesh();
 		int seg = 28;
 		Il2CppStructArray<Vector3> verts = new Il2CppStructArray<Vector3>(seg + 1);
 		Il2CppStructArray<int> tris = new Il2CppStructArray<int>(seg * 3);
 		Il2CppStructArray<Color> cols = new Il2CppStructArray<Color>(seg + 1);
+		Il2CppStructArray<Vector2> uvs = new Il2CppStructArray<Vector2>(seg + 1);
 		verts[0] = Vector3.zero;
 		cols[0] = Color.white;
+		uvs[0] = new Vector2(0.5f, 0.5f);
 		for (int i = 0; i < seg; i++)
 		{
 			float a = (float)i / seg * Mathf.PI * 2f;
 			verts[i + 1] = new Vector3(Mathf.Cos(a), 0f, Mathf.Sin(a));
 			cols[i + 1] = Color.white;
+			uvs[i + 1] = new Vector2(0.5f + Mathf.Cos(a) * 0.5f, 0.5f + Mathf.Sin(a) * 0.5f);
 			tris[i * 3] = 0;
 			tris[i * 3 + 1] = i + 1;
 			tris[i * 3 + 2] = (i + 1) % seg + 1;
@@ -335,6 +404,7 @@ internal static class SceneMarkers
 		mesh.vertices = verts;
 		mesh.triangles = tris;
 		mesh.colors = cols;
+		mesh.uv = uvs;
 		mesh.RecalculateNormals();
 		mesh.RecalculateBounds();
 		mf.sharedMesh = mesh;
@@ -351,12 +421,26 @@ internal static class SceneMarkers
 		used.Add(key);
 		Mark m = GetRing(key, throughWall);
 		m.go.SetActive(true);
-		m.go.transform.localScale = new Vector3(radius, 1f, radius);
+		// 1.4.22：**父缩放恒为 1**——与 Bracket 同款修法（陷阱 90：lossyScale 会连带放大线宽，
+		// 旧实现 localScale=radius 是"环糊成实心圆盘"的一半成因，另一半是 camDist 取错）。
+		m.go.transform.localScale = Vector3.one;
 		m.go.transform.position = groundPos;
 		LineRenderer lr = m.lrs[0];
 		lr.startColor = c;
 		lr.endColor = c;
 		lr.widthMultiplier = width;
+		// 半径写进顶点：半径没变就不重写（脉动环每帧变、脚环恒定——各取所需）
+		Il2CppStructArray<Vector3> pts = m.bracketPts != null && m.bracketPts.Length > 0 ? m.bracketPts[0] : null;
+		if (pts != null && !Mathf.Approximately(m.lastRadius, radius))
+		{
+			m.lastRadius = radius;
+			for (int i = 0; i < Segments; i++)
+			{
+				float a = (float)i / Segments * Mathf.PI * 2f;
+				pts[i] = new Vector3(Mathf.Cos(a) * radius, 0f, Mathf.Sin(a) * radius);
+			}
+			lr.SetPositions(pts);
+		}
 	}
 
 	/// <summary>世界空间文字名签（自动朝向相机）。2.5.0：带深色底板提升可读性。</summary>

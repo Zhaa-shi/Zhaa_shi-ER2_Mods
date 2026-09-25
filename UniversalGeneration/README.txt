@@ -1,4 +1,4 @@
-ER2 Universal Generation v2.5.2
+ER2 Universal Generation v2.5.3
 ================================
 
 Spawn any unit, vehicle, or item anywhere, right from Battlefield Commander's RTS god view.
@@ -41,6 +41,13 @@ How to use
 
 Changelog
 --------------------------------
+2.5.3
+- **Dark-brown translucent UI** - the shared palette moved to warm dark brown with translucency (panel #1E1813 @ 0.82, title bar #2A2119 @ 0.86, control #32271E @ 0.84, selected #584331 @ 0.96), matching Battle Commander 1.4.22.
+- **Elements are clearly separated:** tabs, faction buttons and the crew button all get outlines (warm brown when idle, warm white when selected); list rows get hairline separators; the panel border and dividers are warm brown.
+- **Text no longer collides with its background:** crew / preview / title / faction / list / pager rows still used hard-coded pixel sizes that ignored the adaptive scale, and row spacing was baked into only some rows - so crew and preview sat flush together. All sizes now follow the scale, and spacing is applied once in the row loop.
+- English config description for the UI palette switch.
+
+
 2.5.2
 - **Panels got structure instead of flat colour blocks.** Every surface used to be a flat fill, so hierarchy rested on brightness alone and collapsed against a bright battlefield. Shared toolkit gained three primitives - `Frame` (outline), `HLine` (divider) and `AccentBar` (selection stripe) - and the panel now draws a separate title-bar fill, a divider under the title, an outer frame, inset borders around both lists and a left stripe on favourite rows. Hierarchy is now face + line + bar.
 - **Palette pulled back to mid-dark grey.** The 2.5.1 lift went too far (feedback: "too light"). Panel #14181D, title bar #1F252C, control #262D35, hover #333B45, selected #46505C - stepped 8-14 brightness levels apart, which is what makes the new outlines read.

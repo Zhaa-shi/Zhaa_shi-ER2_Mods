@@ -159,31 +159,31 @@ internal static class Er2Ui
 	public static bool Mono = true;
 
 	// 结构色的两套预设（Mono / Legacy），下面用属性按 Mono 分派。
-	// 2.5.2 回调：1.4.20 那次提亮过头（用户："颜色浅了"）。整体压回**中深灰**，
-	// 并补上真正的设计元素——此前"只有单一色块、没有设计感"的病根是：
-	// 所有面都是纯色填充，**没有任何边框 / 分隔线 / 强调条**，靠明度差硬撑层次，
-	// 在亮背景战场上一压就糊成一片。现在补三组结构线令牌：
-	//   `PanelBorder` 面板外框、`Edge` 分隔线、`AccentBar` 选中竖条（见下面 Frame/AccentBar 原语）。
+	// 1.4.22 **黑棕半透明**（用户明确要求："要黑棕色半透明的UI"）：
+	//   · 色相从冷灰换成**暖棕**（地面战场是泥土/枯草色，暖棕面板与环境协调，冷灰反而突兀）；
+	//   · **整体半透明**（α 0.80~0.96）——用户这次点名要半透明的面板（之前"质感不好"指的是
+	//     3D 世界标记的半透明，两回事：面板要透出战场，标记要实色）；
+	//   · 元素区分靠三重：明度档 + **暖棕描边/分隔线** + 选中亮棕填充。
 	// 层次 = 面（明度档）+ 线（边框/分隔）+ 条（选中/激活），三维而不是只靠面。
-	private static readonly Color MonoPanelBg = new Color(0x14 / 255f, 0x18 / 255f, 0x1D / 255f, 0.95f);
-	private static readonly Color MonoPanelBorder = new Color(0x3C / 255f, 0x46 / 255f, 0x52 / 255f, 0.95f);
-	private static readonly Color MonoTitleBar = new Color(0x1F / 255f, 0x25 / 255f, 0x2C / 255f, 0.97f);
-	private static readonly Color MonoSurface = new Color(0x26 / 255f, 0x2D / 255f, 0x35 / 255f, 0.95f);
-	private static readonly Color MonoSurfaceHover = new Color(0x33 / 255f, 0x3B / 255f, 0x45 / 255f, 0.97f);
-	private static readonly Color MonoSurfaceActive = new Color(0x46 / 255f, 0x50 / 255f, 0x5C / 255f, 1f);
-	private static readonly Color MonoRowBg = new Color(0x1B / 255f, 0x20 / 255f, 0x27 / 255f, 0.92f);
+	private static readonly Color MonoPanelBg = new Color(0x1E / 255f, 0x18 / 255f, 0x13 / 255f, 0.82f);
+	private static readonly Color MonoPanelBorder = new Color(0x6E / 255f, 0x58 / 255f, 0x44 / 255f, 0.92f);
+	private static readonly Color MonoTitleBar = new Color(0x2A / 255f, 0x21 / 255f, 0x19 / 255f, 0.86f);
+	private static readonly Color MonoSurface = new Color(0x32 / 255f, 0x27 / 255f, 0x1E / 255f, 0.84f);
+	private static readonly Color MonoSurfaceHover = new Color(0x44 / 255f, 0x35 / 255f, 0x2A / 255f, 0.90f);
+	private static readonly Color MonoSurfaceActive = new Color(0x58 / 255f, 0x43 / 255f, 0x31 / 255f, 0.96f);
+	private static readonly Color MonoRowBg = new Color(0x24 / 255f, 0x1C / 255f, 0x15 / 255f, 0.80f);
 	private static readonly Color MonoFavRow = new Color(1f, 1f, 1f, 0.10f);
-	private static readonly Color MonoText = new Color(0xE9 / 255f, 0xED / 255f, 0xF1 / 255f, 1f);
-	private static readonly Color MonoTextDim = new Color(0xB2 / 255f, 0xBA / 255f, 0xC3 / 255f, 0.92f);
-	private static readonly Color MonoTextDisabled = new Color(0x7B / 255f, 0x83 / 255f, 0x8C / 255f, 0.80f);
+	private static readonly Color MonoText = new Color(0xF1 / 255f, 0xEB / 255f, 0xE2 / 255f, 1f);
+	private static readonly Color MonoTextDim = new Color(0xC9 / 255f, 0xBC / 255f, 0xAB / 255f, 0.92f);
+	private static readonly Color MonoTextDisabled = new Color(0x96 / 255f, 0x89 / 255f, 0x7A / 255f, 0.80f);
 	private static readonly Color MonoTextOnActive = new Color(1f, 1f, 1f, 1f);
-	private static readonly Color MonoTextOnPlate = new Color(0xF5 / 255f, 0xF7 / 255f, 0xF9 / 255f, 1f);
-	private static readonly Color MonoStarHot = new Color(0.88f, 0.90f, 0.92f, 0.95f);
-	private static readonly Color MonoSurfaceDisabled = new Color(0x17 / 255f, 0x1A / 255f, 0x1E / 255f, 0.62f);
-	private static readonly Color MonoRowHover = new Color(1f, 1f, 1f, 0.08f);
-	private static readonly Color MonoListBg = new Color(0x05 / 255f, 0x07 / 255f, 0x08 / 255f, 0.42f);
-	// 2.5.2 新增：结构线（设计感的主要来源）
-	private static readonly Color MonoEdge = new Color(0x31 / 255f, 0x39 / 255f, 0x41 / 255f, 0.92f);   // 分隔线
+	private static readonly Color MonoTextOnPlate = new Color(0xF5 / 255f, 0xF0 / 255f, 0xE8 / 255f, 1f);
+	private static readonly Color MonoStarHot = new Color(0.91f, 0.87f, 0.82f, 0.95f);
+	private static readonly Color MonoSurfaceDisabled = new Color(0x1A / 255f, 0x14 / 255f, 0x0F / 255f, 0.62f);
+	private static readonly Color MonoRowHover = new Color(0xE8 / 255f, 0xD9 / 255f, 0xC4 / 255f, 0.12f);
+	private static readonly Color MonoListBg = new Color(0f, 0f, 0f, 0.35f);
+	// 1.4.22：结构线换暖棕——在黑棕面板上，灰描边读不出"框"，暖棕才能勾勒出元素边界
+	private static readonly Color MonoEdge = new Color(0x57 / 255f, 0x45 / 255f, 0x2F / 255f, 0.92f);   // 分隔线
 	private static readonly Color MonoEdgeSoft = new Color(1f, 1f, 1f, 0.10f);                          // 极淡分隔（行间）
 
 	// —— A 面板结构 ——
@@ -214,11 +214,11 @@ internal static class Er2Ui
 	public static Color TextOnPlate => Mono ? MonoTextOnPlate : new Color(0.9f, 0.96f, 0.9f, 1f);      // 底板上的字
 
 	// —— C 指示 ——
-	public static Color Accent => new Color(1f, 1f, 1f, 1f);                                  // 强调（灰黑主题里=纯白）
+	public static Color Accent => new Color(0xF5 / 255f, 0xEF / 255f, 0xE6 / 255f, 1f);        // 强调（1.4.22 黑棕主题里=暖白）
 	public static Color Warn => new Color(0xE0 / 255f, 0xA3 / 255f, 0x3A / 255f, 0.98f);      // 警告（暂停等）
 	public static Color Danger => new Color(0xC4 / 255f, 0x45 / 255f, 0x3C / 255f, 0.95f);    // 危险（集火）
 	public static Color Success => new Color(0x6F / 255f, 0xA8 / 255f, 0x60 / 255f, 0.95f);   // 成功
-	public static Color Scrim => new Color(0f, 0f, 0f, 0.50f);                                // 遮罩
+	public static Color Scrim => new Color(0x14 / 255f, 0x0F / 255f, 0x0A / 255f, 0.72f);     // 遮罩（1.4.22 暖黑半透，提示条/徽标底）
 	public static Color StarOn => new Color(1f, 0xD4 / 255f, 0x5E / 255f, 1f);                // ★
 	public static Color StarHot => Mono ? MonoStarHot : LegacyStarHot;                        // ☆ 悬停
 
@@ -452,8 +452,12 @@ internal static class Er2Ui
 			bool on = i == sel;
 			GUIStyle st = on ? active : normal;
 			// ⚠️ 只改专用样式实例的字号（这两个样式归页签专用，别处不得复用）
-			st.fontSize = FitSize(st, labels[i], cw - 6f, FontTabMax, FontTabMin);
+			// 1.4.22：内缩随 Scale（19px = 左右各留 ~6.5px 呼吸位 + 描边位），长标签不再贴边
+			st.fontSize = FitSize(st, labels[i], cw - 19f * Scale, FontTabMax, FontTabMin);
 			if (GUI.Button(r, labels[i], st)) clicked = i;
+			// 1.4.22：**每个页签都描边**——未选中用暖棕 Edge、选中用暖白 Accent。
+			// 用户反馈"UI 各元素区分不明显"：此前页签只有填充色差，在亮背景上读不出边界。
+			Frame(r, on ? Accent : Edge, Mathf.Max(1f, Scale));
 		}
 		return clicked;
 	}
@@ -473,9 +477,11 @@ internal static class Er2Ui
 		if (pages <= 1) return 0;
 		bool shift = Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift);
 		int step = shift ? 10 : 1;
-		if (GUI.Button(new Rect(x, y, 30f, BtnH), "◀", btn)) return -step;
-		GUI.Label(new Rect(x + 38f, y + 2f, w - 76f, 20f), mid, label);
-		if (GUI.Button(new Rect(x + w - 30f, y, 30f, BtnH), "▶", btn)) return step;
+		// 1.4.22：全部 × Scale（原 30/38/76/20 硬编码 → UI 缩放后箭头与文字错位）
+		float pw = 30f * Scale, pgap = 8f * Scale;
+		if (GUI.Button(new Rect(x, y, pw, BtnH), "◀", btn)) return -step;
+		GUI.Label(new Rect(x + pw + pgap, y + 2f * Scale, w - (pw + pgap) * 2f, 20f * Scale), mid, label);
+		if (GUI.Button(new Rect(x + w - pw, y, pw, BtnH), "▶", btn)) return step;
 		return 0;
 	}
 

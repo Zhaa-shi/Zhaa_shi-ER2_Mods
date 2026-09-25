@@ -6,7 +6,7 @@ Adds an "RTS god-view squad command" layer to Easy Red 2, with mouse operations 
 ## Installation instructions
 1. Install BepInEx (IL2CPP build) into the game root folder.
 2. Put `ER2_BattlefieldCommander.dll` into `Easy Red 2\BepInEx\plugins\`.
-3. Launch the game — `Loading [ER2 Battlefield Commander 1.4.21]` in the BepInEx log means success.
+3. Launch the game — `Loading [ER2 Battlefield Commander 1.4.22]` in the BepInEx log means success.
 
 ## Main features
 - **God-view command**: F9 to enter free camera, WASD move, wheel zoom, MMB rotate, Q/E height, Space to pause/resume the world.
@@ -38,6 +38,35 @@ Adds an "RTS god-view squad command" layer to Easy Red 2, with mouse operations 
 Thanks to the Easy Red 2 community and the BepInEx / Harmony ecosystem, and to all authors whose IL2CPP modding work paved the way.
 
 ## Recent changes
+**1.4.22**
+* **Line width blown up by a wrong camera distance - the real cause of "still too thick".**
+  Marker width is derived from camera distance, but that distance was computed as
+  `cam.transform.position.magnitude` - the distance to the **world origin**, not to the markers.
+  On an ER2 map the origin can sit hundreds of metres away, so the value was always a bogus large
+  number. The old build hid this behind a `Clamp(0.6, 2.5)` multiplier; 1.4.21 replaced that with a
+  linear pixel formula, so the bogus distance went straight into the width - rings filled in as
+  solid discs and selection brackets merged into fat X shapes. The distance is now the real
+  line-of-sight ground-intersection distance (0.1 s cache, shared by GodView and formation markers).
+* **Rings no longer scale their parent object.** Rings were still sized with `localScale = radius`,
+  and `LineRenderer` width is multiplied by the parent's `lossyScale` - so rings were inflated by up
+  to 4.2x on vehicles. Radius is now baked into the vertices (the fix the brackets already got), so
+  width is a pure, predictable world value.
+* **Anti-aliasing for lines and dots.** Line meshes ignore MSAA. Lines now sample a feather texture
+  across their width (25% smooth falloff per side) and dots use a radially feathered disc, so edges
+  read as clean instead of stair-stepped. Rings also went from 48 to 64 segments.
+* **Dark-brown translucent UI.** Palette moved from cold grey to warm dark brown with translucency
+  (panel #1E1813 @ 0.82, title bar #2A2119 @ 0.86, control #32271E @ 0.84, selected #584331 @ 0.96).
+  Warm hues sit far better against dirt and grass, and the battlefield still shows through.
+* **Elements are clearly separated now.** Every tab, faction button and crew button gets an outline
+  (warm brown when idle, warm white when selected); list rows get hairline separators; the panel
+  border and dividers are warm brown so they actually read on a dark-brown surface.
+* **Text no longer collides with its background.** Crew / preview / title / faction / list / pager
+  rows still used hard-coded pixel sizes that never multiplied by the adaptive scale, and row
+  spacing was baked into only *some* rows - so the crew and preview rows sat flush together. All of
+  those sizes now follow the scale, and spacing is applied once in the row loop.
+* English config descriptions filled in for 16 strings that previously fell back to Chinese.
+
+
 **1.4.21**
 - **Line width is defined in pixels now.** `LineRenderer.widthMultiplier` is world-space, so a fixed number is fat up close and hair-thin at range, and any distance-multiplier fudge silently got 1.33x fatter at 1440p / 2x at 4K. Call sites now state a 1080p target pixel width (1.1 thin ... 2.2 emphasis) and the shared toolkit converts it from the real camera distance and FOV. Constant on-screen thickness at any distance and resolution.
 - **Selection brackets no longer read as arrowheads.** Real cause: the bracket root was scaled to `radius` and `LineRenderer` width is multiplied by the parent `lossyScale`, so on a vehicle a 0.1 m line became ~0.5-1.0 m thick against ~1 m corner arms - two fat arms merged into a solid triangle. The root now stays at scale 1 with the radius baked into the vertices; corner arms lengthened 0.34 -> 0.42 of the radius.
