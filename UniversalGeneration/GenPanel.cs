@@ -374,7 +374,9 @@ internal static class GenPanel
 						// 1.4.28：换行 + 中左对齐（原来是 MiddleLeft，两行时会整体偏下）
 						string helpTxt = Ui.Tr("点击条目拿起 → 拖到单位身上放入背包，拖到地上则生成实体");
 						helpStyle.alignment = TextAnchor.UpperLeft;
-						GUI.Label(rect, helpTxt, helpStyle);
+						Rect hr = new Rect(rect.x, rect.y, rect.width, rect.height);
+						hr.x = Mathf.Round(hr.x); hr.y = Mathf.Round(hr.y);   // 2.5.27：整数对齐
+						GUI.Label(hr, helpTxt, helpStyle);
 					}
 					break;
 			}
@@ -390,14 +392,22 @@ internal static class GenPanel
 	private static bool DrawTitleRow(Rect rect, Rect panel)
 	{
 		// 1.4.22：全部 × Scale（原为硬编码 100/24/62/22——UI 缩放后标题与按钮错位）
+		// 2.5.27：三个矩形全部**整数对齐**（2.5.4 亚像素模糊根因——裸 GUI.Label/Button 不经过
+		// LabelShadowed 的对齐，Scale≈0.998 之类非整数倍率下坐标带小数 = 文字发灰）
 		float ts = Er2Ui.Scale;
-		GUI.Label(new Rect(rect.x, rect.y, rect.width - 100f * ts, 24f * ts), Ui.Tr("通用生成"), titleStyle);
-		if (GUI.Button(new Rect(panel.xMax - (34f + 62f) * ts, rect.y, 62f * ts, 22f * ts), Ui.Tr("清除"), buttonStyle))
+		Rect tr = new Rect(rect.x, rect.y, rect.width - 100f * ts, 24f * ts);
+		tr.x = Mathf.Round(tr.x); tr.y = Mathf.Round(tr.y);
+		GUI.Label(tr, Ui.Tr("通用生成"), titleStyle);
+		Rect clearR = new Rect(panel.xMax - (34f + 62f) * ts, rect.y, 62f * ts, 22f * ts);
+		clearR.x = Mathf.Round(clearR.x); clearR.y = Mathf.Round(clearR.y);
+		if (GUI.Button(clearR, Ui.Tr("清除"), buttonStyle))
 		{
 			int n = GenRunner.ClearAllSpawned();
 			Flash(Ui.Tr("已清除 ") + n + Ui.Tr(" 个生成物"));
 		}
-		if (GUI.Button(new Rect(panel.xMax - 8f * ts - 22f * ts, rect.y, 22f * ts, 22f * ts), "×", buttonStyle))
+		Rect xR = new Rect(panel.xMax - 8f * ts - 22f * ts, rect.y, 22f * ts, 22f * ts);
+		xR.x = Mathf.Round(xR.x); xR.y = Mathf.Round(xR.y);
+		if (GUI.Button(xR, "×", buttonStyle))
 		{
 			SetOpen(false);
 			return true;
@@ -408,6 +418,8 @@ internal static class GenPanel
 	private static void DrawFactionRow(Rect rect)
 	{
 		// 1.4.22：× Scale + 未选中项加暖棕描边（用户："UI 各元素区分不明显"）
+		// 2.5.27：按钮矩形**整数对齐**——third = 宽度/3 除不尽 → 阵营行文字亚像素模糊发灰
+		//（用户实测：Allies 整数位 255 纯白、Neutral 分数位 229 灰），文字描边由按钮样式自带白色
 		float fs = Er2Ui.Scale;
 		float third = (rect.width - 16f * fs) / 3f;
 		float fh = 30f * fs;
@@ -417,6 +429,7 @@ internal static class GenPanel
 		{
 			bool on = faction == keys[i];
 			Rect br = new Rect(rect.x + (third + 8f * fs) * i, rect.y, third, fh);
+			br.x = Mathf.Round(br.x); br.y = Mathf.Round(br.y);
 			if (GUI.Button(br, labs[i], on ? activeButtonStyle : buttonStyle)) faction = keys[i];
 			Er2Ui.Frame(br, on ? Er2Ui.Accent : Er2Ui.Edge, Mathf.Max(1f, fs));
 		}
@@ -731,6 +744,7 @@ internal static class GenPanel
 		// 1.4.22：× Scale（原 90/24 硬编码——缩放后按钮与行高不匹配，文字压到相邻行上）
 		float cs = Er2Ui.Scale;
 		Rect crewBtn = new Rect(rect.x, rect.y, 90f * cs, 24f * cs);
+		crewBtn.x = Mathf.Round(crewBtn.x); crewBtn.y = Mathf.Round(crewBtn.y);   // 2.5.27：整数对齐
 		if (GUI.Button(crewBtn, crewLabel, crewMode != 2 ? activeButtonStyle : buttonStyle))
 			crewMode = (crewMode + 1) % 3;
 		Er2Ui.Frame(crewBtn, Er2Ui.Edge, Mathf.Max(1f, cs));   // 1.4.22：描边，与页签/阵营按钮同款

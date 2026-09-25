@@ -9,7 +9,7 @@ using UnityEngine;
 
 namespace ER2SquadCommand;
 
-[BepInPlugin("er2.squadcommand", "ER2 Battlefield Commander", "1.4.46")]
+[BepInPlugin("er2.squadcommand", "ER2 Battlefield Commander", "1.4.47")]
 public class Plugin : BasePlugin
 {
 	internal static ManualLogSource ModLog;
@@ -136,7 +136,7 @@ public class Plugin : BasePlugin
 		// 1.4.40-1.4.42 的"武器只进背包"拦截把原生"拾取并放置于右手"也堵死了，已全部移除。
 		new Harmony("er2.squadcommand").PatchAll(typeof(Plugin).Assembly);
 		FrameEndRunner.Ensure();
-		ModLog.LogInfo("ER2 Battlefield Commander 1.4.46 loaded. godKey=" + godKey.Value);
+		ModLog.LogInfo("ER2 Battlefield Commander 1.4.47 loaded. godKey=" + godKey.Value);
 		ThirdPartyCompat.LogCoexistenceHint(ModLog); // 1.4.15：第三方 mod 共存提示
 	}
 }

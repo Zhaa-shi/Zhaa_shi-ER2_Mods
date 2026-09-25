@@ -629,10 +629,11 @@ internal static class Er2Ui
 		bool shift = Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift);
 		int step = shift ? 10 : 1;
 		// 1.4.22：全部 × Scale（原 30/38/76/20 硬编码 → UI 缩放后箭头与文字错位）
+		// 2.5.4：文字/按钮矩形整数对齐（亚像素模糊根因，见 LabelShadowed）
 		float pw = 30f * Scale, pgap = 8f * Scale;
-		if (GUI.Button(new Rect(x, y, pw, BtnH), "◀", btn)) return -step;
-		GUI.Label(new Rect(x + pw + pgap, y + 2f * Scale, w - (pw + pgap) * 2f, 20f * Scale), mid, label);
-		if (GUI.Button(new Rect(x + w - pw, y, pw, BtnH), "▶", btn)) return step;
+		if (GUI.Button(new Rect(Mathf.Round(x), Mathf.Round(y), pw, BtnH), "◀", btn)) return -step;
+		GUI.Label(new Rect(Mathf.Round(x + pw + pgap), Mathf.Round(y + 2f * Scale), w - (pw + pgap) * 2f, 20f * Scale), mid, label);
+		if (GUI.Button(new Rect(Mathf.Round(x + w - pw), Mathf.Round(y), pw, BtnH), "▶", btn)) return step;
 		return 0;
 	}
 
