@@ -114,7 +114,9 @@ internal static class GenPanel
 	{
 		rows.Clear();
 		// 2.5.2：固定行高也要乘 Scale（此前漏了 → 自适应下标题/阵营/分页/预览行不跟着缩放）
-		rows.Add(new Row { Kind = RowKind.Title, H = 26f * Er2Ui.Scale });
+		// 1.4.23：26 → 34 = 8(上留白) + 22(标题行按钮) + 4(下留白)，
+		// 原 26 装不下"从 +8 开始、高 22"的按钮 → 按钮底部越过分隔线，压出"最上面的按钮重叠"。
+		rows.Add(new Row { Kind = RowKind.Title, H = 34f * Er2Ui.Scale });
 		rows.Add(new Row { Kind = RowKind.Faction, H = 36f * Er2Ui.Scale });
 		rows.Add(new Row { Kind = RowKind.UnitTabs, H = Er2Ui.TabGridH(UnitCats.Length, TabsPerRow, TabH) });
 		if (itemCats.Count > 0)
@@ -303,7 +305,8 @@ internal static class GenPanel
 			Event.current.Use();
 		}
 
-		Er2Ui.Fill(r, Er2Ui.PanelBg);
+		// 1.4.23：**近黑皮革底**（纯色 Fill → PanelBase：底色 + 皮革噪声 + 顶部受光边）
+		Er2Ui.PanelBase(r);
 
 		// 2.5.2 **设计感三件套**（用户："只有单一的色块没有设计感"）：
 		// ① 标题条独立底色，把"标题"从内容里分出来；② 标题条下分隔线；③ 面板外框。
@@ -312,6 +315,7 @@ internal static class GenPanel
 		BuildRows();
 		float titleH = rows.Count > 0 ? rows[0].H : 26f * s;
 		Er2Ui.Fill(new Rect(r.x, r.y, r.width, titleH), Er2Ui.TitleBar);
+		Er2Ui.Leather(new Rect(r.x, r.y, r.width, titleH), 0.14f);   // 1.4.23：标题条皮革
 		Er2Ui.HLine(new Rect(r.x, r.y + titleH, r.width, Mathf.Max(1f, s)), Er2Ui.Edge);
 
 		// 2.4.2：绘制**只消费行计划**——高度与绘制同源（见 BuildRows），加行只需改一处

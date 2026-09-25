@@ -3617,7 +3617,7 @@ internal static class GodViewController
 						long k = (long)s.Pointer;
 						if (smSelected.Contains(k)) continue; // 选中角括号更醒目，不叠画
 						SceneMarkers.Ring("F" + k, s.transform.position + Vector3.up * 0.15f, UnitRingRadius(s) * MarkerScaleMul, dim,
-							ER2Shared.Er2Ui.LineWidth(1.1f, camDist) * MarkerWidthMul, true);
+							ER2Shared.Er2Ui.LineWidth(1.5f, camDist) * MarkerWidthMul, true);
 						drawn++;
 					}
 					catch { }
@@ -3631,7 +3631,7 @@ internal static class GodViewController
 						long k = (long)v.Pointer;
 						if (smSelected.Contains(k)) continue;
 						SceneMarkers.Ring("FV" + k, v.transform.position + Vector3.up * 0.15f, VehicleRingRadius(v) * MarkerScaleMul, dimVeh,
-							ER2Shared.Er2Ui.LineWidth(1.4f, camDist) * MarkerWidthMul, true);
+							ER2Shared.Er2Ui.LineWidth(2.0f, camDist) * MarkerWidthMul, true);
 						drawn++;
 					}
 					catch { }
@@ -3652,7 +3652,7 @@ internal static class GodViewController
 						// 2.5.0：脉动相位按 key 错开（原来所有标记共用同一全局 pulse，同频同相）
 						float pl = PulseOf(key, t);
 						SceneMarkers.Bracket(key, s.transform.position + Vector3.up * 0.15f, UnitRingRadius(s) * 1.3f * pl, selWhite,
-							ER2Shared.Er2Ui.LineWidth(1.6f, camDist) * MarkerWidthMul, true);
+							ER2Shared.Er2Ui.LineWidth(2.2f, camDist) * MarkerWidthMul, true);
 					}
 					catch { }
 				}
@@ -3664,7 +3664,7 @@ internal static class GodViewController
 						if (v == null || v.transform == null) continue;
 						string vkey = "SV" + (long)v.Pointer;
 						SceneMarkers.Bracket(vkey, v.transform.position + Vector3.up * 0.15f, VehicleRingRadius(v) * PulseOf(vkey, t), selWhite,
-							ER2Shared.Er2Ui.LineWidth(1.9f, camDist) * MarkerWidthMul, true);
+							ER2Shared.Er2Ui.LineWidth(2.6f, camDist) * MarkerWidthMul, true);
 					}
 					catch { }
 				}
@@ -3685,7 +3685,7 @@ internal static class GodViewController
 				Color mc = m.Downgraded ? ER2Shared.Er2Ui.MarkerFocusDown : ER2Shared.Er2Ui.MarkerFocus;
 				string mkey = "MK";
 				SceneMarkers.Ring(mkey, m.Position + Vector3.up * 0.12f, 1.5f * PulseOf(mkey, t) * MarkerScaleMul, mc,
-					ER2Shared.Er2Ui.LineWidth(2.2f, camDist) * MarkerWidthMul, true, MarkerThroughWall);
+					ER2Shared.Er2Ui.LineWidth(3.0f, camDist) * MarkerWidthMul, true, MarkerThroughWall);
 				if (MarkerNamePlates)
 					SceneMarkers.Label("MKN", m.Position + Vector3.up * 2.6f, "⚔ " + (m.Downgraded ? Ui.Tr("[降级] ") : "") + m.Name, mc, true);
 			}
@@ -3706,7 +3706,7 @@ internal static class GodViewController
 				Color moveC = ER2Shared.Er2Ui.WMove;
 				string mtKey = "MT";
 				SceneMarkers.Ring(mtKey, cmdTarget + Vector3.up * 0.1f, 0.45f * PulseOf(mtKey, t) * MarkerScaleMul, moveC,
-					ER2Shared.Er2Ui.LineWidth(1.6f, camDist) * MarkerWidthMul, true);
+					ER2Shared.Er2Ui.LineWidth(2.2f, camDist) * MarkerWidthMul, true);
 				SceneMarkers.Dot("MTD", cmdTarget + Vector3.up * 0.1f, 0.11f * PulseOf(mtKey, t) * MarkerScaleMul, moveC, true);
 			}
 		}
@@ -3726,12 +3726,12 @@ internal static class GodViewController
 				for (int i = 0; i < obsUnits.Count && n < RouteLineCap; i++, n++)
 				{
 					Soldier s = obsUnits[i];
-					try { if (s != null && s.transform != null && s.IsAlive && IsSelectedUnit(s)) SceneMarkers.Line("PL" + n, s.transform.position + Vector3.up * 0.9f, obsTarget + Vector3.up * 0.3f, pathC, ER2Shared.Er2Ui.LineWidth(1.2f, camDist) * MarkerWidthMul, true, false); } catch { }
+					try { if (s != null && s.transform != null && s.IsAlive && IsSelectedUnit(s)) SceneMarkers.Line("PL" + n, s.transform.position + Vector3.up * 0.9f, obsTarget + Vector3.up * 0.3f, pathC, ER2Shared.Er2Ui.LineWidth(1.7f, camDist) * MarkerWidthMul, true, false); } catch { }
 				}
 				for (int i = 0; i < obsVehicles.Count && n < RouteLineCap + 10; i++, n++)
 				{
 					Vehicle v = obsVehicles[i];
-					try { if (v != null && v.transform != null && IsSelectedVehicle(v)) SceneMarkers.Line("PL" + n, v.transform.position + Vector3.up * 1.2f, obsTarget + Vector3.up * 0.3f, pathC, ER2Shared.Er2Ui.LineWidth(1.3f, camDist) * MarkerWidthMul, true, false); } catch { }
+					try { if (v != null && v.transform != null && IsSelectedVehicle(v)) SceneMarkers.Line("PL" + n, v.transform.position + Vector3.up * 1.2f, obsTarget + Vector3.up * 0.3f, pathC, ER2Shared.Er2Ui.LineWidth(1.8f, camDist) * MarkerWidthMul, true, false); } catch { }
 				}
 			}
 		}
@@ -3748,7 +3748,7 @@ internal static class GodViewController
 				for (int i = 0; i < pendingBoardUnits.Count && n < RouteLineCap; i++, n++)
 				{
 					Soldier s = pendingBoardUnits[i];
-					try { if (s != null && s.transform != null && s.IsAlive && IsSelectedUnit(s)) SceneMarkers.Line("PB" + n, s.transform.position + Vector3.up * 0.9f, pendingBoardVeh.transform.position + Vector3.up * 1.0f, boardC, ER2Shared.Er2Ui.LineWidth(1.3f, camDist) * MarkerWidthMul, true, true); } catch { }
+					try { if (s != null && s.transform != null && s.IsAlive && IsSelectedUnit(s)) SceneMarkers.Line("PB" + n, s.transform.position + Vector3.up * 0.9f, pendingBoardVeh.transform.position + Vector3.up * 1.0f, boardC, ER2Shared.Er2Ui.LineWidth(1.8f, camDist) * MarkerWidthMul, true, true); } catch { }
 				}
 			}
 		}
@@ -3975,6 +3975,7 @@ internal static class GodViewController
 			GUI.color = ER2Shared.Er2Ui.Scrim;
 			GUI.DrawTexture(new Rect(hintX, hintY, hintW, hintH), Texture2D.whiteTexture);
 			GUI.color = Color.white;
+			ER2Shared.Er2Ui.Leather(new Rect(hintX, hintY, hintW, hintH), 0.10f);   // 1.4.23：皮革
 			GUI.Label(new Rect(hintX, hintY - 1f * s, hintW, hintH), hint, hs);
 
 			// 左上角：暂停 + 选择信息

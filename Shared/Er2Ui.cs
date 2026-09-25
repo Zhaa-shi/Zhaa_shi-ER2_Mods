@@ -159,31 +159,32 @@ internal static class Er2Ui
 	public static bool Mono = true;
 
 	// 结构色的两套预设（Mono / Legacy），下面用属性按 Mono 分派。
-	// 1.4.22 **黑棕半透明**（用户明确要求："要黑棕色半透明的UI"）：
-	//   · 色相从冷灰换成**暖棕**（地面战场是泥土/枯草色，暖棕面板与环境协调，冷灰反而突兀）；
-	//   · **整体半透明**（α 0.80~0.96）——用户这次点名要半透明的面板（之前"质感不好"指的是
-	//     3D 世界标记的半透明，两回事：面板要透出战场，标记要实色）；
-	//   · 元素区分靠三重：明度档 + **暖棕描边/分隔线** + 选中亮棕填充。
-	// 层次 = 面（明度档）+ 线（边框/分隔）+ 条（选中/激活），三维而不是只靠面。
-	private static readonly Color MonoPanelBg = new Color(0x1E / 255f, 0x18 / 255f, 0x13 / 255f, 0.82f);
-	private static readonly Color MonoPanelBorder = new Color(0x6E / 255f, 0x58 / 255f, 0x44 / 255f, 0.92f);
-	private static readonly Color MonoTitleBar = new Color(0x2A / 255f, 0x21 / 255f, 0x19 / 255f, 0.86f);
-	private static readonly Color MonoSurface = new Color(0x32 / 255f, 0x27 / 255f, 0x1E / 255f, 0.84f);
-	private static readonly Color MonoSurfaceHover = new Color(0x44 / 255f, 0x35 / 255f, 0x2A / 255f, 0.90f);
-	private static readonly Color MonoSurfaceActive = new Color(0x58 / 255f, 0x43 / 255f, 0x31 / 255f, 0.96f);
-	private static readonly Color MonoRowBg = new Color(0x24 / 255f, 0x1C / 255f, 0x15 / 255f, 0.80f);
+	// 1.4.23 **近黑皮革**（用户："这完全就是棕色，黑色呢，我要皮革的那种感觉，然后更黑一点"）：
+	//   ① **α 0.82 → 0.92**：这是"变成棕色"的真正原因——半透明面板叠在棕色泥地地形上，
+	//      地形颜色会透上来染色，α 越低越像"棕玻璃"。面板要黑就必须压住背景。
+	//   ② 底色整体压到**近黑**（#0C0906 系，"更黑一点"），只保留极轻的暖调（R>G>B）。
+	//   ③ **皮革质感**由 `Leather()`（64×64 程序化噪声，0.10 透明度叠加）+ `PanelBase()` 的
+	//      顶部内高光边共同实现——单靠颜色调不出"皮"，质感来自**斑驳 + 受光边缘**。
+	//   元素区分靠三重：近黑底 + 深棕描边/分隔线 + 选中亮棕填充。
+	private static readonly Color MonoPanelBg = new Color(0x0C / 255f, 0x09 / 255f, 0x06 / 255f, 0.92f);
+	private static readonly Color MonoPanelBorder = new Color(0x46 / 255f, 0x38 / 255f, 0x2A / 255f, 0.95f);
+	private static readonly Color MonoTitleBar = new Color(0x14 / 255f, 0x0F / 255f, 0x0B / 255f, 0.94f);
+	private static readonly Color MonoSurface = new Color(0x1B / 255f, 0x15 / 255f, 0x0F / 255f, 0.90f);
+	private static readonly Color MonoSurfaceHover = new Color(0x2A / 255f, 0x20 / 255f, 0x17 / 255f, 0.94f);
+	private static readonly Color MonoSurfaceActive = new Color(0x3B / 255f, 0x2C / 255f, 0x1F / 255f, 0.97f);
+	private static readonly Color MonoRowBg = new Color(0x13 / 255f, 0x0F / 255f, 0x0B / 255f, 0.86f);
 	private static readonly Color MonoFavRow = new Color(1f, 1f, 1f, 0.10f);
-	private static readonly Color MonoText = new Color(0xF1 / 255f, 0xEB / 255f, 0xE2 / 255f, 1f);
-	private static readonly Color MonoTextDim = new Color(0xC9 / 255f, 0xBC / 255f, 0xAB / 255f, 0.92f);
-	private static readonly Color MonoTextDisabled = new Color(0x96 / 255f, 0x89 / 255f, 0x7A / 255f, 0.80f);
+	private static readonly Color MonoText = new Color(0xF2 / 255f, 0xED / 255f, 0xE6 / 255f, 1f);
+	private static readonly Color MonoTextDim = new Color(0xBF / 255f, 0xB3 / 255f, 0xA3 / 255f, 0.92f);
+	private static readonly Color MonoTextDisabled = new Color(0x8A / 255f, 0x7F / 255f, 0x70 / 255f, 0.80f);
 	private static readonly Color MonoTextOnActive = new Color(1f, 1f, 1f, 1f);
 	private static readonly Color MonoTextOnPlate = new Color(0xF5 / 255f, 0xF0 / 255f, 0xE8 / 255f, 1f);
 	private static readonly Color MonoStarHot = new Color(0.91f, 0.87f, 0.82f, 0.95f);
-	private static readonly Color MonoSurfaceDisabled = new Color(0x1A / 255f, 0x14 / 255f, 0x0F / 255f, 0.62f);
+	private static readonly Color MonoSurfaceDisabled = new Color(0x12 / 255f, 0x0E / 255f, 0x0A / 255f, 0.66f);
 	private static readonly Color MonoRowHover = new Color(0xE8 / 255f, 0xD9 / 255f, 0xC4 / 255f, 0.12f);
-	private static readonly Color MonoListBg = new Color(0f, 0f, 0f, 0.35f);
-	// 1.4.22：结构线换暖棕——在黑棕面板上，灰描边读不出"框"，暖棕才能勾勒出元素边界
-	private static readonly Color MonoEdge = new Color(0x57 / 255f, 0x45 / 255f, 0x2F / 255f, 0.92f);   // 分隔线
+	private static readonly Color MonoListBg = new Color(0f, 0f, 0f, 0.45f);
+	// 1.4.23：结构线——近黑底上要用**深棕**才读得出边界（纯灰会发脏）
+	private static readonly Color MonoEdge = new Color(0x3A / 255f, 0x2E / 255f, 0x22 / 255f, 0.92f);   // 分隔线
 	private static readonly Color MonoEdgeSoft = new Color(1f, 1f, 1f, 0.10f);                          // 极淡分隔（行间）
 
 	// —— A 面板结构 ——
@@ -399,6 +400,69 @@ internal static class Er2Ui
 
 	/// <summary>水平分隔线（标题条下、分区之间）。</summary>
 	public static void HLine(Rect r, Color c) => Fill(r, c);
+
+	/// <summary>
+	/// 1.4.23：**皮革纹理**（64×64 程序化噪声，确定性）。
+	/// 为什么需要：IMGUI 只有纯色填充，面板再怎么调色也只是"一块色板"。
+	/// 皮革的观感来自**细微的斑驳明暗**，一层低透明度的噪声叠加即可获得。
+	/// 用固定种子的 value noise（两层：0.09 的皱褶 + 0.37 的细粒），
+	/// 刻意做成偏暗（0.34~0.66）——叠上去只压暗不泛灰。
+	/// hideFlags=61 是陷阱 12 的定案值。
+	/// </summary>
+	private static Texture2D leatherTex;
+
+	public static Texture2D LeatherTex()
+	{
+		if (leatherTex != null) return leatherTex;
+		const int S = 64;
+		leatherTex = new Texture2D(S, S, TextureFormat.ARGB32, false);
+		leatherTex.hideFlags = (HideFlags)61;
+		leatherTex.wrapMode = TextureWrapMode.Repeat;   // 平铺
+		leatherTex.filterMode = FilterMode.Bilinear;
+		var px = new Color[S * S];
+		for (int y = 0; y < S; y++)
+		{
+			for (int x = 0; x < S; x++)
+			{
+				float n1 = Mathf.PerlinNoise(x * 0.09f, y * 0.09f);   // 皮面大皱褶
+				float n2 = Mathf.PerlinNoise(x * 0.37f + 31.7f, y * 0.37f + 11.3f); // 细粒
+				float v = Mathf.Clamp01(0.5f + (n1 - 0.5f) * 0.62f + (n2 - 0.5f) * 0.28f);
+				float g = Mathf.Lerp(0.34f, 0.66f, v);
+				px[y * S + x] = new Color(g, g * 0.96f, g * 0.90f, 1f);   // 略暖，与黑棕底同调
+			}
+		}
+		leatherTex.SetPixels(px);
+		leatherTex.Apply(false, true);
+		return leatherTex;
+	}
+
+	/// <summary>把皮革纹理**平铺**铺满一个矩形（低透明度叠加，只做质感不做主角）。</summary>
+	public static void Leather(Rect r, float alpha = 0.10f)
+	{
+		if (r.width <= 0f || r.height <= 0f) return;
+		try
+		{
+			Texture2D t = LeatherTex();
+			if (t == null) return;
+			Color keep = GUI.color;
+			GUI.color = new Color(1f, 1f, 1f, alpha);
+			GUI.DrawTextureWithTexCoords(r, t, new Rect(0f, 0f, r.width / t.width, r.height / t.height));
+			GUI.color = keep;
+		}
+		catch { }
+	}
+
+	/// <summary>
+	/// 1.4.23：**标准面板底** = 近黑底 + 皮革纹理 + 顶部内高光。
+	/// 顶端那条 1px 亮度是皮革的"受光边缘"——它让面板看起来是**一块有厚度的皮**，
+	/// 而不是一个纯色矩形（这是"皮革感"的第二个来源，第一个是噪声纹理）。
+	/// </summary>
+	public static void PanelBase(Rect r, float leatherAlpha = 0.10f)
+	{
+		Fill(r, PanelBg);
+		Leather(r, leatherAlpha);
+		HLine(new Rect(r.x, r.y, r.width, Mathf.Max(1f, Scale)), EdgeSoft);   // 受光边缘
+	}
 
 	/// <summary>
 	/// 左侧（或指定边）强调竖条——选中行的"激活"指示。

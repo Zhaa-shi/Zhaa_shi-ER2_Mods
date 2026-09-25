@@ -1164,8 +1164,12 @@ internal static class BackpackPanel
         // 描边改共享令牌 `PanelBorder`，让它成为真正的设计元素而非"底色的半透明版"。
         GUI.color = new Color(baseC.r, baseC.g, baseC.b, 0.95f);
         GUI.DrawTexture(r, Texture2D.whiteTexture);
+        GUI.color = Color.white;
+        // 1.4.23：皮革质感（低透明度噪声叠加）——纯色底板永远只是"一块色板"
+        Er2Ui.Leather(r, 0.10f);
         // 2.5.2：标题条独立底色——把"标题/关闭/翻页"从格子区里分出来（设计感）
         Er2Ui.Fill(new Rect(r.x, r.y, r.width, TitleH), Er2Ui.TitleBar);
+        Er2Ui.Leather(new Rect(r.x, r.y, r.width, TitleH), 0.14f);
         GUI.color = Er2Ui.PanelBorder;
         float bd = Mathf.Max(1f, 1f * k);
         GUI.DrawTexture(new Rect(r.x, r.y, r.width, bd), Texture2D.whiteTexture);

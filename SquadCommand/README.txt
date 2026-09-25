@@ -1,7 +1,25 @@
-ER2 Battlefield Commander v1.4.22
+ER2 Battlefield Commander v1.4.23
 =================================
 
 A BepInEx plugin for Easy Red 2 that adds an "RTS god-view squad command" layer — mouse operations inspired by Gates of Hell: Ostfront.
+
+[1.4.23 Near-black leather panels + thicker markers]
+* **Marker lines were too thin after the distance fix** - base widths raised about 40%
+  (infantry ring 1.1 -> 1.5, selection brackets 1.6/1.9 -> 2.2/2.6, focus ring 2.2 -> 3.0, etc.).
+  The on-screen thickness stays resolution-independent.
+* **Why the UI came out "completely brown": translucency was tinted by the terrain.** At alpha 0.82
+  the panel lets the brown dirt through, so no amount of palette work could make it black. Panel
+  opacity is now 0.92 and the base colour moved to near-black (#0C0906), keeping only a faint warm
+  cast.
+* **Leather feel.** A near-black rectangle is still just a colour swatch, so the panel base is now
+  rendered as: near-black fill + a 64x64 procedural leather noise texture (two octaves, deterministic)
+  tiled at 10% opacity + a 1px lit top edge. Texture and the lighting edge - not colour - are what
+  read as leather.
+* **Fixed the overlapping buttons at the top of the panel.** The title row was 26px tall but its
+  content starts 8px in with 22px-tall buttons, so the Clear / x buttons crossed the divider under
+  the title bar. Title row is now 34px (8 + 22 + 4).
+* Config defaults darkened to match (#0F0B08 / #2A2017).
+
 
 [1.4.22 Fixes + dark-brown UI]
 * **Line width blown up by a wrong camera distance - the real cause of "still too thick".**

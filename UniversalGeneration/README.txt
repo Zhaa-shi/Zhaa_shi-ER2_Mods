@@ -1,4 +1,4 @@
-ER2 Universal Generation v2.5.3
+ER2 Universal Generation v2.5.4
 ================================
 
 Spawn any unit, vehicle, or item anywhere, right from Battlefield Commander's RTS god view.
@@ -41,6 +41,13 @@ How to use
 
 Changelog
 --------------------------------
+2.5.4
+- **Marker lines raised about 40%** (they were too thin after the camera-distance fix).
+- **Near-black leather panel.** The panel used to read as "completely brown" because translucent panels get tinted by the brown terrain behind them - opacity is now 0.92 over a near-black base (#0C0906), with a 64x64 procedural leather noise overlay and a 1px lit top edge for the leather feel.
+- **Fixed the overlapping buttons at the top** (title row 26 -> 34px; the Clear / x buttons no longer cross the divider).
+- Config defaults darkened to match.
+
+
 2.5.3
 - **Dark-brown translucent UI** - the shared palette moved to warm dark brown with translucency (panel #1E1813 @ 0.82, title bar #2A2119 @ 0.86, control #32271E @ 0.84, selected #584331 @ 0.96), matching Battle Commander 1.4.22.
 - **Elements are clearly separated:** tabs, faction buttons and the crew button all get outlines (warm brown when idle, warm white when selected); list rows get hairline separators; the panel border and dividers are warm brown.
