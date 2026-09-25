@@ -177,7 +177,10 @@ internal static class Er2Ui
 	private static readonly Color MonoRowBg = new Color(0x1E / 255f, 0x1E / 255f, 0x1E / 255f);
 	private static readonly Color MonoFavRow = new Color(1f, 1f, 1f, 0.10f);
 	private static readonly Color MonoText = new Color(1f, 1f, 1f, 1f);
-	private static readonly Color MonoTextDim = new Color(0xE4 / 255f, 0xE4 / 255f, 0xE8 / 255f, 1f);
+	private static readonly Color MonoTextDim = new Color(1f, 1f, 1f, 1f);   // 1.4.35：次要文字也纯白（用户："字体改成白色"）
+	// 1.4.35：**悬停专用暗色**——normal 已全白，悬停"变暗"需要一个确实更暗的色，
+	// 否则 TabGrid/列表行的 hov ? TextDim : Text 两边同色，反馈失效
+	private static readonly Color MonoTextHover = new Color(0xB4 / 255f, 0xB4 / 255f, 0xBA / 255f, 1f);
 	private static readonly Color MonoTextDisabled = new Color(0xA8 / 255f, 0xA8 / 255f, 0xB0 / 255f, 0.90f);
 	private static readonly Color MonoTextOnActive = new Color(1f, 1f, 1f, 1f);
 	private static readonly Color MonoTextOnPlate = new Color(0xF5 / 255f, 0xF5 / 255f, 0xF7 / 255f, 1f);
@@ -198,7 +201,7 @@ internal static class Er2Ui
 	/// 各结构色的相对层次（标题条更实、行底更透）由下面属性按比例推出，玩家只调一个值。
 	/// </summary>
 	/// 1.4.30：默认 0.85 → **0.72**，与 HUD 提示条同款半透明度
-	public static float PanelAlpha = 0.72f;
+	public static float PanelAlpha = 0.50f;
 
 	public static void SetPanelAlpha(float v)
 	{
@@ -236,6 +239,8 @@ internal static class Er2Ui
 	public static Color Text => Mono ? MonoText : LegacyText;                                 // 正文
 	public static Color TextOnActive => Mono ? MonoTextOnActive : new Color(0.04f, 0.09f, 0.04f, 1f); // 选中态文字
 	public static Color TextDim => Mono ? MonoTextDim : LegacyTextDim;                        // 次要文字
+	/// <summary>悬停态文字（比 normal 暗一档，即"文字变暗"的悬停反馈）。</summary>
+	public static Color TextHover => Mono ? MonoTextHover : new Color(0.7f, 0.7f, 0.7f, 1f);
 	public static Color TextDisabled => Mono ? MonoTextDisabled : new Color(0.55f, 0.65f, 0.55f, 0.65f); // 禁用文字
 	public static Color TextOnPlate => Mono ? MonoTextOnPlate : new Color(0.9f, 0.96f, 0.9f, 1f);      // 底板上的字
 
@@ -244,7 +249,7 @@ internal static class Er2Ui
 	public static Color Warn => new Color(0xE0 / 255f, 0xA3 / 255f, 0x3A / 255f, 0.98f);      // 警告（暂停等）
 	public static Color Danger => new Color(0xC4 / 255f, 0x45 / 255f, 0x3C / 255f, 0.95f);    // 危险（集火）
 	public static Color Success => new Color(0x6F / 255f, 0xA8 / 255f, 0x60 / 255f, 0.95f);   // 成功
-	public static Color Scrim => new Color(0f, 0f, 0f, 0.72f);   // 1.4.32 归一为纯黑 72%（"底部提示条那个背景"的基准）                       // 遮罩（1.4.24 中性黑半透，提示条/徽标底）
+	public static Color Scrim => new Color(0f, 0f, 0f, 0.50f);   // 1.4.35：背景透明度 50%（用户指定）                       // 遮罩（1.4.24 中性黑半透，提示条/徽标底）
 	public static Color StarOn => new Color(1f, 0xE8 / 255f, 0x1A / 255f, 1f);                // ★（1.4.29 再提亮）
 	public static Color StarHot => Mono ? MonoStarHot : LegacyStarHot;                        // ☆ 悬停
 
@@ -551,7 +556,7 @@ internal static class Er2Ui
 			bool hov = r.Contains(Event.current.mousePosition);
 			if (GUI.Button(r, GUIContent.none, st)) clicked = i;
 			LabelOutlined(new Rect(r.x + 3f * Scale, r.y, r.width - 6f * Scale, r.height),
-				labels[i], st, hov ? TextDim : Color.white, Mathf.Max(1f, Scale));
+				labels[i], st, hov ? TextHover : Color.white, Mathf.Max(1f, Scale));
 			// 1.4.22：**每个页签都描边**——未选中用暖棕 Edge、选中用暖白 Accent。
 			// 用户反馈"UI 各元素区分不明显"：此前页签只有填充色差，在亮背景上读不出边界。
 			Frame(r, on ? Accent : Edge, Mathf.Max(1f, Scale));

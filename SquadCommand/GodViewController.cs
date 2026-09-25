@@ -3542,13 +3542,16 @@ internal static class GodViewController
 					SquadCmdLogic.LogAlways("[SquadCmd] cfg 颜色迁移 colorHover " + s + " → #3A3A3AEE");
 					break;
 				}
-			// 面板不透明度：旧默认 0.85 → 0.72（与底部提示条一致）
-			if (Plugin.uiPanelAlpha != null && Mathf.Abs(Plugin.uiPanelAlpha.Value - 0.85f) < 0.001f
-				&& Mathf.Abs(ER2Shared.Er2Ui.PanelAlpha - 0.72f) > 0.001f)
-			{
-				Plugin.uiPanelAlpha.Value = 0.72f;
-				SquadCmdLogic.LogAlways("[SquadCmd] cfg 迁移 uiPanelAlpha 0.85 → 0.72");
-			}
+			// 面板不透明度：历史默认 0.85 → 0.72 → 0.50（每次改默认都要把旧值加进迁移链）
+			float[] legacyAlpha = { 0.85f, 0.72f };
+			foreach (float la in legacyAlpha)
+				if (Plugin.uiPanelAlpha != null && Mathf.Abs(Plugin.uiPanelAlpha.Value - la) < 0.001f
+					&& Mathf.Abs(ER2Shared.Er2Ui.PanelAlpha - 0.50f) > 0.001f)
+				{
+					Plugin.uiPanelAlpha.Value = 0.50f;
+					SquadCmdLogic.LogAlways("[SquadCmd] cfg 迁移 uiPanelAlpha " + la + " → 0.50");
+					break;
+				}
 		}
 		catch (System.Exception ex) { SquadCmdLogic.LogWarning("[SquadCmd] cfg 迁移异常: " + ex.Message); }
 	}
@@ -4219,7 +4222,8 @@ internal static class GodViewController
 		int rows = cachedFriendlySquads.Count;
 		float totalH = rows * (PanelH + PanelGap);
 		float startX = Screen.width - PanelW - 10f * ER2Shared.Er2Ui.Scale;
-		float y = Mathf.Max(8f * ER2Shared.Er2Ui.Scale, Screen.height - 14f * ER2Shared.Er2Ui.Scale - totalH);
+		// 1.4.35：底距 14 → 36（与左下信息面板同）——14 会压到底部提示条上（提示条顶在离底 30f*Scale）
+		float y = Mathf.Max(8f * ER2Shared.Er2Ui.Scale, Screen.height - 36f * ER2Shared.Er2Ui.Scale - totalH);
 		squadPanelHit = new Rect(startX, y, PanelW, totalH);
 
 		int idx = 1;

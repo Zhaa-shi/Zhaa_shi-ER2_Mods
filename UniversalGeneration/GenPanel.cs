@@ -474,7 +474,7 @@ internal static class GenPanel
 			GUI.backgroundColor = keep;
 			bool fhov = rr.Contains(Event.current.mousePosition);
 			Er2Ui.LabelOutlined(new Rect(rr.x + 6f * s, rr.y, rr.width - 12f * s, rr.height),
-				label, rowTextStyle, fhov ? Er2Ui.TextDim : Er2Ui.Text, Mathf.Max(1f, s));
+				label, rowTextStyle, fhov ? Er2Ui.TextHover : Er2Ui.Text, Mathf.Max(1f, s));
 			// 1.4.29：文件夹列表也要有行分隔线（原来这里 0 处，与其他列表观感不一致）
 			Er2Ui.HLine(new Rect(rr.x, rowY + RowH - 2f * s, rr.width, Mathf.Max(1f, s)), Er2Ui.EdgeSoft);
 			if (hit)
@@ -618,7 +618,7 @@ internal static class GenPanel
 			// 1.4.34：悬停反馈 = 文字变暗（用户指明；原 tooltip 方案已删）
 			bool hov = rowRect.Contains(Event.current.mousePosition);
 			Er2Ui.LabelOutlined(new Rect(rowRect.x + 6f * ls, rowRect.y, rowRect.width - 12f * ls, rowRect.height),
-				e.Title, rowTextStyle, hov ? Er2Ui.TextDim : Er2Ui.Text, Mathf.Max(1f, ls));
+				e.Title, rowTextStyle, hov ? Er2Ui.TextHover : Er2Ui.Text, Mathf.Max(1f, ls));
 			// 2.5.2：收藏行左侧强调竖条——比"整行换底色"更像设计（底色只轻微提亮，靠竖条点名）
 			if (fav) Er2Ui.AccentBar(rowRect, Er2Ui.Accent, Mathf.Max(2f, 3f * ls));
 			// 1.4.22：行分隔线——行底与行底之间加一条极淡暖棕，元素边界一眼可辨
@@ -683,7 +683,7 @@ internal static class GenPanel
 			GUI.backgroundColor = keep;
 			bool ihov = itemRowRect.Contains(Event.current.mousePosition);
 			Er2Ui.LabelOutlined(new Rect(itemRowRect.x + 6f * isc, itemRowRect.y, itemRowRect.width - 12f * isc, itemRowRect.height),
-				e.Title, rowTextStyle, ihov ? Er2Ui.TextDim : Er2Ui.Text, Mathf.Max(1f, isc));
+				e.Title, rowTextStyle, ihov ? Er2Ui.TextHover : Er2Ui.Text, Mathf.Max(1f, isc));
 			// 2.5.2：收藏行左侧强调竖条（与单位列表同款）
 			if (fav) Er2Ui.AccentBar(itemRowRect, Er2Ui.Accent, Mathf.Max(2f, 3f * isc));
 			Er2Ui.HLine(new Rect(itemRowRect.x, rowY + RowH - 2f * isc, itemRowRect.width, Mathf.Max(1f, isc)), Er2Ui.EdgeSoft);   // 1.4.29：每行都画

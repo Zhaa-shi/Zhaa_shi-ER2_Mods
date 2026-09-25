@@ -6,7 +6,7 @@ Adds an "RTS god-view squad command" layer to Easy Red 2, with mouse operations 
 ## Installation instructions
 1. Install BepInEx (IL2CPP build) into the game root folder.
 2. Put `ER2_BattlefieldCommander.dll` into `Easy Red 2\BepInEx\plugins\`.
-3. Launch the game — `Loading [ER2 Battlefield Commander 1.4.34]` in the BepInEx log means success.
+3. Launch the game — `Loading [ER2 Battlefield Commander 1.4.35]` in the BepInEx log means success.
 
 ## Main features
 - **God-view command**: F9 to enter free camera, WASD move, wheel zoom, MMB rotate, Q/E height, Space to pause/resume the world.
@@ -38,6 +38,19 @@ Adds an "RTS god-view squad command" layer to Easy Red 2, with mouse operations 
 Thanks to the Easy Red 2 community and the BepInEx / Harmony ecosystem, and to all authors whose IL2CPP modding work paved the way.
 
 ## Recent changes
+**1.4.35**
+* **The bottom-left panel and the squad list no longer overlap the hint bar.** My previous "symmetry"
+  pass set both bottom gaps to 14 px - but the hint bar's top edge sits 30 px above the screen bottom,
+  so both blocks were drawn straight through it (your screenshot). Both gaps are now **36 px**
+  (hint bar 30 + 6 gap), still symmetric left/right.
+* **Panel opacity is 50% now** (you asked for it): `uiPanelAlpha` default 0.72 -> 0.50 (config range
+  lowered to 0.40-1.0), and the hint bar's own `Scrim` matches at 50% too. Old defaults (0.85 / 0.72)
+  are added to the migration chain.
+* **All text is white now** - secondary text too (`#E4E4E8` -> `#FFFFFF`). The hover feedback keeps
+  working through a new dedicated hover colour (`TextHover #B4B4BA`) - if hover simply reused the
+  now-white normal colour, the "text dims on hover" feedback would have silently vanished again.
+
+
 **1.4.34**
 * **Removed the tooltip box** (you asked for that) and restored the original hover feedback instead:
   hovering a tab or a list row now **dims its text** - that was the old behaviour, lost when the

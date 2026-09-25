@@ -1,7 +1,20 @@
-ER2 Battlefield Commander v1.4.34
+ER2 Battlefield Commander v1.4.35
 =================================
 
 A BepInEx plugin for Easy Red 2 that adds an "RTS god-view squad command" layer — mouse operations inspired by Gates of Hell: Ostfront.
+
+[1.4.35 Overlap fix, 50% panel opacity, all-white text]
+* **The bottom-left panel and the squad list no longer overlap the hint bar.** My previous "symmetry"
+  pass set both bottom gaps to 14 px - but the hint bar's top edge sits 30 px above the screen bottom,
+  so both blocks were drawn straight through it (your screenshot). Both gaps are now **36 px**
+  (hint bar 30 + 6 gap), still symmetric left/right.
+* **Panel opacity is 50% now** (you asked for it): `uiPanelAlpha` default 0.72 -> 0.50 (config range
+  lowered to 0.40-1.0), and the hint bar's own `Scrim` matches at 50% too. Old defaults (0.85 / 0.72)
+  are added to the migration chain.
+* **All text is white now** - secondary text too (`#E4E4E8` -> `#FFFFFF`). The hover feedback keeps
+  working through a new dedicated hover colour (`TextHover #B4B4BA`) - if hover simply reused the
+  now-white normal colour, the "text dims on hover" feedback would have silently vanished again.
+
 
 [1.4.34 Symmetric bottom HUD + hover feedback restored]
 * **Removed the tooltip box** (you asked for that) and restored the original hover feedback instead:

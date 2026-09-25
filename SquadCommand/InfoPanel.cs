@@ -19,8 +19,10 @@ internal static class InfoPanel
 	// 2.5.1：改为属性，随 Er2Ui.Scale 自适应（原本 const → 分辨率变化时 UI 尺寸钉死）
 	private static float W => 352f * ER2Shared.Er2Ui.Scale;
 	private static float H => 190f * ER2Shared.Er2Ui.Scale;
-	// 1.4.34：34 → 14，与右下小队列表同——左右两块贴底位置一致（用户："让他们对称啊"）
-	private static float BottomGap => 14f * ER2Shared.Er2Ui.Scale;
+	// 1.4.35：14 → **36**。14 是我上轮改坏的——底部提示条顶在离底 30f*Scale 处，
+	// 14 的底距让信息面板直接压在提示条上（用户截图："重叠了"）。
+	// 36 = 提示条 30 + 6 间隙；与小队列表同值，左右依旧对称、都不压提示条。
+	private static float BottomGap => 36f * ER2Shared.Er2Ui.Scale;
 	private static float LeftX => 12f * ER2Shared.Er2Ui.Scale;
 	// 1.4.32：面板左边缘。原来 x=0（贴屏幕边），而右侧小队列表是"离右边缘 10*Scale"——
 	// 用户要求"与右边的小队列表对齐"，这里取同样的 10*Scale 做**左右对称**。
