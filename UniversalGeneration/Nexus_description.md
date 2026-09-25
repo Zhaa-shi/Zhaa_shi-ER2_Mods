@@ -51,6 +51,11 @@ Items go into backpacks as their **proper subclass** — magazines hold the righ
 
 ## Changelog
 
+**2.5.17**
+- No change on this mod's side; the text colour unification and the info-panel / hint-bar exclusivity
+  live in the shared toolkit and the commander mod.
+
+
 **2.5.16**
 - **Hover feedback kept working**: all text went pure white, so the hover dim now uses a dedicated
   slightly-darker token instead of the (now equally white) secondary colour.

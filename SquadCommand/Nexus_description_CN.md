@@ -6,7 +6,7 @@
 ## Installation instructions
 1. 安装 BepInEx（IL2CPP 版）到游戏根目录。
 2. 将 `ER2_BattlefieldCommander.dll` 放入 `Easy Red 2\BepInEx\plugins\`。
-3. 启动游戏，BepInEx 日志出现 `Loading [ER2 Battlefield Commander 1.4.35]` 表示加载成功。
+3. 启动游戏，BepInEx 日志出现 `Loading [ER2 Battlefield Commander 1.4.36]` 表示加载成功。
 
 ## Main features
 - **上帝视角指挥**：F9 进入自由视角，WASD 移动、滚轮缩放、中键旋转、Q/E 升降，空格暂停/继续世界。
@@ -38,6 +38,16 @@
 感谢 Easy Red 2 社区与 BepInEx / Harmony 生态，以及所有为 IL2CPP modding 提供思路的作者。
 
 ## 近期更新
+**1.4.36**
+· **文字还是灰色的原因**：HUD 的文字色来自**配置文件**，而 cfg 不会自己更新（陷阱 109）——
+  你本地的 `colorText` 还是旧灰值。现在 `colorText` 加入迁移链（旧值 #E8E8E8 / #F1EBE2 / #F0F0F2
+  → #FFFFFF），并且**更重要的是：HUD 文字色源改为直接读 `Er2Ui.Text`**——
+  指挥官 mod 与通用生成从此共用同一个纯白，三个颜色配置保留但不再被读取。
+· **信息栏与底部提示条在竖轴上互斥**：没选中任何单位时，信息面板整个不画（提示条显示）；
+  有选中时信息面板出现（提示条让位）——不再同时存在。
+· `colorBase` 默认改为 `#00000080`（黑 50%，与新的透明度一致），迁移链同步。
+
+
 **1.4.35**
 · **左下信息面板和小队列表不再压到底部提示条上。** 上一轮做"对称"时我把两块的底距都改成了
   14px——但提示条的**顶边在离屏幕底部 30px** 处，14px 的底距让两块直接穿过去（你的截图）。

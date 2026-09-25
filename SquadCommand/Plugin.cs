@@ -9,7 +9,7 @@ using UnityEngine;
 
 namespace ER2SquadCommand;
 
-[BepInPlugin("er2.squadcommand", "ER2 Battlefield Commander", "1.4.35")]
+[BepInPlugin("er2.squadcommand", "ER2 Battlefield Commander", "1.4.36")]
 public class Plugin : BasePlugin
 {
 	internal static ManualLogSource ModLog;
@@ -80,7 +80,7 @@ public class Plugin : BasePlugin
 		// 2.5.0：默认值改中性灰（原来深绿/中绿/淡绿是军绿主题）。uiMono 只管 Er2Ui 的面板令牌，
 		// 这三个是**世界空间与 HUD 按钮**的色源，必须同步换灰，否则"面板灰黑、按钮军绿"。
 		// 1.4.24：中性半透明黑（用户："把面板UI改成半透明黑色，不要棕色了"）——与 Er2Ui Mono 预设同一色系。
-		uiColorBase = Config.Bind("UI", "colorBase", "#000000B8", new ConfigDescription(Ui.Tr("HUD 按钮底板 / 小队列表行颜色（#RRGGBB 或 #RRGGBBAA）。默认纯黑 72%（与底部提示条一致）。")));
+		uiColorBase = Config.Bind("UI", "colorBase", "#00000080", new ConfigDescription(Ui.Tr("HUD 按钮底板 / 小队列表行颜色（#RRGGBB 或 #RRGGBBAA）。默认纯黑 72%（与底部提示条一致）。")));
 		uiColorHover = Config.Bind("UI", "colorHover", "#3A3A3AEE", Ui.Tr("HUD 按钮悬停/选中颜色。默认中性深灰。"));
 		uiColorText = Config.Bind("UI", "colorText", "#FFFFFF", Ui.Tr("HUD 文字/描边颜色。默认近纯白。"));
 		uiColorBase.SettingChanged += (s, e) => GodViewController.ApplyUiTheme();
@@ -131,7 +131,7 @@ public class Plugin : BasePlugin
 
 		new Harmony("er2.squadcommand").PatchAll(typeof(Plugin).Assembly);
 		FrameEndRunner.Ensure();
-		ModLog.LogInfo("ER2 Battlefield Commander 1.4.35 loaded. godKey=" + godKey.Value);
+		ModLog.LogInfo("ER2 Battlefield Commander 1.4.36 loaded. godKey=" + godKey.Value);
 		ThirdPartyCompat.LogCoexistenceHint(ModLog); // 1.4.15：第三方 mod 共存提示
 	}
 }

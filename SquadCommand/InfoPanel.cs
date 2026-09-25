@@ -54,10 +54,16 @@ internal static class InfoPanel
 		return false;
 	}
 
+	/// <summary>1.4.36: the panel is shown only when something is selected. When nothing is
+	/// selected the whole panel is not drawn, giving way to the bottom hint bar (user: the two
+	/// blocks must not co-exist vertically). Same source as GVC.HasSelection (trap 78).</summary>
+	internal static bool Visible => GodViewController.SelInfantryCountPublic() > 0 || GodViewController.VehicleRefCountPublic() > 0;
+
 	internal static void Draw()
 	{
 		if (!GodViewController.Active) return;
 		if (GodViewController.EscMenuOpen) return;
+		if (!Visible) { contentH = 96f * ER2Shared.Er2Ui.Scale; return; }   // 1.4.36: mutex with the hint bar
 		try
 		{
 			// 2.5.1：先按屏幕分辨率刷新自适应倍率；scale 变了就重建样式（字号随分辨率走）

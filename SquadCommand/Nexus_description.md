@@ -6,7 +6,7 @@ Adds an "RTS god-view squad command" layer to Easy Red 2, with mouse operations 
 ## Installation instructions
 1. Install BepInEx (IL2CPP build) into the game root folder.
 2. Put `ER2_BattlefieldCommander.dll` into `Easy Red 2\BepInEx\plugins\`.
-3. Launch the game — `Loading [ER2 Battlefield Commander 1.4.35]` in the BepInEx log means success.
+3. Launch the game — `Loading [ER2 Battlefield Commander 1.4.36]` in the BepInEx log means success.
 
 ## Main features
 - **God-view command**: F9 to enter free camera, WASD move, wheel zoom, MMB rotate, Q/E height, Space to pause/resume the world.
@@ -38,6 +38,19 @@ Adds an "RTS god-view squad command" layer to Easy Red 2, with mouse operations 
 Thanks to the Easy Red 2 community and the BepInEx / Harmony ecosystem, and to all authors whose IL2CPP modding work paved the way.
 
 ## Recent changes
+**1.4.36**
+* **Why the text was still grey: the HUD text colour comes from the config**, and config files never
+  update themselves (trap 109). `colorText` has joined the migration chain (old values #E8E8E8 /
+  #F1EBE2 / #F0F0F2 -> #FFFFFF), and — more importantly — **the HUD text source is now
+  `Er2Ui.Text` directly**, so the commander mod and Universal Generation share the exact same white
+  text. The three colour configs are kept but no longer read.
+* **The unit-info panel and the bottom hint bar now take turns.** Previously both existed at once on
+  the same vertical strip. With nothing selected the info panel is not drawn (and the hint bar is);
+  with a selection the panel takes that space and the hint bar steps aside.
+* `colorBase` default is now `#00000080` (black at 50%, matching the new opacity), and its migration
+  chain includes the previous default.
+
+
 **1.4.35**
 * **The bottom-left panel and the squad list no longer overlap the hint bar.** My previous "symmetry"
   pass set both bottom gaps to 14 px - but the hint bar's top edge sits 30 px above the screen bottom,

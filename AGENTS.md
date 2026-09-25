@@ -148,6 +148,8 @@ ER2_Mods/
 
 17g44. **⚠️ shader 取样来源要查清——`Sprites/Default` 读**顶点色**不读 `_Color`**（SquadCommand 1.4.32 定案，用户："幽灵物体材质不好，太亮了，同时不够透明"）：幽灵（Mesh）渲染成**实心亮白**，`ghostMat.color`（含 alpha）毫无作用——因为 `Sprites/Default` 片元是 `tex × IN.color`，颜色来自**顶点色**（Sprite 渲染器会填，普通 Mesh 没有＝白），该 shader **根本没有 `_Color`**。修法：换 `Particles/Standard Unlit`（unlit + `_Color` + alpha）并**显式配 Fade**（`_Mode=2` + SrcAlpha/OneMinusSrcAlpha + `_ZWrite=0` + `_ALPHABLEND_ON` + renderQueue Transparent）。**通用律："设了颜色没反应"先怀疑 shader 读哪个属性（`_Color`/顶点色/`_BaseColor`）；`Sprites/*` 系一律走顶点色。同族陷阱 105（Bold 被忽略）。** 详见 guide 陷阱 108
 
+17g49. **⚠️ "UI 全部统一"要落到色源上——走 cfg 的那几处永远改不到**（SquadCommand 1.4.36 定案，用户："文字还是灰色的"+"UI改了后所有的都要改，包括附属mod"）：HUD 文字色来自 cfg `colorText`，而用户 cfg 里是旧灰值（陷阱 109：cfg 不随代码默认值更新）。修法两层：① `colorText` 加入迁移链（#E8E8E8/#F1EBE2/#F0F0F2 → #FFFFFF）；② **色源收编**——`ApplyUiTheme()` 里 `uiText = Er2Ui.Text`（不再读 cfg），HUD 文字与 UniGen 面板共用同一个令牌；三个颜色 cfg 保留但不再被读取。**通用律："统一"不是"把默认值改一致"，是"让所有消费点读同一个源"；只要还有消费点走旁路（cfg/硬编码），就一定会在某个老用户/某台机器上掉队。同源 109/78。** 详见 guide 陷阱 113
+
 17g48. **⚠️ 同屏 HUD 块要共享「垂直空间预算」——改底距前列出它下面还有什么**（SquadCommand 1.4.35 定案，用户："重叠了"）：1.4.34 做"对称"时把左下信息面板与右下小队列表的底距都改成 14——但**底部提示条顶在离底 30px**，14 的底距让两块 HUD 直接穿过提示条。修法：底距统一 **36 = 提示条 30 + 6 间隙**，且应由提示条高度**推导**（30 + gap），不是独立常量。**通用律：同屏堆叠的 HUD 块，垂直位置要用"从底往上累加"公式表达（bottomOf = screenH − 已占用和 − gap），每块的"底距"是推导值不是常量；改任何一块前列出"它下面还有什么"。**
 
 17g47b. **⚠️ 改共享文字色时全局搜"引用它的反馈逻辑"**（同批）：把 `TextDim` 提纯白后，悬停反馈 `hov ? TextDim : Text` 两色相同、**静默失效**；修法是新增专用 `TextHover`（比 normal 暗一档）。**同源陷阱 105/100——共享令牌改色值时，所有引用点（包括"拿它当对比色"的反馈）都要过一遍。**

@@ -1,4 +1,4 @@
-ER2 Universal Generation v2.5.16
+ER2 Universal Generation v2.5.17
 ================================
 
 Spawn any unit, vehicle, or item anywhere, right from Battlefield Commander's RTS god view.
@@ -41,6 +41,11 @@ How to use
 
 Changelog
 --------------------------------
+2.5.17
+- No change on this mod's side; the text colour unification and the info-panel / hint-bar exclusivity
+  live in the shared toolkit and the commander mod.
+
+
 2.5.16
 - **Hover feedback kept working**: all text went pure white, so the hover dim now uses a dedicated
   slightly-darker token instead of the (now equally white) secondary colour.

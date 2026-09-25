@@ -3526,19 +3526,27 @@ internal static class GodViewController
 	{
 		try
 		{
-			string[] legacyBase = { "#0E1C0EB4", "#1E1E1EE6", "#262A30F0", "#201812D9", "#0F0B08EA", "#101010EE", "#0A0A0DEE" };
-			string[] legacyHover = { "#2E4A2EE0", "#3A3A3AF2", "#454E59F5", "#44352AE6", "#2A2017F0", "#2A2A31F5" };
+			string[] legacyBase = { "#0E1C0EB4", "#1E1E1EE6", "#262A30F0", "#201812D9", "#0F0B08EA", "#101010EE", "#0A0A0DEE", "#000000B8" };
+			string[] legacyHover = { "#2E4A2EE0", "#3A3A3AF2", "#454E59F5", "#44352AE6", "#2A2017F0", "#2A2A31F5", "#3A3A3AEE" };
 			foreach (string s in legacyBase)
 				if (string.Equals(Plugin.uiColorBase.Value, s, System.StringComparison.OrdinalIgnoreCase))
 				{
-					Plugin.uiColorBase.Value = "#000000B8";
-					SquadCmdLogic.LogAlways("[SquadCmd] cfg 颜色迁移 colorBase " + s + " → #000000B8");
+					Plugin.uiColorBase.Value = "#00000080";
+					SquadCmdLogic.LogAlways("[SquadCmd] cfg 颜色迁移 colorBase " + s + " → #00000080");
 					break;
 				}
 			foreach (string s in legacyHover)
 				if (string.Equals(Plugin.uiColorHover.Value, s, System.StringComparison.OrdinalIgnoreCase))
 				{
 					Plugin.uiColorHover.Value = "#3A3A3AEE";
+			string[] legacyText = { "#E8E8E8", "#F1EBE2", "#F0F0F2" };
+			foreach (string t in legacyText)
+				if (string.Equals(Plugin.uiColorText.Value, t, System.StringComparison.OrdinalIgnoreCase))
+				{
+					Plugin.uiColorText.Value = "#FFFFFF";
+					SquadCmdLogic.LogAlways("[SquadCmd] cfg migration colorText " + t + " -> #FFFFFF");
+					break;
+				}
 					SquadCmdLogic.LogAlways("[SquadCmd] cfg 颜色迁移 colorHover " + s + " → #3A3A3AEE");
 					break;
 				}
@@ -3561,7 +3569,11 @@ internal static class GodViewController
 		MigrateLegacyUiCfg();   // 1.4.33：先迁移旧默认值，再读 cfg
 		uiBase = ParseThemeColor(Plugin.uiColorBase.Value, uiBase);
 		uiHover = ParseThemeColor(Plugin.uiColorHover.Value, uiHover);
-		uiText = ParseThemeColor(Plugin.uiColorText.Value, uiText);
+		// 1.4.36：**文字/底/悬停色源统一到 Er2Ui 令牌**——不再走 cfg。
+		// 原因：cfg 文件不随代码默认值更新（陷阱 109），用户本地的 colorText 还是旧灰值，
+		// 表现为"文字还是灰色的"；且两个 mod 的文字色也因此不一致（用户："包括附属mod"）。
+		// `uiColorText`/`uiColorBase`/`uiColorHover` 三个 cfg 保留但不再被读取（见 Plugin.cs 注释）。
+		uiText = ER2Shared.Er2Ui.Text;
 	}
 
 	private static Color ParseThemeColor(string hex, Color fallback)
@@ -4034,8 +4046,13 @@ internal static class GodViewController
 			float hintX = (Screen.width - hintW) * 0.5f;
 			float hintY = Screen.height - 30f * s;
 			// 1.4.32：提示条 = HUD 统一底板（它本来就是玩家指定的"基准背景"）
-			DrawHudPlate(new Rect(hintX, hintY, hintW, hintH));
-			GUI.Label(new Rect(hintX, hintY - 1f * s, hintW, hintH), hint, hs);
+			// 1.4.36：与左下信息面板互斥（用户："不希望信息栏与下面的提示在竖轴上同时存在"）——
+			// 有选中时信息面板占这块竖向空间，提示条整条让位（底板 + 文字都不画）。
+			if (!InfoPanel.Visible)
+			{
+				DrawHudPlate(new Rect(hintX, hintY, hintW, hintH));
+				GUI.Label(new Rect(hintX, hintY - 1f * s, hintW, hintH), hint, hs);
+			}
 
 			// 左上角：暂停 + 选择信息
 			// 1.2.10 性能：此处原每帧调 PruneSelection()，但 OnGUI 每帧有多次事件（Layout/Repaint），
