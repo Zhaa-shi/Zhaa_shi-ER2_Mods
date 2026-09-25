@@ -51,6 +51,11 @@ Items go into backpacks as their **proper subclass** — magazines hold the righ
 
 ## Changelog
 
+**2.5.14**
+- **Panel opacity migration:** if `uiPanelAlpha` still holds the old default (0.85), it is updated to the current default (0.72). Values you changed yourself are untouched.
+- **Stronger text outline** (four directions) and one point larger list text, so labels read clearly against the panel.
+
+
 **2.5.13**
 - **Hover tooltips restored** (the 1.4.30 control refactor had dropped the tooltip channel): tabs, list entries and the panel title carry tooltips again, drawn as a small box near the cursor.
 - No other change.

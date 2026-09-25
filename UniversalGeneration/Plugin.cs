@@ -9,7 +9,7 @@ using UnityEngine;
 
 namespace ER2UniversalGeneration;
 
-[BepInPlugin("er2.universalgeneration", "ER2 Universal Generation", "2.5.13")]
+[BepInPlugin("er2.universalgeneration", "ER2 Universal Generation", "2.5.14")]
 public class Plugin : BasePlugin
 {
 	internal static ManualLogSource ModLog;
@@ -41,6 +41,9 @@ public class Plugin : BasePlugin
 		// 1.4.24：与 SquadCommand 同名同义（两个 mod 的面板要长得一样）
 		uiPanelAlpha = Config.Bind("UI", "uiPanelAlpha", 0.72f, new ConfigDescription(Ui.Tr("面板不透明度（0.55~1.0）。越低越能透出战场，但面板越容易被地形颜色带偏；1.0 = 完全不透明。"), new AcceptableValueRange<float>(0.55f, 1f)));
 		uiPanelAlpha.SettingChanged += (s, e) => ER2Shared.Er2Ui.SetPanelAlpha(uiPanelAlpha.Value);
+		// 1.4.33：**cfg 默认值迁移**——BepInEx 的 cfg 一旦生成就不随代码默认值更新，
+		// 老用户本地仍是旧默认 0.85；命中旧默认值（＝从未自定义）时更新为新默认 0.72。
+		if (Mathf.Abs(uiPanelAlpha.Value - 0.85f) < 0.001f) uiPanelAlpha.Value = 0.72f;
 		ER2Shared.Er2Ui.SetPanelAlpha(uiPanelAlpha.Value);
 
 		HostLink.Init();
@@ -71,6 +74,6 @@ public class Plugin : BasePlugin
 		ItemCatalog.Ensure();
 		new Harmony("er2.universalgeneration").PatchAll(typeof(Plugin).Assembly); // Tick/Draw 驱动补丁
 
-		ModLog.LogInfo("ER2 Universal Generation 2.5.13 loaded. panelKey=" + panelKey.Value);
+		ModLog.LogInfo("ER2 Universal Generation 2.5.14 loaded. panelKey=" + panelKey.Value);
 	}
 }

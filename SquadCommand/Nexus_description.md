@@ -6,7 +6,7 @@ Adds an "RTS god-view squad command" layer to Easy Red 2, with mouse operations 
 ## Installation instructions
 1. Install BepInEx (IL2CPP build) into the game root folder.
 2. Put `ER2_BattlefieldCommander.dll` into `Easy Red 2\BepInEx\plugins\`.
-3. Launch the game — `Loading [ER2 Battlefield Commander 1.4.32]` in the BepInEx log means success.
+3. Launch the game — `Loading [ER2 Battlefield Commander 1.4.33]` in the BepInEx log means success.
 
 ## Main features
 - **God-view command**: F9 to enter free camera, WASD move, wheel zoom, MMB rotate, Q/E height, Space to pause/resume the world.
@@ -38,6 +38,21 @@ Adds an "RTS god-view squad command" layer to Easy Red 2, with mouse operations 
 Thanks to the Easy Red 2 community and the BepInEx / Harmony ecosystem, and to all authors whose IL2CPP modding work paved the way.
 
 ## Recent changes
+**1.4.33**
+* **Why the UI looked half-converted: your config file.** BepInEx writes a `.cfg` on first run and
+  never rewrites it when the code default changes - so `colorBase` / `colorHover` in your file were
+  still the values from a much older release (the military-green ones). Panels follow the shared
+  palette and looked new, while the HUD buttons kept the old colour. There is now an automatic
+  **migration**: if a value still matches one of the historical defaults (meaning you never edited it),
+  it is updated to the current default. Values you set yourself are left alone.
+* **Ghost preview now replaces every material slot.** The code assigned `renderer.sharedMaterial`,
+  which only touches slot 0. Soldiers and vehicles are multi-slot models (body / gear / helmet /
+  tracks), so everything after slot 0 kept its original material - which is why gear stayed coloured.
+  All slots are filled now.
+* **Stronger text outline.** The outline is drawn in four directions instead of two, and list row text
+  is one point larger, so labels separate from the panel behind them.
+
+
 **1.4.32**
 * **Hover tooltips are back.** When the 1.4.30 pass switched controls from a text label to
   `GUIContent.none` (so the label could be outlined), it also removed the tooltip channel - so tabs and

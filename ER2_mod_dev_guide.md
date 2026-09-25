@@ -904,6 +904,43 @@
      `_TintColor` 各 shader 不同；`Sprites/*` 系一律走顶点色。选 shader 时先确认它读哪个属性，
      别默认 `_Color` 通用。同族：陷阱 105（Bold 被忽略）、陷阱 12（资源被卸载）。
 
+109. **⚠️ BepInEx 的 `.cfg` 文件**不会**随代码默认值更新——改默认值必须配套"旧默认值迁移"**
+     （SquadCommand 1.4.33 定案，用户："为什么UI没改完"）：
+   - **现象**：我把配色改了好几轮（军绿 → 灰黑 → 黑棕 → 中性黑），**代码里的默认值早就是新的**，
+     但用户截图里 HUD 按钮仍是**军绿色**，而其它面板都已经是新配色。
+   - **机制**：BepInEx 在首次运行时把 `Config.Bind(..., defaultValue)` 的默认值**写进 `.cfg` 文件**；
+     此后**只在文件里读值**，代码里改默认值**对它毫无影响**。
+     于是"走共享令牌的面板"（`Er2Ui`）自动变新，而"走 cfg 的那几处"（`colorBase` 等）永远停在旧值——
+     表现就是"**UI 只改了一半**"，而且**只在这个老用户身上出现**（新装用户是好的）。
+   - **修法**：**配置迁移**。把历史默认值列成集合，启动时比对——
+     命中（＝玩家从未自定义）就写入当前默认值；**不命中一律不动**（绝不能覆盖用户意图）：
+     ```csharp
+     string[] legacyBase = { "#0E1C0EB4", "#1E1E1EE6", "#262A30F0", ... , "#101010EE" };
+     foreach (string s in legacyBase)
+         if (string.Equals(cfg.Value, s, StringComparison.OrdinalIgnoreCase))
+         { cfg.Value = "#000000B8"; LogAlways("cfg 颜色迁移 " + s + " → 新值"); break; }
+     ```
+     同时**必须打日志**（迁移是静默发生的，出问题要能追溯）。
+   - **通用律**：**任何"改默认值"的提交，都要问一句"老用户的 cfg 会怎样"**。
+     默认值只在"第一次运行"生效——凡是能持久化的配置，改默认值等于**只管新用户**。
+     同源陷阱 102（写了 ≠ 在跑）、81（代码里有 ≠ 在生效）：**"我改了"与"用户那里生效了"是两件事**。
+
+110. **⚠️ `Renderer.sharedMaterial` 只改**第 1 个**材质槽——多槽模型要填 `sharedMaterials` 全部**
+     （SquadCommand 1.4.33 定案，用户："幽灵物品，单位，载具等部分模型并没有被替换材质"）：
+   - **机制**：`Renderer.sharedMaterial`（单数）**只作用于索引 0 的材质槽**。
+     士兵 = 身体 + 装备 + 头盔，载具 = 车体 + 履带 + 细节——**每个部件一个槽**，
+     所以"只换第一个"的结果是：**模型一部分变灰、其余保持原色**（用户描述完全吻合）。
+   - **修法**：
+     ```csharp
+     int n = r.sharedMaterials.Length;
+     if (n <= 1) r.sharedMaterial = mat;
+     else { var arr = new Material[n]; for (int k = 0; k < n; k++) arr[k] = mat; r.sharedMaterials = arr; }
+     ```
+     用 `sharedMaterial(s)` 而不是 `material(s)`：前者只改**引用**、不改材质资产，对克隆体安全
+     （`material` 会实例化材质，克隆体多了会成倍增加内存）。
+   - **通用律**：凡是"批量改一个物体组件的视觉/属性"，先问**它是不是函数式/数组式的**
+     （材质槽、BlendShape、顶点色、子渲染器）——单数 API 往往只碰第 0 个。
+
 ## 3.5 UI / IMGUI 设计（原生观感）
 
 > 详细文档见 `ER2_UI_design.md`（含 API 清单、改造记录、踩坑）。要点速查：

@@ -3514,8 +3514,48 @@ internal static class GodViewController
 	private static Color uiHover = new Color(0.23f, 0.23f, 0.23f, 0.95f);     // 悬停/选中
 	private static Color uiText = new Color(0.91f, 0.91f, 0.91f, 1f);         // 文字/描边
 
+	/// <summary>
+	/// 1.4.33：**cfg 默认值迁移**。
+	/// BepInEx 的 cfg 文件一旦生成，**不会**因为代码里默认值改变而更新——
+	/// 所以老用户本地的 `colorBase` / `colorHover` 仍是很早以前的旧值（如军绿 `#0E1C0EB4`），
+	/// 表现为"其他 UI 都换成新主题了，只有 HUD 按钮/小队列表还是军绿"（用户截图实证："为什么UI没改完"）。
+	/// 做法：**仅当值命中历史默认值集合**（说明玩家从未自定义过）时才写入新默认值；
+	/// 玩家手动改过的值一律不动（不能覆盖用户意图）。
+	/// </summary>
+	private static void MigrateLegacyUiCfg()
+	{
+		try
+		{
+			string[] legacyBase = { "#0E1C0EB4", "#1E1E1EE6", "#262A30F0", "#201812D9", "#0F0B08EA", "#101010EE", "#0A0A0DEE" };
+			string[] legacyHover = { "#2E4A2EE0", "#3A3A3AF2", "#454E59F5", "#44352AE6", "#2A2017F0", "#2A2A31F5" };
+			foreach (string s in legacyBase)
+				if (string.Equals(Plugin.uiColorBase.Value, s, System.StringComparison.OrdinalIgnoreCase))
+				{
+					Plugin.uiColorBase.Value = "#000000B8";
+					SquadCmdLogic.LogAlways("[SquadCmd] cfg 颜色迁移 colorBase " + s + " → #000000B8");
+					break;
+				}
+			foreach (string s in legacyHover)
+				if (string.Equals(Plugin.uiColorHover.Value, s, System.StringComparison.OrdinalIgnoreCase))
+				{
+					Plugin.uiColorHover.Value = "#3A3A3AEE";
+					SquadCmdLogic.LogAlways("[SquadCmd] cfg 颜色迁移 colorHover " + s + " → #3A3A3AEE");
+					break;
+				}
+			// 面板不透明度：旧默认 0.85 → 0.72（与底部提示条一致）
+			if (Plugin.uiPanelAlpha != null && Mathf.Abs(Plugin.uiPanelAlpha.Value - 0.85f) < 0.001f
+				&& Mathf.Abs(ER2Shared.Er2Ui.PanelAlpha - 0.72f) > 0.001f)
+			{
+				Plugin.uiPanelAlpha.Value = 0.72f;
+				SquadCmdLogic.LogAlways("[SquadCmd] cfg 迁移 uiPanelAlpha 0.85 → 0.72");
+			}
+		}
+		catch (System.Exception ex) { SquadCmdLogic.LogWarning("[SquadCmd] cfg 迁移异常: " + ex.Message); }
+	}
+
 	internal static void ApplyUiTheme()
 	{
+		MigrateLegacyUiCfg();   // 1.4.33：先迁移旧默认值，再读 cfg
 		uiBase = ParseThemeColor(Plugin.uiColorBase.Value, uiBase);
 		uiHover = ParseThemeColor(Plugin.uiColorHover.Value, uiHover);
 		uiText = ParseThemeColor(Plugin.uiColorText.Value, uiText);

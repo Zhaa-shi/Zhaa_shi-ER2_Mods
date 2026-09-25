@@ -142,7 +142,25 @@ internal static class GhostPreview
 				if (r == null) continue;
 				try
 				{
-					if (ghostMat != null) r.sharedMaterial = ghostMat;
+					if (ghostMat != null)
+					{
+						// 1.4.33：**必须填满所有材质槽**。
+						// `r.sharedMaterial = ghostMat` 只改**第 1 个**槽位；而士兵/载具是多槽模型
+						//（身体 / 装备 / 头盔 / 履带各自一槽）→ 其余槽位保持原材质，
+						// 表现为"幽灵里只有一部分变灰，装备还是原色"（用户实测）。
+						int n = 0;
+						try { n = r.sharedMaterials.Length; } catch { n = 1; }
+						if (n <= 1)
+						{
+							r.sharedMaterial = ghostMat;
+						}
+						else
+						{
+							Material[] arr = new Material[n];
+							for (int k = 0; k < n; k++) arr[k] = ghostMat;
+							r.sharedMaterials = arr;
+						}
+					}
 					r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
 					r.receiveShadows = false;
 				}

@@ -438,7 +438,7 @@ Scale = clamp(ResourcesManager.ResolutionMult, 0.75, 1.6)   // 游戏原生 UI �
 
 ---
 
-## 6.1 实施状态（v16 · SquadCommand 1.4.32 / UniGen 2.5.13）
+## 6.1 实施状态（v17 · SquadCommand 1.4.33 / UniGen 2.5.14）
 
 | 项 | 内容 | 状态 |
 |---|---|---|
@@ -499,6 +499,10 @@ Scale = clamp(ResourcesManager.ResolutionMult, 0.75, 1.6)   // 游戏原生 UI �
 | **幽灵预览** | shader 链改 `Particles/Standard Unlit`（读 `_Color` 支持 alpha）+ Fade 显式配置；`WGhost` → `#8C9196@0.20`（更暗更透） | ✅ 已实施（1.4.32） |
 | **悬停提示恢复** | 控件改 `new GUIContent(string.Empty, null, tooltip)`（IL2CPP 仅三参构造）+ 帧末 `DrawHoverTip()` 自绘 | ✅ 已实施（2.5.13） |
 | 新陷阱（续 10） | **107（`GUIContent.none` 丢 tooltip）/ 108（shader 取样来源：Sprites 读顶点色）** | ✅ 已入指南 |
+| **cfg 默认值迁移** | `GodViewController.MigrateLegacyUiCfg()`：`colorBase`/`colorHover` 命中历史默认值集合（军绿→…→`#101010EE`）才迁移；`uiPanelAlpha` 0.85 → 0.72；UG 侧同款；**迁移必打日志** | ✅ 已实施（1.4.33 / 2.5.14） |
+| **幽灵全材质槽** | `sharedMaterial` → `sharedMaterials` 数组全填（原来只改槽 0，多槽模型的装备/履带保持原色） | ✅ 已实施（1.4.33） |
+| **文字对比** | `LabelOutlined` 描边 2 方向 → **4 方向**（5 次 Label）；列表行文字 `FontBody+3 → FontBody+4`（16px） | ✅ 已实施（1.4.33 / 2.5.14） |
+| 新陷阱（续 11） | **109（cfg 不随默认值更新 → 配置迁移）/ 110（`sharedMaterial` 只改槽 0）** | ✅ 已入指南 |
 | **底部呼吸余量** | 底部留白 8 → 18、帮助行 34 → 38（修"最下面的字超出菜单"） | ✅ 已实施（1.4.25 / 2.5.6） |
 | **对比度** | 面板描边 `#555560` + ~2px；选中底 `#52525E`；行底更沉；行分隔线 10%→15%；列表底 α 0.40→0.50 | ✅ 已实施（1.4.25 / 2.5.6） |
 | 新陷阱（续 3） | **97（像素恒定 ≠ 感知粗细；近处环大线细）/ 98（贴边读作溢出）** | ✅ 已入指南 |

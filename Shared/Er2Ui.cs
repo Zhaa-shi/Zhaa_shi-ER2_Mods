@@ -412,9 +412,13 @@ internal static class Er2Ui
 		if (style == null || string.IsNullOrEmpty(text)) return;
 		Color keep = GUI.contentColor;
 		float o = Mathf.Max(1f, outline);
-		GUI.contentColor = new Color(0f, 0f, 0f, 0.9f);          // 描边（近黑，不透明度过低会糊）
-		GUI.Label(new Rect(r.x + o, r.y + o, r.width, r.height), text, style);
-		GUI.Label(new Rect(r.x - o, r.y - o, r.width, r.height), text, style);
+		// 1.4.33：**四方向描边**（原来只做左上/右下两个对角）——用户反馈"字体和背景区分不开"，
+		// 四向描边把文字轮廓整个包住，在小字号 + 半透明底上区分度明显更好。成本 4 次 Label。
+		GUI.contentColor = new Color(0f, 0f, 0f, 1f);
+		GUI.Label(new Rect(r.x + o, r.y, r.width, r.height), text, style);
+		GUI.Label(new Rect(r.x - o, r.y, r.width, r.height), text, style);
+		GUI.Label(new Rect(r.x, r.y + o, r.width, r.height), text, style);
+		GUI.Label(new Rect(r.x, r.y - o, r.width, r.height), text, style);
 		GUI.contentColor = fg;                                    // 正文
 		GUI.Label(r, text, style);
 		GUI.contentColor = keep;

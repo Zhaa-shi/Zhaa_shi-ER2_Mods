@@ -6,7 +6,7 @@
 ## Installation instructions
 1. 安装 BepInEx（IL2CPP 版）到游戏根目录。
 2. 将 `ER2_BattlefieldCommander.dll` 放入 `Easy Red 2\BepInEx\plugins\`。
-3. 启动游戏，BepInEx 日志出现 `Loading [ER2 Battlefield Commander 1.4.32]` 表示加载成功。
+3. 启动游戏，BepInEx 日志出现 `Loading [ER2 Battlefield Commander 1.4.33]` 表示加载成功。
 
 ## Main features
 - **上帝视角指挥**：F9 进入自由视角，WASD 移动、滚轮缩放、中键旋转、Q/E 升降，空格暂停/继续世界。
@@ -38,6 +38,19 @@
 感谢 Easy Red 2 社区与 BepInEx / Harmony 生态，以及所有为 IL2CPP modding 提供思路的作者。
 
 ## 近期更新
+**1.4.33**
+· **"UI 没改完"的原因在你的配置文件里。** BepInEx 首次运行写下 `.cfg` 后，**不会**因为代码里
+  默认值改变而重写它——所以你这个文件里的 `colorBase` / `colorHover` 还是很多版本前的旧值
+  （军绿那套）。面板走的是共享色板所以是新的，HUD 按钮却保留着旧色。
+  现在加了**自动迁移**：值若仍命中历史默认值（说明你从未手动改过），就更新为当前默认值；
+  你自己改过的值一律不动。
+· **幽灵预览现在会替换**每一个**材质槽。** 原代码用 `renderer.sharedMaterial`，它只改第 0 个槽；
+  士兵和载具都是多槽模型（身体 / 装备 / 头盔 / 履带），第 1 个之后的槽位一直保持原材质——
+  这就是"装备还是原色"的原因。现在所有槽位都会被填成幽灵材质。
+· **文字描边加强**：描边由两方向改为**四方向**，列表行文字再放大一号，
+  让文字与背后的面板明确分开。
+
+
 **1.4.32**
 · **悬停提示回来了。** 1.4.30 那轮为了让文字能描边，把控件内容从文本换成了 `GUIContent.none`——
   顺带把 tooltip 通道也清掉了，于是页签和条目悬停什么都不显示。现在控件改为携带

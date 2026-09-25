@@ -1124,7 +1124,7 @@ internal static class GenPanel
 		titleStyle = Er2Ui.MakeLabel(Er2Ui.FontTitle, TextAnchor.MiddleLeft, Er2Ui.Text, FontStyle.Bold);
 		textStyle = Er2Ui.MakeLabel(Er2Ui.FontBody, TextAnchor.MiddleLeft, Er2Ui.Text);
 		// 1.4.30：行文字再放大一号（FontBody+3 = 15px）——配合描边，深底上足够醒
-		rowTextStyle = Er2Ui.MakeLabel(Er2Ui.FontBody + 3, TextAnchor.MiddleLeft, Er2Ui.Text);
+		rowTextStyle = Er2Ui.MakeLabel(Er2Ui.FontBody + 4, TextAnchor.MiddleLeft, Er2Ui.Text);   // 1.4.33：15 → 16px
 		helpStyle = Er2Ui.MakeLabel(Er2Ui.FontBody, TextAnchor.MiddleLeft, Er2Ui.Text);
 		helpStyle.wordWrap = true;   // 1.4.28：允许换行（否则长文案只能溢出被裁）
 

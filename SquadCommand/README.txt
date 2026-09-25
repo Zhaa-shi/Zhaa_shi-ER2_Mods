@@ -1,7 +1,22 @@
-ER2 Battlefield Commander v1.4.32
+ER2 Battlefield Commander v1.4.33
 =================================
 
 A BepInEx plugin for Easy Red 2 that adds an "RTS god-view squad command" layer — mouse operations inspired by Gates of Hell: Ostfront.
+
+[1.4.33 Config migration, all ghost material slots, stronger outline]
+* **Why the UI looked half-converted: your config file.** BepInEx writes a `.cfg` on first run and
+  never rewrites it when the code default changes - so `colorBase` / `colorHover` in your file were
+  still the values from a much older release (the military-green ones). Panels follow the shared
+  palette and looked new, while the HUD buttons kept the old colour. There is now an automatic
+  **migration**: if a value still matches one of the historical defaults (meaning you never edited it),
+  it is updated to the current default. Values you set yourself are left alone.
+* **Ghost preview now replaces every material slot.** The code assigned `renderer.sharedMaterial`,
+  which only touches slot 0. Soldiers and vehicles are multi-slot models (body / gear / helmet /
+  tracks), so everything after slot 0 kept its original material - which is why gear stayed coloured.
+  All slots are filled now.
+* **Stronger text outline.** The outline is drawn in four directions instead of two, and list row text
+  is one point larger, so labels separate from the panel behind them.
+
 
 [1.4.32 Hover tooltips back, ghost preview fixed, unified HUD plate]
 * **Hover tooltips are back.** When the 1.4.30 pass switched controls from a text label to
