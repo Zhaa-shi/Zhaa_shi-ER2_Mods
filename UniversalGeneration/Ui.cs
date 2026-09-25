@@ -133,10 +133,12 @@ internal static class Ui
 		if (En.TryGetValue(cn, out string v)) return v;
 
 		// 2.2.2：词条缺失自检。字典键与代码串一旦漂移（改了措辞没改字典），
-		// 英文版会静默回退中文——用户正是这么发现的。现在开启调试日志时直接点名是哪一条。
+		// 英文版会静默回退中文——用户正是这么发现的。
+		// 2.5.30（日志强制令）：**无条件告警**（每键一次）——2.5.29 的" · Shift 连续"并键事故
+		// 证明 debugLog 门控会让漂移静默漏报，用户在游戏里直接看到中文回退才发现。
 		try
 		{
-			if (missedKeys.Add(cn) && Plugin.debugLog != null && Plugin.debugLog.Value)
+			if (missedKeys.Add(cn))
 				Plugin.ModLog?.LogWarning("[UniGen] 英文词条缺失（回退中文）: " + cn);
 		}
 		catch { }

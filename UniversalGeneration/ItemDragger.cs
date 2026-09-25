@@ -51,7 +51,9 @@ internal static class ItemDragger
 		hoverSoldier = null;
 		// 关闭面板 → 全屏让位给拖放（关掉才能看到落点，也避免面板吃掉松手事件）
 		GenPanel.SetOpen(false, false);
-		GenPanel.Flash(Ui.Tr("携带 ") + e.Title + Ui.Tr("：拖到单位身上放背包，拖到地上丢弃 · Shift 连续"));
+		// 2.5.30：**拆成两个 Tr 调用**——上一版把" · Shift 连续"并进同一字面量，字典键对不上
+		// → 英文版整句回退中文（用户实测）。旧键 EN 已存在，新键 " · Shift 连续" 也已存在。
+		GenPanel.Flash(Ui.Tr("携带 ") + e.Title + Ui.Tr("：拖到单位身上放背包，拖到地上丢弃") + Ui.Tr(" · Shift 连续"));
 	}
 
 	/// <summary>取消携带（右键/ESC/G/宿主退出）。幂等。</summary>
