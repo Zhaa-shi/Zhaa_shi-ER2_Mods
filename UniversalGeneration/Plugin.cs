@@ -9,7 +9,7 @@ using UnityEngine;
 
 namespace ER2UniversalGeneration;
 
-[BepInPlugin("er2.universalgeneration", "ER2 Universal Generation", "2.5.19")]
+[BepInPlugin("er2.universalgeneration", "ER2 Universal Generation", "2.5.26")]
 public class Plugin : BasePlugin
 {
 	internal static ManualLogSource ModLog;
@@ -39,13 +39,13 @@ public class Plugin : BasePlugin
 		uiMono.SettingChanged += (s, e) => ER2Shared.Er2Ui.SetMono(uiMono.Value);
 		ER2Shared.Er2Ui.SetMono(uiMono.Value);
 		// 1.4.24：与 SquadCommand 同名同义（两个 mod 的面板要长得一样）
-		uiPanelAlpha = Config.Bind("UI", "uiPanelAlpha", 0.50f, new ConfigDescription(Ui.Tr("面板不透明度（0.55~1.0）。越低越能透出战场，但面板越容易被地形颜色带偏；1.0 = 完全不透明。"), new AcceptableValueRange<float>(0.40f, 1f)));
+		// 2.5.20：**默认值与 SquadCommand 统一为 0.50**（用户指定）。此前分叉的根因：
+		// build.ps1 部署即删 cfg → 每边按各自代码默认值重新生成，一边 0.85 一边 0.50，
+		// 同一套 Er2Ui 令牌画出两种观感。默认值必须两边一字不差。
+		// ⚠️ **不要再加"旧默认迁移链"**：部署流程会删 cfg 按代码默认重新生成，
+		// 迁移链只会把对齐好的默认值又改写掉（1.4.35 的 0.85→0.50 迁移正是这次分叉的元凶）。
+		uiPanelAlpha = Config.Bind("UI", "uiPanelAlpha", 0.50f, new ConfigDescription(Ui.Tr("面板不透明度（0.40~1.0）。越低越能透出战场，但面板越容易被地形颜色带偏；1.0 = 完全不透明。"), new AcceptableValueRange<float>(0.40f, 1f)));
 		uiPanelAlpha.SettingChanged += (s, e) => ER2Shared.Er2Ui.SetPanelAlpha(uiPanelAlpha.Value);
-		// 1.4.33：**cfg 默认值迁移**——BepInEx 的 cfg 一旦生成就不随代码默认值更新，
-		// 老用户本地仍是旧默认 0.85；命中旧默认值（＝从未自定义）时更新为新默认 0.72。
-		// 1.4.35：历史默认 0.85 → 0.72 → 0.50（迁移链）
-		if (Mathf.Abs(uiPanelAlpha.Value - 0.85f) < 0.001f || Mathf.Abs(uiPanelAlpha.Value - 0.72f) < 0.001f)
-			uiPanelAlpha.Value = 0.50f;
 		ER2Shared.Er2Ui.SetPanelAlpha(uiPanelAlpha.Value);
 
 		HostLink.Init();
@@ -76,6 +76,6 @@ public class Plugin : BasePlugin
 		ItemCatalog.Ensure();
 		new Harmony("er2.universalgeneration").PatchAll(typeof(Plugin).Assembly); // Tick/Draw 驱动补丁
 
-		ModLog.LogInfo("ER2 Universal Generation 2.5.19 loaded. panelKey=" + panelKey.Value);
+		ModLog.LogInfo("ER2 Universal Generation 2.5.26 loaded. panelKey=" + panelKey.Value);
 	}
 }

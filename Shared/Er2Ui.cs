@@ -26,6 +26,20 @@ namespace ER2Shared;
 /// </summary>
 internal static class Er2Ui
 {
+	// ══════════ ⓪ 色彩空间（2.5.2 定案，2026-09-25 实测）══════════
+	// 游戏跑在 **Linear 色彩空间**：IMGUI 顶点色（GUI.color / contentColor / textColor）与
+	// `Texture2D.SetPixels` 都把写入值当**线性值**解释，输出再编码回 sRGB——
+	// 直接写设计稿上的 sRGB 深灰会被提亮（#282828=0.157 → 显示 ~110）：
+	// 实测按钮显示 88-94（设计合成值 53），整个面板成灰雾、白字发灰——用户三轮反馈"还是灰"的根因。
+	// 定案：**进 IMGUI 的颜色一律经 Col() 转线性**；自建贴图用 sRGB 构造 + SetPixels32 写原始字节。
+	// 纯黑/纯白两个端点在两种空间下数值一致（免疫），这也是此前指挥官信息面板"看着正常"的原因。
+	/// <summary>设计稿 sRGB 颜色 → IMGUI 线性值（alpha 不动）。黑白不受影响，彩色/灰阶必须过这一步。</summary>
+	public static Color Col(Color c) => new Color(
+		c.r <= 0.04045f ? c.r / 12.92f : Mathf.Pow((c.r + 0.055f) / 1.055f, 2.4f),
+		c.g <= 0.04045f ? c.g / 12.92f : Mathf.Pow((c.g + 0.055f) / 1.055f, 2.4f),
+		c.b <= 0.04045f ? c.b / 12.92f : Mathf.Pow((c.b + 0.055f) / 1.055f, 2.4f),
+		c.a);
+
 	// ══════════ ① 令牌：尺寸（随 Scale 联动）═════════
 	// 2.5.1：**全部改成属性**——以前是 const，"UI 是死的"根源就在这里：
 	// 字号/间距/行高写死，玩家没法按自己的屏幕和视力调。现在统一乘 `Scale`。
@@ -38,11 +52,14 @@ internal static class Er2Ui
 
 	// ══════════ ① 令牌：字号（随 Scale 联动）══════════
 	// ⚠️ 字号是 int，必须 RoundToInt——直接截断会让 0.8 倍下 12*0.8=9.6 变 9，落差过大。
-	public static int FontTitle => Mathf.RoundToInt(15 * Scale);
-	public static int FontBody => Mathf.RoundToInt(12 * Scale);
-	public static int FontSmall => Mathf.RoundToInt(10 * Scale);
-	public static int FontTabMax => Mathf.RoundToInt(12 * Scale);  // 页签自适应上限
-	public static int FontTabMin => Mathf.Max(6, Mathf.RoundToInt(8 * Scale)); // 自适应下限（再小不可读）
+	// 2.5.3：**全部加下限**（对齐 SC 的做法：HudStyleSmall 有 max(10,·) 下限）——
+	// 低分辨率倍率下 9px 细笔画白字必然被抗锯齿稀释成"灰字"（用户连续多轮反馈的残留来源）。
+	// 下限值 = 各档在 1.0 倍以下仍可读的最小像素。
+	public static int FontTitle => Mathf.Max(13, Mathf.RoundToInt(15 * Scale));
+	public static int FontBody => Mathf.Max(11, Mathf.RoundToInt(12 * Scale));
+	public static int FontSmall => Mathf.Max(9, Mathf.RoundToInt(10 * Scale));
+	public static int FontTabMax => Mathf.Max(11, Mathf.RoundToInt(12 * Scale));  // 页签自适应上限
+	public static int FontTabMin => Mathf.Max(9, Mathf.RoundToInt(8 * Scale)); // 自适应下限（再小不可读）
 
 	/// <summary>
 	/// 2.5.1：**自适应 UI 缩放倍率**（由 AutoScale() 按屏幕分辨率算出，不需要玩家设置）。
@@ -182,6 +199,8 @@ internal static class Er2Ui
 	// 否则 TabGrid/列表行的 hov ? TextDim : Text 两边同色，反馈失效
 	private static readonly Color MonoTextHover = new Color(0xB4 / 255f, 0xB4 / 255f, 0xBA / 255f, 1f);
 	private static readonly Color MonoTextDisabled = new Color(0xA8 / 255f, 0xA8 / 255f, 0xB0 / 255f, 0.90f);
+	// 2.5.4：**回滚 2.5.3 的"选中态深字"**（用户："谁叫你改颜色对比了"）——全部文字一律纯白。
+	// 真正的"灰字/隐形字"根因是**亚像素模糊**（见 LabelShadowed 注释），不是颜色。
 	private static readonly Color MonoTextOnActive = new Color(1f, 1f, 1f, 1f);
 	private static readonly Color MonoTextOnPlate = new Color(0xF5 / 255f, 0xF5 / 255f, 0xF7 / 255f, 1f);
 	private static readonly Color MonoStarHot = new Color(0.90f, 0.90f, 0.92f, 0.95f);
@@ -200,7 +219,9 @@ internal static class Er2Ui
 	/// 这是"透 ↔ 黑"那条矛盾轴：α 越低越能透出战场，但越容易被地形颜色染色（陷阱 96）。
 	/// 各结构色的相对层次（标题条更实、行底更透）由下面属性按比例推出，玩家只调一个值。
 	/// </summary>
-	/// 1.4.30：默认 0.85 → **0.72**，与 HUD 提示条同款半透明度
+	/// 2.5.2：默认 **0.50**（用户指定，两个 mod 统一）。代码默认仅在 cfg 缺失
+	/// （部署后首启）时生效，**必须与两个 mod 的 Config.Bind 默认值一字不差**，
+	/// 否则 build.ps1 删 cfg 后两边会按不同默认值重新生成 → 同一套令牌两种观感。
 	public static float PanelAlpha = 0.50f;
 
 	public static void SetPanelAlpha(float v)
@@ -372,21 +393,23 @@ internal static class Er2Ui
 		int key = (b.r << 24) | (b.g << 16) | (b.b << 8) | b.a;
 		if (solidCache.TryGetValue(key, out Texture2D t) && t != null) return t;
 
-		Texture2D tex = new Texture2D(4, 4, TextureFormat.RGBA32, false);
-		Color[] px = new Color[16];
-		for (int i = 0; i < px.Length; i++) px[i] = c;
-		tex.SetPixels(px);
+		// linear:false = sRGB 采样贴图 + SetPixels32 写原始字节 → 存的字节即显示的字节。
+		// 旧写法（默认构造 + SetPixels(Color)）在线性项目里会把深灰提亮近 3 倍（见 ⓪ 注释）。
+		Texture2D tex = new Texture2D(4, 4, TextureFormat.RGBA32, false, false);
+		Color32[] px = new Color32[16];
+		for (int i = 0; i < px.Length; i++) px[i] = b;
+		tex.SetPixels32(px);
 		tex.Apply();
 		tex.hideFlags = (HideFlags)61;
 		solidCache[key] = tex;
 		return tex;
 	}
 
-	/// <summary>实心矩形（面板底/列表底/分隔）。内部保证 GUI.color 复位。</summary>
+	/// <summary>实心矩形（面板底/列表底/分隔）。内部保证 GUI.color 复位。颜色经 Col() 转线性。</summary>
 	public static void Fill(Rect r, Color c)
 	{
 		Color keep = GUI.color;
-		GUI.color = c;
+		GUI.color = Col(c);
 		GUI.DrawTexture(r, Texture2D.whiteTexture);
 		GUI.color = keep;
 	}
@@ -405,16 +428,15 @@ internal static class Er2Ui
 	}
 
 	/// <summary>
-	/// 1.4.30：**带描边的文字**——先画一圈暗色偏移副本，再画正文。
-	/// 为什么不用 `FontStyle.Bold`：IMGUI 的粗体依赖**字体带粗体字形**，
-	/// 而游戏原生字体很可能只有一个字重 → `fontStyle = Bold` 被**静默忽略、不报错、不生效**
-	/// （用户连续两轮："文字太暗……一点区别都没有"）。
-	/// 描边不依赖字体变体，**100% 生效**，且同时提升深底/亮底上的可读性。
-	/// 成本：每处 3 次 GUI.Label（左上 + 右下 + 正文），列表十几行完全可接受。
+	/// 1.4.30：带描边的文字（四向暗色偏移副本 + 正文）。
+	/// ⚠️ 2.5.3 实测**已弃用于 UniGen 面板**：四向黑描边会压住细笔画的抗锯齿边缘——
+	/// 小字号白字峰值只有 ~230（SC 同字号阴影式 255、亮像素密度 3 倍），这就是"白字读作灰"的元凶。
+	/// 新代码一律用 <see cref="LabelShadowed"/>（指挥官同款）。
 	/// </summary>
 	public static void LabelOutlined(Rect r, string text, GUIStyle style, Color fg, float outline = 1f)
 	{
 		if (style == null || string.IsNullOrEmpty(text)) return;
+		r.x = Mathf.Round(r.x); r.y = Mathf.Round(r.y);   // 2.5.4：整数对齐（亚像素模糊根因，见 LabelShadowed）
 		Color keep = GUI.contentColor;
 		float o = Mathf.Max(1f, outline);
 		// 1.4.33：**四方向描边**（原来只做左上/右下两个对角）——用户反馈"字体和背景区分不开"，
@@ -424,9 +446,35 @@ internal static class Er2Ui
 		GUI.Label(new Rect(r.x - o, r.y, r.width, r.height), text, style);
 		GUI.Label(new Rect(r.x, r.y + o, r.width, r.height), text, style);
 		GUI.Label(new Rect(r.x, r.y - o, r.width, r.height), text, style);
-		GUI.contentColor = fg;                                    // 正文
+		GUI.contentColor = Col(fg);                               // 正文（2.5.3：过 Col，防非白字色被提亮）
 		GUI.Label(r, text, style);
 		GUI.contentColor = keep;
+	}
+
+	/// <summary>
+	/// 2.5.4：**指挥官同款阴影文字 + 整数像素对齐**。
+	/// ★ 根因定案（2026-09-25 用户截图实测）：UniGen 面板**可拖拽**，panelPos 是浮点数 →
+	/// 所有文字画在非整数像素上，字体图集被双线性采样，每个笔画像素 = 白与底色各混一半——
+	/// 白字掉到 ~134-152（用户眼里的"灰字"），选中态深字直接糊进浅底（"Enemy 文字消失"）。
+	/// 同帧里落在整数像素上的文字（如 MGs/Wheeled）实测 235-255 纯白——同一份代码两种结果，
+	/// 差异只有亚像素相位。指挥官文字脆白正是因为它的窗口在固定整坐标上。
+	/// 修复：文字矩形 x/y **四舍五入到整数**再画（阴影偏移 1.5px 保留）。
+	/// </summary>
+	public static void LabelShadowed(Rect r, string text, GUIStyle style, Color fg)
+	{
+		if (style == null || string.IsNullOrEmpty(text)) return;
+		r.x = Mathf.Round(r.x); r.y = Mathf.Round(r.y);   // ★ 整数对齐：亚像素模糊的解药
+		Color keepC = GUI.contentColor;
+		float o = 1.5f * Scale;
+		GUI.color = new Color(0f, 0f, 0f, 0.85f);                 // 阴影（黑×style.textColor=黑，色源无关）
+		GUI.Label(new Rect(r.x + o, r.y + o, r.width, r.height), text, style);
+		// 2.5.4：正文**强制白底座**——不信任进入时的 GUI.color（可能被宿主/游戏污染成半透明，
+		// 实测整面板文字被乘 ~0.5 alpha = 灰字）。最终颜色由 style.textColor(已 Col)×contentColor 决定。
+		GUI.color = Color.white;
+		GUI.contentColor = Col(fg);                               // 正文
+		GUI.Label(r, text, style);
+		GUI.contentColor = keepC;
+		GUI.color = Color.white;
 	}
 
 	/// <summary>水平分隔线（标题条下、分区之间）。</summary>
@@ -446,11 +494,12 @@ internal static class Er2Ui
 	{
 		if (leatherTex != null) return leatherTex;
 		const int S = 64;
-		leatherTex = new Texture2D(S, S, TextureFormat.ARGB32, false);
+		// linear:false = sRGB 采样 + SetPixels32 写原始字节（灰阶按设计值显示，不再被提亮——见 ⓪）
+		leatherTex = new Texture2D(S, S, TextureFormat.ARGB32, false, false);
 		leatherTex.hideFlags = (HideFlags)61;
 		leatherTex.wrapMode = TextureWrapMode.Repeat;   // 平铺
 		leatherTex.filterMode = FilterMode.Bilinear;
-		var px = new Color[S * S];
+		var px = new Color32[S * S];
 		for (int y = 0; y < S; y++)
 		{
 			for (int x = 0; x < S; x++)
@@ -459,10 +508,11 @@ internal static class Er2Ui
 				float n2 = Mathf.PerlinNoise(x * 0.37f + 31.7f, y * 0.37f + 11.3f); // 细粒
 				float v = Mathf.Clamp01(0.5f + (n1 - 0.5f) * 0.62f + (n2 - 0.5f) * 0.28f);
 				float g = Mathf.Lerp(0.34f, 0.66f, v);
-				px[y * S + x] = new Color(g, g, g, 1f);   // 1.4.24：中性灰（去暖调，配中性黑底）
+				byte gb = (byte)Mathf.RoundToInt(g * 255f);
+				px[y * S + x] = new Color32(gb, gb, gb, 255);   // 中性灰（去暖调，配中性黑底）
 			}
 		}
-		leatherTex.SetPixels(px);
+		leatherTex.SetPixels32(px);
 		leatherTex.Apply(false, true);
 		return leatherTex;
 	}
@@ -511,7 +561,7 @@ internal static class Er2Ui
 		s.fontSize = size;
 		s.fontStyle = fs;
 		s.alignment = align;
-		s.normal.textColor = fg;   // 陷阱：默认黑
+		s.normal.textColor = Col(fg);   // 陷阱：默认黑；且必须转线性，否则白以外的字色被提亮（见 ⓪）
 		return s;
 	}
 
@@ -549,14 +599,13 @@ internal static class Er2Ui
 			// ⚠️ 只改专用样式实例的字号（这两个样式归页签专用，别处不得复用）
 			// 1.4.22：内缩随 Scale（19px = 左右各留 ~6.5px 呼吸位 + 描边位），长标签不再贴边
 			st.fontSize = FitSize(st, labels[i], cw - 19f * Scale, FontTabMax, FontTabMin);
-			// 1.4.30：空按钮画底 + **描边文字**（`FontStyle.Bold` 在游戏字体上不生效，
-			// 描边不依赖字体变体；fg 传纯白让 st.textColor 完全决定颜色）
-			// 1.4.34：悬停反馈 = **文字变暗**（用户指明）——描边文字不感知 GUI 样式的 hover，
-			// 所以这里手动判一次鼠标是否在本页签内；tooltip 框已按用户要求删除。
+			// 1.4.30：空按钮画底 + 文字（`FontStyle.Bold` 在游戏字体上不生效）
+			// 1.4.34：悬停反馈 = **文字变暗**（用户指明）——手动判一次鼠标是否在本页签内。
+			// 2.5.3：描边 → **指挥官同款阴影**（四向黑描边压灰了细笔画白字，见 LabelShadowed 注释）
 			bool hov = r.Contains(Event.current.mousePosition);
 			if (GUI.Button(r, GUIContent.none, st)) clicked = i;
-			LabelOutlined(new Rect(r.x + 3f * Scale, r.y, r.width - 6f * Scale, r.height),
-				labels[i], st, hov ? TextHover : Color.white, Mathf.Max(1f, Scale));
+			LabelShadowed(new Rect(r.x + 3f * Scale, r.y, r.width - 6f * Scale, r.height),
+				labels[i], st, hov ? TextHover : Color.white);
 			// 1.4.22：**每个页签都描边**——未选中用暖棕 Edge、选中用暖白 Accent。
 			// 用户反馈"UI 各元素区分不明显"：此前页签只有填充色差，在亮背景上读不出边界。
 			Frame(r, on ? Accent : Edge, Mathf.Max(1f, Scale));

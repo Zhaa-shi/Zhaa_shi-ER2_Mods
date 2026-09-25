@@ -267,19 +267,34 @@ internal static class BackpackPanel
             var weapon = (helmet == null && clothing == null) ? c.first.TryCast<VirtualWeapon>() : null;
             if (weapon != null)
             {
-                menuLabels.Add(Ui.Tr("穿上"));
-                menuRaw.Add("穿上"); // 1.4.17：合成条目压占位原文，保持各列表等长（剪枝/索引安全）
+                // 1.4.43：标签改**枪械语义**（用户："反而有穿戴一个物品才有的操作选项"）——
+                // 武器的这个动作 = 拿起并放到右手，不再沿用穿戴件的"穿上"文案
+                menuLabels.Add(Ui.Tr("拿起至右手"));
+                menuRaw.Add("拿起至右手"); // 1.4.17：合成条目压占位原文，保持各列表等长（剪枝/索引安全）
                 menuInts.Add(null);
+                // 1.4.44（用户实测"点拿起至右手没反应"+探针实锤）：**LoadAndSetWeapon 对非玩家单位
+                // 静默无效**（探针触发 2 次枪没上手，同 1.4.12 衣物"原生穿戴对 AI 无效"的坑）——
+                // 改走**原生 PickUpItemFromInventory**（背包→手持的官方入口，从尸体包拿枪就是它），
+                // 失败再兜底 LoadAndSetWeapon。手持快照前后对比进日志（日志强制令：结果可判定）；
+                // 真正挂上手时 AddItemInHand 探针也会留下记录，双保险可观测。
                 menuExec.Add(() =>
                 {
-                    string bw = WearSnapshot(owner);
-                    string werr = "";
-                    try { FrameEndRunner.RunNativeCoroutine(new Lua_Soldier(owner).LoadAndSetWeapon(id, 0)); }
-                    catch (Exception ex) { werr = ex.Message; }
-                    SquadCmdLogic.Log("[Backpack] 穿戴 武器 id=" + id + " 前[" + bw + "] 后[" + WearSnapshot(owner) + "]"
-                        + (werr.Length > 0 ? " 异常=" + werr : ""));
+                    string before = "";
+                    try { before = new Lua_Soldier(owner).getHeldWeaponId(); } catch { }
+                    string step = "PickUpItemFromInventory";
+                    try { owner.PickUpItemFromInventory(c.first, w.invMgr, 0); }
+                    catch (Exception ex) { step += " 异常:" + ex.Message; }
+                    string after = "";
+                    try { after = new Lua_Soldier(owner).getHeldWeaponId(); } catch { }
+                    if (string.IsNullOrEmpty(after) || after == before)
+                    {
+                        step += " → LoadAndSetWeapon 兜底（协程异步，生效看 AddItemInHand 探针）";
+                        try { FrameEndRunner.RunNativeCoroutine(new Lua_Soldier(owner).LoadAndSetWeapon(id, 0)); }
+                        catch (Exception ex) { step += " 异常:" + ex.Message; }
+                    }
+                    SquadCmdLogic.LogAlways("[Backpack] 武器上手 id=" + id + " 手持[" + before + "]→[" + after + "] 通道=" + step);
                 });
-                SquadCmdLogic.Log("[Backpack] 合成穿戴项（武器）" + id);
+                SquadCmdLogic.Log("[Backpack] 合成上手项（武器）" + id);
             }
             else if (helmet != null)
             {
@@ -621,8 +636,16 @@ internal static class BackpackPanel
                 bool hasPos = false;
                 try { if (gi != null && gi.transform != null) { gpos = gi.transform.position; hasPos = true; } } catch { }
                 if (!hasPos) { GodViewController.Flash(Ui.Tr("物品已失效"), 1.5f); return; }
-                SquadCmdLogic.LogAlways("[Backpack] 地面菜单「" + raw + "」→ 改走过去拾取链路（不再隔空 Call）");
-                RequestItemPickup(gi, gpos); // 联动半径内即时 / 超出派最近士兵走过去，与单交互物品同路
+                // 1.4.43：**「放置于右手」类条目不再混进入背包链路**（用户实测：点「Take Into Right Hand」
+                // 结果进了背包）。判据 = 原文含 hand / 右手——命中则"走过去 → 到达后执行原生交互本体"，
+                // 距离语义由走路保证（1.4.31 防隔空的初衷不变），枪进右手、单位照常能用；
+                // 其余拾起类（「Take Into Inventory」/「拾起」）仍进入背包链路（用户 1.4.40 的原始诉求保留）。
+                bool handEntry = raw.ToLowerInvariant().Contains("hand") || raw.Contains("右手");
+                Action nativeCall = null;
+                if (handEntry && idx < menuExec.Count && menuExec[idx] != null) nativeCall = menuExec[idx];
+                SquadCmdLogic.LogAlways("[Backpack] 地面菜单「" + raw + "」→ "
+                    + (nativeCall != null ? "走过去 → 到达后原生放置右手" : "改走过去拾取链路（不再隔空 Call）"));
+                RequestItemPickup(gi, gpos, nativeCall);
                 return;
             }
         }
@@ -839,6 +862,7 @@ internal static class BackpackPanel
     private static bool lootBoth;       // 到达后同时开 walker 自己的背包（右键友军）
     private static bool lootSkipWalker; // walker 就是目标自己（右键的是选中集内成员）→ 只开一个
     private static ItemObject lootItem; // 1.4.1：非空 = 走过去**拾取地面物品**（否则 = 走过去开背包）
+    private static Action lootNativeCall; // 1.4.43：非空 = 到达后**执行原生交互**（如「Take Into Right Hand」放置右手），不再混进入背包链路
     private static Vector3 lootLastPos; // 1.4.8：停驻检测（兵停下但没进圈 → 重新下达移动）
     private static float lootLastMoveT = -10f;
     private static int lootReissues;
@@ -937,8 +961,10 @@ internal static class BackpackPanel
     }
 
     /// <summary>1.4.1：右键地面物品 → 快速拾取（联动半径内）或派最近士兵走过去捡（超半径）。
-    /// 多交互物品（弹药箱等）不走这里——宿主直接开地面交互菜单。</summary>
-    internal static void RequestItemPickup(ItemObject item, Vector3 pos)
+    /// 多交互物品（弹药箱等）不走这里——宿主直接开地面交互菜单。
+    /// 1.4.43：`nativeCall` 非空 = 「放置于右手」类**枪械专属操作**——到达后执行**原生交互本身**
+    ///（用户定案"只用原生方法"：右手放置不得再被改道进背包），null = 普通拾取入背包。</summary>
+    internal static void RequestItemPickup(ItemObject item, Vector3 pos, Action nativeCall = null)
     {
         ResetLoot("新拾取请求");
         if (item == null) return;
@@ -965,7 +991,17 @@ internal static class BackpackPanel
         if (best == null && anyBest != null) { best = anyBest; bd = anyBd; }
         if (best == null) { GodViewController.Flash(Ui.Tr("先框选/选中单位"), 1.5f); return; }
         float range = Plugin.packRange.Value;
-        if (bd <= range * range) { GodViewController.ExecuteGroundPickup(best, item); return; }
+        if (bd <= range * range)
+        {
+            // 1.4.43：右手放置类 = 到达（本来就在范围内）后执行原生交互本体
+            if (nativeCall != null)
+            {
+                SquadCmdLogic.LogAlways("[Backpack] 距离内 → 直接执行原生交互（放置右手）");
+                nativeCall();
+            }
+            else GodViewController.ExecuteGroundPickup(best, item);
+            return;
+        }
         if (!GodViewController.IsOnFoot(best))
         {
             // 1.4.10：同上——全在车里就改派最近的徒步友军
@@ -990,6 +1026,7 @@ internal static class BackpackPanel
         }
         lootSoldier = best;
         lootItem = item;
+        lootNativeCall = nativeCall; // 1.4.43：右手放置任务（null = 普通入背包拾取）
         lootPos = pos;
         lootDeadline = Time.unscaledTime + 90f;
         lootLastPos = best.transform != null ? best.transform.position : pos;
@@ -1000,7 +1037,9 @@ internal static class BackpackPanel
         lootStartedAt = Time.unscaledTime;
         lootStopTried = false;
         string nm = ""; try { nm = GodViewController.SafeName(best); } catch { }
-        GodViewController.Flash(string.Format(Ui.Tr("已派 {0} 前去拾取（到达后捡起）"), nm), 2.5f);
+        GodViewController.Flash(nativeCall != null
+            ? string.Format(Ui.Tr("已派 {0} 前去拾取（到达后放置右手）"), nm)
+            : string.Format(Ui.Tr("已派 {0} 前去拾取（到达后捡起）"), nm), 2.5f);
         SquadCmdLogic.Log("[Backpack] 派兵拾取 " + nm + " → " + pos.ToString("0.0"));
     }
 
@@ -1113,7 +1152,17 @@ internal static class BackpackPanel
         InventoryManager inv = lootInv;
         bool both = lootBoth;
         bool skip = lootSkipWalker;
+        Action ncall = lootNativeCall; // 1.4.43：右手放置任务先取出来（ResetLoot 会清）
         ResetLoot(why);
+        if (ncall != null)
+        {
+            // 1.4.43：到达后执行**原生交互本体**（「Take Into Right Hand」等）——
+            // 士兵已到物品旁边，原生 Call 的距离语义成立，枪进右手、行为与玩家亲手拾取一致
+            SquadCmdLogic.LogAlways("[Backpack] 到达 → 执行原生交互（放置右手）");
+            try { ncall(); }
+            catch (Exception ex) { SquadCmdLogic.LogAlways("[Backpack] 原生交互执行失败: " + ex.Message); GodViewController.Flash(Ui.Tr("交互失败"), 1.5f); }
+            return;
+        }
         if (pi != null) { GodViewController.ExecuteGroundPickup(walker, pi); return; } // 1.4.1：拾取任务
         Soldier target = null;
         try { target = inv != null ? inv.GetComponentInParent<Soldier>() : null; } catch { }
@@ -1131,6 +1180,7 @@ internal static class BackpackPanel
         lootBoth = false;
         lootSkipWalker = false;
         lootItem = null;
+        lootNativeCall = null;
         lootLastPos = Vector3.zero;
         lootLastMoveT = -10f;
         lootReissues = 0;

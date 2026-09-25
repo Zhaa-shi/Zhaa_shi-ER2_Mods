@@ -18,8 +18,8 @@
 | 8 | `ZoomAnywhere` | `er2.zoomanywhere` | ER2 Zoom Anywhere | **1.0.1** | `ER2_ZoomAnywhere.dll` | 已部署 |
 | 9 | `HighValueTarget` | `er2.highvaluetarget` | ER2 Veteran HVT | **1.2.2** | `ER2_VeteranHVT.dll` | 已部署（+ Assets 目录） |
 | 10 | `InventoryPause` | `er2.inventorypause` | ER2 Inventory Pause | **1.0.5** | `ER2_InventoryPause.dll` | 已部署 |
-| 11 | `SquadCommand` | `er2.squadcommand` | ER2 Battlefield Commander | **1.4.38** | `ER2_BattlefieldCommander.dll` | 已发布 |
-| 12 | `UniversalGeneration` | `er2.universalgeneration` | ER2 Universal Generation | **2.5.19** | `ER2_UniversalGeneration.dll` | 已发布 |
+| 11 | `SquadCommand` | `er2.squadcommand` | ER2 Battlefield Commander | **1.4.46** | `ER2_BattlefieldCommander.dll` | 已发布 |
+| 12 | `UniversalGeneration` | `er2.universalgeneration` | ER2 Universal Generation | **2.5.26** | `ER2_UniversalGeneration.dll` | 已发布 |
 | 13 | `UnitCollision` | `er2.morephysics.unitcollision` | ER2 More Physics - Unit Collision | **1.0.8** | `ER2_MorePhysics_UnitCollision.dll` | 已部署 |
 | 14 | `UnitInfoOverlay` | `er2.unitinfooverlay` | ER2 Unit Inspector | **1.0.5** | `ER2_UnitInfoOverlay.dll` | 已部署 |
 | 15 | `FleshWoundsFixed` | `ER2_FleshWounds` | ER2 Flesh Wounds | **1.0.1** | （需手动构建部署，build.ps1 无条目） | 第三方修复版 |
@@ -116,7 +116,13 @@ AI 血量低于 `eatBelowHp`（默认 **40**）自动吃背包食物回血：`Fi
 打开背包（自己/尸体）时**真暂停**（延迟 timeScale 冻结，等打开动画完成）；暂停期间丢弃道具自动落地（扫描 `ItemObject.spawnedItems`）。
 **ER2 暂停机制图谱（全部实测定案，做任何暂停功能前必读）**：原生 `Pause.SetPause` = timeScale=0 + 弹菜单 + `disableOnPause`（藏菜单 = 死锁）；手动 `Pause.isPaused=true` 禁用输入但**不冻结世界**；`timeScale=0` 真暂停但**卡 UI 协程动画** + 丢弃武器浮空（解法：延迟冻结等动画完成 + 扫描 `spawnedItems` 拉下道具）；`enableAiBehaviour(false)` **无效**（true 才有效）；背包开关读 `InventoryPanel.isOpen`。
 
-### 2.11 SquadCommand（Battlefield Commander）`er2.squadcommand` v1.4.38
+### 2.11 SquadCommand（Battlefield Commander）`er2.squadcommand` v1.4.46
+**1.4.46（2026-09-25，用户第 40-42 轮：武器拾取方案反转 + 灰字终审联动）**：
+- **1.4.40-1.4.42 的"武器只进背包"拦截全部撤销（用户定案"只用原生方法"）**：探针实锤单位拿枪路径含 `Lua_Soldier.LoadAndSetWeapon`（且该通道对非玩家静默无效——触发 2 次枪没上手）；地面菜单「Take Into Right Hand」被 1.4.31 防隔空改道送进背包 = "不能拾取并放置于右手"。LootPolicy 只留 4 个只读探针（PickUpCR / PickUpItemFromInventory / AddItemInHand / LoadAndSetWeapon，全部 LogInfo）。
+- **1.4.43**：BackpackPanel 右手类条目（原文含 hand/右手）改 **"走过去 → 到达后执行原生交互本体"**（新 `lootNativeCall` 任务，防隔空初衷保留）；背包武器合成操作改标 **"拿起至右手"**（原"穿上"是穿戴件文案）。
+- **1.4.44**：背包武器上手改原生 `Soldier.PickUpItemFromInventory(vi, invMgr, 0)`（LoadAndSetWeapon 对 AI 无效），手持快照（getHeldWeaponId）前后对比 + 失败兜底，LogAlways 全程。
+- **1.4.41 教训（F9 失效事故）**：Harmony 跳过协程工厂方法必须 `ref __result` 且类型用 interop 的 `Il2CppSystem.Collections.IEnumerator`（空协程用 `Il2CppSystem.Collections.ArrayList().GetEnumerator()`）——托管 IEnumerator 类型不匹配 = IL 编译失败 = **PatchAll 中断全插件报废**。另：`Il2CppSystem.Collections.ArrayList` 在 Il2Cppmscorlib；`Lua_Soldier.connectedSoldier` 取真实 Soldier。
+- **1.4.45/1.4.46**：共享 Er2Ui 灰字终审（见 UniGen 2.5.25/2.5.26）联动重构建。
 **1.4.38（2026-09-25，用户第 39 轮："谁告诉你是信息面板去底板了？我说的是屏幕底的提示，截图里截的也是，你那看出来我要你把信息栏去底板了。"）**：
 - **纠正 1.4.37 的误读（陷阱 114）**：用户上一轮说"既然都可以隐藏了干脆做成左上角显示的样子，不要背景了"——他前一句在谈【屏幕底的提示条】（"可以隐藏"正是提示条的互斥特性），主语就是提示条；我却把"左上角的样子"当成了【样式参考来源】，把"不要背景"执行到了【信息面板】上，还把提示条的底板留着——**两个都改错了对象**。
   - 修法：① **信息面板底板恢复**（回滚 1.4.37 的误删，`DrawHudPlate(pr)` 加回）；② **提示条去底板** → `DrawShadowLabel` 白字 + 阴影直接叠场景（与左上角原生选中信息同款）。
@@ -501,7 +507,13 @@ AI 血量低于 `eatBelowHp`（默认 **40**）自动吃背包食物回血：`Fi
   2. 枚举型工具函数（`CollectSquads` 这类"遍历全局静态表"的）一律加短缓存，否则被连续调用时浏览器级开销；
   3. OnGUI 路径里 `new List<>`/`new Dictionary<>`/`ToArray()` 逐个清掉，复用静态缓冲区；
   4. 缓存失效点要显式（`InvalidatePlayerSoldier`/`InvalidateMainCam`），并让"拿不到值的缓存"不写入（避免把 null 缓存成半秒的真相）。
-### 2.12 UniversalGeneration `er2.universalgeneration` v2.5.19
+### 2.12 UniversalGeneration `er2.universalgeneration` v2.5.26
+**2.5.20-2.5.26（2026-09-25，用户第 40-42 轮：灰字三层根因终审 + 与 SC 配置统一）**：
+- **2.5.20**：`uiPanelAlpha` 与 SC 统一 **0.5**（用户拍板）；**删除默认值迁移链**——build.ps1 部署即删 cfg，两边代码默认值必须一字不差，迁移链只会把对齐值改写掉（分叉元凶）。
+- **2.5.21（灰字第一层：色彩空间）**：游戏跑 **Linear 色彩空间**，IMGUI 顶点色与 `SetPixels` 按线性解释 → 深灰被提亮近 3 倍（#282828 显示 ~110）。修复：`Er2Ui.Col()`（sRGB→linear）应用于 Fill/MakeLabel；`Solid()/LeatherTex()` 改 `linear:false` 构造 + `SetPixels32` 写原始字节。纯黑/纯白两端点免疫——这就是 SC 信息面板"看着正常"的原因。
+- **2.5.22-2.5.25（灰字第二层：描边与亚像素）**：① LabelShadowed（SC 阴影配方：黑影右下 +1.5px）替换四向黑描边（描边压灰细笔画）；② 字号全部加下限（Title≥13/Body≥11/TabMin≥9）；③ **文字矩形 x/y 整数对齐**——可拖拽 panelPos 浮点 → 文字亚像素模糊，白字掉 50%（像素实证：同帧整数位置 235-255，分数位置 134-152）。
+- **2.5.26（灰字第三层：IMGUI 全局状态污染）**：标题/阵营/列表行文字 = 恰好 50% alpha = **宿主/游戏/其他 OnGUI 留下的半透明 GUI.color 跨事件残留渗进绘制**。修复：GenRunner.Draw 总入口强制复位 GUI.color/contentColor/backgroundColor = white + **污染探针**（首帧非白即 LogWarning 点名）；LabelShadowed 正文 `GUI.color = Color.white` 强制（不信任进入态）。**教训：IMGUI 状态跨事件残留，Postfix 链绘制必须入口复位；IMGUI 文字必须整数像素；可拖拽窗口 pos 必须取整。**
+- **日志强制令（用户指令，AGENTS.md §3.5）**：新功能/修 bug 必须带日志（入口/分支/结果）+ cfg 日志开关；不确定路径先挂探针；UI 问题附截图像素测量；补丁上线必查 Failed to patch。
 **2.5.19（2026-09-25，用户第 39 轮，与 SquadCommand 1.4.38 同批）**：
 - 本 mod 侧无独立变化；纠正（信息面板底板恢复、提示条去背景）在指挥官 mod。
 - 验证：编译 0 error；部署 DLL 124,928 B，sha256 `7E6A73A1996FBA0FAB8D6E9B1201063163FD8B00FA8F8D74CBAACE1BC79AB92F`，与构建产物逐字节一致；`ER2_UniversalGeneration_v2.5.19.zip`。

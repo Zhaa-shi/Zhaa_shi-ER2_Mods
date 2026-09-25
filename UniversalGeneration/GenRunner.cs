@@ -867,12 +867,29 @@ internal static class GenDriver
 		}
 	}
 
+	private static bool colorProbeDone; // 2.5.26：GUI.color 污染探针只报一次
+
 	public static void Draw()
 	{
 		try
 		{
 			if (!Plugin.enabled.Value) return;
 			if (HostLink.EscMenuOpen) return; // 宿主设置菜单打开时隐藏全部本 mod UI（跟随宿主行为）
+			// 2.5.26：**IMGUI 状态防污染**（日志强制令 + 2026-09-25 灰字终审）——
+			// 宿主/游戏/其他 OnGUI 代码留下的 GUI.color（实测整面板文字被乘上 ~0.5 alpha = 灰字）
+			// 会渗进本 mod 的全部绘制。OnGUI 首次检测到污染即告警点名，随后强制复位。
+			if (!colorProbeDone)
+			{
+				colorProbeDone = true;
+				Color c = GUI.color;
+				if (Mathf.Abs(c.a - 1f) > 0.01f || Mathf.Abs(c.r - 1f) > 0.01f
+					|| Mathf.Abs(c.g - 1f) > 0.01f || Mathf.Abs(c.b - 1f) > 0.01f)
+					Plugin.ModLog?.LogWarning("[UniGen] 检测到 GUI.color 污染: " + c
+						+ "（来自先于本 mod 执行的 OnGUI 代码，已强制复位）");
+			}
+			GUI.color = Color.white;
+			GUI.contentColor = Color.white;
+			GUI.backgroundColor = Color.white;
 			// 2.5.1：**自适应入口放在总入口**——下面三个分支（携带/放置/面板）不一定都经过
 			// GenPanel.Draw()，只在那里刷新的话"携带"和"放置"两条分支会一直用旧倍率。
 			ER2Shared.Er2Ui.AutoScale();

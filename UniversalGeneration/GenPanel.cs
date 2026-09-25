@@ -306,6 +306,9 @@ internal static class GenPanel
 			panelPos += Event.current.delta;
 			panelPos.x = Mathf.Clamp(panelPos.x, 0f, Screen.width - 80f);
 			panelPos.y = Mathf.Clamp(panelPos.y, 0f, Screen.height - 80f);
+			// 2.5.4：**拖拽后取整**——panelPos 带小数时整个面板的文字都画在亚像素上被模糊成灰字
+			panelPos.x = Mathf.Round(panelPos.x);
+			panelPos.y = Mathf.Round(panelPos.y);
 			Event.current.Use();
 		}
 		else if (dragging && (Event.current.type == EventType.MouseUp || Event.current.rawType == EventType.MouseUp))
@@ -467,14 +470,14 @@ internal static class GenPanel
 		{
 			float rowY = rect.y + 4f * s + i * RowH;
 			Color keep = GUI.backgroundColor;
-			GUI.backgroundColor = (i & 1) == 0 ? Er2Ui.RowBg : Er2Ui.RowBgAlt;
+			GUI.backgroundColor = Er2Ui.Col((i & 1) == 0 ? Er2Ui.RowBg : Er2Ui.RowBgAlt);
 			Rect rr = new Rect(rect.x + 6f * s, rowY, rect.width - 12f * s, RowH - 2f * s);
 			string label = "▸ " + favCatNames[i] + "   (" + FavCountOf(i) + ")";
 			bool hit = GUI.Button(rr, GUIContent.none, rowStyle);
 			GUI.backgroundColor = keep;
 			bool fhov = rr.Contains(Event.current.mousePosition);
-			Er2Ui.LabelOutlined(new Rect(rr.x + 6f * s, rr.y, rr.width - 12f * s, rr.height),
-				label, rowTextStyle, fhov ? Er2Ui.TextHover : Er2Ui.Text, Mathf.Max(1f, s));
+			Er2Ui.LabelShadowed(new Rect(rr.x + 6f * s, rr.y, rr.width - 12f * s, rr.height),
+				label, rowTextStyle, fhov ? Er2Ui.TextHover : Er2Ui.Text);
 			// 1.4.29：文件夹列表也要有行分隔线（原来这里 0 处，与其他列表观感不一致）
 			Er2Ui.HLine(new Rect(rr.x, rowY + RowH - 2f * s, rr.width, Mathf.Max(1f, s)), Er2Ui.EdgeSoft);
 			if (hit)
@@ -609,7 +612,7 @@ internal static class GenPanel
 			bool fav = GenCatalog.IsFav(e.Id);
 			Color keep = GUI.backgroundColor;
 			// 1.4.28：**斑马纹**——偶数行换一档底色（用户"还是很暗"＝层次看不出）
-			GUI.backgroundColor = fav ? Er2Ui.FavRow : (((i - from) & 1) == 0 ? Er2Ui.RowBg : Er2Ui.RowBgAlt);
+			GUI.backgroundColor = Er2Ui.Col(fav ? Er2Ui.FavRow : (((i - from) & 1) == 0 ? Er2Ui.RowBg : Er2Ui.RowBgAlt));
 			Rect rowRect = new Rect(rect.x + 6f * ls, rowY, rect.width - 38f * ls, RowH - 2f * ls);
 			// 1.4.30：**空按钮画底 + 描边文字单独画**——Button 的文字没法做描边，
 			// 而 Bold 在游戏字体上不生效（见 Er2Ui.LabelOutlined 注释）。
@@ -617,8 +620,8 @@ internal static class GenPanel
 			GUI.backgroundColor = keep;
 			// 1.4.34：悬停反馈 = 文字变暗（用户指明；原 tooltip 方案已删）
 			bool hov = rowRect.Contains(Event.current.mousePosition);
-			Er2Ui.LabelOutlined(new Rect(rowRect.x + 6f * ls, rowRect.y, rowRect.width - 12f * ls, rowRect.height),
-				e.Title, rowTextStyle, hov ? Er2Ui.TextHover : Er2Ui.Text, Mathf.Max(1f, ls));
+			Er2Ui.LabelShadowed(new Rect(rowRect.x + 6f * ls, rowRect.y, rowRect.width - 12f * ls, rowRect.height),
+				e.Title, rowTextStyle, hov ? Er2Ui.TextHover : Er2Ui.Text);
 			// 2.5.2：收藏行左侧强调竖条——比"整行换底色"更像设计（底色只轻微提亮，靠竖条点名）
 			if (fav) Er2Ui.AccentBar(rowRect, Er2Ui.Accent, Mathf.Max(2f, 3f * ls));
 			// 1.4.22：行分隔线——行底与行底之间加一条极淡暖棕，元素边界一眼可辨
@@ -677,13 +680,13 @@ internal static class GenPanel
 
 			bool fav = ItemCatalog.IsFav(e.Id);
 			Color keep = GUI.backgroundColor;
-			GUI.backgroundColor = fav ? Er2Ui.FavRow : (((i - from) & 1) == 0 ? Er2Ui.RowBg : Er2Ui.RowBgAlt);
+			GUI.backgroundColor = Er2Ui.Col(fav ? Er2Ui.FavRow : (((i - from) & 1) == 0 ? Er2Ui.RowBg : Er2Ui.RowBgAlt));
 			Rect itemRowRect = new Rect(tx, rowY, tw, RowH - 2f * isc);
 			if (GUI.Button(itemRowRect, GUIContent.none, rowStyle)) clicked = e;
 			GUI.backgroundColor = keep;
 			bool ihov = itemRowRect.Contains(Event.current.mousePosition);
-			Er2Ui.LabelOutlined(new Rect(itemRowRect.x + 6f * isc, itemRowRect.y, itemRowRect.width - 12f * isc, itemRowRect.height),
-				e.Title, rowTextStyle, ihov ? Er2Ui.TextHover : Er2Ui.Text, Mathf.Max(1f, isc));
+			Er2Ui.LabelShadowed(new Rect(itemRowRect.x + 6f * isc, itemRowRect.y, itemRowRect.width - 12f * isc, itemRowRect.height),
+				e.Title, rowTextStyle, ihov ? Er2Ui.TextHover : Er2Ui.Text);
 			// 2.5.2：收藏行左侧强调竖条（与单位列表同款）
 			if (fav) Er2Ui.AccentBar(itemRowRect, Er2Ui.Accent, Mathf.Max(2f, 3f * isc));
 			Er2Ui.HLine(new Rect(itemRowRect.x, rowY + RowH - 2f * isc, itemRowRect.width, Mathf.Max(1f, isc)), Er2Ui.EdgeSoft);   // 1.4.29：每行都画
@@ -707,7 +710,7 @@ internal static class GenPanel
 	{
 		bool hover = r.Contains(Event.current.mousePosition);
 		Color keepTxt = GUI.contentColor;
-		GUI.contentColor = fav ? Er2Ui.StarOn : (hover ? Er2Ui.StarHot : Er2Ui.TextDim);
+		GUI.contentColor = Er2Ui.Col(fav ? Er2Ui.StarOn : (hover ? Er2Ui.StarHot : Er2Ui.TextDim));
 		bool hit = GUI.Button(r, fav ? "★" : "☆", starStyle);
 		GUI.contentColor = keepTxt;
 		return hit;
@@ -1042,7 +1045,7 @@ internal static class GenPanel
 		EnsureStyles();
 		GUIStyle st = flashStyle;
 		// 2.5.1：淡绿正常色 → Er2Ui.Text；错误色 → Er2Ui.Danger（与宿主同一套语义色）
-		st.normal.textColor = flashIsError ? Er2Ui.Danger : Er2Ui.Text;
+		st.normal.textColor = Er2Ui.Col(flashIsError ? Er2Ui.Danger : Er2Ui.Text);
 		GUI.Label(new Rect(panelPos.x, panelPos.y - 24f * Er2Ui.Scale, Er2Ui.ScreenFit(700f), 22f * Er2Ui.Scale), flash, st);
 	}
 
@@ -1090,6 +1093,21 @@ internal static class GenPanel
 		// 各判各的（Er2Ui.ScaleChangedSince）——不用全局 dirty 标志，避免多面板互相抢清。
 		if (titleStyle != null && !Er2Ui.ScaleChangedSince(styleScale)) return;
 		styleScale = Er2Ui.Scale;
+		// 2.5.3（日志强制令）：面板首次构建即记录 UI 诊断快照——用户报"文字发灰"时，
+		// 日志里的 Scale/字号/透明度就是判定依据，不再靠猜
+		if (!uiDiagLogged)
+		{
+			uiDiagLogged = true;
+			try
+			{
+				Plugin.ModLog?.LogInfo("[UniGen] UI 诊断: Scale=" + Er2Ui.Scale.ToString("0.00")
+					+ " FontTitle=" + Er2Ui.FontTitle + " FontBody=" + Er2Ui.FontBody
+					+ " FontTab=" + Er2Ui.FontTabMax + "/" + Er2Ui.FontTabMin
+					+ " Mono=" + Er2Ui.Mono + " PanelAlpha=" + Er2Ui.PanelAlpha.ToString("0.00")
+					+ " 文字=白+右下阴影（LabelShadowed）");
+			}
+			catch { }
+		}
 		// 2.4.2：全部走 ER2Shared.Er2Ui 的令牌与工厂（配色/字号在两个 mod 里只有一个定义处）
 		for (int i = 0; i < UnitCats.Length; i++) UnitCatNames[i] = Ui.Tr(UnitCatRaw[i]);
 		titleStyle = Er2Ui.MakeLabel(Er2Ui.FontTitle, TextAnchor.MiddleLeft, Er2Ui.Text, FontStyle.Bold);
@@ -1104,7 +1122,9 @@ internal static class GenPanel
 		activeButtonStyle = Er2Ui.MakeButton(Er2Ui.FontBody, Er2Ui.SurfaceActive, Er2Ui.TextOnActive, FontStyle.Bold);
 		// 1.4.29：**Bold + 字号 +1**——12px Normal 在深底上「亮度感」不足，用户连续两轮反馈"文本太暗"。
 		// 加粗是提升深底白字可读性最直接的手段（对比度其实早就够了，缺的是笔画厚度）。
-		rowStyle = Er2Ui.MakeButton(Er2Ui.FontBody + 1, Er2Ui.SurfaceRow, Er2Ui.Text, FontStyle.Bold, TextAnchor.MiddleLeft);
+		// 2.5.2：底改**白贴图**——行底色由 backgroundColor 提供（经 Col() 转线性，见 Er2Ui ⓪），
+		// 贴图本身若也是深色会与 backgroundColor 相乘双重变暗、斑马纹消失。
+		rowStyle = Er2Ui.MakeButton(Er2Ui.FontBody + 1, Color.white, Er2Ui.Text, FontStyle.Bold, TextAnchor.MiddleLeft);
 
 		// 页签样式（字号由页签原语逐次改写，故必须单独一份——不能与 buttonStyle 共用）
 		tabStyle = Er2Ui.MakeButton(Er2Ui.FontTabMax, Er2Ui.Surface, Er2Ui.Text);
@@ -1126,4 +1146,6 @@ internal static class GenPanel
 
 	// 建样式时的 Scale（变了就重建，见 EnsureStyles）
 	private static float styleScale = 1f;
+	// 2.5.3：UI 诊断快照只打一次（日志强制令）
+	private static bool uiDiagLogged;
 }

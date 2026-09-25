@@ -85,6 +85,17 @@ ER2_Mods/
 
 **禁止**：修改游戏原文件 · 删除 plugins 里其他 mod · `FindObjectsOfType` 类每帧全场景扫描（用 `Creature.allCreatures` / `Creature.aliveCreatures` 静态列表，或按需 `Physics.OverlapSphere`）。
 
+## 3.5 日志强制令（2026-09-25 用户指令，永久有效）
+
+**做新功能、修 bug 都必须带日志，写进文档记录。不要再猜。**
+
+1. **新功能**：关键路径必须打日志——入口一条、每个分支判定一条、结果（成功/失败+原因）一条；`LogInfo` 为主、异常/拒绝用 `LogWarning`。事件类日志要求低频（禁每帧输出）。
+2. **日志开关必须一并构建**：诊断类日志一律挂在 cfg 开关下（既有模式：`Debug/debugLog` 条目 + `Plugin.debugLog.Value` 门控；SC 侧走 `SquadCmdLogic.Log`（开关门控）/`LogAlways`（不受限））。新 mod 或新功能没有开关的，先建开关再写日志；错误、拒绝、失败类日志**不受开关限制**（必须始终可见）。
+3. **修 bug**：修复前先取证据（`LogOutput.log` / 截图像素测量 / 探针），修复处必须带可判定成败的日志；**不确定路径时先挂只读探针观测一轮，再动手改**（1.4.42 LoadAndSetWeapon 探针锁定真实拿枪路径即此范例）。
+4. **UI 问题**：必须附截图像素测量结论（文字亮度、控件合成值 vs 设计值），并把诊断快照（Scale/字号/透明度）打进日志（GenPanel `uiDiagLogged` 范例）。
+5. **Harmony 补丁**：patch 目标必须先 `ilspycmd` 核对签名（参数名/返回类型一字不差，interop 返回 `Il2CppSystem.*` 时 `__result` 类型必须一致——1.4.41 F9 事故）；补丁类加载失败 = 全插件报废，任何新 patch 上线后必须查日志确认无 `Failed to patch`。
+6. **文档回写**：每轮功能/修复完成后，把结论与日志要点写进 `ER2_projects_status.md` 对应版本条目与会话复盘。
+
 ## 4. 致命陷阱（全部实测定案；完整 71 条见 guide §3）
 
 **写游戏状态类**

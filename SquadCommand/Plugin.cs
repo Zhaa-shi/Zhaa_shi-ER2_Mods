@@ -9,7 +9,7 @@ using UnityEngine;
 
 namespace ER2SquadCommand;
 
-[BepInPlugin("er2.squadcommand", "ER2 Battlefield Commander", "1.4.38")]
+[BepInPlugin("er2.squadcommand", "ER2 Battlefield Commander", "1.4.46")]
 public class Plugin : BasePlugin
 {
 	internal static ManualLogSource ModLog;
@@ -93,7 +93,10 @@ public class Plugin : BasePlugin
 		uiMono.SettingChanged += (s, e) => GodViewController.ApplyMarkerConfig();
 		// 1.4.24：面板不透明度——"透 ↔ 黑"这条矛盾轴交给玩家自己调
 		//（越低越能透出战场，但面板越容易被地形颜色带偏；见 guide 陷阱 96）
-		uiPanelAlpha = Config.Bind("UI", "uiPanelAlpha", 0.50f, new ConfigDescription(Ui.Tr("面板不透明度（0.55~1.0）。越低越能透出战场，但面板越容易被地形颜色带偏；1.0 = 完全不透明。"), new AcceptableValueRange<float>(0.40f, 1f)));
+		// 1.4.39：**默认值与 UniGen 统一为 0.50**（用户指定）——build.ps1 部署即删 cfg、
+		// 按代码默认重新生成，两边默认值差一点（0.85 vs 0.50）就会画出两种观感。
+		// ⚠️ 两边默认值与迁移策略必须一字不差，改这里必须同步 UniGen/Plugin.cs。
+		uiPanelAlpha = Config.Bind("UI", "uiPanelAlpha", 0.50f, new ConfigDescription(Ui.Tr("面板不透明度（0.40~1.0）。越低越能透出战场，但面板越容易被地形颜色带偏；1.0 = 完全不透明。"), new AcceptableValueRange<float>(0.40f, 1f)));
 		uiPanelAlpha.SettingChanged += (s, e) => ER2Shared.Er2Ui.SetPanelAlpha(uiPanelAlpha.Value);
 		ER2Shared.Er2Ui.SetPanelAlpha(uiPanelAlpha.Value);
 
@@ -129,9 +132,11 @@ public class Plugin : BasePlugin
 		// 全部绑定完成后先跑一次，保证启动时快照与 cfg 一致
 		GodViewController.ApplyMarkerConfig();
 
+		// ===== 1.4.43：武器拾取拦截方案撤销（用户定案"只用原生方法"）——LootPolicy 只留探针观测 =====
+		// 1.4.40-1.4.42 的"武器只进背包"拦截把原生"拾取并放置于右手"也堵死了，已全部移除。
 		new Harmony("er2.squadcommand").PatchAll(typeof(Plugin).Assembly);
 		FrameEndRunner.Ensure();
-		ModLog.LogInfo("ER2 Battlefield Commander 1.4.38 loaded. godKey=" + godKey.Value);
+		ModLog.LogInfo("ER2 Battlefield Commander 1.4.46 loaded. godKey=" + godKey.Value);
 		ThirdPartyCompat.LogCoexistenceHint(ModLog); // 1.4.15：第三方 mod 共存提示
 	}
 }
