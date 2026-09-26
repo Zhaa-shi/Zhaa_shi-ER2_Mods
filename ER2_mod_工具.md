@@ -13,9 +13,9 @@
 | 日志 | `<Game>\BepInEx\LogOutput.log` / `ErrorLog.log` |
 | interop | `<Game>\BepInEx\interop\`（IL2CPP 反编译包装，启动时重新生成） |
 | 市场资源清单（manifest，可替代全量解包） | `<Game>\Easy Red 2_Data\StreamingAssets\CorvoBundles\er2items.manifest`（及同目录 `*.manifest`，共 22 个，约 0.1MB） |
-| 源码工作区 | `C:\Users\71011\Documents\ER2_Mods` |
-| 发布包 | `C:\Users\71011\Downloads\<ModName>_v<版本>.zip` |
-| WinRAR（系统装在非标准路径） | `C:\Users\71011\新建文件夹\WinRAR.exe` |
+| 源码工作区 | `<工作区根>` |
+| 发布包 | `<输出目录>\<ModName>_v<版本>.zip` |
+| WinRAR（系统装在非标准路径） | `<WinRAR安装路径>\WinRAR.exe` |
 
 ## 构建命令
 
@@ -63,7 +63,7 @@
 | 命令/工具 | 用途 |
 |---|---|
 | UnityPy（Python） | 读 AssetBundle（er2items / er2bundle / er2vehicles 等）typetree；读 `globalgamemanagers` 的 PhysicsManager/TimeManager/TagManager |
-| `"C:\Users\71011\新建文件夹\WinRAR.exe" x -o+ -y <rar> "<out>\"` | 解压 rar 发布包（用户 mod 有时只有 rar） |
+| `"<WinRAR安装路径>\WinRAR.exe" x -o+ -y <rar> "<out>\"` | 解压 rar 发布包（用户 mod 有时只有 rar） |
 | `scripts/validate_assets.ps1` / `probe_png.ps1` | PNG chunk CRC 校验 + 像素采样通用工具（素材工作流，可复用） |
 | `Check_mm_dup.ps1`（即 `check_mm_dup.ps1`） | ModManager 中文词典（ChineseLabels）重复键校验脚本——在 `ChineseLabels` 词典加键后**必须跑**（详见《ER2_mod_经验.md》陷阱 18） |
 
@@ -75,7 +75,7 @@
 1. 改 `Plugin.cs` → 跑 `scripts/build.ps1 -Mod <名字>`（或 `dotnet build` + 部署轮询脚本）。
 2. **部署时游戏可能运行** → build.ps1 已内置 10 分钟轮询（每 10 秒重试一次）；若失败告知用户退出游戏。
 3. 用户测试后 → `Select-String LogOutput.log -Pattern "..."` 验证（不要猜）。
-4. 发布包 `C:\Users\71011\Downloads\<ModName>_v<版本>.zip`。
+4. 发布包 `<输出目录>\<ModName>_v<版本>.zip`。
 
 ## 命令白名单与禁止事项
 

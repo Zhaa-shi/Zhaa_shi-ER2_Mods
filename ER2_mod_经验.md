@@ -382,7 +382,7 @@ mod 只做游戏没做破坏的**普通道具**（桌子、木箱、栅栏、长
 - 更新时只提**更新内容和达成效果**（简洁），完整 README 按需输出。
 - 发布前清理调试/诊断日志：去掉高频诊断（插件列表 diag、页面高度、每次打开的日志、物品探测 PROBE、tick 状态行）；
   限频保留（补货日志、saved cfg、staged（仅非数值类型）、重置日志）——保留低频功能日志。
-- 发布包在 `C:\Users\71011\Downloads\<ModName>_v<版本>.zip`；zip 内 = DLL + README.txt + Nexus_description.md。
+- 发布包在 `<输出目录>\<ModName>_v<版本>.zip`；zip 内 = DLL + README.txt + Nexus_description.md。
 - 部署版 = 发布版（发布前把 CN/EN 切换干净）；打包后核对 zip 内 DLL 版本。
 - **双语 mod（EN + CN `-Cn` 构建）**：每次 ModManager 更新必须双语；`DefaultChinese` 编译期常量（EN/CN 两构建，三句话见陷阱 39/40）。
 
@@ -718,7 +718,7 @@ mod 只做游戏没做破坏的**普通道具**（桌子、木箱、栅栏、长
 - 工作区 `Physics/`（源码 + csproj + README + Nexus_description.md）
 - 部署 `Easy Red 2\BepInEx\plugins\ER2_Physics.dll`
 - 配置 `Easy Red 2\BepInEx\config\er2.physics.cfg`
-- 发布包 `C:\Users\71011\Downloads\ER2_Physics_v*.zip`（v1.0.0 – v1.2.1 共 14 个）与 `ER2_Physics_CN_v1.0.0.zip`
+- 发布包 `<输出目录>\ER2_Physics_v*.zip`（v1.0.0 – v1.2.1 共 14 个）与 `ER2_Physics_CN_v1.0.0.zip`
 - `scripts/build.ps1` 的 `Physics` 项（ValidateSet + switch）
 
 参考资产仍保留：`research_out/thirdparty/ER2_MorePhysics_017/`（v0.1.7 源码）、`research_out/deployed_dump/ER2_MorePhysics/`（v0.1.31 反编译）、`research_out/morephysics_diag/`、Downloads 的 v0.1.7/v0.1.47 发布包（未动）。
@@ -865,7 +865,7 @@ mod 只做游戏没做破坏的**普通道具**（桌子、木箱、栅栏、长
 - 工作区 `DirectControl/`（Plugin.cs + ControlLogic.cs + csproj + README.txt + Nexus_description.md + bin/obj）
 - 部署 `Easy Red 2\BepInEx\plugins\ER2_DirectControl.dll`
 - 配置 `Easy Red 2\BepInEx\config\er2.directcontrol.cfg`
-- 发布包 `C:\Users\71011\Downloads\ER2_DirectControl_v*.zip`（v1.0.0–v1.0.3 共 4 个）与
+- 发布包 `<输出目录>\ER2_DirectControl_v*.zip`（v1.0.0–v1.0.3 共 4 个）与
   `ER2_DirectControl_CN_v*.zip`（v1.0.0–v1.0.3 共 4 个），以及两个中间产物目录 `ER2_DirectControl/`、
   `ER2_DirectControl_CN/`
 - `scripts/build.ps1` 的 `DirectControl` 项（ValidateSet + switch 行）
