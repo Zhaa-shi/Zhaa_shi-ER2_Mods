@@ -2009,3 +2009,9 @@ Get-ChildItem -Directory | Where-Object { Test-Path (Join-Path $_.FullName "Plug
 Get-ChildItem "E:\SteamLibrary\steamapps\common\Easy Red 2\BepInEx\plugins" -Filter "ER2_*.dll" | Sort-Object LastWriteTime -Descending | Select-Object Name,LastWriteTime -First 12
 ```
 
+
+**2.5.47 发布包补齐（2026-09-26 12:55）**：此前发布包停在 2.5.34（2.5.35~2.5.47 迭代期 -SkipPackage 不出包）。
+本轮补打双语双包 `ER2_UniversalGeneration_v2.5.47.zip`（EN，138,240 B，`4B9A8168…`）/
+`ER2_UniversalGeneration_CN_v2.5.47.zip`（CN，130,048 B，`C8C93CC3…`）；文档四件套本就已同步 2.5.47（变更史
+2.5.30~2.5.47 齐全）。因重编译哈希漂移，部署已重新对齐 EN 构建（构建=部署=EN 包内 DLL 逐字节一致）；
+拆包核对全 PASS（条目三件/文档=源/版本双写/显示名写入）。
