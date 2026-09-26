@@ -1,0 +1,425 @@
+# ER2 Universal Generation
+
+> Part of the [ER2 Mods](../README.md) collection.
+
+Spawn any unit, vehicle, or item anywhere, right from Easy Red Gate's (formerly ER2 Battlefield Commander) RTS god view.
+A sandbox/cheat tool: no balance gating, just clean spawning through the game's own native pipelines.
+
+## Requirements
+- Easy Red 2 (BepInEx IL2CPP)
+- Easy Red Gate v1.2.19 or newer, renamed from "ER2 Battlefield Commander" (this mod only works inside its RTS god view; it stays dormant otherwise)
+
+## Installation instructions
+1. Extract and drop ER2_UniversalGeneration.dll into <game>/BepInEx/plugins/
+2. Make sure ER2_BattlefieldCommander.dll (v1.2.8+) is present
+3. Start a battle, press F9 to enter the god view, then press G (or click the "Spawn [G]" button on the left edge)
+
+## Main features
+- Three clicks to a tank: G -> pick entry -> click the battlefield
+- Zero-lag panel: the whole catalog (squad library, vehicles, firepoints, items) is built in the background at game startup, time-sliced across frames
+- Everything spawnable: ~50 base squad types + 400+ era/theater variants straight from the game's squad library (winter, D-Day, early-war…), plus every vehicle from the game + DLC (auto-enumerated), firepoints included
+- Firepoints tab: every fixed machine gun in the game — MG34/MG42/Browning/Maxim/Type92/Vickers and more, ground/tripod/bunker mounts, AA machine guns and the M45 Quadmount — spawned with a gunner by default
+- Item spawning (new in 2.0.0, catalog rewritten in 2.0.2): the item list is now **enumerated directly from the game's live item database**, so every listed item is guaranteed to spawn — no more "clicked it, says invalid". Categories come from the game's own item types (Weapons / Ammo / Throwables / Gear / Medical & Food / Misc), and entries show their real in-game icon where available. Click an item to pick it up, then drag it onto a soldier to put it in their backpack, or onto the ground to drop it as a real physical item. The catalog is **cached next to the config file** and topped up by cumulative background passes, so launches stay instant while the list still fills up completely (see the changelog for 2.5.36-2.5.46 — this took a while to get right)
+- Faction picker: Allies / Enemy / Neutral (Civilian) — spawned units fight accordingly
+- Allied & neutral spawns hold position and engage on sight, always obeying your RTS orders; enemy spawns use their native AI — they advance and attack on their own like any other enemy force (configurable)
+- Vehicles spawn with a proper crew already seated: per-nation tank crews, exact seat count, native spawn-on-vehicle (no boarding wait; they obey RTS orders)
+- Crew customization: dedicated tankers, any infantry squad type, or an empty vehicle
+- Placement preview: a real translucent ghost model of the unit, rotatable by hold-dragging the left mouse button
+- Favorites: star any entry, persisted across sessions, shown in the Favs tab
+- One-click cleanup of everything you spawned
+- Bilingual (EN/CN), built-in Chinese localization
+
+## How to use
+- G: toggle the spawn panel (inside the god view)
+- Panel: pick faction -> category -> entry -> the panel collapses into placement mode
+- Placement: left-click to place, Shift+left-click to keep placing, right-click/ESC/G to cancel
+- Items: open the item tabs -> click an item to pick it up -> drag onto a soldier (green ring) to fill their backpack, or onto the ground (amber ring) to drop it. **Hold Shift while dropping on the ground to keep carrying** (drop several in a
+  row; right-click ends the run). Right-click / ESC / G cancels the carry
+- "Clear" button in the panel title removes everything the mod spawned
+
+## Changelog
+2.5.49
+- **Fixed the remaining startup error spam** (`Prop ID '...' not found! - MappedResources contains: False`
+  for Canadian / COD3-smock / Afrika Korps uniform props): the squad-catalog probe started from the mod's
+  load hook — i.e. during the game's loading screen, **before its resource mapping table is populated** —
+  and building each official squad type resolved the soldiers' uniform/gear props, one game error per
+  missing prop (hundreds during the loading window). The probe now starts **lazily, the first time you open
+  the spawn panel** (in battle, when everything is loaded): the same ~0.4 s time-sliced fill, zero errors.
+  The watchdog only continues the probe after the panel has been opened once.
+- Misc: added the missing English string for the `Catalog / refreshItemCache` description (logged a
+  "missing entry" warning on every English launch); host-name references in config descriptions and the
+  no-host warning now say **Easy Red Gate**.
+
+2.5.48
+- **Fixed the startup error spam** (`Prop ID '...' not found! - MappedResources contains: False`). Display
+  names are resolved through the game's own mapping API, and the game logs an error for every prop that has
+  no entry in its mapping table (WW1 uniforms, soldier props like `Ger_Schutze Rifleman(1916)`). With the
+  catalog at 2,107 items and the multi-pass cumulative enumeration, those failing calls repeated over and
+  over during startup. Ids that come back empty are now remembered - for the session and in the disk cache -
+  and never asked again; the shown names are exactly what they always were (empty results already fell back
+  to the internal name), just without hundreds of error lines. `Catalog / refreshItemCache` clears the
+  memory so a manual rebuild asks everything once more.
+- The host mod is now called **Easy Red Gate** (formerly ER2 Battlefield Commander); requirement lines
+  updated. Note the host's god-view key defaults to **F8** from its 1.4.57.
+
+2.5.47
+- **Fixed: the item catalog was re-verified on every launch - and that is the stutter you feel right after
+  entering a battle.** The check that decides "is the catalog complete now" compared total entry counts,
+  but that total includes third-party (mod) items, which a separate scanner indexes asynchronously in
+  rounds. So the number kept rising for reasons unrelated to the official item database, the "it is stable
+  now" test never passed, and the heavy enumeration (measured at up to 8.6 s in a single call) ran again
+  on every start. The test now looks at official items only and treats a handful of new entries as stable;
+  as soon as a pass comes up clean the cache is marked verified and later launches skip the enumeration
+  entirely - zero database calls, zero freeze.
+
+2.5.46
+- **The item list no longer misses half the game's content.** Measured in one session:
+  the catalog held **1,164 official items while the game actually had 2,107** (weapons alone went
+  from 549 to 1,164). The game registers its item database **gradually as the session runs**, so a
+  single snapshot taken shortly after startup is always short - the item tab looked "smaller than
+  it used to be" for exactly that reason. The catalog is now built by **cumulative passes**
+  (up to 3 per session, spaced 30 s / 2 min): each pass only adds, and the accumulation stops the
+  moment a pass finds nothing new.
+- Fixed: two passes could run **at the same time**. The next pass was scheduled by a fixed timer
+  without waiting for the previous one - and a pass takes 30-60 s, so the timer had always already
+  expired. The same game-side database scans were paid for twice, doubling the hitch. Passes are
+  now serialised, spaced from the moment the previous one *finished*, and every log line carries
+  its own pass number instead of whatever the global counter happened to be.
+
+2.5.45
+- Item catalog: multi-pass cumulative enumeration (the mechanism described in 2.5.46).
+- A cache that is still growing is written but **not** marked as trusted - only a pass that finds
+  nothing new marks it verified, so an unfinished snapshot can never be frozen in permanently.
+
+2.5.44
+- **No more 55-second re-scan on every launch.** Building the item catalog costs four atomic
+  database queries - measured 5.3 s / 8.1 s / 4.8 s / 0.8 s, roughly **55 s of stutter in total** -
+  and it was paid again on every single start. The cache file now records whether its contents were
+  ever cross-checked against a live enumeration, plus a signature of the game build
+  (`GameAssembly.dll` + `global-metadata.dat` + the `er2bundle` asset bundle). Unchanged signature
+  and a verified cache = the enumeration is skipped entirely. Update the game and it re-verifies;
+  `Catalog / refreshItemCache` forces it by hand.
+- All cache/enumeration log lines now include the per-category counts (weapons / ammo / throwables /
+  gear / medical & food / misc / mod), which is how the shortfall above was pinned down.
+
+2.5.43
+- **Fixed: the item list could stay short forever.** The check that decided whether the background
+  verification should run read a timer captured *before the game had drawn a single frame* - that
+  value is 0 - so the verification was silently rejected on every launch and the log showed nothing
+  at all. Diagnosed by decompiling the deployed DLL and reading what was actually running, then
+  fixed by healing the baseline in place.
+
+2.5.42 / 2.5.41
+- Every "are we in battle yet" scene check was removed from the item catalog. Two different checks
+  (`MainMenu.instance == null`, then `BattleManager.IsBattleActive()`) both proved wrong in practice
+  and were skipping the enumeration entirely - the item tab could vanish ("the big tabs went from 4
+  to 3"). Completeness is now guaranteed by **waiting for the game's asset bundle to finish
+  loading**, not by guessing at scene state.
+
+2.5.40 / 2.5.39
+- Item catalog: cache verification pass, plus the `items` category (throwables / medical & food /
+  misc) deferred to a later pass so the panel opens immediately instead of waiting on the two
+  slowest queries in the game.
+
+2.5.38
+- The catalog waits for the `er2bundle` asset bundle before enumerating. Item definitions live in
+  that bundle and it loads progressively - anchoring to the finished bundle is the only reliable
+  completeness guarantee. Only the three main categories are enumerated up front; the rest follows.
+
+2.5.37
+- **Fixed: two thirds of the item list could go missing permanently.** The disk cache was written
+  from whatever the database happened to contain at that moment - in the main menu that is roughly
+  a third of it - and that partial snapshot was then trusted forever. The cache header now carries a
+  completeness marker and refuses to be used without it.
+
+2.5.36
+- **Item catalog disk cache** - the catalog is enumerated once and stored next to the config, so
+  later launches load it in milliseconds instead of running the game's multi-second database scans.
+- Removed the automatic "re-scan 20 seconds after ready" pass, which was a guaranteed multi-second
+  freeze shortly after every launch.
+
+2.5.35
+- Diagnostics only: per-query timing, so those freezes could be attributed to specific database
+  calls. This is how the 4.5-8 s single calls were found.
+
+2.5.34
+- **Fixed the panel sitting at 55% instead of the 50% you asked for.** The config side had been
+  relaxed to `0.50 / 0.40-1.0` back in 2.5.16, but the shared toolkit still clamped the incoming
+  value to `0.55-1.0` (left over from the days when the default was 0.85) - so the 0.50 was
+  silently pushed up to 0.55, and the 0.40-0.55 part of the range was dead. No error, no warning,
+  nothing in the log: the panel simply never reached 50%. The clamp now matches the config range,
+  so a 50% setting really is 50%, and the lower half of the slider works again.
+
+2.5.33
+- **Release tidy-up: the remaining periodic / throttled diagnostics are behind the `Debug/debugLog`
+  switch now** (the faction-row state probe, the item-database readiness probe, the per-scan
+  third-party-content line and the squad-coverage statistics). A release build stays quiet by
+  default; flip the switch to get exactly the same readout back when troubleshooting.
+- No user-visible behaviour change.
+
+2.5.32
+- **The "Spawn [G]" toggle button on the left edge got a solid black 72% plate.** A translucent
+  button sitting directly on bright mud was washed into a grey haze no matter how bright the text or
+  how white the outline. The plate uses the same recipe as the commander mod's hint bar.
+
+2.5.31
+- **The last bare labels joined the shadowed-text primitive** (title, Clear, x, the three faction
+  buttons, the crew row, the no-match line and the item help line). A probe proved the IMGUI state
+  was pure white and the text still read grey - white text with no shadow backing simply sits one
+  contrast step lower on a translucent light panel. Every label in the panel now shares one
+  primitive.
+
+2.5.30
+- **English build: fixed text falling back to Chinese.** 2.5.29 merged the extra "Shift continuous"
+  suffix into an existing string, so the dictionary key no longer matched and the lookup silently
+  returned Chinese. Split back into two separate strings.
+- **The missing-translation warning is unconditional now** (one line per missing key, no longer gated
+  by `debugLog`), so any future key drift shows up immediately instead of staying silent.
+
+2.5.29
+- **The "Spawn [G]" toggle button matches the mono panel style** (pixel-aligned rectangle plus an
+  outline, same as the tabs and faction buttons).
+- **Items support Shift continuous placement:** hold Shift while dropping an item on the ground and
+  you keep carrying it (ghost model included), so you can place several in a row. Right-click ends
+  the run, and the status flash says so.
+
+2.5.28
+- Internal: the faction row force-resets the IMGUI colour state right before it draws, and carries a
+  throttled state probe. Both were added while chasing the grey-text report; the probe is behind
+  `debugLog` now (see 2.5.33).
+
+2.5.27
+- **Pixel alignment completed on the last bare draw calls**: the title row, the faction row, the item
+  help line, the crew row and the pager. Text drawn through `GUIStyle` was already aligned; these raw
+  `GUI.Label` / `GUI.Button` calls were not, so they kept the sub-pixel blur (see 2.5.25).
+
+2.5.26
+- **Second layer of the grey-text root cause: IMGUI global state leaking between events.**
+  `GUI.color` left behind by the host mod, the game or any other `OnGUI` code multiplies into this
+  mod's drawing - measured as text rendered at exactly 50% alpha. The panel entry point now
+  hard-resets `GUI.color` / `contentColor` / `backgroundColor` to white before drawing, the shadow
+  primitive forces pure white on its main pass, and a one-time warning names the offending colour if
+  pollution is ever detected again.
+
+2.5.25
+- **The real cause of the grey text: sub-pixel blur.** The panel is draggable, so its position is a
+  float - every label was rasterised on fractional pixels, and bilinear sampling of the font atlas
+  blended each stroke halfway into the background (pure white text measured ~140). Text rectangles
+  are rounded to whole pixels now, and the panel position is rounded after a drag.
+- **Reverts 2.5.24:** selected tab / faction text is pure white again - the dark-on-light variant was
+  treating a symptom of something that was never a contrast problem.
+
+2.5.24
+- Selected tab and faction-button text switched to dark-on-light to raise contrast. **Reverted in
+  2.5.25** - the text was not too low-contrast, it was blurred (see 2.5.25).
+
+2.5.23
+- **Minimum font sizes** so the mono preset never shrinks text below readability (title >= 13,
+  body >= 11, tab >= 9), matching the commander mod.
+- The panel logs a one-time UI snapshot at first build (scale, font sizes, panel opacity), so a
+  future "text looks grey" report arrives with hard numbers instead of guesswork.
+
+2.5.22
+- **Text is drawn with a bottom-right shadow instead of a four-way outline.** The black outline was
+  eating the anti-aliased edges of thin strokes, which made white text read greyer than no outline
+  at all - the shadow keeps the glyph body clean and only darkens what sits behind it.
+
+2.5.21
+- **Root cause of the "grey haze" over the whole panel: the game runs in Linear colour space.**
+  IMGUI vertex colours (and `SetPixels`) are interpreted as linear and then encoded to sRGB on
+  output, so a dark grey is brightened almost 3x - every panel surface came out washed out, and pure
+  black / white were the only immune values (which is why the commander mod's panel looked fine).
+  The shared toolkit now converts sRGB to linear for every fill, texture and text colour.
+
+2.5.20
+- **Panel opacity default unified with the commander mod at 0.50.** The two mods had drifted apart
+  (each regenerated its own config with a different default), so the same shared toolkit produced two
+  different looks. The old default-migration chain is gone - with the build process deleting the
+  config on deploy, it could only ever rewrite an already-correct value.
+
+2.5.19
+- No change on this mod's side; the correction (info panel plate restored, hint bar background-free)
+  lives in the commander mod.
+
+2.5.18
+- No change on this mod's side; the last grey text fixes live in the commander mod (its own side-scanned
+  styles) and the shared toolkit. A project-wide scan confirmed every text source in Universal Generation
+  is already pure white.
+
+2.5.17
+- No change on this mod's side; the text colour unification and the info-panel / hint-bar exclusivity
+  live in the shared toolkit and the commander mod.
+
+2.5.16
+- **Hover feedback kept working**: all text went pure white, so the hover dim now uses a dedicated
+  slightly-darker token instead of the (now equally white) secondary colour.
+- No other change on this mod's side; the overlap fix and 50% opacity live in the shared toolkit and
+  the commander mod.
+
+2.5.15
+- **Removed the tooltip box** and restored hover feedback: hovering a tab or a list entry now dims its text.
+- No other change.
+
+2.5.14
+- **Panel opacity migration:** if `uiPanelAlpha` still holds the old default (0.85), it is updated to the current default (0.72). Values you changed yourself are untouched.
+- **Stronger text outline** (four directions) and one point larger list text, so labels read clearly against the panel.
+
+2.5.13
+- **Hover tooltips restored** (the 1.4.30 control refactor had dropped the tooltip channel): tabs, list entries and the panel title carry tooltips again, drawn as a small box near the cursor.
+- No other change.
+
+2.5.12
+- **Shared panel style with the commander mod**: same colour tokens, same leather texture and top highlight edge; HUD button outlines use the shared border token.
+- No gameplay change.
+
+2.5.11
+- **Text is outlined instead of bold.** `FontStyle.Bold` is silently ignored when the font has no bold face (likely the case for the game font), which is why the previous attempt changed nothing. Row text and tab labels now draw a dark offset copy first, then the white text on top.
+- **Row text enlarged** to `FontBody + 3`.
+- **Panel colour matched to the bottom HUD bar:** all surfaces lost their blue cast and panel opacity now defaults to 0.72 (same as the HUD bar), so the panel picks up terrain colour the same way instead of looking cold.
+
+2.5.10
+- **Row text is bold and 1 pt larger.** White on #1A1A22 is already ~15:1 contrast - what was missing was stroke weight, not brightness. Bold + larger is the actual fix.
+- **Every row draws its separator now.** Lines were previously drawn only between rows, so a single-entry list showed none (which is why favourites appeared to have lost them), and the favourites folder list had none at all.
+- **Favourite stars: 14 -> 17 px, bold, brighter gold (#FFE81A).**
+- **Surfaces lifted another step** (panel #1A1A22, control #32323C, rows #24242C / #2E2E38).
+
+2.5.9
+- **Favourites are now a two-level folder view.** Opening *Favourites* shows one **folder per category** (`> Name (count)`); clicking a folder opens its saved entries, with a breadcrumb `< Favourites / Name` to go back. The old row of category tabs is gone, and entering Favourites no longer jumps straight into the first category.
+- **Panel lifted one step** (panel #121218, title bar #1C1C24, control #26262E, row #1A1A20) and rows use **zebra striping** so list lines are easy to follow.
+- **The bottom help line wraps now** (dedicated style with word-wrap and a two-line row height) - shortening the text alone could never fix a narrow panel plus a long English sentence.
+
+2.5.8
+- **Translucency is background-only now.** Faces follow the panel-opacity setting; text and lines are fully opaque (previously the border/divider alpha was tied to it too, which killed contrast).
+- **Text and lines are white** (#FFFFFF text, white borders and dividers) instead of near-white grey.
+- **Favourite stars brightened** - `GUI.contentColor` multiplies with `GUIStyle.normal.textColor`, so a grey star style was darkening the gold; the style is pure white now and the gold is #FFD800.
+- **Fixed the bottom help line overflowing the panel** - the cause was horizontal (a ~99-character English string against ~450 px of width), not the vertical padding. Shortened the string and added width-aware font shrinking.
+
+2.5.7
+- **Marker line width now uses fixed world units** (shared toolkit), matching the marker radii which are also fixed world sizes. Previously width was constant in screen pixels, so its *world* width grew with distance and far-away rings filled into solid discs. Near is now thicker and far thinner, with a constant ratio - natural perspective.
+- `[Markers] markerLineWidth` still scales every marker line together.
+
+2.5.6
+- **Marker lines reverted to the 1.4.23 widths** - the "too thin" impression came from a very close camera: marker radii are fixed world sizes, so up close the ring fills much of the screen while the line stays pixel-constant, dropping the line/hole ratio. Use `[Markers] markerLineWidth` if it still reads thin at close range.
+- **Fixed the bottom help text running past the panel edge** (bottom padding 8 -> 18px, help row 34 -> 38px).
+- **Contrast pass:** brighter/thicker panel border (#555560, ~2px), brighter selected fill, darker row fills, row separators 10% -> 15%, more opaque list background.
+
+2.5.5
+- **Marker lines raised about 60%** again (infantry ring 1.5 -> 2.4, selection brackets -> 3.5/4.2, focus ring -> 4.8).
+- **Panel is neutral black now, not brown** - all surfaces are R=G=B and the leather noise texture lost its warm tint.
+- **Panel opacity is configurable:** `UI/uiPanelAlpha` (default 0.85, range 0.55-1.0); 1.0 = fully opaque. Translucency and darkness pull against each other, so the axis is exposed instead of guessed.
+
+2.5.4
+- **Marker lines raised about 40%** (they were too thin after the camera-distance fix).
+- **Near-black leather panel.** The panel used to read as "completely brown" because translucent panels get tinted by the brown terrain behind them - opacity is now 0.92 over a near-black base (#0C0906), with a 64x64 procedural leather noise overlay and a 1px lit top edge for the leather feel.
+- **Fixed the overlapping buttons at the top** (title row 26 -> 34px; the Clear / x buttons no longer cross the divider).
+- Config defaults darkened to match.
+
+2.5.3
+- **Dark-brown translucent UI** - the shared palette moved to warm dark brown with translucency (panel #1E1813 @ 0.82, title bar #2A2119 @ 0.86, control #32271E @ 0.84, selected #584331 @ 0.96), matching Battle Commander 1.4.22.
+- **Elements are clearly separated:** tabs, faction buttons and the crew button all get outlines (warm brown when idle, warm white when selected); list rows get hairline separators; the panel border and dividers are warm brown.
+- **Text no longer collides with its background:** crew / preview / title / faction / list / pager rows still used hard-coded pixel sizes that ignored the adaptive scale, and row spacing was baked into only some rows - so crew and preview sat flush together. All sizes now follow the scale, and spacing is applied once in the row loop.
+- English config description for the UI palette switch.
+
+2.5.2
+- **Panels got structure instead of flat colour blocks.** Every surface used to be a flat fill, so hierarchy rested on brightness alone and collapsed against a bright battlefield. Shared toolkit gained three primitives - `Frame` (outline), `HLine` (divider) and `AccentBar` (selection stripe) - and the panel now draws a separate title-bar fill, a divider under the title, an outer frame, inset borders around both lists and a left stripe on favourite rows. Hierarchy is now face + line + bar.
+- **Palette pulled back to mid-dark grey.** The 2.5.1 lift went too far (feedback: "too light"). Panel #14181D, title bar #1F252C, control #262D35, hover #333B45, selected #46505C - stepped 8-14 brightness levels apart, which is what makes the new outlines read.
+- Fixed row heights that were never multiplied by the adaptive scale (title / faction / pager / item-help / crew / preview), so those rows stayed at their design size while everything else grew.
+
+2.5.1
+- **Adaptive UI.** The panel, the placing badge and the carry badge now follow the **game's own UI size setting** (`ResourcesManager.ResolutionMult`, with a screen-resolution fallback). Change UI size in the game options and the panel rescales with it — no dragging, no number fields, no extra config. Clamped to 0.75x – 1.6x.
+- **The layout is no longer frozen:** size and font tokens in the shared toolkit were compile-time constants, so nothing could ever move. They are now scale-driven properties, and styles rebuild automatically when the scale changes.
+- **Fixed-width elements converge into the screen:** the carry badge (previously a hard-coded 560 px) no longer spills off a narrow display.
+- **Grey-black palette lifted.** The 2.5.0 step came out too dark: dark surfaces compressed into each other. Panel / title bar / control / row / selected now step +8 to +14 brightness levels apart.
+- **Last green leftovers removed:** the carry badge background (old military green) and the drag-target ring (was bright green) are on the shared grey/white palette now.
+
+2.5.0
+- **Grey-black mono UI.** The panel now uses the neutral grey-black palette from the shared toolkit (`Shared/Er2Ui.cs`) instead of the old military green — list rows, tabs, buttons and the preview area all read as one flat dark-grey surface, with hierarchy carried by brightness rather than hue. Set `UI/uiMono=false` to fall back to the previous green preset.
+- Internal: the shared toolkit gained a `Mono` switch, so both this mod and Battlefield Commander change appearance from the same single place.
+
+2.4.2
+- **No user-visible change — this is a code-quality release that prepares the UI for a full redraw.** The panel's drawing code was restructured so that bugs like the 2.4.0 "list drawn past the bottom of the panel" cannot come back: the panel height is no longer a separate formula that has to be kept in sync with the drawing code. Both mods now build a **row plan** first (one entry per row: title / faction / tabs / list / pager / preview…), and the height is simply the sum of that plan, while drawing walks the very same list. Adding or removing a row can no longer desynchronise the height from what is drawn.
+- **Both mods now share one UI toolkit.** A new shared source file (`Shared/Er2Ui.cs`) holds the design tokens (spacing, font sizes, colours) and the drawing primitives (solid fills, style factories, adaptive tabs, pager, text fitting). The two assemblies do not reference each other, so each compiles the same file into itself. This means a visual change is made once and lands in both mods — the prerequisite for redrawing them into a single coherent look.
+- Tab text fitting now measures text properly (`GUIStyle.CalcSize`) instead of estimating per-character widths, and caches the result, so tabs land on the correct font size without a measurement cost every frame.
+
+2.4.1
+- **The "Mod Vehicles" tab no longer overlaps its neighbours.** Category tabs are a fixed-width grid (~72 px per cell) with a fixed 12 px font, so a long label such as "Mod Vehicles" (or the "Medical/Food" item tab) was wider than its button — IMGUI does not clip button text, so it spilled over the adjacent tabs. Every tab now picks the largest font size (12 down to 8) that actually fits its cell, using a per-character width estimate (CJK ≈ 1.0 em, Latin ≈ 0.56 em).
+- **The "Mod Vehicles" / "Mod Items" tabs are no longer permanently empty.** Third-party content was discovered through `ModsLoader.mods_installed`, which is still empty on the main menu; the probe waited 30 s, saw zero mods, then flagged itself "ready" forever — so mod vehicles/items never appeared even after entering a battle (where the game actually loads mod content). Discovery now scans the disk directly (`<SteamLibrary>/steamapps/workshop/content/<appid>/*/index.xml`, plus `<game>/Mods` and the runtime mod list as fallback), caches the parsed candidates, and only defers the runtime validation until the item database is ready — re-scanning periodically (15 s while there is pending work, 60 s idle) so newly subscribed mods appear without a restart. No more terminal "ready with zero mods" state.
+- Vehicle candidates that keep failing validation (mod bundle not loaded / prefab name mismatch) are dropped after 5 attempts, with a log line saying exactly which id was dropped.
+
+2.4.0
+- **The spawn panel no longer overflows its background.** The panel height was a fixed sum that only accounted for the unit-category layout — item tabs, favourite sub-tabs, the item sub-category row and the letter-index rows were not included, so on item tabs the lower list rows, the pagination line and the help text were drawn past the bottom of the panel. The height is now computed from the same row counts the panel actually draws, in lockstep with the layout.
+- **Item entries now use the game's own display-name mapping.** Names are resolved through the game's `GetMappedResourcesName()` (the same lookup its own UI uses), falling back to the internal object name. Vanilla items that showed raw internal names (e.g. "arisaka t38carbine") now display their registered names.
+- Still seeing Chinese item names with the game set to English? Those entries are **third-party workshop weapons whose authors registered them under Chinese names** — that is mod data, not this mod's UI text, so it follows the mod author's wording in every language.
+2.3.0
+- **The item 3D ghost preview is back** (a 2.2.0 bug made it invisible): the ghost was registered with a wrong anchor offset — it was teleported away from the cursor every frame (to near the world origin), so you never saw it. The offset is now recorded after positioning, so the model sits 25 cm above the ground point and follows the cursor like unit/vehicle previews.
+- **Mouse wheel and middle-mouse camera controls work again while placing or carrying** (needs ER2 Battlefield Commander 1.4.16+). The gesture-mutex full-screen block used to also freeze the camera; the host now distinguishes "gesture mutex" from "UI panel" via a new `externalCameraPass` hook, so wheel zoom and MMB rotate stay live during placement/drag while clicks are still swallowed.
+- **English build: the "Wearable" sub-tab no longer shows Chinese** — the label helper returned raw Chinese without going through the translation lookup.
+- Failed item-ghost creation is now logged unconditionally (missing prefab / clone failure / ghostify refusal), so "no preview" can always be diagnosed from the log.
+- Note: item / squad / vehicle **names** come from the game's own database and from each mod's own `index.xml`, so they follow the game's language setting and the mod author's wording — those are not mod UI text and cannot be translated.
+2.2.2
+- **English build: fixed leftover Chinese text.** The EN dictionary keys had drifted out of sync with the strings in the code (two config descriptions were reworded but the dictionary was not), so those entries silently fell back to Chinese. Keys now match the code verbatim, the missing "Item spawn failed:" entry was added, and `Ui.Tr` now logs a one-time warning naming any key it cannot translate (with `debugLog` on) so future drift is caught immediately.
+  Note: item / squad / vehicle **names** come from the game's own database and from each mod's own `index.xml`, so they follow the game's language setting and the mod author's wording — those are not mod UI text and cannot be translated.
+2.2.1
+- **Fixed the item list rendering completely blank** (a 2.2.0 regression): the "All" button of the letter-index row was drawn at grid cell 0 but the loop read `letters[i - 2]` starting at i = 1 — index -1 threw `ArgumentOutOfRangeException`, which aborted the whole OnGUI frame, so the letters and the entire item list vanished (symptom: sub-category tabs + a lone "All" button, nothing else). Letters now start at i >= 2.
+2.2.0
+- **Item carry preview is now a real 3D ghost model** (replacing the ground ring + cursor icon, as requested). When you carry an item over open ground, a translucent model of the actual item follows the cursor — the same ghost visual used for unit/vehicle placement. The green ring under a hovered soldier stays (it marks who will receive the item in their backpack).
+- **Mod content support is back (units, squads, items, vehicles).** Workshop / local mods are discovered from each mod's own `index.xml` registration list; entry ids are computed with the game's own `ModsLoader.GenerateModItemId`, then **validated at runtime** — items only appear after `GetItemObject(id)` confirms them, vehicles only after their prefab loads. Validated mod vehicles get a "Mod Vehicles" tab (placed like any other vehicle); validated mod items get a "Mod Items" tab (carried/dropped like any other item). Mod-defined squads and squads from custom factions already flow into the "Infantry" tab automatically (they live in the same squad archive the mod enumerates).
+- Fixed overlapping buttons in the letter-index row: the "All" button now occupies two grid cells instead of overrunning its neighbour.
+2.1.1
+- **Initial-letter index** replaces the 2.1.0 keyword box. `GUI.TextField` is stripped from the game's IL2CPP build → `Method unstripping failed` → the entire OnGUI frame aborted → item list rendered blank. The index row is click-only (letters that actually occur + "All"), 24 px buttons that wrap.
+2.1.0
+- **Items can now be favourited.** Every item row has a ★ toggle on the right (as units always had); favourites persist to the config file alongside unit favourites (`t:<item_id>` entries).
+- **Favourites are now grouped by category.** Selecting the "Favs" tab shows a second row of category sub-tabs (Infantry / MGs / Tanks / Wheeled / Planes / Artillery + Weapons / Ammo / Throwables / Gear / Medical-Food / Misc), listing only the categories you have actually favourited. Unit categories and item categories each use their own list renderer, so a unit row still means "place it" and an item row still means "pick it up" — no mixed list, no accidental clicks.
+- **Item sub-categories**, because a single "Weapons" bucket holds ~700 entries. Sub-tabs appear automatically per bucket and are derived from **the game's own data, not name guessing**: `TryCast<Weapon>` → `weaponPose` gives Rifles / Pistols, and `Interagible.IsWerable()` gives Wearables.
+- **Initial-letter index** on item lists. A click-only row of the letters that actually occur in the current bucket/sub-category (plus "All"); buttons are 24 px wide and wrap automatically, so even 30+ letters stay clickable. This replaced the 2.1.0 keyword box on purpose: `GUI.TextField` is **stripped out of this game's IL2CPP build**, so calling it throws `Method unstripping failed`, which aborts the whole OnGUI frame — the visible symptom was "sub-category tabs render, but the list is completely blank". Click-only input has zero keyboard dependency and cannot hit a stripped method.
+- Switching category resets the sub-category and letter filter, so you never land on an empty list.
+
+2.0.7
+- **Fixed the actual root cause of "no item tabs at all"** (the real one; 2.0.3–2.0.6 were all treating symptoms).
+  Two defects, both now fixed:
+  1. **The readiness gate was removed entirely.** Every previous version waited for a condition before enumerating: "the item database reports ready AND the `items` category is non-empty". 2.0.6's diagnostics proved that condition can **never** be true — `ItemsDatabase.Loaded` is always true, but `GetAllItemsOfType(PropType.items)` **always returns an empty array** (measured for 154 s continuously, across Menu → LoadingScene → Aberdeen). So the gate never opened and the enumeration code never ran, no matter how healthy the coroutine was. The mod now **enumerates unconditionally** and simply retries when it gets nothing, removing this whole class of failure instead of guessing a better condition.
+  2. **It was asking for the wrong type.** The enumerator was called as `GetAllItemsOfType<PropData>`, which is almost certainly filtered by the generic argument — and the database stores **`ItemObject`** (the type returned by `GetItemObject(id)`, which has `item_id` and `icon`). `ItemObject` is now the primary source and `PropData` is kept as a fallback; duplicates are de-duplicated by id.
+- Diagnostics now print the real counts for **both** types and all four categories, e.g. `物品库可枚举(IO=ItemObject, PD=PropData): items=IO:12/PD:0 weapons=...`, so the log states plain facts instead of requiring guesses.
+- Added a one-time top-up sweep 20 s after the catalog is built, in case the database loads in batches and the first pass only captured part of it.
+
+2.0.6
+- **Fixed "no item tabs at all"**: 2.0.5's watchdog logic was **inverted**. It began with "if the probe is running, do nothing" — but when the coroutine is killed by a scene change, **nothing resets the state** (the thing that would reset it is the dead coroutine itself). So the state stayed at "running" forever, the watchdog **assumed everything was fine and never restarted it**, and the probe went permanently silent right after printing "not ready, polling every frame". Hence no item tabs.
+- **Liveness is now determined by counting the coroutine's own frames, not by time.** The coroutine increments a counter on every frame it runs; the watchdog compares that counter between its own invocations — **if it has not advanced, the coroutine genuinely is not running**, and it is restarted immediately. This test is time-independent, so scene loads and clock drift cannot fool it.
+  Every previous round failed for the same underlying reason: using *elapsed time* as the criterion for coroutine death (150 s in 2.0.3, a 20 s heartbeat in 2.0.4). During a scene load the main thread is held and the coroutine stalls **while the clock keeps advancing**, which guarantees a misjudgement. That assumption is now gone entirely.
+
+2.0.5
+- Fixed "still no item options". 2.0.4's per-frame polling was the right direction, but the watchdog misread the **normal stall during a scene load** as "coroutine dead" and restarted it; each restart incremented the retry counter, and **after 6 restarts the probe marked itself permanently abandoned** — so even once the scene had loaded and the database was ready, it never retried.
+  The auto-abandon path is removed: the probe has only three states (not started / running / done), plus readiness diagnostics explaining why the gate has not opened.
+
+2.0.4
+- Fixed item spawning still being unavailable. 2.0.3 corrected the readiness test but polled it only **once every 2 seconds**, so its wait window landed exactly on the scene change and was killed. It now **polls every frame** and begins enumerating the moment the database is ready; the enumeration budget starts only after readiness.
+
+2.0.3
+- **Fixed item spawning being completely unavailable**: 2.0.2 rewrote the item catalog to enumerate the game's live item database, but the readiness gate was too weak — it accepted a list that was merely non-null. Before the database finishes loading, `GetAllItemsOfType` returns an **empty but non-null** array, so the probe passed the gate immediately, collected 0 entries, marked itself permanently failed and never retried. The item tabs therefore never appeared and **the whole item-spawn feature was dead**.
+  The probe now waits for the game's own `ItemsDatabase.Loaded` flag *and* requires a genuinely non-empty result, retries for up to ~2 minutes instead of giving up on the first try, and the watchdog no longer mistakes a legitimate wait for a killed coroutine.
+- Diagnostics: startup now logs `item catalog ready (source=runtime ItemsDatabase enumeration)` with a per-category count once it succeeds.
+
+2.0.2
+- **Fixed "only items with an icon can spawn, everything else is invalid"**: the item list now comes from a different source.
+  The old version guessed item ids from the prefab manifest on disk, but **those filenames are not the same key space as the game's live item database** — ArisakaT38, Carcano, Syringe and Thompson_M1928 all really exist on disk, yet the database lookup for those ids returns nothing; only entries whose names happened to match (bar_1918, bandages, ToolBox) could spawn. The icon comes from the item object itself, so "has an icon" accidentally became a marker for "actually works".
+  The list is now **enumerated directly from the game's live item database**, with categories taken from the game's own item types instead of guesswork. Only items that genuinely spawn are listed.
+- **All uniform entries removed**: uniforms are not pickable items in this game — they are loadout fields, and were never spawnable as items. The 757 uniform entries the old build listed were all dead weight.
+- The item catalog is now built by a **background time-sliced enumeration at startup** (max 3 ms per frame), so opening the panel stays instant.
+
+2.0.1
+- Fixed: clicking an item placed it instantly instead of picking it up. The mouse-release that ends the panel click was being consumed and then still evaluated as a drop in the same frame — you can now click an item and drag it properly.
+- Fixed: many items reported "invalid item". Two causes: (a) 61 firearms (Gewehr43, Springfield_1903, MAS_36, VZ24…) were mis-sorted into the Misc tab because the classifier only knew English weapon names — they are now under Weapons; (b) the manifest lists every prefab on disk, but not all of them exist in the game's runtime item database, so entries are now verified at startup and unusable ones are dropped from the list.
+- Fixed: dragging onto a soldier often failed, because the camera ray usually hit the ground in front of them rather than the soldier. The target search now scales with camera distance instead of a fixed 1.6 m radius, and dropping on the ground no longer refuses when a soldier is in the way.
+- Added failure logging for every item path (previously silent), so "invalid item" now always tells you why in the log.
+
+## Known limitations
+- Singleplayer verified; multiplayer only as host
+- Planes spawn on the ground and may crash — handle with care
+- Spawned units are not guaranteed to survive phase transitions
+- Custom squads created in the mission editor cannot be spawned: the game does not expose their member data at runtime (the squad objects attached to spawn points are empty shells)
+- Item icons are decoded lazily in the background as you scroll; a freshly opened item tab may briefly show names before icons appear
+
+## Shout outs
+- Corvostudio: Easy Red 2 and its open attitude towards modding
+- BepInEx / Il2CppInterop / Harmony teams
+- The Easy Red Gate mod (formerly ER2 Battlefield Commander) — this tool is built on top of its RTS view

@@ -11,24 +11,24 @@
 
 | 目录 | 插件 GUID | 显示名 | 版本 | 说明 |
 |---|---|---|---|---|
-| [`SquadCommand/`](SquadCommand/) | `er2.squadcommand` | Easy Red Gate | 1.4.57 | 上帝视角 RTS 小队指挥（最大工程） |
-| [`UniversalGeneration/`](UniversalGeneration/) | `er2.universalgeneration` | ER2 Universal Generation | 2.5.49 | RTS 内自定义生成单位 / 载具 / 物品（含鼠标拖放） |
-| [`NoInteractionHints/`](NoInteractionHints/) | `com.ryan.er2.nointeractionhints` | ER2 Hide Anything | 4.5.4 | 原生 UI 隐藏（14 类），被其他插件复用 |
-| [`ModManager/`](ModManager/) | `er2.modmanager` | ER2 Mod Manager | 1.7.9 | 游戏内 Mod 管理面板（EN/CN 双语） |
-| [`LimbTweaks/`](LimbTweaks/) | `er2.limbtweaks` | ER2 Limb Tweaks | 2.13.101 | 肢体与伤害系统调整 |
-| [`WeatherControl/`](WeatherControl/) | `er2.weathercontrol` | ER2 Weather Control | 1.7.2 | 天气 / 氛围 / 光照控制 |
-| [`AIFood/`](AIFood/) | `er2.aifood` | ER2 AI Food | 1.4.0 | AI 补给与食物系统 |
-| [`ThrowableWheel/`](ThrowableWheel/) | `er2.throwablewheel` | ER2 Throwable Wheel | 1.3.6 | 自定义投掷物转盘 + 背包补货 |
-| [`HighValueTarget/`](HighValueTarget/) | `er2.highvaluetarget` | ER2 Veteran HVT | 1.2.2 | Veteran 高危目标标记（EN/CN 双语） |
-| [`CombatTweaks/`](CombatTweaks/) | `er2.combattweaks` | ER2 Combat Tweaks | 1.2.2 | 战斗手感调整 |
-| [`ZoomAnywhere/`](ZoomAnywhere/) | `er2.zoomanywhere` | ER2 Zoom Anywhere | 1.0.1 | 视野与武器放大 |
-| [`InventoryPause/`](InventoryPause/) | `er2.inventorypause` | ER2 Inventory Pause | 1.0.5 | 开背包时冻结世界 |
-| [`UnitInfoOverlay/`](UnitInfoOverlay/) | `er2.unitinfooverlay` | ER2 Unit Inspector | 1.0.5 | 单位状态悬浮显示（开发者调试工具） |
-| [`MorePhysics/`](MorePhysics/) | `er2.morephysics` | ER2 More Physics | 0.1.49 | 完整物理化 |
-| [`UnitCollision/`](UnitCollision/) | `er2.morephysics.unitcollision` | ER2 More Physics - Unit Collision | 1.0.9 | 单位 / 尸体碰撞（MorePhysics 轻量版） |
-| [`Endless/`](Endless/) | `er2.endless` | ER2 Endless | 0.3.0 | 无尽模式（开发中，M0 战斗尖峰） |
-| [`HvtTestDriver/`](HvtTestDriver/) | `er2.hvt.testdriver` | HVT Test Driver | 1.0.0 | HVT 自测工具（内部，不发布） |
-| [`FleshWoundsFixed/`](FleshWoundsFixed/) | `ER2_FleshWounds` | ER2 Flesh Wounds | 1.0.1 | 第三方 Flesh Wounds 重建修复（紫贴图 bug） |
+| [`SquadCommand/`](SquadCommand/README.md) | `er2.squadcommand` | Easy Red Gate | 1.4.57 | 上帝视角 RTS 小队指挥（最大工程） |
+| [`UniversalGeneration/`](UniversalGeneration/README.md) | `er2.universalgeneration` | ER2 Universal Generation | 2.5.49 | RTS 内自定义生成单位 / 载具 / 物品（含鼠标拖放） |
+| [`NoInteractionHints/`](NoInteractionHints/README.md) | `com.ryan.er2.nointeractionhints` | ER2 Hide Anything | 4.5.4 | 原生 UI 隐藏（14 类），被其他插件复用 |
+| [`ModManager/`](ModManager/README.md) | `er2.modmanager` | ER2 Mod Manager | 1.7.9 | 游戏内 Mod 管理面板（EN/CN 双语） |
+| [`LimbTweaks/`](LimbTweaks/README.md) | `er2.limbtweaks` | ER2 Limb Tweaks | 2.13.101 | 肢体与伤害系统调整 |
+| [`WeatherControl/`](WeatherControl/README.md) | `er2.weathercontrol` | ER2 Weather Control | 1.7.2 | 天气 / 氛围 / 光照控制 |
+| [`AIFood/`](AIFood/README.md) | `er2.aifood` | ER2 AI Food | 1.4.0 | AI 补给与食物系统 |
+| [`ThrowableWheel/`](ThrowableWheel/README.md) | `er2.throwablewheel` | ER2 Throwable Wheel | 1.3.6 | 自定义投掷物转盘 + 背包补货 |
+| [`HighValueTarget/`](HighValueTarget/README.md) | `er2.highvaluetarget` | ER2 Veteran HVT | 1.2.2 | Veteran 高危目标标记（EN/CN 双语） |
+| [`CombatTweaks/`](CombatTweaks/README.md) | `er2.combattweaks` | ER2 Combat Tweaks | 1.2.2 | 战斗手感调整 |
+| [`ZoomAnywhere/`](ZoomAnywhere/README.md) | `er2.zoomanywhere` | ER2 Zoom Anywhere | 1.0.1 | 视野与武器放大 |
+| [`InventoryPause/`](InventoryPause/README.md) | `er2.inventorypause` | ER2 Inventory Pause | 1.0.5 | 开背包时冻结世界 |
+| [`UnitInfoOverlay/`](UnitInfoOverlay/README.md) | `er2.unitinfooverlay` | ER2 Unit Inspector | 1.0.5 | 单位状态悬浮显示（开发者调试工具） |
+| [`MorePhysics/`](MorePhysics/README.md) | `er2.morephysics` | ER2 More Physics | 0.1.49 | 完整物理化 |
+| [`UnitCollision/`](UnitCollision/README.md) | `er2.morephysics.unitcollision` | ER2 More Physics - Unit Collision | 1.0.9 | 单位 / 尸体碰撞（MorePhysics 轻量版） |
+| [`Endless/`](Endless/README.md) | `er2.endless` | ER2 Endless | 0.3.0 | 无尽模式（开发中，M0 战斗尖峰） |
+| [`HvtTestDriver/`](HvtTestDriver/README.md) | `er2.hvt.testdriver` | HVT Test Driver | 1.0.0 | HVT 自测工具（内部，不发布） |
+| [`FleshWoundsFixed/`](FleshWoundsFixed/README.md) | `ER2_FleshWounds` | ER2 Flesh Wounds | 1.0.1 | 第三方 Flesh Wounds 重建修复（紫贴图 bug） |
 
 ---
 
