@@ -2061,3 +2061,8 @@ Get-ChildItem "E:\SteamLibrary\steamapps\common\Easy Red 2\BepInEx\plugins" -Fil
    `_CN_v2.5.49.zip`（CN，130,560 B，`C82C1837…`），拆包核对 PASS；部署 = 构建 = EN 包内 DLL。
 **待实测**：启动加载阶段（按空格前后）**不再出现任何 `MappedResources contains` 报错**；生成面板
 步兵页签在首次打开后正常填充（55 官方 + 466 小队库）。
+**2.5.49 补充（同日 14:05，并入未发布的 2.5.49 包）**：顺手修当前日志里唯一一条残留告警——
+`refreshItemCache` 描述缺英文词条（英文版每次启动告警一次"词条缺失"）。另把当前态 UI 词条与"未找到宿主"
+警告里的宿主旧名同步为 Easy Red Gate（字典键与代码串逐字同步改，查表不落空；panelKey 词条在 Ui.cs 字典里
+有两处相同键，后者覆盖前者属冗余，两处一并同步）。文档四件 2.5.49 条目补杂项说明；双语双包重新打包，
+拆包核对 PASS；部署 = 构建 = EN 包内 DLL（`CB821DDF…`）。

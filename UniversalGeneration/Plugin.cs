@@ -31,7 +31,7 @@ public class Plugin : BasePlugin
 		ModLog = Log;
 
 		enabled = Config.Bind("General", "enabled", true, Ui.Tr("主开关。关闭后 mod 完全休眠。"));
-		panelKey = Config.Bind("General", "panelKey", KeyCode.G, Ui.Tr("生成面板开关（仅战场指挥官 RTS 上帝视角内有效）。落点模式/携带物品中再按一次取消。"));
+		panelKey = Config.Bind("General", "panelKey", KeyCode.G, Ui.Tr("生成面板开关（仅 Easy Red Gate RTS 上帝视角内有效）。落点模式/携带物品中再按一次取消。"));
 		noAttackNeutral = Config.Bind("General", "noAttackNeutral", true, Ui.Tr("生成的我方/敌方单位不主动攻击中立（Civilian）阵营（被打仍会还手；玩家手动标记的目标照打）。"));
 		enemyNativeAI = Config.Bind("General", "enemyNativeAI", true, Ui.Tr("生成的敌方单位走原生 AI（主动推进、随战役任务进攻）。关闭后敌方与我方单位一样原地驻守、只接战不移动。"));
 		debugLog = Config.Bind("Debug", "debugLog", false, new ConfigDescription(Ui.Tr("调试日志开关（发布版保持关闭）。输出枚举/反射/生成诊断。"), new AcceptableValueList<bool>(true, false)));

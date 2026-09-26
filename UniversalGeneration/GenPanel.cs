@@ -179,7 +179,7 @@ internal static class GenPanel
 	{
 		if (!HostLink.HostPresent)
 		{
-			Plugin.ModLog.LogWarning("[UniGen] 未找到战场指挥官宿主——本 mod 仅在其 RTS 模式内工作。");
+			Plugin.ModLog.LogWarning("[UniGen] 未找到 Easy Red Gate（原战场指挥官）宿主——本 mod 仅在其 RTS 模式内工作。");
 			return;
 		}
 		SetOpen(!open, true); // 用户主动打开 → 回到收藏页

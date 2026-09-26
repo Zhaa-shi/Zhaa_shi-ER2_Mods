@@ -50,6 +50,9 @@ Changelog
   missing prop (hundreds during the loading window). The probe now starts **lazily, the first time you open
   the spawn panel** (in battle, when everything is loaded): the same ~0.4 s time-sliced fill, zero errors.
   The watchdog only continues the probe after the panel has been opened once.
+- Misc: added the missing English string for the `Catalog / refreshItemCache` description (logged a
+  "missing entry" warning on every English launch); host-name references in config descriptions and the
+  no-host warning now say **Easy Red Gate**.
 
 2.5.48
 - **Fixed the startup error spam** (`Prop ID '...' not found! - MappedResources contains: False`). Display

@@ -24,7 +24,7 @@ internal static class Ui
 		["点击条目拿起 → 拖到单位身上放入背包，拖到地上则生成实体"] = "Click to pick up - drop on a unit (backpack) or the ground (spawn)",
 		["生成的我方/敌方单位不主动攻击中立（Civilian）阵营（被打仍会还手；玩家手动标记的目标照打）。"] = "Spawned friendly/enemy units do not attack the neutral (Civilian) faction on their own (they still fight back if attacked; manually marked targets are engaged as usual).",
 		["生成的敌方单位走原生 AI（主动推进、随战役任务进攻）。关闭后敌方与我方单位一样原地驻守、只接战不移动。"] = "Spawned enemy units use native AI (they advance and attack with the battle objective). Off = enemies hold position like your own units and only fight when engaged.",
-		["生成面板开关（仅战场指挥官 RTS 上帝视角内有效）。落点模式/携带物品中再按一次取消。"] = "Panel toggle (only works inside the Battlefield Commander RTS god view). Pressing again while placing or carrying cancels.",
+		["生成面板开关（仅 Easy Red Gate RTS 上帝视角内有效）。落点模式/携带物品中再按一次取消。"] = "Panel toggle (only works inside the Easy Red Gate RTS god view). Pressing again while placing or carrying cancels.",
 		["调试日志开关（发布版保持关闭）。输出枚举/反射/生成诊断。"] = "Debug logging (keep off for release). Emits enumeration/reflection/spawn diagnostics.",
 		["我方"] = "Allies",
 		["敌方"] = "Enemy",
@@ -111,14 +111,16 @@ internal static class Ui
 		["主开关。关闭后 mod 完全休眠。"] = "Master switch. When off, the mod is fully dormant.",
 		// 2.2.2：**键必须与代码里的串逐字一致**——此前字典里是旧版措辞，代码已改 → 查表落空 → 回退中文
 		//（用户实测"英文版为什么还有中文"就是这条配置说明）。新增 `Tr` 缺失自检，漂移会直接进日志。
-		["生成面板开关（仅战场指挥官 RTS 上帝视角内有效）。落点模式/携带物品中再按一次取消。"]
-			= "Toggle the spawn panel (only inside Battlefield Commander's RTS god view). Press again while placing or carrying to cancel.",
+		["生成面板开关（仅 Easy Red Gate RTS 上帝视角内有效）。落点模式/携带物品中再按一次取消。"]
+			= "Toggle the spawn panel (only inside Easy Red Gate's RTS god view). Press again while placing or carrying to cancel.",
 		["生成的我方/敌方单位不主动攻击中立（Civilian）阵营（被打仍会还手；玩家手动标记的目标照打）。"]
 			= "Spawned ally/enemy units do not proactively engage the neutral (Civilian) faction (they still fight back when attacked, and units you manually mark are always attacked).",
 		["生成的敌方单位走原生 AI（主动推进、随战役任务进攻）。关闭后敌方与我方单位一样原地驻守、只接战不移动。"]
 			= "Spawned ENEMY units use their native AI (they advance and attack on their own, following battle tasks). Turn off to make them hold position like allied spawns (engage only, never move).",
 		["调试日志开关（发布版保持关闭）。输出枚举/反射/生成诊断。"]
 			= "Debug logging (keep off in releases). Enumeration/reflection/spawn diagnostics.",
+		["忽略物品目录的磁盘缓存并重新枚举（游戏更新新增物品后勾一次，下次启动生效后可关回）。"]
+			= "Ignore the item-catalog disk cache and re-enumerate (tick once after a game update adds items; untick again once it takes effect on the next launch).",
 		["收藏的生成条目（自动维护，勿手改）。"] = "Favorited spawn entries (maintained automatically).",
 		// ===== 物品（2.0.0）=====
 		["物品生成失败："] = "Item spawn failed: ",
