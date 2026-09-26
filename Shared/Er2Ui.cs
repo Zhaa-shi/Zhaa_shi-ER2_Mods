@@ -179,9 +179,9 @@ internal static class Er2Ui
 	// 1.4.24 **中性半透明黑**（用户："把面板UI改成半透明黑色，不要棕色了"）：
 	//   ① **去掉色相**——R=G=B（纯中性灰黑），不再带暖棕。棕色是上一轮为了"协调泥土背景"
 	//      刻意加的，用户明确否掉。
-	//   ② **不透明度改由 cfg 驱动**：`PanelAlpha`（cfg UI/uiPanelAlpha，默认 0.85）。
+	//   ② **不透明度改由 cfg 驱动**：`PanelAlpha`（cfg UI/uiPanelAlpha，当前默认 0.50）。
 	//      半透明与"够黑"是一对矛盾轴——α 越低越透但越容易被地形染色（陷阱 96），
-	//      与其替玩家猜，不如把这一轴暴露成配置项，默认取折中的 0.85。
+	//      与其替玩家猜，不如把这一轴暴露成配置项（默认值 1.4.24 起 0.85 → 1.4.35 起 0.50）。
 	//   ③ 皮革纹理保留（用户上轮要的质感），但**去掉暖调**改中性灰——
 	//      在中性黑底上留暖色会重新泛黄。
 	//   元素区分靠三重：中性黑底 + 中性描边/分隔线 + 选中亮灰填充。
@@ -215,9 +215,12 @@ internal static class Er2Ui
 	private static readonly Color MonoRowBgAlt = new Color(0x2A / 255f, 0x2A / 255f, 0x2A / 255f);
 
 	/// <summary>
-	/// cfg UI/uiPanelAlpha → 面板**主不透明度**（0.55~1.0）。默认 0.85。
+	/// cfg UI/uiPanelAlpha → 面板**主不透明度**（**0.40~1.0**，与 cfg 的 AcceptableValueRange 同口径）。默认 0.50。
 	/// 这是"透 ↔ 黑"那条矛盾轴：α 越低越能透出战场，但越容易被地形颜色染色（陷阱 96）。
 	/// 各结构色的相对层次（标题条更实、行底更透）由下面属性按比例推出，玩家只调一个值。
+	/// ⚠️ 这里的 clamp 是**第二个"范围定义"**，必须与两个 mod 的
+	/// `Config.Bind(..., AcceptableValueRange&lt;float&gt;(0.40f, 1f))` 一字不差——否则取值范围的下半段会变成
+	/// **静默死区**（AGENTS 陷阱 17g52：陈旧的 0.55 下界曾把用户指定的 0.50 悄悄抬成 0.55，面板从未真正到过 50%）。
 	/// </summary>
 	/// 2.5.2：默认 **0.50**（用户指定，两个 mod 统一）。代码默认仅在 cfg 缺失
 	/// （部署后首启）时生效，**必须与两个 mod 的 Config.Bind 默认值一字不差**，
@@ -227,7 +230,7 @@ internal static class Er2Ui
 	public static void SetPanelAlpha(float v)
 	{
 		if (float.IsNaN(v)) return;
-		PanelAlpha = Mathf.Clamp(v, 0.55f, 1f);
+		PanelAlpha = Mathf.Clamp(v, 0.40f, 1f);   // 陈旧下界 0.55 → 0.40，对齐 cfg 范围（旧值让"50%"永远生效不了）
 	}
 
 	private static Color WithA(Color c, float a) => new Color(c.r, c.g, c.b, Mathf.Clamp01(a));
