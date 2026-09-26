@@ -277,8 +277,11 @@ internal static class ModCatalog
 					if (!enumNames.Contains(k)) nonEnum++;
 					probeTicks++;
 				}
-				Plugin.ModLog.LogInfo("[UniGen] 小队覆盖诊断: SquadsArchive 总数=" + total
-					+ " 非官方枚举键=" + nonEnum + "（这些已在「步兵」页签直接可生成）");
+				// 2.5.33（§7 发布前清理）：统计性诊断收进 debugLog 门控。
+				//   probeTicks 计数照旧累积——它是看门狗的存活信号，绝不能因门控而漏算。
+				if (Plugin.debugLog.Value)
+					Plugin.ModLog.LogInfo("[UniGen] 小队覆盖诊断: SquadsArchive 总数=" + total
+						+ " 非官方枚举键=" + nonEnum + "（这些已在「步兵」页签直接可生成）");
 			}
 			catch (Exception ex)
 			{
@@ -290,10 +293,13 @@ internal static class ModCatalog
 		ready = true;
 		probeState = 2;
 		nextPassAt = Time.unscaledTime + (more ? RetryWaitDb : RetryIdle);
-		Plugin.ModLog.LogInfo("[UniGen] 第三方内容目录 第 " + passes + " 轮: 索引 mod=" + srcs.Count
-			+ " 载具候选=" + candVeh + " 累计通过=" + vehicles.Count
-			+ " 物品候选=" + candItems + " 累计通过=" + ItemCatalog.Bucket("mod").Count
-			+ "（本轮新通过 载具=" + vehOk + " 物品=" + itemOk + "，待校验 载具=" + (vehQ.Count - vehTodo) + "）");
+		// 2.5.33（§7 发布前清理）：这是一条**周期性**日志（15s / 60s 循环重扫），发布版只保留首轮，
+		//   之后静默；需要看每一轮扫描的累计通过数时把 Debug/debugLog 打开。
+		if (Plugin.debugLog.Value || passes == 1)
+			Plugin.ModLog.LogInfo("[UniGen] 第三方内容目录 第 " + passes + " 轮: 索引 mod=" + srcs.Count
+				+ " 载具候选=" + candVeh + " 累计通过=" + vehicles.Count
+				+ " 物品候选=" + candItems + " 累计通过=" + ItemCatalog.Bucket("mod").Count
+				+ "（本轮新通过 载具=" + vehOk + " 物品=" + itemOk + "，待校验 载具=" + (vehQ.Count - vehTodo) + "）");
 
 		if (vehOk > 0 || itemOk > 0)
 		{

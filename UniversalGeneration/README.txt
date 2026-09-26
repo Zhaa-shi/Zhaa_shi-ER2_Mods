@@ -1,4 +1,4 @@
-ER2 Universal Generation v2.5.19
+ER2 Universal Generation v2.5.47
 ================================
 
 Spawn any unit, vehicle, or item anywhere, right from Battlefield Commander's RTS god view.
@@ -21,7 +21,7 @@ Main features
 - Zero-lag panel: the whole catalog (squad library, vehicles, firepoints, items) is built in the background at game startup, time-sliced across frames
 - Everything spawnable: ~50 base squad types + 400+ era/theater variants straight from the game's squad library (winter, D-Day, early-war…), plus every vehicle from the game + DLC (auto-enumerated), firepoints included
 - Firepoints tab: every fixed machine gun in the game — MG34/MG42/Browning/Maxim/Type92/Vickers and more, ground/tripod/bunker mounts, AA machine guns and the M45 Quadmount — spawned with a gunner by default
-- Item spawning (new in 2.0.0, catalog rewritten in 2.0.2): the item list is now **enumerated directly from the game's live item database**, so every listed item is guaranteed to spawn — no more "clicked it, says invalid". Categories come from the game's own item types (Weapons / Ammo / Throwables / Gear / Medical & Food / Misc), and entries show their real in-game icon where available. Click an item to pick it up, then drag it onto a soldier to put it in their backpack, or onto the ground to drop it as a real physical item
+- Item spawning (new in 2.0.0, catalog rewritten in 2.0.2): the item list is now **enumerated directly from the game's live item database**, so every listed item is guaranteed to spawn — no more "clicked it, says invalid". Categories come from the game's own item types (Weapons / Ammo / Throwables / Gear / Medical & Food / Misc), and entries show their real in-game icon where available. Click an item to pick it up, then drag it onto a soldier to put it in their backpack, or onto the ground to drop it as a real physical item. The catalog is **cached next to the config file** and topped up by cumulative background passes, so launches stay instant while the list still fills up completely (see the changelog for 2.5.36-2.5.46 — this took a while to get right)
 - Faction picker: Allies / Enemy / Neutral (Civilian) — spawned units fight accordingly
 - Allied & neutral spawns hold position and engage on sight, always obeying your RTS orders; enemy spawns use their native AI — they advance and attack on their own like any other enemy force (configurable)
 - Vehicles spawn with a proper crew already seated: per-nation tank crews, exact seat count, native spawn-on-vehicle (no boarding wait; they obey RTS orders)
@@ -36,11 +36,202 @@ How to use
 - G: toggle the spawn panel (inside the god view)
 - Panel: pick faction -> category -> entry -> the panel collapses into placement mode
 - Placement: left-click to place, Shift+left-click to keep placing, right-click/ESC/G to cancel
-- Items: open the item tabs -> click an item to pick it up -> drag onto a soldier (green ring) to fill their backpack, or onto the ground (amber ring) to drop it. Right-click / ESC / G cancels the carry
+- Items: open the item tabs -> click an item to pick it up -> drag onto a soldier (green ring) to fill their backpack, or onto the ground (amber ring) to drop it. **Hold Shift while dropping on the ground to keep carrying** (drop several in a
+  row; right-click ends the run). Right-click / ESC / G cancels the carry
 - "Clear" button in the panel title removes everything the mod spawned
 
 Changelog
 --------------------------------
+2.5.47
+- **Fixed: the item catalog was re-verified on every launch - and that is the stutter you feel right after
+  entering a battle.** The check that decides "is the catalog complete now" compared total entry counts,
+  but that total includes third-party (mod) items, which a separate scanner indexes asynchronously in
+  rounds. So the number kept rising for reasons unrelated to the official item database, the "it is stable
+  now" test never passed, and the heavy enumeration (measured at up to 8.6 s in a single call) ran again
+  on every start. The test now looks at official items only and treats a handful of new entries as stable;
+  as soon as a pass comes up clean the cache is marked verified and later launches skip the enumeration
+  entirely - zero database calls, zero freeze.
+
+2.5.46
+- **The item list no longer misses half the game's content.** Measured in one session:
+  the catalog held **1,164 official items while the game actually had 2,107** (weapons alone went
+  from 549 to 1,164). The game registers its item database **gradually as the session runs**, so a
+  single snapshot taken shortly after startup is always short - the item tab looked "smaller than
+  it used to be" for exactly that reason. The catalog is now built by **cumulative passes**
+  (up to 3 per session, spaced 30 s / 2 min): each pass only adds, and the accumulation stops the
+  moment a pass finds nothing new.
+- Fixed: two passes could run **at the same time**. The next pass was scheduled by a fixed timer
+  without waiting for the previous one - and a pass takes 30-60 s, so the timer had always already
+  expired. The same game-side database scans were paid for twice, doubling the hitch. Passes are
+  now serialised, spaced from the moment the previous one *finished*, and every log line carries
+  its own pass number instead of whatever the global counter happened to be.
+
+2.5.45
+- Item catalog: multi-pass cumulative enumeration (the mechanism described in 2.5.46).
+- A cache that is still growing is written but **not** marked as trusted - only a pass that finds
+  nothing new marks it verified, so an unfinished snapshot can never be frozen in permanently.
+
+2.5.44
+- **No more 55-second re-scan on every launch.** Building the item catalog costs four atomic
+  database queries - measured 5.3 s / 8.1 s / 4.8 s / 0.8 s, roughly **55 s of stutter in total** -
+  and it was paid again on every single start. The cache file now records whether its contents were
+  ever cross-checked against a live enumeration, plus a signature of the game build
+  (`GameAssembly.dll` + `global-metadata.dat` + the `er2bundle` asset bundle). Unchanged signature
+  and a verified cache = the enumeration is skipped entirely. Update the game and it re-verifies;
+  `Catalog / refreshItemCache` forces it by hand.
+- All cache/enumeration log lines now include the per-category counts (weapons / ammo / throwables /
+  gear / medical & food / misc / mod), which is how the shortfall above was pinned down.
+
+2.5.43
+- **Fixed: the item list could stay short forever.** The check that decided whether the background
+  verification should run read a timer captured *before the game had drawn a single frame* - that
+  value is 0 - so the verification was silently rejected on every launch and the log showed nothing
+  at all. Diagnosed by decompiling the deployed DLL and reading what was actually running, then
+  fixed by healing the baseline in place.
+
+2.5.42 / 2.5.41
+- Every "are we in battle yet" scene check was removed from the item catalog. Two different checks
+  (`MainMenu.instance == null`, then `BattleManager.IsBattleActive()`) both proved wrong in practice
+  and were skipping the enumeration entirely - the item tab could vanish ("the big tabs went from 4
+  to 3"). Completeness is now guaranteed by **waiting for the game's asset bundle to finish
+  loading**, not by guessing at scene state.
+
+2.5.40 / 2.5.39
+- Item catalog: cache verification pass, plus the `items` category (throwables / medical & food /
+  misc) deferred to a later pass so the panel opens immediately instead of waiting on the two
+  slowest queries in the game.
+
+2.5.38
+- The catalog waits for the `er2bundle` asset bundle before enumerating. Item definitions live in
+  that bundle and it loads progressively - anchoring to the finished bundle is the only reliable
+  completeness guarantee. Only the three main categories are enumerated up front; the rest follows.
+
+2.5.37
+- **Fixed: two thirds of the item list could go missing permanently.** The disk cache was written
+  from whatever the database happened to contain at that moment - in the main menu that is roughly
+  a third of it - and that partial snapshot was then trusted forever. The cache header now carries a
+  completeness marker and refuses to be used without it.
+
+2.5.36
+- **Item catalog disk cache** - the catalog is enumerated once and stored next to the config, so
+  later launches load it in milliseconds instead of running the game's multi-second database scans.
+- Removed the automatic "re-scan 20 seconds after ready" pass, which was a guaranteed multi-second
+  freeze shortly after every launch.
+
+2.5.35
+- Diagnostics only: per-query timing, so those freezes could be attributed to specific database
+  calls. This is how the 4.5-8 s single calls were found.
+
+2.5.34
+- **Fixed the panel sitting at 55% instead of the 50% you asked for.** The config side had been
+  relaxed to `0.50 / 0.40-1.0` back in 2.5.16, but the shared toolkit still clamped the incoming
+  value to `0.55-1.0` (left over from the days when the default was 0.85) - so the 0.50 was
+  silently pushed up to 0.55, and the 0.40-0.55 part of the range was dead. No error, no warning,
+  nothing in the log: the panel simply never reached 50%. The clamp now matches the config range,
+  so a 50% setting really is 50%, and the lower half of the slider works again.
+
+
+2.5.33
+- **Release tidy-up: the remaining periodic / throttled diagnostics are behind the `Debug/debugLog`
+  switch now** (the faction-row state probe, the item-database readiness probe, the per-scan
+  third-party-content line and the squad-coverage statistics). A release build stays quiet by
+  default; flip the switch to get exactly the same readout back when troubleshooting.
+- No user-visible behaviour change.
+
+
+2.5.32
+- **The "Spawn [G]" toggle button on the left edge got a solid black 72% plate.** A translucent
+  button sitting directly on bright mud was washed into a grey haze no matter how bright the text or
+  how white the outline. The plate uses the same recipe as the commander mod's hint bar.
+
+
+2.5.31
+- **The last bare labels joined the shadowed-text primitive** (title, Clear, x, the three faction
+  buttons, the crew row, the no-match line and the item help line). A probe proved the IMGUI state
+  was pure white and the text still read grey - white text with no shadow backing simply sits one
+  contrast step lower on a translucent light panel. Every label in the panel now shares one
+  primitive.
+
+
+2.5.30
+- **English build: fixed text falling back to Chinese.** 2.5.29 merged the extra "Shift continuous"
+  suffix into an existing string, so the dictionary key no longer matched and the lookup silently
+  returned Chinese. Split back into two separate strings.
+- **The missing-translation warning is unconditional now** (one line per missing key, no longer gated
+  by `debugLog`), so any future key drift shows up immediately instead of staying silent.
+
+
+2.5.29
+- **The "Spawn [G]" toggle button matches the mono panel style** (pixel-aligned rectangle plus an
+  outline, same as the tabs and faction buttons).
+- **Items support Shift continuous placement:** hold Shift while dropping an item on the ground and
+  you keep carrying it (ghost model included), so you can place several in a row. Right-click ends
+  the run, and the status flash says so.
+
+
+2.5.28
+- Internal: the faction row force-resets the IMGUI colour state right before it draws, and carries a
+  throttled state probe. Both were added while chasing the grey-text report; the probe is behind
+  `debugLog` now (see 2.5.33).
+
+
+2.5.27
+- **Pixel alignment completed on the last bare draw calls**: the title row, the faction row, the item
+  help line, the crew row and the pager. Text drawn through `GUIStyle` was already aligned; these raw
+  `GUI.Label` / `GUI.Button` calls were not, so they kept the sub-pixel blur (see 2.5.25).
+
+
+2.5.26
+- **Second layer of the grey-text root cause: IMGUI global state leaking between events.**
+  `GUI.color` left behind by the host mod, the game or any other `OnGUI` code multiplies into this
+  mod's drawing - measured as text rendered at exactly 50% alpha. The panel entry point now
+  hard-resets `GUI.color` / `contentColor` / `backgroundColor` to white before drawing, the shadow
+  primitive forces pure white on its main pass, and a one-time warning names the offending colour if
+  pollution is ever detected again.
+
+
+2.5.25
+- **The real cause of the grey text: sub-pixel blur.** The panel is draggable, so its position is a
+  float - every label was rasterised on fractional pixels, and bilinear sampling of the font atlas
+  blended each stroke halfway into the background (pure white text measured ~140). Text rectangles
+  are rounded to whole pixels now, and the panel position is rounded after a drag.
+- **Reverts 2.5.24:** selected tab / faction text is pure white again - the dark-on-light variant was
+  treating a symptom of something that was never a contrast problem.
+
+
+2.5.24
+- Selected tab and faction-button text switched to dark-on-light to raise contrast. **Reverted in
+  2.5.25** - the text was not too low-contrast, it was blurred (see 2.5.25).
+
+
+2.5.23
+- **Minimum font sizes** so the mono preset never shrinks text below readability (title >= 13,
+  body >= 11, tab >= 9), matching the commander mod.
+- The panel logs a one-time UI snapshot at first build (scale, font sizes, panel opacity), so a
+  future "text looks grey" report arrives with hard numbers instead of guesswork.
+
+
+2.5.22
+- **Text is drawn with a bottom-right shadow instead of a four-way outline.** The black outline was
+  eating the anti-aliased edges of thin strokes, which made white text read greyer than no outline
+  at all - the shadow keeps the glyph body clean and only darkens what sits behind it.
+
+
+2.5.21
+- **Root cause of the "grey haze" over the whole panel: the game runs in Linear colour space.**
+  IMGUI vertex colours (and `SetPixels`) are interpreted as linear and then encoded to sRGB on
+  output, so a dark grey is brightened almost 3x - every panel surface came out washed out, and pure
+  black / white were the only immune values (which is why the commander mod's panel looked fine).
+  The shared toolkit now converts sRGB to linear for every fill, texture and text colour.
+
+
+2.5.20
+- **Panel opacity default unified with the commander mod at 0.50.** The two mods had drifted apart
+  (each regenerated its own config with a different default), so the same shared toolkit produced two
+  different looks. The old default-migration chain is gone - with the build process deleting the
+  config on deploy, it could only ever rewrite an already-correct value.
+
+
 2.5.19
 - No change on this mod's side; the correction (info panel plate restored, hint bar background-free)
   lives in the commander mod.

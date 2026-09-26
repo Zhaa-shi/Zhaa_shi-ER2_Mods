@@ -426,11 +426,13 @@ internal static class GenPanel
 		// 2.5.27：按钮矩形**整数对齐**——third = 宽度/3 除不尽 → 阵营行文字亚像素模糊发灰
 		//（用户实测：Allies 整数位 255 纯白、Neutral 分数位 229 灰），文字描边由按钮样式自带白色
 		// 2.5.28：**连续探针 + 强制复位**——灰字若在此处仍出现，探针会把当时的 IMGUI 状态打进日志
+		// 2.5.33（§7 发布前清理）：探针是**限频诊断**，已收进 debugLog 门控，发布版不再常开输出；
+		//   灰字若在将来回归，把 Debug/debugLog 打开即可复现同样的观测（诊断能力保留，噪音清零）
 		// 2.5.31：探针证实状态纯白仍灰 → **文字收编 LabelShadowed**（GUI.Button 只当点击区，
 		// 文案走阴影原语，与页签同配方；无阴影衬底的白字在半透明浅底上对比度天然低一档）
 		float fs = Er2Ui.Scale;
 		GUI.color = Color.white; GUI.contentColor = Color.white; GUI.backgroundColor = Color.white;
-		if (Time.unscaledTime >= factionProbeNext)
+		if (Plugin.debugLog.Value && Time.unscaledTime >= factionProbeNext)
 		{
 			factionProbeNext = Time.unscaledTime + 2f;
 			Plugin.ModLog?.LogInfo("[UniGen] 阵营行状态探针: GUI.color=" + GUI.color

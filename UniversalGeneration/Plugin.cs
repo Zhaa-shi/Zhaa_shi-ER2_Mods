@@ -9,7 +9,7 @@ using UnityEngine;
 
 namespace ER2UniversalGeneration;
 
-[BepInPlugin("er2.universalgeneration", "ER2 Universal Generation", "2.5.32")]
+[BepInPlugin("er2.universalgeneration", "ER2 Universal Generation", "2.5.47")]
 public class Plugin : BasePlugin
 {
 	internal static ManualLogSource ModLog;
@@ -23,6 +23,9 @@ public class Plugin : BasePlugin
 	internal static ConfigEntry<bool> uiMono;      // 2.5.0：灰黑单色 UI（与 SquadCommand 同名同义）
 	internal static ConfigEntry<float> uiPanelAlpha; // 1.4.24：面板不透明度（与 SquadCommand 同名同义）
 
+	/// <summary>2.5.36：忽略磁盘物品目录缓存、强制重新枚举（游戏更新新增物品后手动勾一次）。</summary>
+	internal static ConfigEntry<bool> refreshItemCache;
+
 	public override void Load()
 	{
 		ModLog = Log;
@@ -32,6 +35,9 @@ public class Plugin : BasePlugin
 		noAttackNeutral = Config.Bind("General", "noAttackNeutral", true, Ui.Tr("生成的我方/敌方单位不主动攻击中立（Civilian）阵营（被打仍会还手；玩家手动标记的目标照打）。"));
 		enemyNativeAI = Config.Bind("General", "enemyNativeAI", true, Ui.Tr("生成的敌方单位走原生 AI（主动推进、随战役任务进攻）。关闭后敌方与我方单位一样原地驻守、只接战不移动。"));
 		debugLog = Config.Bind("Debug", "debugLog", false, new ConfigDescription(Ui.Tr("调试日志开关（发布版保持关闭）。输出枚举/反射/生成诊断。"), new AcceptableValueList<bool>(true, false)));
+		// 2.5.36：物品目录磁盘缓存（首次枚举写盘，之后启动零枚举调用——单次 GetAllItemsOfType
+		// 实测最高 5.5 秒且无法分帧，是"进游戏固定时间卡几秒"的元凶）。游戏更新新增物品后勾一次刷新。
+		refreshItemCache = Config.Bind("Catalog", "refreshItemCache", false, Ui.Tr("忽略物品目录的磁盘缓存并重新枚举（游戏更新新增物品后勾一次，下次启动生效后可关回）。"));
 		favorites = Config.Bind("General", "favorites", "", Ui.Tr("收藏的生成条目（自动维护，勿手改）。"));
 		// 2.5.0：与 SquadCommand 的 UI/uiMono 同名同义——两个 mod 的面板要长得一样，
 		// 玩家改一个就该两边都变（共享 Er2Ui 令牌，只有这一处开关各读各的 cfg）。
@@ -76,6 +82,6 @@ public class Plugin : BasePlugin
 		ItemCatalog.Ensure();
 		new Harmony("er2.universalgeneration").PatchAll(typeof(Plugin).Assembly); // Tick/Draw 驱动补丁
 
-		ModLog.LogInfo("ER2 Universal Generation 2.5.32 loaded. panelKey=" + panelKey.Value);
+		ModLog.LogInfo("ER2 Universal Generation 2.5.47 loaded. panelKey=" + panelKey.Value);
 	}
 }
