@@ -104,34 +104,18 @@ $mineList = @(
     'ER2_UnitInfoOverlay.dll'
 )
 
-# 注意：处于「纯净」状态时整个 BepInEx\ 都在 bepinex_off\ 里，
-# 此时 $pluginsDir 不存在是正常的 —— 要做的是提示用户恢复，而不是报错退出。
-#
-# 但 -Action restore 必须能穿过这里（它的职责就是把 BepInEx 搬回来），
-# 所以仅在没有指定 Action 时报错。
+# 关于「纯净」状态（整个 BepInEx\ 暂存在 bepinex_off\ 里）：
+# 此时 $pluginsDir 不存在，但这**不是错误** —— 必须放行让用户进入菜单，
+# 否则「3. 恢复」永远点不到（重新运行还是走到这里）。
+# 只有「既没有 plugins、也没有可恢复的备份」才算真的没装 BepInEx。
 $bepOffHasBepInEx = Test-Path (Join-Path $bepOffDir $BepInExDirName)
-if (-not (Test-Path $pluginsDir)) {
-    if ($Action -and $Action.ToLower() -eq 'restore') {
-        # 交给后面的 restore 分支处理，这里直接放行
-    }
-    elseif ($bepOffHasBepInEx) {
-        Write-Host ""
-        Write-Host "  当前是「纯净」状态（BepInEx 在 bepinex_off\ 里暂存）。" -ForegroundColor Magenta
-        Write-Host ""
-        Write-Host "  要恢复 mod 功能，请重新运行本启动器并选「3. 恢复」，" -ForegroundColor Yellow
-        Write-Host "  或运行: launch-er2.bat restore" -ForegroundColor Yellow
-        Write-Host ""
-        Read-Host "  按回车退出"
-        exit 0
-    }
-    else {
-        Write-Host ""
-        Write-Host "  找不到插件目录: $pluginsDir" -ForegroundColor Red
-        Write-Host "  这台机器上似乎没装 BepInEx。" -ForegroundColor Yellow
-        Write-Host ""
-        Read-Host "  按回车退出"
-        exit 1
-    }
+if ((-not (Test-Path $pluginsDir)) -and (-not $bepOffHasBepInEx)) {
+    Write-Host ""
+    Write-Host "  找不到插件目录: $pluginsDir" -ForegroundColor Red
+    Write-Host "  这台机器上似乎没装 BepInEx。" -ForegroundColor Yellow
+    Write-Host ""
+    Read-Host "  按回车退出"
+    exit 1
 }
 if ((-not (Test-Path $disabledDir)) -and (Test-Path $bepRootDir)) {
     New-Item -ItemType Directory -Path $disabledDir -Force -ErrorAction SilentlyContinue | Out-Null
@@ -401,12 +385,18 @@ function Start-Game {
 
 function Invoke-WithMods {
     Write-Host ""
-    Write-Host "  [1/2] 启用全部插件" -ForegroundColor White
-    $r = Set-AllMods -Enabled $true
-    Write-Host ("        启用 {0} 个，失败 {1} 个" -f $r.Ok, $r.Fail) -ForegroundColor Gray
+    # 顺序很重要：必须**先**恢复 BepInEx，插件目录才存在，才能启插件。
+    # （纯净状态下 BepInEx\ 整个在 bepinex_off\ 里。）
+    Write-Host "  [1/2] 开启 BepInEx" -ForegroundColor White
+    $ok = Set-BepInEx -Enable $true
     Write-Host ""
-    Write-Host "  [2/2] 开启 BepInEx 注入器" -ForegroundColor White
-    [void](Set-BepInEx -Enable $true)
+    Write-Host "  [2/2] 启用全部插件" -ForegroundColor White
+    if ($ok) {
+        $r = Set-AllMods -Enabled $true
+        Write-Host ("        启用 {0} 个，失败 {1} 个" -f $r.Ok, $r.Fail) -ForegroundColor Gray
+    } else {
+        Write-Host "        BepInEx 恢复失败，跳过插件启用。" -ForegroundColor Red
+    }
     Start-Game
 }
 
@@ -518,3 +508,4 @@ while ($true) {
 
 Write-Host ""
 Write-Host "  已退出。" -ForegroundColor DarkGray
+exit 0
