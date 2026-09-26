@@ -64,11 +64,22 @@ if (-not (Test-Path $GameDir)) {
 
 $pluginsDir  = Join-Path $GameDir "BepInEx\plugins"
 $disabledDir = Join-Path $GameDir "BepInEx\plugins_disabled"
+$bepRootDir  = Join-Path $GameDir "BepInEx"
 $bepOffDir   = Join-Path $GameDir "bepinex_off"
 $exePath     = Join-Path $GameDir "Easy Red 2.exe"
 
-# BepInEx 注入器文件（决定游戏是否弹「已修改」提示）
-$InjectorFiles = @('winhttp.dll', 'doorstop_config.ini', '.doorstop_version')
+# 「纯净」档位要移走的东西。
+#
+# 依据（2026-09-26 实测 Player.log 取证）：
+#   游戏内置 IntegrityGuard，日志打出
+#     [IntegrityGuard] BepInEx/Doorstop rilevato (early): .../BepInEx/core
+#   即它检测的是 **BepInEx 目录**（core / plugins 等）的存在，
+#   而不是（或不只是）winhttp.dll —— 只移 winhttp.dll 仍会弹提示。
+#
+# 所以「纯净」= 移走下列全部：
+$InjectorFiles = @('winhttp.dll', 'doorstop_config.ini', '.doorstop_version')  # 游戏根目录下的注入器
+$BepInExDirName = 'BepInEx'   # 整个 BepInEx 目录（约 83 MB，同盘移动是瞬间的）
+$DotnetDirName  = 'dotnet'    # BepInEx 6 的 CoreCLR 运行时（doorstop 的 coreclr_path）
 
 # 配套资源目录：禁用插件时必须一起移动
 $Companions = @{
@@ -93,16 +104,37 @@ $mineList = @(
     'ER2_UnitInfoOverlay.dll'
 )
 
+# 注意：处于「纯净」状态时整个 BepInEx\ 都在 bepinex_off\ 里，
+# 此时 $pluginsDir 不存在是正常的 —— 要做的是提示用户恢复，而不是报错退出。
+#
+# 但 -Action restore 必须能穿过这里（它的职责就是把 BepInEx 搬回来），
+# 所以仅在没有指定 Action 时报错。
+$bepOffHasBepInEx = Test-Path (Join-Path $bepOffDir $BepInExDirName)
 if (-not (Test-Path $pluginsDir)) {
-    Write-Host ""
-    Write-Host "  找不到插件目录: $pluginsDir" -ForegroundColor Red
-    Write-Host "  这台机器上似乎没装 BepInEx。" -ForegroundColor Yellow
-    Write-Host ""
-    Read-Host "  按回车退出"
-    exit 1
+    if ($Action -and $Action.ToLower() -eq 'restore') {
+        # 交给后面的 restore 分支处理，这里直接放行
+    }
+    elseif ($bepOffHasBepInEx) {
+        Write-Host ""
+        Write-Host "  当前是「纯净」状态（BepInEx 在 bepinex_off\ 里暂存）。" -ForegroundColor Magenta
+        Write-Host ""
+        Write-Host "  要恢复 mod 功能，请重新运行本启动器并选「3. 恢复」，" -ForegroundColor Yellow
+        Write-Host "  或运行: launch-er2.bat restore" -ForegroundColor Yellow
+        Write-Host ""
+        Read-Host "  按回车退出"
+        exit 0
+    }
+    else {
+        Write-Host ""
+        Write-Host "  找不到插件目录: $pluginsDir" -ForegroundColor Red
+        Write-Host "  这台机器上似乎没装 BepInEx。" -ForegroundColor Yellow
+        Write-Host ""
+        Read-Host "  按回车退出"
+        exit 1
+    }
 }
-if (-not (Test-Path $disabledDir)) {
-    New-Item -ItemType Directory -Path $disabledDir -Force | Out-Null
+if ((-not (Test-Path $disabledDir)) -and (Test-Path $bepRootDir)) {
+    New-Item -ItemType Directory -Path $disabledDir -Force -ErrorAction SilentlyContinue | Out-Null
 }
 
 # ════════════════════════════════════════════════════════════════
@@ -144,6 +176,12 @@ function Move-Entry {
                 if ($g -eq $Name) { throw "源不存在: $src" }
                 continue
             }
+            if (Test-Path $dst) {
+                # 目标可能是上次失败留下的空目录 —— 空的话直接删掉，不算冲突
+                $isEmptyDir = (Test-Path $dst -PathType Container) -and
+                              (@(Get-ChildItem $dst -Recurse -Force -ErrorAction SilentlyContinue).Count -eq 0)
+                if ($isEmptyDir) { Remove-Item $dst -Recurse -Force -ErrorAction SilentlyContinue }
+            }
             if (Test-Path $dst) { throw "目标已存在: $dst" }
             Move-Item -LiteralPath $src -Destination $dst -Force
             $moved += @{ From = $src; To = $dst }
@@ -183,38 +221,65 @@ function Set-AllMods {
 # ════════════════════════════════════════════════════════════════
 
 function Test-BepInExActive {
-    return (Test-Path (Join-Path $GameDir 'winhttp.dll'))
+    <# BepInEx 是否"在场"。
+       判据用 winhttp.dll 与 BepInEx 目录两者：
+       只要游戏还能看到任何一样，IntegrityGuard 就会报「已修改」。 #>
+    $hasDll = Test-Path (Join-Path $GameDir 'winhttp.dll')
+    $hasDir = Test-Path $bepRootDir
+    $hasDotnet = Test-Path (Join-Path $GameDir $DotnetDirName)
+    return ($hasDll -or $hasDir -or $hasDotnet)
 }
 
 function Set-BepInEx {
-    <# $true 恢复注入器；$false 关闭注入器（游戏不再弹修改提示）#>
+    <# $true 恢复；$false 关闭（游戏不再弹「已修改」提示）。
+       关闭时移走：注入器 3 个文件 + BepInEx\ + dotnet\。
+       恢复时全部搬回。同盘移动是元数据操作，瞬间完成。
+
+       注意：这里**不做"已是某状态"的早退判断** —— 因为可能出现
+       部分状态（例：BepInEx 已移走但 dotnet 还在），早退会漏搬。
+       搬运时源不存在的条目自动跳过，所以幂等。 #>
     param([bool]$Enable)
-    $active = Test-BepInExActive
-    if ($Enable -and $active)  { Write-Host "  BepInEx 已是开启状态。" -ForegroundColor DarkGray; return $true }
-    if (-not $Enable -and -not $active) { Write-Host "  BepInEx 已是关闭状态。" -ForegroundColor DarkGray; return $true }
 
     if (-not (Test-Path $bepOffDir)) {
-        if (-not $Enable) { New-Item -ItemType Directory -Path $bepOffDir -Force | Out-Null }
-        else {
+        if ($Enable) {
             Write-Host ""
             Write-Host "  找不到 bepinex_off\ 备份，无法自动恢复。" -ForegroundColor Red
-            Write-Host "  请手工把 winhttp.dll / doorstop_config.ini / .doorstop_version 放回游戏目录。" -ForegroundColor Yellow
+            Write-Host "  请手工把 BepInEx 目录与 winhttp.dll / doorstop_config.ini /" -ForegroundColor Yellow
+            Write-Host "  .doorstop_version 放回游戏目录。" -ForegroundColor Yellow
             return $false
         }
+        New-Item -ItemType Directory -Path $bepOffDir -Force | Out-Null
     }
+
+    # 要搬运的条目：3 个注入器文件 + BepInEx 目录 + dotnet 目录
+    $items = @($InjectorFiles) + @($BepInExDirName) + @($DotnetDirName)
 
     if ($Enable) { $from = $bepOffDir; $to = $GameDir }
     else         { $from = $GameDir;   $to = $bepOffDir }
 
     $moved = @()
     try {
-        foreach ($f in $InjectorFiles) {
+        foreach ($f in $items) {
             $src = Join-Path $from $f
             $dst = Join-Path $to $f
             if (-not (Test-Path $src)) { continue }
-            if ((Test-Path $dst) -and -not $Enable) { Remove-Item $dst -Force }
-            Move-Item -LiteralPath $src -Destination $dst -Force
-            $moved += @{ From = $src; To = $dst }
+            if (Test-Path $dst) {
+                # 目标可能是上次失败留下的空目录 —— 空的话直接删掉，不算冲突
+                $isEmptyDir = (Test-Path $dst -PathType Container) -and
+                              (@(Get-ChildItem $dst -Recurse -Force -ErrorAction SilentlyContinue).Count -eq 0)
+                if ($isEmptyDir) { Remove-Item $dst -Recurse -Force -ErrorAction SilentlyContinue }
+            }
+            if (Test-Path $dst) {
+                # 目标已存在：关闭时覆盖旧备份，恢复时不该发生
+                if (-not $Enable) { Remove-Item $dst -Recurse -Force -ErrorAction Stop }
+                else { throw "目标已存在，拒绝覆盖: $dst" }
+            }
+            if ($f -eq $BepInExDirName -or $f -eq $DotnetDirName) {
+                Write-Host "    正在移动 BepInEx 目录（约 83 MB，同盘瞬间完成）..." -ForegroundColor DarkGray
+            }
+            Move-Item -LiteralPath $src -Destination $dst -Force -ErrorAction Stop
+            $moved += @{ From = $src; To = $dst; Name = $f }
+            if ($f -ne $BepInExDirName) { Write-Host "    移走: $f" -ForegroundColor DarkGray }
         }
     }
     catch {
@@ -226,10 +291,10 @@ function Set-BepInEx {
         return $false
     }
 
-    # 校验结果，防止半截状态
+    # 校验：目标状态必须真的达成，否则回滚（防止 BepInEx 半死导致 mod 全废）
     $nowActive = Test-BepInExActive
     if ($nowActive -ne $Enable) {
-        Write-Host "  校验失败，正在回滚..." -ForegroundColor Red
+        Write-Host "  校验失败（状态未达成），正在回滚..." -ForegroundColor Red
         for ($i = $moved.Count - 1; $i -ge 0; $i--) {
             try { Move-Item -LiteralPath $moved[$i].To -Destination $moved[$i].From -Force } catch { }
         }

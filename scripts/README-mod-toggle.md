@@ -37,20 +37,29 @@
 
 ### 为什么「纯净」要关 BepInEx
 
-游戏检测的是游戏根目录下有没有 `winhttp.dll`（BepInEx 的注入器），
-**跟你加载了几个插件无关**。只要它还在，游戏就弹：
+游戏内置一个 `IntegrityGuard` 检查，按**特征名**逐个探测 BepInEx/Doorstop 的安装痕迹，
+**跟你加载了几个插件无关**。只要任一特征还在，游戏就弹：
 
 > An unofficially modified version of the game has been detected.
 
-取证：游戏程序集 `global-metadata.dat` 里有 `winhttp.dll in game dir` 这条检测文案。
+取证（两处）：
+
+- 游戏程序集 `global-metadata.dat` 里有 `winhttp.dll in game dir`、`BepInEx/core`、`BepInEx/plugins` 等特征字符串
+- 实测 `Player.log` 里 IntegrityGuard 逐条打出命中路径：
+  `[IntegrityGuard] BepInEx/Doorstop rilevato (early): .../BepInEx/core`，
+  移走后再启动又报 `.../dotnet` —— 说明它是在**逐个探测**这些特征
+
+> 只移 `winhttp.dll` 不够（提示依旧）；必须把 `BepInEx\` 和 `dotnet\` 也移走。
 
 所以「纯净」档位会把这三个文件移到游戏根目录下的 `bepinex_off\`：
 
-| 文件 | 作用 |
+| 移走的东西 | 作用 |
 |---|---|
-| `winhttp.dll` | 注入器本体（游戏检测的就是它） |
+| `winhttp.dll` | 注入器本体 |
 | `doorstop_config.ini` | Doorstop 配置 |
 | `.doorstop_version` | 版本标记 |
+| `BepInEx\` | BepInEx 本体（约 83 MB） |
+| `dotnet\` | BepInEx 6 的 CoreCLR 运行时 |
 
 恢复用「3. 恢复」。
 
