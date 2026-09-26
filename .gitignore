@@ -24,3 +24,8 @@ mm_toggle_dump/
 # AI 工具产生的本地状态（zcode 计划/会话产物，不入库）
 .zcode/
 .jspace/
+
+# AI 会话临时产物（构建/验证日志、临时脚本；.workbuddy/memory 仍入库）
+.workbuddy/*.log
+.workbuddy/tmp/
+d1.log
