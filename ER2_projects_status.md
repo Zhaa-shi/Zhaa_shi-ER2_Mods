@@ -18,7 +18,7 @@
 | 8 | `ZoomAnywhere` | `er2.zoomanywhere` | ER2 Zoom Anywhere | **1.0.1** | `ER2_ZoomAnywhere.dll` | 已部署 |
 | 9 | `HighValueTarget` | `er2.highvaluetarget` | ER2 Veteran HVT | **1.2.2** | `ER2_VeteranHVT.dll` | 已部署（+ Assets 目录） |
 | 10 | `InventoryPause` | `er2.inventorypause` | ER2 Inventory Pause | **1.0.5** | `ER2_InventoryPause.dll` | 已部署 |
-| 11 | `SquadCommand` | `er2.squadcommand` | ER2 Battlefield Commander | **1.4.56** | `ER2_BattlefieldCommander.dll` | **已发布（双语双包 EN 部署）** |
+| 11 | `SquadCommand` | `er2.squadcommand` | **Easy Red Gate**（原 ER2 Battlefield Commander） | **1.4.57** | `ER2_BattlefieldCommander.dll` | **已发布（双语双包 EN 部署）** |
 | 12 | `UniversalGeneration` | `er2.universalgeneration` | ER2 Universal Generation | **2.5.47** | `ER2_UniversalGeneration.dll` | 已部署 |
 | 13 | `UnitCollision` | `er2.morephysics.unitcollision` | ER2 More Physics - Unit Collision | **1.0.8** | `ER2_MorePhysics_UnitCollision.dll` | 已部署 |
 | 14 | `UnitInfoOverlay` | `er2.unitinfooverlay` | ER2 Unit Inspector | **1.0.5** | `ER2_UnitInfoOverlay.dll` | 已部署 |
@@ -732,6 +732,25 @@ tab right:enter-mods cur=3 myIndex=4  ← 原生把它丢回第 3 页，玩家�
 ### 2.10 InventoryPause `er2.inventorypause` v1.0.5
 打开背包（自己/尸体）时**真暂停**（延迟 timeScale 冻结，等打开动画完成）；暂停期间丢弃道具自动落地（扫描 `ItemObject.spawnedItems`）。
 **ER2 暂停机制图谱（全部实测定案，做任何暂停功能前必读）**：原生 `Pause.SetPause` = timeScale=0 + 弹菜单 + `disableOnPause`（藏菜单 = 死锁）；手动 `Pause.isPaused=true` 禁用输入但**不冻结世界**；`timeScale=0` 真暂停但**卡 UI 协程动画** + 丢弃武器浮空（解法：延迟冻结等动画完成 + 扫描 `spawnedItems` 拉下道具）；`enableAiBehaviour(false)` **无效**（true 才有效）；背包开关读 `InventoryPanel.isOpen`。
+
+### 2.11 SquadCommand（**Easy Red Gate**，原 Battlefield Commander）`er2.squadcommand` v1.4.57
+**1.4.57（2026-09-26，玩家：godKey 默认换键 + mod 改名 Easy Red Gate）**：
+1. **改名**：显示名 `ER2 Battlefield Commander` → **`Easy Red Gate`**。**GUID / cfg 文件名 / DLL 文件名
+   全部不变**（er2.squadcommand / er2.squadcommand.cfg / ER2_BattlefieldCommander.dll）——改 GUID 会丢
+   玩家现有 cfg，改 DLL 名会让老玩家更新时残留旧 DLL 造成同 GUID 双加载。ModManager 的显示名/收藏区
+   自动跟随元数据（玩家当前 0 收藏，无按名收藏需要迁移）；build.ps1 包名 `$pkg` 改为 `EasyRedGate`
+   （zip：`EasyRedGate_v1.4.57.zip` / `EasyRedGate_CN_v1.4.57.zip`）。
+2. **godKey 默认 F9 → F8**：F9 与 AdvancedCombatMovement 的 Restart Mission 相撞（ModManager 1.7.7
+   冲突提示抓到的三组之一）。选 F8 的依据：全机无占用（F5=UniGen/F9/F10 已占，F11/F12 是系统键）、
+   功能键在本游戏实测可用（F5/F9/F10 在跑）、与旧键相邻迁移成本最低；字母键（H/T 等）与游戏原生键位
+   无法核对（原生键位无磁盘清单），不冒险。**已装玩家 cfg 保留自己的键**（BepInEx 只在新建 cfg 时写
+   默认值）——本机 cfg 已手工改 `godKey = F8`。
+3. 四份发布文档：改名 + 版本 1.4.57 + 顶部新增 1.4.57 变更条目 + 全文 F9→F8 引用清理（含 Nexus 描述
+   与 CN 词条）。
+4. 验证：0 error；EN 构建 = 部署 = EN 包内 DLL 逐字节一致 sha256 `ea26bc05…`（242,176 B，12:10 部署，
+   走 cp+sha 以免 build.ps1 清掉玩家 cfg）；CN 包 222,720 B。
+**待实测**：进游戏日志出现 `Loading […… Easy Red Gate 1.4.57]`；F8 进/出上帝视角；ModManager 页顶
+冲突警告从 3 组降为 2 组（F、G）。
 
 ### 2.11 SquadCommand（Battlefield Commander）`er2.squadcommand` v1.4.56
 **1.4.56（2026-09-25，用户反馈："幽灵单位靠近掩体的判定范围太小了"）**：

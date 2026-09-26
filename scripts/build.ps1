@@ -27,7 +27,7 @@ switch ($Mod) {
     "UnitInfoOverlay" { $proj = "UnitInfoOverlay.csproj"; $dll = "ER2_UnitInfoOverlay.dll"; $cfg = "er2.unitinfooverlay.cfg"; $pkg = "ER2_UnitInfoOverlay"; $assetsDir = "" }
     "HighValueTarget" { $proj = "HighValueTarget.csproj"; $dll = "ER2_VeteranHVT.dll"; $cfg = "er2.highvaluetarget.cfg"; $pkg = "ER2_VeteranHVT"; $assetsDir = "ER2_VeteranHVT" }
     "InventoryPause" { $proj = "InventoryPause.csproj"; $dll = "ER2_InventoryPause.dll"; $cfg = "er2.inventorypause.cfg"; $pkg = "ER2_InventoryPause"; $assetsDir = "" }
-    "SquadCommand" { $proj = "SquadCommand.csproj"; $dll = "ER2_BattlefieldCommander.dll"; $cfg = "er2.squadcommand.cfg"; $pkg = "ER2_BattlefieldCommander"; $assetsDir = "" }
+    "SquadCommand" { $proj = "SquadCommand.csproj"; $dll = "ER2_BattlefieldCommander.dll"; $cfg = "er2.squadcommand.cfg"; $pkg = "EasyRedGate"; $assetsDir = "" }
     "UniversalGeneration" { $proj = "UniversalGeneration.csproj"; $dll = "ER2_UniversalGeneration.dll"; $cfg = "er2.universalgeneration.cfg"; $pkg = "ER2_UniversalGeneration"; $assetsDir = "" }
     "MorePhysics" { $proj = "MorePhysics.csproj"; $dll = "ER2_MorePhysics.dll"; $cfg = "er2.morephysics.cfg"; $pkg = "ER2_MorePhysics"; $assetsDir = "" }
     "Conquest" { $proj = "Conquest.csproj"; $dll = "ER2_Conquest.dll"; $cfg = "er2.conquest.cfg"; $pkg = "ER2_Conquest"; $assetsDir = "" }

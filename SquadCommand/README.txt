@@ -1,7 +1,14 @@
-ER2 Battlefield Commander v1.4.56
+Easy Red Gate v1.4.57
 =================================
 
 A BepInEx plugin for Easy Red 2 that adds an "RTS god-view squad command" layer — mouse operations inspired by Gates of Hell: Ostfront.
+
+[1.4.57 Renamed to Easy Red Gate + new default god key]
+* The mod is renamed to **Easy Red Gate** — same GUID, config file name and DLL name, so updates land in
+  place and every setting is kept.
+* God-view default key moved F9 → **F8**: F9 clashed with Advanced Combat Movement's "Restart Mission"
+  (caught by the Mod Manager's conflict warnings). Existing installations keep their bound key - change
+  it on the MODS page if you want F8.
 
 [1.4.56 Wider cover reach]
 * `Control/formCoverCorridor` default 6 → **10 m** — how far a soldier's line slot may reach for a nearby
@@ -427,7 +434,7 @@ A BepInEx plugin for Easy Red 2 that adds an "RTS god-view squad command" layer 
 * Behaviour is unchanged: the caches only accelerate; every decision still resolves against live state.
 
 [Enter / Exit]
-* F9: enter god view (mainly to enter RTS; press F9 again for emergency exit when all friendly squads are wiped).
+* F8: enter god view (mainly to enter RTS; press F8 again for emergency exit when all friendly squads are wiped).
 * Normal exit: box-select/choose units to take over → click the top-center [Take Command] button to possess a random living member, back to first person.
 * Move, focus-fire, boarding and vehicle-move orders issued in RTS keep executing after you leave RTS.
 
@@ -537,7 +544,7 @@ A BepInEx plugin for Easy Red 2 that adds an "RTS god-view squad command" layer 
 * debugLog: debug logging, **default off (keep it off in releases)**. Turning it on emits command / boarding /
   mark / formation / **backpack & wear** diagnostics (e.g. `穿戴 id=… 生效级=… 前[…] 后[…]`, `原生菜单项 …`,
   `会合进行中 dist=…`) — flip it on first when reporting a problem.
-* godKey: god view key, default F9.
+* godKey: god view key, default F8.
 * Hotkeys section keyStand/keyCrouch/keyProne/keyStop/keyHoldFire/keyCover/keyRally/keyScatter/keyPack: command hotkeys, all rebindable.
 * UI section colorBase/colorHover/colorText: UI theme colors (hex, defaults are translucent dark greens),
   applied live (button fill / border / text / friendly foot rings / selection brackets).
@@ -545,7 +552,7 @@ A BepInEx plugin for Easy Red 2 that adds an "RTS god-view squad command" layer 
 [Install]
 1. Install BepInEx (IL2CPP version) into the game root folder.
 2. Drop ER2_BattlefieldCommander.dll into <game root>\BepInEx\plugins\.
-3. Launch the game — "Loading [ER2 Battlefield Commander 1.4.56]" in the log means success.
+3. Launch the game — "Loading [Easy Red Gate 1.4.57]" in the log means success.
 
 [Coexisting with Advanced Combat Movement (Responsive Orders)]
 * Built-in compatibility: restoring fire is now "call -> read back -> write the native holdFire field

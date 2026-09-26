@@ -1,7 +1,12 @@
-ER2 Battlefield Commander v1.4.56
+Easy Red Gate v1.4.57
 ================================
 
 一款给 Easy Red 2 增加「RTS 上帝视角小队指挥」的 BepInEx 插件，鼠标操作逻辑参照《地狱之门：东部前线》。
+
+【1.4.57 更名 Easy Red Gate + 新默认上帝键】
+· mod 更名为 **Easy Red Gate**——GUID / cfg 文件名 / DLL 文件名全部不变，更新原地覆盖、设置全保留。
+· 上帝视角默认键 F9 → **F8**：F9 与 Advanced Combat Movement 的「重开任务」相撞（ModManager 的
+  冲突提示抓到的三组之一）。已装用户保留各自绑定的键，想用 F8 去 MODS 页改。
 
 【1.4.56 掩体判定范围放宽】
 · `Control/formCoverCorridor` 默认 6 → **10 米**——单位阵型槽位能"够到"多远的空闲掩体点。
@@ -81,7 +86,7 @@ ER2 Battlefield Commander v1.4.56
 · **文字还是灰色的原因**：HUD 的文字色来自**配置文件**，而 cfg 不会自己更新（陷阱 109）——
   你本地的 `colorText` 还是旧灰值。现在 `colorText` 加入迁移链（旧值 #E8E8E8 / #F1EBE2 / #F0F0F2
   → #FFFFFF），并且**更重要的是：HUD 文字色源改为直接读 `Er2Ui.Text`**——
-  指挥官 mod 与通用生成从此共用同一个纯白，三个颜色配置保留但不再被读取。
+  Easy Red Gate mod 与通用生成从此共用同一个纯白，三个颜色配置保留但不再被读取。
 · **信息栏与底部提示条在竖轴上互斥**：没选中任何单位时，信息面板整个不画（提示条显示）；
   有选中时信息面板出现（提示条让位）——不再同时存在。
 · `colorBase` 默认改为 `#00000080`（黑 50%，与新的透明度一致），迁移链同步。
@@ -145,7 +150,7 @@ ER2 Battlefield Commander v1.4.56
 · **光标恢复分色。** 1.4.19 为配合灰黑 UI 把光标所有状态压成了灰阶（只剩敌军红、工事橙），
   看起来就像"不能变色了"。现在逐状态配色：友军青绿 / 敌军红 / 可驾驶载具亮青 / 建筑灰白 /
   工事橙 / 可交互物品黄 / 默认白。
-· **指挥官 mod 与通用生成现已共用同一套面板风格**：同一套面板色令牌、同款皮革纹理、
+· **Easy Red Gate mod 与通用生成现已共用同一套面板风格**：同一套面板色令牌、同款皮革纹理、
   同样的顶部受光边；HUD 按钮描边也改用共享边框令牌（原来是拿文字色描的）。
 
 
@@ -352,7 +357,7 @@ ER2 Battlefield Commander v1.4.56
 · 行为零变化：缓存只做加速，所有判定的最终依据仍是实时状态。
 
 【进入/退出】
-· F9：进入上帝视角（主要用于进入 RTS；全军覆没等紧急情况下可再次按 F9 退出）。
+· F8：进入上帝视角（主要用于进入 RTS；全军覆没等紧急情况下可再次按 F8 退出）。
 · 正常退出：先框选/选中要接管的单位 → 点顶部中央 [控制该小队] 按钮，随机接管一名存活成员，回到第一人称。
 · RTS 中已经下达的移动、集火、登车和车辆移动任务，退出 RTS 后仍会继续执行。
 
@@ -441,7 +446,7 @@ ER2 Battlefield Commander v1.4.56
 · customCursor：RTS 内自定义光标，默认开启；cursorStyle：Circle（默认空心半透明圆）/ Arrow / Cross。
 · debugLog：调试日志开关，**默认关闭（发布版保持关闭）**。开启后输出指挥/登车/标记/阵型/**背包与穿戴**诊断
   （含 `穿戴 id=… 生效级=… 前[…] 后[…]`、`原生菜单项 …`、`会合进行中 dist=…` 等），排查问题先把它打开。
-· godKey：默认 F9，进入上帝视角。
+· godKey：默认 F8，进入上帝视角。
 · Hotkeys 节 keyStand/keyCrouch/keyProne/keyStop/keyHoldFire/keyCover/keyRally/keyScatter/keyPack：命令快捷键，全部可改键。
 · UI 节 colorBase/colorHover/colorText：界面主题色（十六进制，默认深绿半透明，与底部提示条一致），
   改后即时生效（按钮底板/描边/文字/友军脚环/选中环）。
@@ -449,7 +454,7 @@ ER2 Battlefield Commander v1.4.56
 【安装】
 1. 确保已安装 BepInEx（IL2CPP 版）到游戏根目录。
 2. 把 ER2_BattlefieldCommander.dll 放进 游戏根目录\BepInEx\plugins\。
-3. 启动游戏，日志出现 "Loading [ER2 Battlefield Commander 1.4.56]" 即成功。
+3. 启动游戏，日志出现 "Loading [Easy Red Gate 1.4.57]" 即成功。
 
 【与 Advanced Combat Movement（Responsive Orders）共存】
 · 已内置兼容：恢复开火走「调用 → 回读校验 → 直写 holdFire 字段」，不会被它的 Prefix 吞掉（见 1.4.15）。

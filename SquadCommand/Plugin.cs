@@ -9,7 +9,7 @@ using UnityEngine;
 
 namespace ER2SquadCommand;
 
-[BepInPlugin("er2.squadcommand", "ER2 Battlefield Commander", "1.4.56")]
+[BepInPlugin("er2.squadcommand", "Easy Red Gate", "1.4.57")]
 public class Plugin : BasePlugin
 {
 	internal static ManualLogSource ModLog;
@@ -61,7 +61,9 @@ public class Plugin : BasePlugin
 		enabled = Config.Bind("General", "enabled", true, Ui.Tr("主开关。"));
 		radius = Config.Bind("Control", "moveRadius", 8f, new ConfigDescription(Ui.Tr("移动到达判定半径（米）；双击右键「前往并防守」的防守半径同用此值。"), new AcceptableValueRange<float>(1f, 60f)));
 		debugLog = Config.Bind("Debug", "debugLog", false, new ConfigDescription(Ui.Tr("调试日志开关（发布版保持关闭）。开启后输出全部指挥/登车/标记/阵型/背包/穿戴诊断日志，用于问题排查。")));
-		godKey = Config.Bind("General", "godKey", KeyCode.F9, Ui.Tr("上帝视角开关（仅进入）。退出＝选中小队后点顶部[控制该小队]随机接管一人；全军覆没时按键紧急退出。空格＝暂停/继续世界。"));
+		// v1.4.57：默认 F9 → **F8**——F9 与 Advanced Combat Movement 的"Restart Mission"相撞
+		//（ModManager 的冲突提示抓到的三组之一）。F8 全机无占用，且与旧键相邻、手感迁移成本最低。
+		godKey = Config.Bind("General", "godKey", KeyCode.F8, Ui.Tr("上帝视角开关（仅进入）。退出＝选中小队后点顶部[控制该小队]随机接管一人；全军覆没时按键紧急退出。空格＝暂停/继续世界。"));
 
 		keyStand = Config.Bind("Hotkeys", "keyStand", KeyCode.Z, Ui.Tr("站起（恢复 AI 姿态）。"));
 		keyCrouch = Config.Bind("Hotkeys", "keyCrouch", KeyCode.X, Ui.Tr("蹲下。"));
@@ -151,7 +153,7 @@ public class Plugin : BasePlugin
 		// 1.4.40-1.4.42 的"武器只进背包"拦截把原生"拾取并放置于右手"也堵死了，已全部移除。
 		new Harmony("er2.squadcommand").PatchAll(typeof(Plugin).Assembly);
 		FrameEndRunner.Ensure();
-		ModLog.LogInfo("ER2 Battlefield Commander 1.4.56 loaded. godKey=" + godKey.Value);
+		ModLog.LogInfo("Easy Red Gate 1.4.57 loaded. godKey=" + godKey.Value);
 		ThirdPartyCompat.LogCoexistenceHint(ModLog); // 1.4.15：第三方 mod 共存提示
 	}
 }
