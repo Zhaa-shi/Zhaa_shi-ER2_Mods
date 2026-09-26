@@ -1,5 +1,6 @@
 # Per-dictionary duplicate check (OrdinalIgnoreCase) - ASCII only
-$src = [System.IO.File]::ReadAllText("D:\Users\71011\Documents\ER2_Mods\ModManager\Plugin.cs")
+$repoRoot = Split-Path -Parent $PSScriptRoot
+$src = [System.IO.File]::ReadAllText((Join-Path $repoRoot "ModManager\Plugin.cs"))
 function Extract-Dict([string]$name) {
     $m = [regex]::Match($src, 'Dictionary<string, string> ' + $name + ' = new Dictionary<string, string>\(StringComparer\.OrdinalIgnoreCase\)\s*\{(?<body>.*?)\n\s*\};', [System.Text.RegularExpressions.RegexOptions]::Singleline)
     if (-not $m.Success) { return @{} }

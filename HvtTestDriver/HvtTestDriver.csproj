@@ -50,7 +50,7 @@
     </Reference>
     <!-- 被测 mod：ER2 High-Value Target（直接引用，仅供内部测试） -->
     <Reference Include="ER2_HighValueTarget">
-      <HintPath>D:\Users\71011\Documents\ER2_Mods\HighValueTarget\bin\Release\net6.0\ER2_HighValueTarget.dll</HintPath>
+      <HintPath>..\HighValueTarget\bin\Release\net6.0\ER2_VeteranHVT.dll</HintPath>
       <Private>false</Private>
     </Reference>
   </ItemGroup>

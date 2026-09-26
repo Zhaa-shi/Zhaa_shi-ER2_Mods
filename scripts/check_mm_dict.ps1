@@ -1,5 +1,6 @@
 # Extract ModManager dictionaries and report coverage gaps (ASCII only - PS5.1 GBK pitfall)
-$src = [System.IO.File]::ReadAllText("D:\Users\71011\Documents\ER2_Mods\ModManager\Plugin.cs")
+$repoRoot = Split-Path -Parent $PSScriptRoot
+$src = [System.IO.File]::ReadAllText((Join-Path $repoRoot "ModManager\Plugin.cs"))
 function Extract-Dict([string]$name) {
     $m = [regex]::Match($src, 'Dictionary<string, string> ' + $name + ' = new Dictionary<string, string>\(StringComparer\.OrdinalIgnoreCase\)\s*\{(?<body>.*?)\n\s*\};', [System.Text.RegularExpressions.RegexOptions]::Singleline)
     if (-not $m.Success) { return @{} }
@@ -21,7 +22,8 @@ $all = @{}; $dup = @()
 foreach ($d in @($keys, $desc, $mods, $sects)) { foreach ($k in $d.Keys) { $lk = $k.ToLowerInvariant(); if ($all.ContainsKey($lk)) { $dup += $k } else { $all[$lk] = $true } } }
 if ($dup.Count -eq 0) { Write-Host "  none" } else { $dup | ForEach-Object { Write-Host ("  " + $_) } }
 Write-Host "=== installed cfg keys missing from keys dict ==="
-$cfgDir = "E:\SteamLibrary\steamapps\common\Easy Red 2\BepInEx\config"
+$cfgDir = Join-Path $(if ($env:ER2_GAME_DIR) { $env:ER2_GAME_DIR } else { "E:\SteamLibrary\steamapps\common\Easy Red 2" }) "BepInEx\config"
+if (-not (Test-Path $cfgDir)) { Write-Host "  (config dir not found, skipped): $cfgDir"; return }
 Get-ChildItem $cfgDir -Filter *.cfg | ForEach-Object {
     $missing = @()
     foreach ($line in [System.IO.File]::ReadAllLines($_.FullName)) {

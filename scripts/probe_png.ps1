@@ -50,7 +50,7 @@ function Sample-Png([string]$path, [int[]]$xs, [int[]]$ys) {
         Write-Host ("  ({0},{1}) idx={2} rgba=({3},{4},{5},{6})" -f $px, $py, $palIdx, $r, $g, $b, $a)
     }
 }
-$tex = "D:\Users\71011\Documents\ER2_Mods\BattlefieldUI\Assets\Textures"
+$tex = Join-Path (Split-Path -Parent $PSScriptRoot) "BattlefieldUI\Assets\Textures"
 Sample-Png "$tex\hitmarker.png" @(32, 32, 20, 20) @(32, 32, 32, 40)
 Sample-Png "$tex\panel_bg.png" @(256, 256, 256, 5, 10, 60) @(64, 6, 64, 64, 3, 90)
 Sample-Png "$tex\panel_sm.png" @(128, 128, 128) @(32, 5, 32)

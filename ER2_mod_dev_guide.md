@@ -12,7 +12,7 @@
 - 编译：dotnet SDK，`<TargetFramework>net6.0</TargetFramework>`，引用 interop/core 程序集（`Private=false`）
 - 反编译：`ilspycmd -t <Type> <dll> -o <dir>`（列出类型 `ilspycmd -l c <dll>`）；**可从已部署的 plugins DLL 恢复源码**
 - 资源解包：UnityPy（Python）读 AssetBundle（er2items/er2bundle 等）
-- rar 解压：`"C:\Users\71011\新建文件夹\WinRAR.exe" x -o+ -y <rar> "<out>\"`（系统 WinRAR 装在非标准路径）
+- rar 解压：`"<WinRAR安装路径>\WinRAR.exe" x -o+ -y <rar> "<out>\"`（系统 WinRAR 装在非标准路径）
 - BepInEx 插件以 `[BepInPlugin(guid, name, version)]` 识别，文件名任意
 
 ## 2. 关键机制（反编译确认）
@@ -1309,7 +1309,7 @@ NoHintsHudLink.cs，`dotnet build` + 运行 `ER2HudCompatTestApp.exe`，34 项�
 
 1. 编译：`dotnet build -c Release <proj>.csproj`（CN 版加 `-p:DefineConstants=CN_BUILD`）
 2. 部署：`powershell -ExecutionPolicy Bypass -File scripts\build.ps1 -Mod <名字>`（构建+部署+清cfg+打包一体；`-SkipDeploy` 只打包；**中文版加 `-Cn` 开关**：编译 CN + 部署 + 打包 `_CN_` 命名 zip，一条命令完成，无需手动复制轮询）
-3. 发布包：`C:\Users\71011\Downloads\<ModName>_v<版本>.zip`（zip = DLL + README.txt + Nexus_description.md；双语 mod 出 4 个包：EN/CN × 2）
+3. 发布包：`<输出目录>\<ModName>_v<版本>.zip`（zip = DLL + README.txt + Nexus_description.md；双语 mod 出 4 个包：EN/CN × 2）
 4. 发布简介按 N 网格式：Description / Installation instructions / Main features / Requirements / Shout outs
 5. 发布前清理调试/诊断日志；启动日志版本字符串与 BepInPlugin 一致
 6. **发布前清理清单**（本次会话经验）：

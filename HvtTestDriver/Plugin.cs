@@ -171,7 +171,7 @@ internal class DriverBehaviour : MonoBehaviour
 	{
 		try
 		{
-			string dir = "D:/Users/71011/Documents/ER2_Mods/research_out/hvt_shots";
+			string dir = Path.Combine(Paths.GameRootPath, "hvt_shots");
 			Directory.CreateDirectory(dir);
 			string path = $"{dir}/{prefix}{Time.unscaledTime.ToString("F0")}_{_shotsLeft}_{_menuShotsLeft}.png";
 			ScreenCapture.CaptureScreenshot(path);

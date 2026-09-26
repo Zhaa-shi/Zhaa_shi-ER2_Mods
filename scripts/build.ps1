@@ -12,7 +12,14 @@ param(
 #       .\scripts\build.ps1 -Mod WeatherControl -SkipDeploy
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
-$game = "E:\SteamLibrary\steamapps\common\Easy Red 2"
+
+# 游戏安装目录：可用环境变量 ER2_GAME_DIR 覆盖，否则用下面的默认值。
+# 自定义 Steam 库请改这里，或先执行 $env:ER2_GAME_DIR = "D:\SteamLibrary\steamapps\common\Easy Red 2"
+$game = if ($env:ER2_GAME_DIR) { $env:ER2_GAME_DIR } else { "E:\SteamLibrary\steamapps\common\Easy Red 2" }
+
+# 发布包输出目录：可用环境变量 ER2_OUT_DIR 覆盖，默认当前用户的下载目录。
+$outDir = if ($env:ER2_OUT_DIR) { $env:ER2_OUT_DIR } else { Join-Path $env:USERPROFILE "Downloads" }
+if (-not (Test-Path $outDir)) { New-Item -ItemType Directory -Path $outDir -Force | Out-Null }
 
 switch ($Mod) {
     "LimbTweaks" { $proj = "limbtweaks.csproj"; $dll = "ER2_LimbTweaks.dll"; $cfg = "er2.limbtweaks.cfg"; $pkg = "ER2_LimbTweaks"; $assetsDir = "" }
@@ -72,7 +79,7 @@ if (-not $SkipPackage) {
     Write-Host "[3/4] Packaging ..."
     $src = "$root\$Mod\bin\Release\net6.0\$dll"
     $tag = if ($Cn) { "_CN" } else { "" }
-    $pkgDir = "C:\Users\71011\Downloads\$pkg$tag"
+    $pkgDir = Join-Path $outDir "$pkg$tag"
     if (Test-Path $pkgDir) { Remove-Item $pkgDir -Recurse -Force }
     New-Item -ItemType Directory -Path $pkgDir -Force | Out-Null
     Copy-Item $src "$pkgDir\$dll" -Force
@@ -93,8 +100,9 @@ if (-not $SkipPackage) {
         if (Test-Path $docSrc) { Copy-Item $docSrc "$pkgDir\$doc" -Force }
     }
     $zipName = "$pkg" + $tag + "_v" + ((Select-String -Path "$root\$Mod\Plugin.cs" -Pattern '"(\d+)\.(\d+)\.(\d+)"' | Select-Object -First 1).Matches.Value.Trim('"')) + ".zip"
-    Compress-Archive -Path "$pkgDir\*" -DestinationPath "C:\Users\71011\Downloads\$zipName" -Force
-    Write-Host "Packaged: C:\Users\71011\Downloads\$zipName"
+    $zipPath = Join-Path $outDir $zipName
+    Compress-Archive -Path "$pkgDir\*" -DestinationPath $zipPath -Force
+    Write-Host "Packaged: $zipPath"
 }
 
 Write-Host "[4/4] Done. Ask user to restart the game and test."

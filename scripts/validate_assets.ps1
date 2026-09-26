@@ -11,7 +11,7 @@ function Get-Crc32([byte[]]$data) {
 }
 function Rd32([byte[]]$d, [int]$i) { return ([long](([int]$d[$i] -shl 24) -bor ([int]$d[$i+1] -shl 16) -bor ([int]$d[$i+2] -shl 8) -bor ([int]$d[$i+3]))) -band 4294967295 }
 function Rd32LE([byte[]]$d, [int]$i) { return ([long](([int]$d[$i]) -bor ([int]$d[$i+1] -shl 8) -bor ([int]$d[$i+2] -shl 16) -bor ([int]$d[$i+3] -shl 24))) -band 4294967295 }
-$tex = "D:\Users\71011\Documents\ER2_Mods\BattlefieldUI\Assets\Textures"
+$tex = Join-Path (Split-Path -Parent $PSScriptRoot) "BattlefieldUI\Assets\Textures"
 Get-ChildItem $tex -Filter *.png | ForEach-Object {
     $d = [System.IO.File]::ReadAllBytes($_.FullName)
     $sigOk = ($d[0] -eq 0x89 -and $d[1] -eq 0x50 -and $d[2] -eq 0x4E -and $d[3] -eq 0x47)
@@ -31,7 +31,7 @@ Get-ChildItem $tex -Filter *.png | ForEach-Object {
     $w = Rd32 $d 16; $h = Rd32 $d 20
     Write-Host ("{0} {1}x{2} sig={3} chunksOK={4} chunks=[{5}]" -f $_.Name, $w, $h, $sigOk, $ok, ($chunks -join ','))
 }
-$snd = "D:\Users\71011\Documents\ER2_Mods\BattlefieldUI\Assets\Sounds"
+$snd = Join-Path (Split-Path -Parent $PSScriptRoot) "BattlefieldUI\Assets\Sounds"
 Get-ChildItem $snd -Filter *.wav | ForEach-Object {
     $d = [System.IO.File]::ReadAllBytes($_.FullName)
     $riff = [System.Text.Encoding]::ASCII.GetString($d, 0, 4)

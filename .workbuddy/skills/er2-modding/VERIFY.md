@@ -18,7 +18,7 @@ Get-Item "E:\SteamLibrary\steamapps\common\Easy Red 2\Easy Red 2_Data\il2cpp_dat
 
 ## 验证 1：Skill 能被 WorkBuddy 自动加载
 
-**操作**：另开一个会话，工作目录设为 `D:\Users\71011\Documents\ER2_Mods`，然后问：
+**操作**：另开一个会话，工作目录设为 `<工作区根>`，然后问：
 「ER2 的 Mod 是 JSON 配置吗？」
 
 **判断依据**：

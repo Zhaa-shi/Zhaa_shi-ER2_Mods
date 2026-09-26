@@ -28,13 +28,13 @@ agent_created: true
 
 | 项 | 值 |
 |---|---|
-| 工作区根 | `D:\Users\71011\Documents\ER2_Mods` |
+| 工作区根 | `<工作区根>` |
 | 游戏根 | `E:\SteamLibrary\steamapps\common\Easy Red 2`（Steam appid 1324780） |
 | 插件 / 配置 / 日志 | `<Game>\BepInEx\plugins\` / `config\` / `LogOutput.log` |
 | interop | `<Game>\BepInEx\interop\`（`Assembly-CSharp.dll` ~8.7MB，游戏启动时重新生成） |
 | BepInEx | 6.0.0.0（IL2CPP 版），插件 `<TargetFramework>net6.0</TargetFramework>` |
 | 分支 | `master`，无远端，纯本地版本库 |
-| 发布包 | `C:\Users\71011\Downloads\<pkg>_v<ver>.zip` |
+| 发布包 | `<输出目录>\<pkg>_v<ver>.zip` |
 
 ### 1.1 环境核实命令（每轮开始先跑，游戏更新会静默改签名）
 

@@ -9,7 +9,7 @@
 
 | 项 | 值 |
 |---|---|
-| 工作区根 | `D:\Users\71011\Documents\ER2_Mods`（**2026-09 从 C 盘迁到 D 盘**，旧文档里的 `C:\Users\71011\Documents\ER2_Mods` 已失效） |
+| 工作区根 | `<工作区根>`（**2026-09 从 C 盘迁到 D 盘**，旧文档里的 `<工作区根>` 已失效） |
 | 游戏根 | `E:\SteamLibrary\steamapps\common\Easy Red 2`（Steam appid 1324780，buildid 25255578） |
 | 插件/配置/日志 | `<Game>\BepInEx\plugins\` / `config\` / `LogOutput.log` |
 | interop | `<Game>\BepInEx\interop\`（`Assembly-CSharp.dll` 约 8.7 MB，游戏启动时重新生成） |
@@ -17,7 +17,7 @@
 | 目标框架 | 引用 interop/core 程序集，全部 `Private=false` |
 | 分支 | `master`（**无远端**，纯本地版本库，66 个提交） |
 | 反编译 | `ilspycmd -t <Type> <dll> -o <dir>`（`-l c <dll>` 列类型）；**可从已部署 plugins DLL 恢复源码** |
-| rar 解压 | `"C:\Users\71011\新建文件夹\WinRAR.exe" x -o+ -y <rar> "<out>\"`（WinRAR 在非标准路径） |
+| rar 解压 | `"<WinRAR安装路径>\WinRAR.exe" x -o+ -y <rar> "<out>\"`（WinRAR 在非标准路径） |
 
 **游戏 2.1.x 重大变更（2026-09-05 起）**：游戏移除了 `PhaseBarGUI` 类型 —— 任何 `typeof(PhaseBarGUI)` / 直接 patch 会 `TypeLoadException` 导致**整个插件加载失败**。现行做法：`NoInteractionHints` 用 `FindGameType("PhaseBarGUI")` 运行时探测 + 条件 patch；字体获取改「活体 uGUI Text → GUI.skin」回退链（`LimbTweaks/NativeUi.cs`、`WeatherControl/NativeUi.cs`、`ModManager/Plugin.cs` 四处）。
 
@@ -33,7 +33,7 @@
 
 **两套记忆的分工（2026-09-12 起）**：
 - **仓库文档（本文件 + 台账 + zcode 成果）= 事实源**，随 git 走、任何 AI 工具都能读、跨工具迁移不丢。改代码后同步更新它。
-- **DSH 记忆插件（`dsh-memory-evolve`）= 会话记忆层**：项目关键记忆自动注入（`~/.dsh/memories/projects/0f0497177829/KEY.md`），项目日志与待办按需读写（同目录 `MEMORY.md` / `TODOS.md`）。它只在 DSH 里可见。
+- **DSH 记忆插件（`dsh-memory-evolve`）= 会话记忆层**：项目关键记忆自动注入（`<DSH记忆目录>/KEY.md`），项目日志与待办按需读写（同目录 `MEMORY.md` / `TODOS.md`）。它只在 DSH 里可见。
 - 两者冲突时**以仓库文档和源码为准**；把长期有效的结论回写进仓库文档，别只留在插件记忆里。
 
 ## 2. 目录结构
@@ -81,7 +81,7 @@ ER2_Mods/
 | `Select-String <log> -Pattern "..."` | 查日志 / 过滤本 mod 日志（**每次实测后必查，不要猜**） |
 | `ilspycmd -t <Type> <dll> -o <dir>` | 反编译查 API；也可反编译已部署 plugins DLL 恢复源码 |
 | `Get-Item <game>\BepInEx\plugins\<name>.dll` | 确认部署（比对时间戳/sha256） |
-| `"C:\Users\71011\新建文件夹\WinRAR.exe" x -o+ -y <rar> "<out>\"` | 解压 rar 发布包 |
+| `"<WinRAR安装路径>\WinRAR.exe" x -o+ -y <rar> "<out>\"` | 解压 rar 发布包 |
 
 **禁止**：修改游戏原文件 · 删除 plugins 里其他 mod · `FindObjectsOfType` 类每帧全场景扫描（用 `Creature.allCreatures` / `Creature.aliveCreatures` 静态列表，或按需 `Physics.OverlapSphere`）。
 
@@ -270,7 +270,7 @@ if (ER2Shared.NoHintsHudLink.IsHidden("er2.你的modid", "显示名")) return; /
 - 发布简介按 N 网格式：**Description / Installation instructions / Main features / Requirements / Shout outs**
 - 更新说明只讲**更新内容与达成效果**（简洁）；完整 README 按需
 - **发布前清理调试/诊断日志**（高频日志、限频诊断全清），保留低频功能日志
-- 发布包在 `C:\Users\71011\Downloads\<pkg>_v<版本>.zip`（zip 内 = DLL + README.txt + Nexus_description.md）
+- 发布包在 `<输出目录>\<pkg>_v<版本>.zip`（zip 内 = DLL + README.txt + Nexus_description.md）
 - **双语发布**（2026-09-05 起）：默认包 EN，`-Cn` 出中文包 → `README_CN.txt` / `Nexus_description_CN.md` 按包语言取（build.ps1 自动）；已做双语：SquadCommand、UniversalGeneration、**HighValueTarget（2026-09-13 补）**，其余 mod 只有 EN 文档
 - **`-Cn` 会带 `CN_BUILD` 编译定义**（`DefaultChinese=true` → 游戏内提示为中文）→ **EN/CN 两个包的 DLL 内容不同**。决定最终部署语言靠构建顺序：惯例部署 **EN 构建**（ModManager 玩家要求，HVT 同此），故先跑 `-Cn`、最后跑默认包
 

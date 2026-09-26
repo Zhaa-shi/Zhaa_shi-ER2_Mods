@@ -119,5 +119,5 @@
 - **AiParams 不是 xml 文件**：磁盘无此类 xml；AI 数值调参的入口在 `SoldierAI.ProcessAiAccuracy` + static 字段 + Lua brain，而非 AiParams（AiParams 全是能力开关，仅网络字节同步）。
 
 ## 附：反编译产物
-- 全部在 `D:\Users\71011\Documents\ER2_Mods\research_out\`（`*.decompiled.cs`，根目录为本次清单，`battle/`、`code/`、`code2/` 为附带解出的相关类型）。涉及文件：SoldierAI、ISAI、SAI_Default、AiParams、AiParamsSerializer、SquadTask、AiDestination、DestinationWaypoint、DestinationWithoutCover、ChargeDestination、MedicHealingDestination、VehicleRepairTask、CombatCover、CoverManager、AIVehicle、IVAI、VAI_Vehicle/Movable/MovableArtillery/Static/Scripted、TurretAI、Spottable、IShotTarget、Target、Turret（code/）。
+- 全部在 `<工作区根>\research_out\`（`*.decompiled.cs`，根目录为本次清单，`battle/`、`code/`、`code2/` 为附带解出的相关类型）。涉及文件：SoldierAI、ISAI、SAI_Default、AiParams、AiParamsSerializer、SquadTask、AiDestination、DestinationWaypoint、DestinationWithoutCover、ChargeDestination、MedicHealingDestination、VehicleRepairTask、CombatCover、CoverManager、AIVehicle、IVAI、VAI_Vehicle/Movable/MovableArtillery/Static/Scripted、TurretAI、Spottable、IShotTarget、Target、Turret（code/）。
 - 磁盘脚本：`Easy Red 2_Data/StreamingAssets/Missions/**/scripts/AI/*.lua`、`Missions/SHARED/*.lua`（官方 AI 大脑示例，已读 `briefing.lua` 验证 `setBrain`/`myself()`/`global`/`isSquadReady` 等 API）。
