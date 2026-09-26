@@ -1,37 +1,50 @@
-# ER2 Mod 启停切换器
+# ER2 Mod 启动器
 
-一键切换「纯原版 / 带 mod」状态，不用手动搬 DLL。
+一个文件，双击就能切换「带 mod 玩 / 无 mod 玩」。
 
-## 为什么需要它
+## 用法
 
-BepInEx 启动时会扫描 `BepInEx\plugins\` 下的**所有** `*.dll` 并加载，没有内置开关。
-装的 mod 一多，想回到原版就得逐个把 DLL 挪出去 —— 麻烦且容易漏。
+双击 **`launch-er2.bat`**，出现三个选项：
 
-本工具的做法：**把插件在 `plugins\` 和 `plugins_disabled\` 之间移动**。
-移出去 = 不加载，移回来 = 加载。只改位置，不改内容，随时可手工还原。
+```
+    1.  带 mod 玩
+        启用全部插件，正常启动游戏
 
-## 快速使用
+    2.  无 mod 玩（纯净）
+        禁用全部插件并关闭 BepInEx，不弹「已修改」提示
 
-| 操作 | 命令 |
+    3.  恢复
+        重新开启 BepInEx（不启动游戏）
+
+    d.  高级选项
+    q.  退出
+```
+
+也可以带参数直接执行：
+
+| 命令 | 作用 |
 |---|---|
-| 打开交互菜单 | 双击 `launch-er2.bat`，或 `powershell -ExecutionPolicy Bypass -File scripts\er2-mods.ps1` |
-| 真·原版启动 | 双击 `launch-er2.bat` 前先选 `n`，或 `launch-er2.bat vanilla` |
-| 真原版（无提示） | `launch-er2.bat pure` 或 `-Pure` |
-| 恢复 BepInEx | `launch-er2.bat restore` 或 `-RestoreBepInEx` |
-| 只看状态 | `powershell -ExecutionPolicy Bypass -File scripts\er2-mods.ps1 -List` |
+| `launch-er2.bat mods` | 带 mod 玩 |
+| `launch-er2.bat pure` | 无 mod 玩（纯净） |
+| `launch-er2.bat restore` | 只恢复 BepInEx，不启动游戏 |
 
-### 两种「回到原版」的区别
+## 两个档位的区别
 
 | 档位 | 做什么 | 游戏内效果 | 「已修改」提示 |
 |---|---|---|---|
-| **vanilla** | 只禁用全部插件 | 没有任何 mod | **仍然会弹** |
-| **pure（真·原版）** | 禁用全部插件 **+ 关闭 BepInEx 注入器** | 完全纯净 | **不再弹** |
+| **带 mod 玩** | 启用全部插件 | 所有 mod 生效 | 会弹 |
+| **无 mod 玩（纯净）** | 禁用全部插件 **+ 关闭 BepInEx 注入器** | 完全纯净，像没装过 mod | **不弹** |
 
-**为什么 vanilla 还会弹提示**：游戏检测的是游戏目录下有没有 `winhttp.dll`
-（BepInEx 的注入器），**与加载了哪些插件无关**。只要它还在，游戏就认为被改过。
-证据：游戏程序集 `global-metadata.dat` 里有 `winhttp.dll in game dir` 这条检测文案。
+### 为什么「纯净」要关 BepInEx
 
-**pure 模式移动的 3 个文件**（都在游戏根目录）：
+游戏检测的是游戏根目录下有没有 `winhttp.dll`（BepInEx 的注入器），
+**跟你加载了几个插件无关**。只要它还在，游戏就弹：
+
+> An unofficially modified version of the game has been detected.
+
+取证：游戏程序集 `global-metadata.dat` 里有 `winhttp.dll in game dir` 这条检测文案。
+
+所以「纯净」档位会把这三个文件移到游戏根目录下的 `bepinex_off\`：
 
 | 文件 | 作用 |
 |---|---|
@@ -39,126 +52,100 @@ BepInEx 启动时会扫描 `BepInEx\plugins\` 下的**所有** `*.dll` 并加载
 | `doorstop_config.ini` | Doorstop 配置 |
 | `.doorstop_version` | 版本标记 |
 
-它们会被移到游戏根目录下的 `bepinex_off\`。恢复用 `-RestoreBepInEx` 或菜单 `r` 键。
+恢复用「3. 恢复」。
 
-> ⚠️ **pure 期间任何 mod 都不工作**（BepInEx 根本没启动）。
-> 文件不会丢失 —— 脚本每次移动后都校验，任一步失败立即回滚。
+> ⚠️ **纯净期间任何 mod 都不工作** —— BepInEx 根本没启动。
+> 文件不会丢：每次移动后都校验，任一步失败立即回滚。
 
-### 交互菜单
+## 高级选项
 
+按 `d` 进入：
 
-```
-   1. commandmarker                        三方 [资源包]
-   2. ER2_AIFood.dll                       我的
-   ...
-  28. ER2_ZoomAnywhere.dll                 我的
-```
-
-| 输入 | 作用 |
+| 选项 | 作用 |
 |---|---|
-| `1,3,5` | 切换这几项（已启用→禁用，已禁用→启用） |
-| `a` | 全部启用 |
-| `n` | 全部禁用（= 纯原版） |
-| `m` | 只启用「我的」，禁用第三方 |
-| `t` | 只启用「第三方」，禁用「我的」 |
-| `s` 或回车 | 只刷新状态 |
-| `q` | 退出 |
+| 1 | 只启用「我的 mod」，禁用第三方 |
+| 2 | 只启用「第三方」，禁用我的 |
+| 3 | 查看完整插件清单（`[我]` / `[三]` 标记归属） |
+| 4 | 不改动，直接启动游戏 |
 
-### 命令行参数
+## 原理
 
-```powershell
--File scripts\er2-mods.ps1 -Vanilla              # 全部禁用
--File scripts\er2-mods.ps1 -All                  # 全部启用
--File scripts\er2-mods.ps1 -OnlyMine             # 只留自己的 mod
--File scripts\er2-mods.ps1 -List                 # 只看状态
--File scripts\er2-mods.ps1 -Disable 'A.dll','B.dll'
--File scripts\er2-mods.ps1 -Enable 'A.dll'
--File scripts\er2-mods.ps1 -GameDir 'D:\Steam\...\Easy Red 2'
-```
-
-## 切换后要重启游戏
-
-BepInEx 在**启动时**扫描插件目录，所以切换对**当前已运行的游戏无效**。
-`launch-er2.bat` 已把「切换 → 启动」串成一步。
-
-## 安全设计
-
-- **只移动登记在册的条目** —— `plugins\` 里的未知文件不会被碰
-- **先移动后校验** —— 任一步失败立即回滚，不留半截状态
-- **禁用 ModManager 前会警告** —— 因为它一被禁用，游戏内 MODS 页面就没了
-- **不改 DLL 内容** —— 纯位置移动，任何时候都能手工改回来
-
-## 归属清单
-
-`scripts/er2-mods.ps1` 顶部有两份清单，**新增插件时按需维护**：
-
-```powershell
-# 你自己开发的 mod（-OnlyMine / m 键用）
-$Mine = @(
-    'ER2_AIFood.dll'
-    ...
-)
-
-# 配套资源目录：禁用插件时一起移动
-$Companions = @{
-    'ER2_VeteranHVT.dll' = @('ER2_VeteranHVT')   # 插件 + 音频资源
-}
-
-# 资源包（BepInEx 不加载，但为"彻底还原"一并管理）
-$Bundles = @(
-    'commandmarker'
-)
-```
-
-> **`$Companions` 很重要**：像 `ER2_VeteranHVT.dll` 这类插件带了同名资源目录，
-> 只移 DLL 不移目录，轻则功能异常重则报错。发现新插件带资源目录时加进来。
-
-## 目录结构
+BepInEx 启动时扫描 `BepInEx\plugins\` 下**所有** `*.dll` 并加载，没有内置开关。
+本工具的做法是**移动文件**：
 
 ```
 <Game>\BepInEx\
 ├── plugins\              启用的插件（BepInEx 扫描这里）
 ├── plugins_disabled\     禁用的插件（BepInEx 不扫描）
-└── config\               配置（不受影响，切换不会丢设置）
+└── config\               配置（不受影响）
+
+<Game>\
+└── bepinex_off\          关闭 BepInEx 时，注入器文件暂存这里
 ```
 
-**配置不会丢** —— 切换只动插件目录，`config\*.cfg` 原封不动。所以你来回切换后，
-每个 mod 的设置还是原来的。
+**配置不会丢** —— 切换只动插件目录，`config\*.cfg` 原封不动，
+来回切换后每个 mod 的设置还是原来的。
 
-## 维护须知：bat 文件必须保持纯 ASCII
+**需要重启游戏** —— BepInEx 只在启动时扫描目录，切换对已运行的游戏无效。
 
-`launch-er2.bat` **不能加中文注释**。`cmd.exe` 按 ANSI/GBK 读取 .bat，
-而文件是 UTF-8 保存的，中文会变成乱码并被当作命令执行（报一堆
-`'xxx' is not recognized as an internal or external command`）。
+## 维护须知
 
-所以该文件里所有说明都用英文写，文件名也用 ASCII（`launch-er2.bat`
-而非 `启动ER2.bat`）。要改它的话请保持这个约定。
+### 两个编码约束（很重要，别搞混）
 
-> 另：PowerShell 脚本（`er2-mods.ps1`）相反 —— 它**含中文，必须以
-> UTF-8 BOM 保存**，否则 PS 5.1 会按 GBK 读取导致中文乱码、语法报错。
-> 两者要求正好相反，别搞混。
+| 部分 | 编码要求 | 原因 |
+|---|---|---|
+| **bat 头部**（`###PS1###` 之前） | **必须纯 ASCII，且不能有 BOM** | `cmd.exe` 按 ANSI/GBK 读取，中文会乱码并被当命令执行；BOM 会破坏 `@echo off` |
+| **PowerShell 部分**（`###PS1###` 之后） | **UTF-8**，运行时自动加 BOM | PS 5.1 需要 BOM 才能正确读中文 |
+
+脚本运行时会把 `###PS1###` 之后的部分提取到临时 `.ps1`（带 BOM），
+所以中文提示能正常显示，而 cmd 不会碰到它们。
+
+**改这个文件时**：bat 头部加注释只能用英文；中文注释请加到 `###PS1###` 之后。
+
+### 新增插件时
+
+在 PowerShell 部分的 `$Companions` 里登记配套资源目录（如果该插件带同名资源文件夹）：
+
+```powershell
+$Companions = @{
+    'ER2_VeteranHVT.dll' = @('ER2_VeteranHVT')   # 插件 + 音频资源，必须一起移动
+}
+```
+
+只移 DLL 不移资源目录，轻则功能异常重则报错。
+
+如果是你自己开发的新 mod，还要加进 `$mineList`（高级选项靠它区分归属）：
+
+```powershell
+$mineList = @(
+    'ER2_AIFood.dll'
+    ...
+)
+```
 
 ## 与 ModManager 的分工
 
 | | 管什么 | 何时生效 |
 |---|---|---|
-| **本工具** | 插件**是否加载** | 游戏启动前 |
+| **本启动器** | 插件**是否加载** | 游戏启动前 |
 | **ER2 ModManager** | 已加载插件的**配置项** | 即时 |
 
 两者互补：ModManager 无法让插件不加载（它自己也得先被加载才能工作），
-本工具无法改配置值。**建议保留 ModManager 为启用状态**，否则游戏里就调不了配置了。
+本启动器无法改配置值。
+
+**注意**：「纯净」档位会连 ModManager 一起关掉，那时游戏内没有 MODS 页面。
+如果只是不想要某些第三方 mod、但仍想调设置，用「高级选项 → 只启用我的」，
+而不是「纯净」。
 
 ## 常见问题
 
 **切换后游戏里 mod 还在？**
 游戏没重启。BepInEx 只在启动时扫描目录。
 
-**想让某个 mod 彻底不加载，但它不在列表里？**
-把它加进 `$Mine` 或 `$Bundles` 清单；未登记的未知文件脚本会刻意跳过。
-
-**移错了/想手工恢复？**
-直接把文件从 `plugins_disabled\` 拖回 `plugins\` 即可，两者结构完全一样。
+**移错了 / 想手工恢复？**
+直接把文件从 `plugins_disabled\` 拖回 `plugins\`，
+或从 `bepinex_off\` 拖回游戏根目录即可，两边结构完全一样。
 
 **`plugins\` 里有个 `commandmarker` 是什么？**
-UnityFS AssetBundle（Unity 资源包），BepInEx 不加载它。已纳入管理清单，
-「纯原版」时会被一起移走。
+UnityFS AssetBundle（Unity 资源包），BepInEx 不加载它。
+它属于某个 mod 的资产，会被一并移动以保持"纯净"彻底。
