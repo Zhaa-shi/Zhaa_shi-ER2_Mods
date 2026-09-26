@@ -232,7 +232,11 @@ internal static class GenCatalog
 
 	/// <summary>Plugin.Load（主菜单）调用：官方班型 + 小队库 + mod 载具在后台分帧探测。
 	/// 主菜单时物品数据库可能未就绪 → 每 2s 自动重试。面板打开时零工作量。
-	/// 重启安全：不清列表（条目去重 guard 保证幂等），被场景切换杀死后由看门狗续跑。</summary>
+	/// 重启安全：不清列表（条目去重 guard 保证幂等），被场景切换杀死后由看门狗续跑。
+	/// **v2.5.49：改为懒启动**（见 NotifyPanelOpened）——Plugin.Load 阶段游戏还在加载资源，
+	/// `GetSquadLoadouts` 内部解析班型士兵的制服/装备道具时，工坊制服包（cod3smock 等）的道具
+	/// 尚未进游戏的 MappedResources 映射表 → 每个道具一条 `Prop ID '...' not found!` Error，
+	/// 加载窗口期刷屏几百条。改到首次打开面板（战斗内，资源已就绪）才探测。</summary>
 	public static void BeginStartupProbe()
 	{
 		if (probeState != 0) return;
@@ -240,6 +244,19 @@ internal static class GenCatalog
 		probeStartedAt = Time.unscaledTime;
 		GenRunner.StartCoroutine(StartupProbeCR());
 	}
+
+	/// <summary>v2.5.49：面板打开时调用（GenPanel.SetOpen）——**探测懒启动**。
+	/// 首次打开面板才探测：那时战斗内资源已加载，制服/装备道具都已在游戏映射表里，
+	/// 探测零 Error；面板列表约 0.4s 内分帧填充完毕。看门狗只在面板开过之后才自动续跑
+	///（否则引导期 probeState==0 会被立刻拉起，等于没改）。</summary>
+	internal static void NotifyPanelOpened()
+	{
+		panelOpenedOnce = true;
+		BeginStartupProbe();
+	}
+
+	/// <summary>v2.5.49：面板是否开过（探测懒启动的闸门）。</summary>
+	private static bool panelOpenedOnce;
 
 	/// <summary>
 	/// 探测看门狗（GenDriver.Tick 每秒调一次）。**实测定案（1.3.0 日志）**：
@@ -264,7 +281,7 @@ internal static class GenCatalog
 			Plugin.ModLog.LogWarning("[UniGen] 探测协程被场景切换中断（第 " + probeRestarts + " 次），自动重启补齐（已有步兵 " + infantry.Count + " 条）");
 			probeState = 0;
 		}
-		if (probeState == 0) BeginStartupProbe();
+		if (probeState == 0 && panelOpenedOnce) BeginStartupProbe(); // v2.5.49：懒启动闸门——面板开过才续跑
 	}
 
 	private static IEnumerator StartupProbeCR()

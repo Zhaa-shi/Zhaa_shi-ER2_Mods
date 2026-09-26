@@ -9,7 +9,7 @@ using UnityEngine;
 
 namespace ER2UniversalGeneration;
 
-[BepInPlugin("er2.universalgeneration", "ER2 Universal Generation", "2.5.48")]
+[BepInPlugin("er2.universalgeneration", "ER2 Universal Generation", "2.5.49")]
 public class Plugin : BasePlugin
 {
 	internal static ManualLogSource ModLog;
@@ -58,7 +58,10 @@ public class Plugin : BasePlugin
 		GenCatalog.LoadFavorites();
 		ItemCatalog.LoadFavs(); // 2.1.0：物品收藏（"t:<id>"，与单位收藏共存于同一配置项）
 		GenRunner.Ensure();             // 协程宿主（生成协程驱动）
-		GenCatalog.BeginStartupProbe(); // 1.3.2：目录在游戏启动时后台分帧探测（面板打开零卡顿）
+		// v2.5.49：班型探测改为**懒启动**（首次打开生成面板时才跑，见 GenCatalog.NotifyPanelOpened）。
+		// 原先从 Plugin.Load（引导阶段）就开始探测，`GetSquadLoadouts` 内部解析班型士兵的制服/装备时，
+		// 工坊制服包（cod3smock 等）的道具还没进游戏的映射表 → 每个道具一条
+		// "Prop ID '...' not found! - MappedResources contains: False"，加载窗口期刷屏几百条。
 		// 2.0.2：物品目录改为**运行时 ItemsDatabase 枚举**（替换 2.0.0 的磁盘 manifest 解析）
 		// 2.0.3：修正就绪闸门（2.0.2 的 `l != null` 被空数组骗过 → 物品页签建不起来）。
 		// 现在等 `ItemsDatabase.Loaded` + 实枚举非空，且 0 条不再永久放弃。
@@ -82,6 +85,6 @@ public class Plugin : BasePlugin
 		ItemCatalog.Ensure();
 		new Harmony("er2.universalgeneration").PatchAll(typeof(Plugin).Assembly); // Tick/Draw 驱动补丁
 
-		ModLog.LogInfo("ER2 Universal Generation 2.5.48 loaded. panelKey=" + panelKey.Value);
+		ModLog.LogInfo("ER2 Universal Generation 2.5.49 loaded. panelKey=" + panelKey.Value);
 	}
 }

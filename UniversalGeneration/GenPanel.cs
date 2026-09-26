@@ -199,9 +199,11 @@ internal static class GenPanel
 			GenCatalog.EnsureVehicleCatalog();
 			GenCatalog.RebuildFavorites(); // 收藏条目解析（目录就绪后）
 			ItemCatalog.Ensure();          // 2.0.2：物品目录（运行时 ItemsDatabase 枚举，分帧）
+			GenCatalog.NotifyPanelOpened(); // v2.5.49：班型探测懒启动（战斗内资源已就绪 → 零 Prop not found 报错）
 			RebuildItemTabs();
 			RebuildFavTabs();              // 2.1.0：收藏分类子页签
-			// 探测在游戏启动时后台进行（Tick 看门狗续跑）——面板打开零探测负担（1.3.1）
+			// v2.5.49：班型探测改为懒启动（首次打开面板时进行，见 GenCatalog.NotifyPanelOpened）；
+			// 此前从 Plugin.Load 就开始，加载窗口期里工坊制服包道具未进映射表 → 每帧几百条 Prop not found 报错
 		}
 	}
 

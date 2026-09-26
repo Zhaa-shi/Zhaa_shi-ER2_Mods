@@ -19,7 +19,7 @@
 | 9 | `HighValueTarget` | `er2.highvaluetarget` | ER2 Veteran HVT | **1.2.2** | `ER2_VeteranHVT.dll` | 已部署（+ Assets 目录） |
 | 10 | `InventoryPause` | `er2.inventorypause` | ER2 Inventory Pause | **1.0.5** | `ER2_InventoryPause.dll` | 已部署 |
 | 11 | `SquadCommand` | `er2.squadcommand` | **Easy Red Gate**（原 ER2 Battlefield Commander） | **1.4.57** | `ER2_BattlefieldCommander.dll` | **已发布（双语双包 EN 部署）** |
-| 12 | `UniversalGeneration` | `er2.universalgeneration` | ER2 Universal Generation | **2.5.48** | `ER2_UniversalGeneration.dll` | 已部署 |
+| 12 | `UniversalGeneration` | `er2.universalgeneration` | ER2 Universal Generation | **2.5.49** | `ER2_UniversalGeneration.dll` | 已部署 |
 | 13 | `UnitCollision` | `er2.morephysics.unitcollision` | ER2 More Physics - Unit Collision | **1.0.9** | `ER2_MorePhysics_UnitCollision.dll` | 已部署 |
 | 14 | `UnitInfoOverlay` | `er2.unitinfooverlay` | ER2 Unit Inspector | **1.0.5** | `ER2_UnitInfoOverlay.dll` | 已部署 |
 | 15 | `FleshWoundsFixed` | `ER2_FleshWounds` | ER2 Flesh Wounds | **1.0.1** | （需手动构建部署，build.ps1 无条目） | 第三方修复版 |
@@ -2045,3 +2045,19 @@ Get-ChildItem "E:\SteamLibrary\steamapps\common\Easy Red 2\BepInEx\plugins" -Fil
   （`#u` 行）后，后续启动零报错——13:16/13:25 两次启动已实测零报错（缓存命中零枚举 + 负缓存已武装）。
   游戏本体将来更新使缓存失效时，枚举会重跑，但 `#u` 集合随缓存恢复 → 只有全新内容可能零星报几条。
 - **待复测**：再重启 2~3 次，启动日志应无 `MappedResources contains`。
+
+### 2.12.6 UniversalGeneration `er2.universalgeneration` v2.5.49（**残余刷屏真因：班型探测在引导期就跑，映射表未填充**）
+**2.5.49（2026-09-26，玩家："只要不按空格，报错一直刷新"（cod3smock/加拿大/非洲军团制服道具）+ "启动游戏加载的时候报错、以前没有"）**：
+1. **2.5.48 只修了物品目录那一半**；本轮抓到另一半：**班型目录探测（GenCatalog.BeginStartupProbe）
+   从 Plugin.Load（引导阶段）就开始**，逐个 SquadType 调 `ItemsDatabase.GetSquadLoadouts` 建班型数据——
+   **该调用内部会解析班型士兵的制服/装备道具**，而工坊制服包（cod3smock=工坊 3173868182、加拿大、
+   非洲军团等）的道具要等资源加载完才进游戏的 MappedResources 映射表 → 加载窗口期里每个道具一条
+   `Prop ID '...' not found!` Error，成对出现（游戏试"带前缀/裸 id"两个候选）。
+2. **修法（懒启动）**：探测从 Plugin.Load 移到**首次打开生成面板时**（`GenCatalog.NotifyPanelOpened`，
+   挂在 GenPanel.SetOpen 既有目录保障链上）；战斗内打开面板时资源已就绪 → 同样 ~370ms 分帧探测零 Error。
+   看门狗的自动续跑加懒启动闸门（`panelOpenedOnce`），否则引导期 probeState==0 会被立刻拉起。
+   单场景游戏（构建只有 LoadingScene 一个场景）→ 按场景名门控不可行，懒启动是零依赖方案。
+3. 验证：0 error；双语双包 `ER2_UniversalGeneration_v2.5.49.zip`（EN，138,240 B，`AC98EFEB…`）/
+   `_CN_v2.5.49.zip`（CN，130,560 B，`C82C1837…`），拆包核对 PASS；部署 = 构建 = EN 包内 DLL。
+**待实测**：启动加载阶段（按空格前后）**不再出现任何 `MappedResources contains` 报错**；生成面板
+步兵页签在首次打开后正常填充（55 官方 + 466 小队库）。

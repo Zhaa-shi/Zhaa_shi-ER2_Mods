@@ -51,6 +51,15 @@ Items go into backpacks as their **proper subclass** — magazines hold the righ
 
 ## Changelog
 
+**2.5.49**
+- **Fixed the remaining startup error spam** (`Prop ID '...' not found! - MappedResources contains: False`
+  for Canadian / COD3-smock / Afrika Korps uniform props): the squad-catalog probe started from the mod's
+  load hook — i.e. during the game's loading screen, **before its resource mapping table is populated** —
+  and building each official squad type resolved the soldiers' uniform/gear props, one game error per
+  missing prop (hundreds during the loading window). The probe now starts **lazily, the first time you open
+  the spawn panel** (in battle, when everything is loaded): the same ~0.4 s time-sliced fill, zero errors.
+  The watchdog only continues the probe after the panel has been opened once.
+
 **2.5.48**
 - **Fixed the startup error spam** (`Prop ID '...' not found! - MappedResources contains: False`). Display
   names are resolved through the game's own mapping API, and the game logs an error for every prop that has
