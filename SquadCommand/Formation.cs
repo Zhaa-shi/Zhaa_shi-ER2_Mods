@@ -47,6 +47,7 @@ internal static class Formation
 	private static readonly List<LineSlot> vehSlots = new List<LineSlot>();      // 载具（每帧）
 	private static readonly List<Vehicle> facingOnly = new List<Vehicle>();      // 1.2.3：不可移动的火力点/火炮 → 只转向
 	private static readonly HashSet<long> coveredPtrs = new HashSet<long>();
+	private static readonly List<LineSlot> snapScratch = new List<LineSlot>();   // 1.4.50：掩体吸附判定的全量步兵槽位（0.35s 节流复用）
 	private static float coverQueryNext = -10f;
 
 	// ===== 复用缓冲（避免每帧分配）=====
@@ -282,13 +283,12 @@ internal static class Formation
 		{
 			coverQueryNext = Time.unscaledTime + CoverQueryInterval;
 			RebuildCoverAssignment();
-			// 1.2.17：撤掉 1.2.16 的"手稳"判据——拖动中鼠标一直在动，判据恒 false →
-			// 幽灵永远建不出来（用户反馈"幽灵数量对不上绿圈"）。
-			// 幽灵按单位指针池化（每单位只建一次），成本可控；帧尖刺改由
-			// "组件处理改回强类型 + 幽灵真正惰性化（无 AI/无物理）"解决，而不是靠不建。
-			GhostPreview.Apply(coverSlots, facingDir);
 		}
 		BuildLayout();
+		// 1.4.50：幽灵覆盖**全部步兵槽位**（掩体吸附槽 + 阵型线槽），且每帧刷新位置——
+		// 此前幽灵只画掩体分配 → 开阔地"幽灵很难出现"、墙边"挤成一排"（用户二轮反馈）。
+		// 克隆创建仍受 MaxNewPerApply 预算限制（每帧 2 个，防 Instantiate 尖刺）；位置更新是纯赋值。
+		GhostPreview.Apply(coverSlots, lineSlots, facingDir);
 	}
 
 	/// <summary>
@@ -330,7 +330,19 @@ internal static class Formation
 			if (right.sqrMagnitude < 0.0001f) right = Vector3.right;
 			dragRight = right; dragFwd = fwd;
 			float camH = Mathf.Max(4f, cam.transform.position.y - anchor.y);
-			dragPerPx = (2f * camH * Mathf.Tan(cam.fieldOfView * 0.5f * Mathf.Deg2Rad)) / Mathf.Max(1f, Screen.height);
+			// 1.4.49：灵敏度倍率（用户反馈"灵敏度太高，阵型常常拉不准"）。
+			// 1.4.54：比例改用**斜距**（相机到锚点的视线距离）而非垂直高度——俯视倾斜时
+			// 地面 1 像素对应的真实距离按斜距算，用垂直高度会系统性偏小（45° 俯角约偏小 30%），
+			// 表现为"箭头端点追不上光标"（用户反馈"拉出的线不跟手"）。俯视度钳 0.35~1 防近水平视角失真。
+			// 代码侧再钳 0.05~4 防手改 cfg 拉出爆长箭头（同源陷阱 17g52：取值链路上每处 clamp 都是第二个范围定义）。
+			float sinDep = 1f;
+			try { sinDep = Mathf.Clamp(Mathf.Abs(cam.transform.forward.y), 0.35f, 1f); } catch { }
+			float slant = camH / sinDep;
+			float sens = Plugin.formDragSens != null ? Mathf.Clamp(Plugin.formDragSens.Value, 0.05f, 4f) : 1f;
+			dragPerPx = (2f * slant * Mathf.Tan(cam.fieldOfView * 0.5f * Mathf.Deg2Rad)) / Mathf.Max(1f, Screen.height) * sens;
+			if (Plugin.debugLog.Value)
+				SquadCmdLogic.Log("[Formation] 拖动基准 perPx=" + dragPerPx.ToString("0.000") + "m/px camH=" + camH.ToString("0.0")
+					+ " 俯视sin=" + sinDep.ToString("0.00") + " sens=" + sens.ToString("0.00"));
 		}
 		catch { }
 	}
@@ -354,10 +366,110 @@ internal static class Formation
 		coveredPtrs.Clear();
 		FillFootInfantry(infBuf);
 		if (infBuf.Count == 0 || lineLen < MinArrowLen) return;
-		float radius = Mathf.Clamp(Mathf.Max(10f, lineLen * 0.5f + 12f), 10f, MaxCoverQueryRadius);
-		AssignCovers(anchor, radius, facingDir, lineLen * 0.5f + 12f);
+		// 1.4.50：**阵型优先、掩体吸附**（用户二轮反馈"幽灵很难出现；出现了还是排排站"）。
+		// 1.4.48-：以锚点/单位为圆心"掩体优先"，阵型线只是兜底 → 掩体密集处全军挤到
+		// 锚点旁同一排掩体（"一字排开站在掩体边"）。
+		// 1.4.49：改成"沿线走廊过滤 + 沿线投影匹配"——过滤窗口太窄（|纵深|≤8m 且
+		// 沿线匹配≤12m 叠加），开阔地几乎抓不到掩体 → 幽灵消失；墙边仍把仅有的掩体占满。
+		// 现在：先给**全部步兵**按 BuildLine 同款数学排好槽位（拖多宽散多宽），
+		// 槽位 formCoverCorridor 米内有空闲掩体才"顺势占用"（每槽至多一个、每掩体至多一人）；
+		// 其余单位留在槽位上。无论有没有掩体，整条线的展开始终成立。
+		// 1.4.54 补：① 吸附半径默认 3 → 6m（3m 实测太紧——"线拉很长幽灵也不靠近掩体"）；
+		// ② 掩体查询沿阵型线**多点采样**（长线只在锚点查一次、半径上限 35m → 两端根本没查过掩体）；
+		// ③ 已选掩体点之间自动保持间距（≈槽位间距的 0.6，下限 1.5m）——掩体点常密集分布在
+		//    同一段墙上，全吸会让人贴人；有了间距，阵型的疏密才不会被掩体改写。
+		float snap = Plugin.formCoverCorridor != null ? Mathf.Clamp(Plugin.formCoverCorridor.Value, 0f, 25f) : 6f;
+		if (snap < 0.05f) return; // 0 = 完全不用掩体：全员按阵型线排开
+		ComputeLineSlots(infBuf, InfSpacing, snapScratch);
+		if (snapScratch.Count == 0) return;
+		// 第一排槽位间距 → 吸附后的最小间隔
+		float usable = Mathf.Max(lineLen, InfSpacing);
+		int perRank = Mathf.Clamp(Mathf.FloorToInt(usable / InfSpacing) + 1, 1, snapScratch.Count);
+		int inRank0 = Mathf.Min(perRank, snapScratch.Count);
+		float slotGap = inRank0 > 1 ? usable / (inRank0 - 1) : Mathf.Max(usable, InfSpacing);
+		float minGap = Mathf.Max(1.5f, slotGap * 0.6f);
+		float radius = Mathf.Clamp(lineLen * 0.5f + snap + 4f, 10f, MaxCoverQueryRadius);
+		List<AiDestination> free = QueryCoversAlongLine(anchor, radius, facingDir, lineLen * 0.5f);
+		if (free.Count == 0) return;
+		int m = free.Count;
+		Vector3[] cp = new Vector3[m];
+		bool[] used = new bool[m];
+		int kept = 0;
+		for (int i = 0; i < m; i++)
+		{
+			try { cp[i] = free[i].GetCoverPosition(); kept++; }
+			catch { used[i] = true; } // 拿不到位置的掩体不可用
+		}
+		if (kept == 0) return;
+		List<Vector3> chosen = new List<Vector3>(m); // 已占用的掩体点（防挤堆）
+		foreach (LineSlot ls in snapScratch)
+		{
+			if (ls?.unit == null) continue;
+			int best = -1; float bestD = snap;
+			for (int i = 0; i < m; i++)
+			{
+				if (used[i]) continue;
+				float dd = DistXz(cp[i], ls.pos);
+				if (dd > bestD) continue;
+				if (!GapOk(cp[i], chosen, minGap)) continue; // 与已选掩体点太近 → 跳过（保住阵型疏密）
+				bestD = dd; best = i;
+			}
+			if (best < 0) continue; // 槽位附近没有空闲掩体 → 留在阵型线上
+			used[best] = true;
+			chosen.Add(cp[best]);
+			SoldierPose pose = SoldierPose.Idle;
+			try { pose = free[best].GetCoverPose(); } catch { }
+			coverSlots.Add(new CoverSlot { unit = ls.unit, pos = cp[best], pose = pose });
+			try { coveredPtrs.Add((long)ls.unit.Pointer); } catch { }
+		}
 		if (Plugin.debugLog.Value)
-			SquadCmdLogic.Log("[Formation] covers 步兵=" + infBuf.Count + " 掩体=" + coverSlots.Count);
+			SquadCmdLogic.Log("[Formation] 掩体吸附 " + coverSlots.Count + "/" + infBuf.Count
+				+ "（snap=" + snap.ToString("0.0") + " 可用掩体=" + kept + " 半径=" + radius.ToString("0.0")
+				+ " 最小间隔=" + minGap.ToString("0.0") + "）");
+	}
+
+	/// <summary>1.4.54：沿阵型线**多点采样**查掩体——长线只在锚点查一次（半径上限 35m）够不到两端，
+	/// 两端槽位永远"找不到掩体"。结果按掩体指针去重，总量仍受 MaxCoverResults 限制。</summary>
+	private static List<AiDestination> QueryCoversAlongLine(Vector3 center, float radius, Vector3 facing, float halfSpan)
+	{
+		List<AiDestination> res = new List<AiDestination>();
+		HashSet<long> seen = new HashSet<long>();
+		List<Vector3> pts = new List<Vector3>();
+		pts.Add(center);
+		if (halfSpan > radius * 0.8f)
+		{
+			pts.Add(center + perpDir * (halfSpan * 0.6f));
+			pts.Add(center - perpDir * (halfSpan * 0.6f));
+		}
+		foreach (Vector3 p in pts)
+		{
+			List<AiDestination> one = QueryCovers(p, radius, facing);
+			if (one == null) continue;
+			foreach (AiDestination d in one)
+			{
+				if (d == null) continue;
+				long k;
+				try { k = (long)d.Pointer; } catch { continue; }
+				if (!seen.Add(k)) continue;
+				res.Add(d);
+				if (res.Count >= MaxCoverResults) break;
+			}
+			if (res.Count >= MaxCoverResults) break;
+		}
+		return res;
+	}
+
+	/// <summary>1.4.54：候选掩体与已选掩体点的最小间隔检查（防吸附把阵型挤成一堆）。</summary>
+	private static bool GapOk(Vector3 p, List<Vector3> chosen, float minGap)
+	{
+		if (chosen.Count == 0) return true;
+		float g2 = minGap * minGap;
+		for (int i = 0; i < chosen.Count; i++)
+		{
+			float dx = chosen[i].x - p.x, dz = chosen[i].z - p.z;
+			if (dx * dx + dz * dz < g2) return false;
+		}
+		return true;
 	}
 
 	/// <summary>掩体分配核心（阵型箭头与"右键建筑进掩体"共用）：按中心查询 → 就近贪心分配 → 记入 coverSlots。</summary>
@@ -428,7 +540,18 @@ internal static class Formation
 			if (n > 0)
 			{
 				GodViewController.GetSelectedInfantryInto(infBuf);
-				GodViewController.RegisterMoveObservation(center, infBuf, routeOnly: true);
+				// 1.4.52：掩体点位 = 每单位自己的落点——到位判定用（否则散在建筑四周的
+				// 单位距中心超半径，观察窗挂满 45s）；路线虚线保留（指向建筑有指向意义）。
+				Dictionary<long, Vector3> slotMap = new Dictionary<long, Vector3>();
+				foreach (CoverSlot cs in coverSlots) { try { if (cs?.unit != null) slotMap[(long)cs.unit.Pointer] = cs.pos; } catch { } }
+				List<Vector3> dests = new List<Vector3>(infBuf.Count);
+				foreach (Soldier s in infBuf)
+				{
+					Vector3 d = center;
+					try { Vector3 v; if (slotMap.TryGetValue((long)s.Pointer, out v)) d = v; } catch { }
+					dests.Add(d);
+				}
+				GodViewController.RegisterMoveObservation(center, infBuf, routeOnly: true, unitDests: dests);
 				GodViewController.NoteFormationTarget(center);
 				GodViewController.Flash(string.Format(Ui.Tr("进入建筑 → {0} 人进掩体防守"), n));
 				SquadCmdLogic.LogAlways("[CoverAssault] 建筑进掩体 center=" + center.ToString("0.0") + " 人数=" + n);
@@ -443,15 +566,35 @@ internal static class Formation
 		}
 	}
 
-	/// <summary>查询中心附近可用掩体（原生 CoverManager 八叉树）。facing 为零向量时不限受敌方向。</summary>
+	/// <summary>查询中心附近可用掩体（原生 CoverManager 八叉树）。facing 为零向量时不限受敌方向。
+	/// 1.4.55：两段查询**各自过滤**——原写法有向查询空 → 无向兜底再查，但兜底结果仍被同一把
+	/// IsCoverAvailable(facing) 有向过滤器杀光 = **兜底是死代码**（陷阱 118：掩体明明就在脚下、
+	/// 可用数恒 0）。且 IsCoverAvailable(shootDirection) 原生语义不可考（interop 无实现）、
+	/// 有向查询本身已带 dir 参数 → 摘掉后置朝向过滤，只留状态过滤（摧毁/被占/载具）。</summary>
 	private static List<AiDestination> QueryCovers(Vector3 center, float radius, Vector3 facing)
 	{
 		List<AiDestination> res = new List<AiDestination>();
 		string fac = GodViewController.MySideFaction();
 		if (string.IsNullOrEmpty(fac)) return res;
 		bool hasDir = facing.sqrMagnitude > 0.01f;
-		if (hasDir) QueryCoversOnce(center, fac, facing, radius, res);
-		if (res.Count == 0) QueryCoversOnce(center, fac, Vector3.zero, radius, res);
+		if (hasDir)
+		{
+			QueryCoversOnce(center, fac, facing, radius, res);
+			FilterCoverStates(res, fac);
+		}
+		if (res.Count == 0)
+		{
+			res.Clear();
+			QueryCoversOnce(center, fac, Vector3.zero, radius, res); // 无向兜底：只认"这里有没有掩体"
+			FilterCoverStates(res, fac);
+		}
+		return res;
+	}
+
+	/// <summary>1.4.55：掩体状态过滤（摧毁/被占/载具）。朝向适配交给 GetCovers 原生 dir 参数，
+	/// 不再做后置 IsCoverAvailable 过滤（原生语义不可考 + 双重过滤 + 曾把无向兜底杀成死代码）。</summary>
+	private static void FilterCoverStates(List<AiDestination> res, string fac)
+	{
 		for (int i = res.Count - 1; i >= 0; i--)
 		{
 			AiDestination dd = res[i];
@@ -459,12 +602,10 @@ internal static class Formation
 			try
 			{
 				if (dd.IsCoverDestroyed() || dd.IsCoverOccupied(fac) || dd.IsVehicle()) keep = false;
-				else if (hasDir && !dd.IsCoverAvailable(facing, fac)) keep = false;
 			}
 			catch { keep = false; }
 			if (!keep) res.RemoveAt(i);
 		}
-		return res;
 	}
 
 	private static void QueryCoversOnce(Vector3 center, string fac, Vector3 dir, float radius, List<AiDestination> sink)
@@ -487,17 +628,19 @@ internal static class Formation
 		catch (Exception ex) { SquadCmdLogic.Log("[Formation] GetCovers 失败: " + ex.Message); }
 	}
 
-	// ===== 布局（每帧，纯数学无分配）=====
+	// ===== 布局（每帧，纯数学）=====
 
 	/// <summary>阵型线排布：中心=锚点、方向=垂直于箭头、单排总宽=max(lineLen,(n-1)×间距)；
-	/// 排不下自动第二排（向箭头反方向错 RankGap）。成员按当前横向投影排序，减少交叉走位。</summary>
+	/// 排不下自动第二排（向箭头反方向错 RankGap）。成员按当前横向投影排序，减少交叉走位。
+	/// 1.4.50：步兵槽位数学抽成 ComputeLineSlots 两处共用——本函数（未被掩体吸附的单位，每帧）
+	/// 与掩体吸附判定（全部步兵：先排槽位，再看槽位旁有没有掩体）。</summary>
 	private static void BuildLayout()
 	{
 		lineSlots.Clear();
 		vehSlots.Clear();
 		facingOnly.Clear();
 		FillFootInfantry(infBuf);
-		// 无掩体的步兵
+		// 未被掩体吸附的步兵
 		lineBuf.Clear();
 		foreach (Soldier s in infBuf)
 		{
@@ -509,8 +652,47 @@ internal static class Formation
 		// 1.2.3：不可移动的火力点/火炮（无 AIVehicle）不进阵型线槽——它们只转向（用户要求）
 		// 1.2.7：不可移动的火力点/火炮/拖车不进阵型线槽（只转向）；判定改用是否履带/轮式/飞机
 		vehBuf.RemoveAll(v => { bool mobile = IsMobileVehicle(v); if (!mobile && v != null) facingOnly.Add(v); return !mobile; });
-		BuildLine(lineBuf, null, InfSpacing);
-		BuildLine(null, vehBuf, VehSpacing);
+		ComputeLineSlots(lineBuf, InfSpacing, lineSlots);
+		BuildVehicleLine(vehBuf, VehSpacing);
+	}
+
+	/// <summary>1.4.50：步兵槽位计算（原 BuildLine 步兵支路抽独立；写满 dst，含清空）。
+	/// 拖多宽散多宽：单排总宽=max(lineLen, spacing)，成员均匀铺满整条线。</summary>
+	private static void ComputeLineSlots(List<Soldier> units, float spacing, List<LineSlot> dst)
+	{
+		dst.Clear();
+		int n = units.Count;
+		if (n == 0) return;
+		SortSoldiersByProj(units); // 横向投影排序（减少交叉；插入排序）
+		float usable = Mathf.Max(lineLen, spacing);
+		int perRank = Mathf.Clamp(Mathf.FloorToInt(usable / spacing) + 1, 1, n);
+		for (int i = 0; i < n; i++)
+		{
+			int rank = i / perRank;
+			int idx = i % perRank;
+			int inRank = Mathf.Min(perRank, n - rank * perRank);
+			float t = inRank == 1 ? 0.5f : (float)idx / (inRank - 1);
+			float off = (t - 0.5f) * usable;
+			dst.Add(new LineSlot { unit = units[i], pos = anchor + perpDir * off - facingDir * (rank * RankGap), rank = rank });
+		}
+	}
+
+	private static void BuildVehicleLine(List<Vehicle> vehicles, float spacing)
+	{
+		int n = vehicles.Count;
+		if (n == 0) return;
+		SortVehiclesByProj(vehicles);
+		float usable = Mathf.Max(lineLen, spacing);
+		int perRank = Mathf.Clamp(Mathf.FloorToInt(usable / spacing) + 1, 1, n);
+		for (int i = 0; i < n; i++)
+		{
+			int rank = i / perRank;
+			int idx = i % perRank;
+			int inRank = Mathf.Min(perRank, n - rank * perRank);
+			float t = inRank == 1 ? 0.5f : (float)idx / (inRank - 1);
+			float off = (t - 0.5f) * usable;
+			vehSlots.Add(new LineSlot { veh = vehicles[i], pos = anchor + perpDir * off - facingDir * (rank * RankGap), rank = rank });
+		}
 	}
 
 	/// <summary>1.2.3：该载具能否被驾驶（有 AIVehicle 才能走原生订单链）。无 AIVehicle = 火力点/火炮等固定物。</summary>
@@ -524,31 +706,6 @@ internal static class Formation
 			return ai != null;
 		}
 		catch { return false; }
-	}
-
-	private static void BuildLine(List<Soldier> units, List<Vehicle> vehicles, float spacing)
-	{
-		bool forVeh = vehicles != null;
-		int n = forVeh ? vehicles.Count : units.Count;
-		if (n == 0) return;
-
-		// 横向投影排序（减少交叉；插入排序，无 lambda 分配）
-		if (forVeh) SortVehiclesByProj(vehicles);
-		else SortSoldiersByProj(units);
-
-		float usable = Mathf.Max(lineLen, spacing);
-		int perRank = Mathf.Clamp(Mathf.FloorToInt(usable / spacing) + 1, 1, n);
-		for (int i = 0; i < n; i++)
-		{
-			int rank = i / perRank;
-			int idx = i % perRank;
-			int inRank = Mathf.Min(perRank, n - rank * perRank);
-			float t = inRank == 1 ? 0.5f : (float)idx / (inRank - 1);
-			float off = (t - 0.5f) * usable;
-			Vector3 pos = anchor + perpDir * off - facingDir * (rank * RankGap);
-			if (forVeh) vehSlots.Add(new LineSlot { veh = vehicles[i], pos = pos, rank = rank });
-			else lineSlots.Add(new LineSlot { unit = units[i], pos = pos, rank = rank });
-		}
 	}
 
 	// ===== 下发（松开右键） =====
@@ -631,7 +788,19 @@ internal static class Formation
 			GodViewController.GetSelectedInfantryInto(infBuf);
 			if (coverN + lineN + vehN + faceN > 0)
 			{
-				GodViewController.RegisterMoveObservation(anchor, infBuf, routeOnly: true); // 只画路线+统计，不加行军停火（进掩体需要自由行为）
+				// 1.4.52：每单位登记"自己的落点"（槽位）判到位；路线虚线不再画——幽灵已预览过落点，
+				// 下发后的扇形虚线只余杂乱（用户反馈"没有幽灵单位后那个虚线还显示，不好看"）。
+				Dictionary<long, Vector3> slotMap = new Dictionary<long, Vector3>();
+				foreach (CoverSlot cs in coverSlots) { try { if (cs?.unit != null) slotMap[(long)cs.unit.Pointer] = cs.pos; } catch { } }
+				foreach (LineSlot ls in lineSlots) { try { if (ls?.unit != null) slotMap[(long)ls.unit.Pointer] = ls.pos; } catch { } }
+				List<Vector3> dests = new List<Vector3>(infBuf.Count);
+				foreach (Soldier s in infBuf)
+				{
+					Vector3 d = anchor;
+					try { Vector3 v; if (slotMap.TryGetValue((long)s.Pointer, out v)) d = v; } catch { }
+					dests.Add(d);
+				}
+				GodViewController.RegisterMoveObservation(anchor, infBuf, routeOnly: true, withRouteLines: false, unitDests: dests); // 统计+到位判定；不加行军停火（进掩体需要自由行为）
 				GodViewController.NoteFormationTarget(anchor);
 				GodViewController.Flash(string.Format(Ui.Tr("阵型 → 掩体 {0} + 排开 {1} + 载具 {2} + 转向 {3}"), coverN, lineN, vehN, faceN));
 				SquadCmdLogic.LogAlways("[Formation] 下发 anchor=" + anchor.ToString("0.0") + " lineLen=" + lineLen.ToString("0.0")

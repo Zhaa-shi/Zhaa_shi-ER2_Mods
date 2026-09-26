@@ -9,7 +9,7 @@ using UnityEngine;
 
 namespace ER2SquadCommand;
 
-[BepInPlugin("er2.squadcommand", "ER2 Battlefield Commander", "1.4.47")]
+[BepInPlugin("er2.squadcommand", "ER2 Battlefield Commander", "1.4.56")]
 public class Plugin : BasePlugin
 {
 	internal static ManualLogSource ModLog;
@@ -29,6 +29,8 @@ public class Plugin : BasePlugin
 	internal static ConfigEntry<KeyCode> keyScatter;
 	internal static ConfigEntry<KeyCode> keyPack;   // 1.3.0：背包窗口
 	internal static ConfigEntry<float> packRange;   // 1.3.0：背包联动半径
+	internal static ConfigEntry<float> formDragSens;      // 1.4.49：阵型拖动灵敏度倍率（1 = 旧比例，默认 0.5）
+	internal static ConfigEntry<float> formCoverCorridor; // 1.4.49：掩体走廊宽度（0 = 不优先进掩体，全部沿线排开）
 	internal static ConfigEntry<bool> ghostPreview;
 	internal static ConfigEntry<bool> customCursor;
 	internal static ConfigEntry<string> cursorStyle; // 1.2.13：Arrow（默认）/ Cross
@@ -73,6 +75,19 @@ public class Plugin : BasePlugin
 		// 1.4.8：半径回归 3m（用户规则）；兵停驻在圈外时由 LootTick 逐步重派移动带进圈（不再放大半径）
 		packRange = Config.Bind("Control", "packRange", 3f, new ConfigDescription(Ui.Tr("背包联动半径（米）：第一个打开的背包为锚点，其余背包距锚点超过此值将无法打开/自动关闭。"), new AcceptableValueRange<float>(1f, 100f)));
 		ghostPreview = Config.Bind("Control", "ghostPreview", true, Ui.Tr("阵型拖动中的白色半透明单位预览（克隆失败会自动降级为标记）。"));
+		// 1.4.49：阵型拖动手感（用户反馈"灵敏度太高，阵型常常拉不准"+"幽灵总挤在掩体边散不开"）
+		// 1.4.54：默认回 1 = 跟手（1.4.49 的 0.5 让箭头端点只到光标一半距离 → 用户反馈"拉出的线不跟手"；
+		// 同时比例本身已按俯角改用斜距修正，见 Formation.CaptureDragBasis）。想更省力就调小。
+		formDragSens = Config.Bind("Control", "formDragSens", 1f, new ConfigDescription(Ui.Tr("阵型拖动灵敏度倍率：1 = 跟手（箭头端点落在光标对应的地面点，已按俯角修正）；小于 1 更慢更省力（箭头更短），大于 1 更快。建议 0.5~1。"), new AcceptableValueRange<float>(0.1f, 2f)));
+		// 1.4.53：默认改回 3m——1.4.51 的"默认 0"把"幽灵显示预定掩体位置"这份预览也一起关掉了
+		//（用户要的是这份信息，不是让阵型被掩体吃掉）。3m = 只吸**真正挨着槽位**的掩体：
+		// 槽位压在沙袋/墙边上的单位会显示到该掩体点（带蹲/趴姿态），离得远的仍留在阵型线上。
+		// 8m（1.4.50）实测会把整条线吸到掩体边——掩体密集地形不要用大值。
+		// 1.4.56：默认 6 → 10m（用户反馈"靠近掩体的判定范围太小"）。放宽的底气来自 1.4.54 的两道保证：
+		// ① 吸附是**槽位锚定**（只允许在自己阵型槽位近旁占用掩体，不是围着锚点抢）；
+		// ② 已选掩体点之间强制保持 ≈0.6×槽位间距（GapOk），不会被吸成一堆。
+		// 超过 12m 后，掩体密集地形（村庄/连续沙袋墙）仍会把整条线拉到掩体边——需要时再往下调。
+		formCoverCorridor = Config.Bind("Control", "formCoverCorridor", 10f, new ConfigDescription(Ui.Tr("阵型槽位多少米内有空闲掩体就顺势占用（每槽至多一人，幽灵会显示在该掩体点的姿态上；已选掩体点之间自动保持间距，不会被吸成一堆）。默认 10；0 = 纯阵型线；超过 12 在掩体密集地形会把整条线拉到掩体边。"), new AcceptableValueRange<float>(0f, 25f)));
 		customCursor = Config.Bind("Control", "customCursor", true, Ui.Tr("自定义光标（RTS 内按指向对象换形状与明度：敌军红、火力点橙，其余灰阶）。"));
 		cursorStyle = Config.Bind("Control", "cursorStyle", "Circle", new ConfigDescription(Ui.Tr("光标样式：Circle=空心半透明圆（默认）/ Arrow=箭头 / Cross=细线十字。"), new AcceptableValueList<string>("Circle", "Arrow", "Cross")));
 		cursorStyle.SettingChanged += (s2, e2) => MouseCursor.InvalidateCache();
@@ -136,7 +151,7 @@ public class Plugin : BasePlugin
 		// 1.4.40-1.4.42 的"武器只进背包"拦截把原生"拾取并放置于右手"也堵死了，已全部移除。
 		new Harmony("er2.squadcommand").PatchAll(typeof(Plugin).Assembly);
 		FrameEndRunner.Ensure();
-		ModLog.LogInfo("ER2 Battlefield Commander 1.4.47 loaded. godKey=" + godKey.Value);
+		ModLog.LogInfo("ER2 Battlefield Commander 1.4.56 loaded. godKey=" + godKey.Value);
 		ThirdPartyCompat.LogCoexistenceHint(ModLog); // 1.4.15：第三方 mod 共存提示
 	}
 }

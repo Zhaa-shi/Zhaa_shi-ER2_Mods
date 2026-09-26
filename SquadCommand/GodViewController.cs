@@ -768,6 +768,12 @@ internal static class GodViewController
 	private const float NoEngageMaxSeconds = 20f;
 	private static float obsUntil = -10f;
 	private static float obsNext = -10f;
+	// 1.4.52：每单位"自己的落点"（阵型槽位）——到位判定优先用它，没有（普通移动）回落 obsTarget。
+	// 阵型单位散在槽位上、距锚点可达线长一半，用锚点判到位永远判不中 → 观察窗挂满 45s，
+	// 虚线/进度行迟迟不消失（用户反馈"没有幽灵单位后那个虚线还显示"）。
+	private static readonly Dictionary<long, Vector3> obsUnitDest = new Dictionary<long, Vector3>();
+	/// <summary>1.4.52：本次观察是否画路线虚线。阵型下发=false——幽灵已预览过落点，下发后的扇形虚线只剩杂乱。</summary>
+	private static bool obsDrawRoutes = true;
 	internal static int ObsArrived; // HUD 进度行用
 	internal static int ObsTotal;
 
@@ -1196,16 +1202,25 @@ internal static class GodViewController
 
 	/// <summary>0.7.99：下达移动后登记完成度观测。0.9.15：改用原生停火通道 + 压制有效期。
 	/// 1.0.3：routeOnly=true 仅登记路线显示/到位统计，不加行军停火（双击「前往并防守」用）。
-	/// 1.2.0：改 internal——Formation 阵型下发复用（routeOnly，进掩体需要自由行为）。</summary>
-	internal static void RegisterMoveObservation(Vector3 point, List<Soldier> units, bool routeOnly = false)
+	/// 1.2.0：改 internal——Formation 阵型下发复用（routeOnly，进掩体需要自由行为）。
+	/// 1.4.52：unitDests=每单位自己的落点（与 units 按下标平行，阵型槽位）——到位判定优先用；
+	/// withRouteLines=false 不画路线虚线（阵型下发用）。</summary>
+	internal static void RegisterMoveObservation(Vector3 point, List<Soldier> units, bool routeOnly = false, bool withRouteLines = true, List<Vector3> unitDests = null)
 	{
 		obsTarget = point;
 		obsUnits.Clear();
+		obsUnitDest.Clear();
+		obsDrawRoutes = withRouteLines;
 		HashSet<long> squads = new HashSet<long>();
-		foreach (Soldier s in units)
+		for (int i = 0; i < units.Count; i++)
 		{
+			Soldier s = units[i];
 			if (s == null || !s.IsAlive) continue;
 			obsUnits.Add(s);
+			if (unitDests != null && i < unitDests.Count)
+			{
+				try { obsUnitDest[(long)s.Pointer] = unitDests[i]; } catch { }
+			}
 			try
 			{
 				SquadCmdLogic.RegisterControlledUnit(s);
@@ -1216,6 +1231,8 @@ internal static class GodViewController
 			}
 			catch { }
 		}
+		if (Plugin.debugLog.Value && obsUnitDest.Count > 0)
+			SquadCmdLogic.Log("[MoveObs] 按槽位判到位 n=" + obsUnitDest.Count + " routeLines=" + obsDrawRoutes);
 		// 0.9.15：原生停火（小队级 SetHoldFireOrder）+ 士兵级禁被压制找掩护。
 		// 不再切断 GetBestVisibleEnemy——全盲会引发任务系统异常（罚站/冻结）且拦不住任务级打断。
 		if (routeOnly) squads.Clear();
@@ -1325,6 +1342,8 @@ internal static class GodViewController
 		obsNoEngageSquads.Clear();
 		obsUnits.Clear();
 		obsVehicles.Clear();
+		obsUnitDest.Clear();  // 1.4.52：槽位落点表随观察一起清
+		obsDrawRoutes = true; // 1.4.52：复位默认（下次普通移动照常画路线）
 		obsUntil = -10f;
 		obsNoEngageExpire = -10f;
 		ObsTotal = 0;
@@ -1390,7 +1409,11 @@ internal static class GodViewController
 			{
 				if (s == null || !s.IsAlive || s.transform == null) { obsUnits.RemoveAt(i); continue; }
 				alive++;
-				if ((s.transform.position - obsTarget).sqrMagnitude <= r2) arrived++;
+				// 1.4.52：优先用该单位自己的落点（阵型槽位）判到位——用锚点判距会把散在
+				// 线两端的单位永远判成未到位，观察窗挂满 45s（虚线/进度行不消失）。
+				Vector3 dest = obsTarget;
+				if (obsUnitDest.Count > 0) { Vector3 d; if (obsUnitDest.TryGetValue((long)s.Pointer, out d)) dest = d; }
+				if ((s.transform.position - dest).sqrMagnitude <= r2) arrived++;
 			}
 			catch { obsUnits.RemoveAt(i); }
 		}
@@ -3789,9 +3812,10 @@ internal static class GodViewController
 		// 1.0.3：移动路线标识——观察任务存续期间，每个行进单位/载具 → 目标点灰色半透明虚线
 		//（含双击「前往并防守」的 routeOnly 登记；45s 观察窗到期或全员到位自动消失）1.0.5：减细
 		// 1.2.1：改为只对【当前选中】的单位显示——用户反馈：选择已清空后连线仍挂着太杂乱
+		// 1.4.52：obsDrawRoutes=false（阵型下发）不画——幽灵已预览过落点，下发后的扇形虚线只剩杂乱
 		try
 		{
-			if (moveViz && ShowPathLines && MarkersAllEnabled && (obsUnits.Count > 0 || obsVehicles.Count > 0))
+			if (moveViz && obsDrawRoutes && ShowPathLines && MarkersAllEnabled && (obsUnits.Count > 0 || obsVehicles.Count > 0))
 			{
 				// 2.5.0：行进路线 = 白 @0.26 **长虚线**（DashLong）——与登车线（短虚线 @0.48）区分开。
 				// 原 pathC 与 boardC 字面量完全相同（都是 0.7,0.7,0.7,0.4），两种语义撞色，已修。

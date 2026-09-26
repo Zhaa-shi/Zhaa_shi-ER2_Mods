@@ -136,6 +136,8 @@ internal static class Ui
 		["集合（各队向班长集结）。"] = "Rally (each squad regroups on its leader).",
 		["分散（各队就地散开找掩护）。"] = "Scatter (squads spread out and seek cover).",
 		["阵型拖动中的白色半透明单位预览（克隆失败会自动降级为标记）。"] = "White translucent unit preview while dragging formations (auto-degrades to markers if cloning fails).",
+		["阵型拖动灵敏度倍率：1 = 跟手（箭头端点落在光标对应的地面点，已按俯角修正）；小于 1 更慢更省力（箭头更短），大于 1 更快。建议 0.5~1。"] = "Formation drag sensitivity multiplier: 1 = 1:1 with the cursor (arrow tip lands on the ground point under the cursor, camera pitch corrected); below 1 is slower/shorter, above 1 faster. Try 0.5-1.",
+		["阵型槽位多少米内有空闲掩体就顺势占用（每槽至多一人，幽灵会显示在该掩体点的姿态上；已选掩体点之间自动保持间距，不会被吸成一堆）。默认 10；0 = 纯阵型线；超过 12 在掩体密集地形会把整条线拉到掩体边。"] = "Formation slots snap to a free cover within this many metres (max one unit per cover; the ghost is drawn at that cover point with its pose, and snapped points keep a minimum gap so they never bunch up). Default 10; 0 = pure formation line; above 12 will pull the whole line onto the cover edge in cover-dense terrain.",
 
 		// ===== 1.4.21 补：Markers 段 cfg 描述（此前表中缺失，EN 构建会回退中文）=====
 		["友军脚环（步兵/载具地面圆环）。仅 RTS 视角显示。"] = "Friendly foot rings (ground circles for infantry/vehicles). RTS view only.",

@@ -19,7 +19,7 @@ namespace ER2SquadCommand;
 internal static class GhostPreview
 {
 	private const int MaxGhosts = 16;        // 单次拖动的幽灵总量上限
-	private const int MaxNewPerApply = 6;    // 每次刷新最多新建几个（分摊 Instantiate 尖刺）
+	private const int MaxNewPerApply = 2;    // 每次刷新最多新建几个（1.4.50 起 Apply 每帧调用，预算降为 2 防 Instantiate 尖刺；16 个约 8 帧建满）
 	private const int GhostPtrCap = 512;     // 幽灵指针表上限（异常路径下防无界增长）
 
 	private static readonly Dictionary<long, GameObject> live = new Dictionary<long, GameObject>();
@@ -255,52 +255,69 @@ internal static class GhostPreview
 	// 池化与刷新
 	// ══════════════════════════════════════════════════════════
 
-	/// <summary>按掩体分配计划刷新幽灵集合（拖动中限频调用）。计划外的幽灵隐藏待复用，不销毁。</summary>
-	internal static void Apply(List<Formation.CoverSlot> covers, Vector3 facing)
+	/// <summary>按计划刷新幽灵集合（1.4.50 起每帧调用）：**掩体吸附槽 + 阵型线槽全部出幽灵**——
+	/// 此前只画掩体分配 → 开阔地幽灵几乎不出现、墙边挤成一排（用户二轮反馈）。
+	/// 计划外的幽灵隐藏待复用，不销毁。克隆创建受 MaxNewPerApply 预算限制。</summary>
+	internal static void Apply(List<Formation.CoverSlot> covers, List<Formation.LineSlot> lineSlots, Vector3 facing)
 	{
 		try
 		{
-			if (!Enabled || covers == null || covers.Count == 0) { ClearAll(); return; }
+			bool hasCovers = covers != null && covers.Count > 0;
+			bool hasLines = lineSlots != null && lineSlots.Count > 0;
+			if (!Enabled || (!hasCovers && !hasLines)) { ClearAll(); return; }
 			EnsureMat();
 			Quaternion rot = Quaternion.LookRotation(facing.sqrMagnitude > 0.001f ? facing : Vector3.forward);
 			int created = 0;
 			int activeTotal = 0;
-			foreach (Formation.CoverSlot cs in covers)
-			{
-				if (cs == null || activeTotal >= MaxGhosts) break;
-				long k = 0;
-				try
-				{
-					if (cs.unit == null || !cs.unit.IsAlive || cs.unit.transform == null) continue;
-					k = (long)cs.unit.Pointer;
-				}
-				catch { continue; }
-				GameObject g;
-				if (!live.TryGetValue(k, out g) || g == null)
-				{
-					if (created >= MaxNewPerApply) continue; // 本轮预算用完：下一轮再建（标记仍在，不缺指示）
-
-					g = MakeGhost(cs.unit);
-					if (g == null) continue; // 克隆失败：本轮跳过（连续失败会自动降级）
-					live[k] = g;
-					TryPose(g, cs.pose);
-					created++;
-				}
-				try { g.SetActive(true); g.transform.position = cs.pos; g.transform.rotation = rot; activeTotal++; } catch { }
-			}
+			if (hasCovers)
+				foreach (Formation.CoverSlot cs in covers)
+					RefreshOne(cs?.unit, cs != null ? cs.pos : Vector3.zero, cs != null ? cs.pose : SoldierPose.Idle, rot, ref created, ref activeTotal);
+			if (hasLines)
+				foreach (Formation.LineSlot ls in lineSlots)
+					RefreshOne(ls?.unit, ls != null ? ls.pos : Vector3.zero, SoldierPose.Idle, rot, ref created, ref activeTotal);
 			// 计划外的幽灵：隐藏待复用（不 Destroy——销毁/重建是拖动卡顿的根因）
 			// 1.2.15 性能：原实现每个幽灵都遍历整张 covers 表（O(n×m)），改为 HashSet 一次比对。
 			wantedPtrs.Clear();
-			foreach (Formation.CoverSlot cs in covers)
-			{
-				try { if (cs?.unit != null) wantedPtrs.Add((long)cs.unit.Pointer); } catch { }
-			}
+			if (hasCovers)
+				foreach (Formation.CoverSlot cs in covers)
+				{
+					try { if (cs?.unit != null) wantedPtrs.Add((long)cs.unit.Pointer); } catch { }
+				}
+			if (hasLines)
+				foreach (Formation.LineSlot ls in lineSlots)
+				{
+					try { if (ls?.unit != null) wantedPtrs.Add((long)ls.unit.Pointer); } catch { }
+				}
 			foreach (KeyValuePair<long, GameObject> kv in live)
 			{
 				try { if (!wantedPtrs.Contains(kv.Key) && kv.Value != null && kv.Value.activeSelf) kv.Value.SetActive(false); } catch { }
 			}
 		}
 		catch (Exception ex) { SquadCmdLogic.Log("[Ghost] Apply 失败: " + ex.Message); }
+	}
+
+	/// <summary>1.4.50：单个槽位的幽灵刷新（建/复用 + 摆位）。掩体槽带建议姿态，阵型线槽为站姿。</summary>
+	private static void RefreshOne(Soldier s, Vector3 pos, SoldierPose pose, Quaternion rot, ref int created, ref int activeTotal)
+	{
+		if (s == null || activeTotal >= MaxGhosts) return;
+		long k = 0;
+		try
+		{
+			if (!s.IsAlive || s.transform == null) return;
+			k = (long)s.Pointer;
+		}
+		catch { return; }
+		GameObject g;
+		if (!live.TryGetValue(k, out g) || g == null)
+		{
+			if (created >= MaxNewPerApply) return; // 本帧预算用完：下一帧再建（标记仍在，不缺指示）
+			g = MakeGhost(s);
+			if (g == null) return; // 克隆失败：本轮跳过（连续失败会自动降级）
+			live[k] = g;
+			TryPose(g, pose);
+			created++;
+		}
+		try { g.SetActive(true); g.transform.position = pos; g.transform.rotation = rot; activeTotal++; } catch { }
 	}
 
 

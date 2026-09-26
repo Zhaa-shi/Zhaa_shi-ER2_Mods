@@ -1,7 +1,74 @@
-ER2 Battlefield Commander v1.4.38
+ER2 Battlefield Commander v1.4.56
 =================================
 
 A BepInEx plugin for Easy Red 2 that adds an "RTS god-view squad command" layer — mouse operations inspired by Gates of Hell: Ostfront.
+
+[1.4.56 Wider cover reach]
+* `Control/formCoverCorridor` default 6 → **10 m** — how far a soldier's line slot may reach for a nearby
+  free cover spot. Larger = more cover use; 0 = pure formation line; above 12 pulls the whole line onto
+  the cover edge in cover-rich terrain.
+
+[1.4.55 Cover that was there but never found]
+* **Covers existed, the query killed them.** The "no facing" fallback re-ran the very facing filter that
+  had already emptied the first query — so when a wall's cover points did not accept the current facing,
+  available cover was always 0 no matter how many times it queried. Both passes now filter for themselves
+  (destroyed / occupied / vehicle only), so the fallback actually falls back.
+
+[1.4.54 The drag follows the cursor]
+* **The arrow tip was systematically short.** The pixel→metre ratio used the camera's **height**, but a
+  tilted god view needs the **slant distance** — at ~45° the arrow came out about 30 % short, so the line
+  never reached where you dragged. Fixed; `Control/formDragSens` default is now **1** (1:1 with the
+  cursor). Below 1 = slower/shorter, above 1 = faster.
+* **Long lines find cover too**: the cover query now samples several points along the formation line
+  instead of one circle at the press point (a single circle could never reach both ends of a long line).
+* **Cover snapping no longer bunches soldiers up**: taken cover spots keep a minimum gap (~0.6× the line
+  spacing, floor 1.5 m), so a dense sandbag wall cannot compress your line.
+
+[1.4.53 Cover preview is back — and localised]
+* Dragging a formation shows ghosts at the cover spots again, but snapping is now **anchored to each
+  soldier's own slot** (default 3 m): only soldiers whose slot is already next to cover take it, everyone
+  else stays on the line. (1.4.51 had switched snapping off entirely, which also killed the preview.)
+
+[1.4.52 No more lingering dashed lines after a formation]
+* **Formation orders no longer draw route dashes** — the ghosts already showed where everyone goes.
+* **Fixed a 45-second hang**: arrival was measured against the shared anchor, but soldiers deploy to their
+  own slots (up to half the line length away), so "everyone arrived" was never true and the route lines,
+  the `Moving → x/N` readout and the target ring stayed up for the whole observation window. Arrival is
+  now judged per soldier against his own slot — everything clears as soon as the last man is in place.
+
+[1.4.50 The preview now shows every soldier]
+* **Ghosts cover every infantry slot** (cover spots *and* line slots), refreshed every frame while you
+  drag. Previously only cover spots had ghosts — which is why open ground looked "empty" and walls looked
+  "crowded". The line you drag is the line you see.
+* Cover switched from "grab the nearest cover around the press point" to **slot-anchored snapping**: a
+  soldier only takes a free cover near his own slot; everyone else stays on the line.
+
+[1.4.49 Formation drag sensitivity is a config knob]
+* New `Control/formDragSens` — length multiplier for the drag arrow (1 = the old ratio, lower = shorter
+  and steadier).
+
+[1.4.48 Panel opacity finally reaches 50 %]
+* The shared UI toolkit clamped `uiPanelAlpha` to 0.55–1.0 while the config allowed 0.40–1.0, so anything
+  below 0.55 was silently raised — **the whole 0.40–0.55 range was dead**. Clamp fixed to 0.40–1.0.
+
+[1.4.47 Pixel-perfect text alignment completed]
+* The last hand-drawn `GUI.Label` / `GUI.Button` call sites (titles, faction row, item help, crew row,
+  pager) now go through the shared toolkit, so no text sits half a pixel off.
+
+[1.4.46 / 1.4.45 Grey-on-grey text: root causes fixed]
+* Three separate causes of "the text still looks grey": colour-space conversion, sub-pixel glyph
+  rendering, and IMGUI state bleeding between draws. All handled in the shared toolkit, so both this mod
+  and Universal Generation benefit.
+
+[1.4.44 / 1.4.43 Weapon handling returns to the native pipeline]
+* Undid the 1.4.40–1.4.42 "weapons can only go into the backpack" interception — it also broke the native
+  "pick up and place in the right hand". Backpack weapon entries now **walk there first, then run the
+  native interaction** (no more teleporting items), and taking a weapon in hand uses the native
+  `Soldier.PickUpItemFromInventory` with a held-weapon check and a fallback.
+
+[1.4.39 Panel opacity defaults unified]
+* Panel opacity default is 0.50 in both this mod and Universal Generation, with matching migration rules —
+  the two mods can no longer render two different looks from the same setting.
 
 [1.4.38 Correction: the background-free style applies to the hint bar, not the info panel]
 * **Info panel background restored** - I misread your last message: "make it look like the top-left
@@ -461,6 +528,11 @@ A BepInEx plugin for Easy Red 2 that adds an "RTS god-view squad command" layer 
 * packRange: backpack link radius (m), default 3 — the first opened pack is the anchor; if a walked unit stops short
   of it the mod re-issues the move (up to 8 times) until he gets inside.
 * ghostPreview: white translucent unit preview while dragging formations, default on (auto-degrades to markers if cloning fails).
+* formDragSens: formation drag sensitivity, default **1** = the arrow tip lands on the ground point under
+  the cursor; below 1 = shorter and steadier, above 1 = faster.
+* formCoverCorridor: how far a soldier's formation slot may reach for a nearby free cover spot, default
+  **10 m** (0 = pure formation line, never use cover; above 12 pulls the whole line onto the cover edge in
+  cover-rich terrain).
 * customCursor: custom cursor in RTS, default on. cursorStyle: Circle (default) / Arrow / Cross.
 * debugLog: debug logging, **default off (keep it off in releases)**. Turning it on emits command / boarding /
   mark / formation / **backpack & wear** diagnostics (e.g. `穿戴 id=… 生效级=… 前[…] 后[…]`, `原生菜单项 …`,
@@ -473,7 +545,7 @@ A BepInEx plugin for Easy Red 2 that adds an "RTS god-view squad command" layer 
 [Install]
 1. Install BepInEx (IL2CPP version) into the game root folder.
 2. Drop ER2_BattlefieldCommander.dll into <game root>\BepInEx\plugins\.
-3. Launch the game — "Loading [ER2 Battlefield Commander 1.4.18]" in the log means success.
+3. Launch the game — "Loading [ER2 Battlefield Commander 1.4.56]" in the log means success.
 
 [Coexisting with Advanced Combat Movement (Responsive Orders)]
 * Built-in compatibility: restoring fire is now "call -> read back -> write the native holdFire field

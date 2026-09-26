@@ -6,7 +6,7 @@ Adds an "RTS god-view squad command" layer to Easy Red 2, with mouse operations 
 ## Installation instructions
 1. Install BepInEx (IL2CPP build) into the game root folder.
 2. Put `ER2_BattlefieldCommander.dll` into `Easy Red 2\BepInEx\plugins\`.
-3. Launch the game — `Loading [ER2 Battlefield Commander 1.4.38]` in the BepInEx log means success.
+3. Launch the game — `Loading [ER2 Battlefield Commander 1.4.56]` in the BepInEx log means success.
 
 ## Main features
 - **God-view command**: F9 to enter free camera, WASD move, wheel zoom, MMB rotate, Q/E height, Space to pause/resume the world.
@@ -15,9 +15,9 @@ Adds an "RTS god-view squad command" layer to Easy Red 2, with mouse operations 
   - LMB on a friendly soldier/vehicle = select (a vehicle crew counts as one unit); LMB on enemy/empty = clear selection
   - Double-click a friendly = select their whole squad
   - RMB short press = order (ground = move; enemy = persistent focus-fire mark; friendly/neutral vehicle or fire position = board/enter directly; friendly soldier in a vehicle = board as reinforcement; building/house = selected infantry enter and take cover inside); RMB double-click = native "Move & Defend"
-  - **RMB long press + drag = formation arrow (Gates of Hell style)**: the line is centered on the press point, perpendicular to the drag, as long as the drag; units face along the arrow. Where native cover points exist near the target (sandbags, walls, Combat Cover props...), infantry are assigned cover spots and walk in through the native cover system (they take the cover's suggested stance/facing themselves); the rest spread along the line. While dragging, white translucent ghost models preview every assigned cover spot plus line/vehicle slot markers. Vehicles take line slots, drive there, then pivot to the arrow direction after arriving
+  - **RMB long press + drag = formation arrow (Gates of Hell style)**: the line is centered on the press point, perpendicular to the drag, as long as the drag; units face along the arrow. **Every infantry slot is previewed live by a white translucent ghost model** (since v1.4.50 — previously only cover spots were). Where native cover points exist near a soldier's own slot (sandbags, walls, Combat Cover props...), he takes that spot and walks in through the native cover system, taking the cover's suggested stance himself; everyone else stays on the line. How far a slot may reach for cover is `formCoverCorridor` (default 10 m, 0 = pure line). Vehicles take line slots, drive there, then pivot to the arrow direction after arriving
   - **Command hotkeys** (rebindable): Z stand / X crouch / C prone / V halt / B hold-fire toggle / N cover nearby / M rally on leaders / F scatter into cover
-  - **Route lines**: after a move or boarding order, every marching unit draws a thin grey dashed line to its target (boarding lines follow the vehicle), cleared on arrival
+  - **Route lines**: after a move or boarding order (not formation orders), every marching unit draws a thin grey dashed line to its target (boarding lines follow the vehicle), cleared on arrival — since v1.4.52 arrival is judged per soldier against his own slot, so lines and the "Moving → x/N" readout clear as soon as the last man is in place
   - Ctrl+1~9 save the current selection as a group; 1~9 recall (dead units auto-pruned)
   - Only units with the ◆ cursor (selected) respond to orders — unselected units stay put
 - **Bottom-left info panel**: focused unit name/class, health bar, stance, suppression level; ◀ ▶ cycles through selected units. With vehicles selected it also carries [Dismount] / [Repair] (the right-click interaction ring was removed). Immobile fire positions/artillery only take formation facing — the arrow pivots them in place. Left-click on a corpse (any faction) selects it.
@@ -288,6 +288,34 @@ Thanks to the Easy Red 2 community and the BepInEx / Harmony ecosystem, and to a
 - **World markers moved from transparency to greyscale.** Semi-transparent grey (alpha 0.26-0.48) gets eaten by grass, snow and sand. All world markers are now near-opaque greyscale (alpha >= 0.80) with hierarchy carried by lightness (#9AA1A8 -> #C6CBD0 -> #E2E6EA -> white). Only the ghost preview stays translucent.
 - **Panels got structure instead of flat colour blocks.** New `Frame` (outline), `HLine` (divider) and `AccentBar` (selection stripe) primitives, a separate title-bar fill, inset list borders and a left stripe on favourite rows. Hierarchy is now face + line + bar.
 - **Palette pulled back to mid-dark grey** (1.4.20 lift went too far): panel #14181D, title bar #1F252C, control #262D35, hover #333B45, selected #46505C.
+
+**1.4.56**
+- Cover reach widened: `formCoverCorridor` default 6 → 10 m (0 = pure formation line, never use cover).
+
+**1.4.55**
+- Fixed: cover that existed was filtered out twice — the "no facing" fallback query re-ran the same facing filter that had already emptied the first query, so some walls never offered any cover.
+
+**1.4.54**
+- **The drag follows the cursor.** The pixel→metre ratio used the camera's height instead of the slant distance, making the arrow about 30 % short on tilted views; the line never reached where you dragged. Fixed, and `formDragSens` now defaults to 1 (1:1 with the cursor).
+- Cover queries now sample along the whole formation line, so long lines find cover past the press point.
+- Snapped cover spots keep a minimum gap — a dense sandbag wall can no longer compress your line.
+
+**1.4.52**
+- Formation orders no longer draw route dashes (the ghosts already showed the plan).
+- Fixed: arrival was judged against the shared anchor instead of each soldier's own slot, so "everyone arrived" was never true and the route lines, the "Moving → x/N" readout and the target ring hung around for 45 seconds.
+
+**1.4.50**
+- **The formation preview now shows every infantry slot** — cover spots *and* line slots — as a ghost, refreshed every frame while you drag. Previously only cover spots had ghosts, which is why open ground looked empty and cover-rich ground looked crowded.
+- Cover is now **slot-anchored**: a soldier only takes a free cover near his own slot, instead of the whole squad grabbing the nearest cover around the press point.
+
+**1.4.49**
+- New config `formDragSens`: formation drag sensitivity (1 = default, 1:1 with the cursor; lower = shorter and steadier).
+
+**1.4.48**
+- Panel opacity can finally go down to 0.40 — the shared UI toolkit clamped it to 0.55, so the whole 0.40–0.55 range was dead.
+
+**1.4.39 – 1.4.47**
+- Maintenance: weapon handling returned to the native pipeline (no more items teleporting into backpacks); the three root causes of grey-on-grey text fixed (colour space / sub-pixel glyph rendering / IMGUI state bleed); pixel-perfect text alignment completed; panel opacity defaults unified with Universal Generation.
 
 **1.4.20**
 - **Adaptive UI.** Panels, HUD text, the bottom hint bar, backpack grids, tooltips and the context menu now follow the **game's own UI size setting** (`ResourcesManager.ResolutionMult`, with a screen-resolution fallback). Change UI size in the game options and both this mod and Universal Generation rescale together. No dragging, no number fields, no config entry. Clamped to 0.75x – 1.6x.
