@@ -28,10 +28,14 @@ param(
     [string[]]$Enable,
     # 全部启用
     [switch]$All,
-    # 全部禁用（= 纯原版）
+    # 全部禁用（= 纯原版，但 BepInEx 仍在）
     [switch]$Vanilla,
     # 启用「自己的 mod」、禁用第三方
     [switch]$OnlyMine,
+    # 真·原版：连 BepInEx 注入器一起关闭（游戏不再提示"已修改"）
+    [switch]$Pure,
+    # 恢复 BepInEx 注入器
+    [switch]$RestoreBepInEx,
     # 游戏目录（默认读环境变量或 Steam 默认路径）
     [string]$GameDir
 )
@@ -58,6 +62,19 @@ if (-not (Test-Path $pluginsDir)) {
 if (-not (Test-Path $disabledDir)) {
     New-Item -ItemType Directory -Path $disabledDir -Force | Out-Null
 }
+
+# ── 「真·原版」档位所需的 BepInEx 注入器文件 ────────────────
+# 游戏靠检测游戏目录下是否存在 winhttp.dll 来判定「游戏被非官方修改」，
+# 与是否加载具体插件无关。把这几个文件移走 = 游戏完全看不到 BepInEx，
+# 启动时的「An unofficially modified version...」提示也就不会出现。
+#
+# 注意：移走期间任何 mod 都不工作（BepInEx 根本没启动）。
+$bepOffDir = Join-Path $GameDir "bepinex_off"
+$InjectorFiles = @(
+    'winhttp.dll'
+    'doorstop_config.ini'
+    '.doorstop_version'
+)
 
 # ── 归属清单：哪些是本人开发的 mod ───────────────────────────
 # 用途：-OnlyMine 一键只启用自己的、关掉第三方。
@@ -248,6 +265,103 @@ function Enable-Entries {
     return @{ Ok = $ok; Fail = $fail }
 }
 
+# ── BepInEx 注入器开关（「真·原版」档位）────────────────────
+
+function Test-BepInExActive {
+    <# BepInEx 是否处于激活状态（即游戏目录下有 winhttp.dll） #>
+    return (Test-Path (Join-Path $GameDir 'winhttp.dll'))
+}
+
+function Test-BepInExDetachedCleanly {
+    <# 检查"已关闭"状态是否完整：注入器文件应全部在 bepinex_off\ 里。
+       用于防止出现"文件一半在这边一半在那边"的坏状态。 #>
+    if (-not (Test-Path $bepOffDir)) { return $false }
+    foreach ($f in $InjectorFiles) {
+        if (-not (Test-Path (Join-Path $bepOffDir $f))) { return $false }
+    }
+    return $true
+}
+
+function Disable-BepInEx {
+    <# 把注入器文件移到 bepinex_off\，让游戏完全看不到 BepInEx。
+       任一步失败即回滚，绝不留下半截状态（否则 mod 会全废）。 #>
+    if (-not (Test-BepInExActive)) {
+        Write-Host "  BepInEx 已经是关闭状态。" -ForegroundColor DarkGray
+        return $true
+    }
+    if (-not (Test-Path $bepOffDir)) {
+        New-Item -ItemType Directory -Path $bepOffDir -Force | Out-Null
+    }
+    $moved = @()
+    try {
+        foreach ($f in $InjectorFiles) {
+            $src = Join-Path $GameDir $f
+            $dst = Join-Path $bepOffDir $f
+            if (-not (Test-Path $src)) { continue }
+            if (Test-Path $dst) { Remove-Item $dst -Force }   # 覆盖旧备份
+            Move-Item -LiteralPath $src -Destination $dst -Force
+            $moved += @{ From = $src; To = $dst; Name = $f }
+            Write-Host "    移出: $f" -ForegroundColor DarkGray
+        }
+    }
+    catch {
+        Write-Host ("    失败: " + $_.Exception.Message) -ForegroundColor Red
+        foreach ($m in $moved) {
+            try { Move-Item -LiteralPath $m.To -Destination $m.From -Force } catch { }
+        }
+        Write-Host "    已回滚（BepInEx 保持可用）" -ForegroundColor Yellow
+        return $false
+    }
+    # 关键校验：确认真的移干净了
+    if (-not (Test-BepInExDetachedCleanly)) {
+        Write-Host "    校验失败：文件未全部移出，正在回滚..." -ForegroundColor Red
+        foreach ($m in $moved) {
+            try { Move-Item -LiteralPath $m.To -Destination $m.From -Force } catch { }
+        }
+        return $false
+    }
+    Write-Host "  BepInEx 已关闭 —— 游戏将以完全纯净状态启动（不再有"已修改"提示）" -ForegroundColor Green
+    return $true
+}
+
+function Enable-BepInEx {
+    <# 把注入器文件移回游戏目录，恢复 mod 能力。 #>
+    if (Test-BepInExActive) {
+        Write-Host "  BepInEx 已经是开启状态。" -ForegroundColor DarkGray
+        return $true
+    }
+    if (-not (Test-Path $bepOffDir)) {
+        Write-Host "  找不到 bepinex_off\ 备份目录，无法自动恢复。" -ForegroundColor Red
+        Write-Host "  请手工把 winhttp.dll / doorstop_config.ini / .doorstop_version 放回游戏目录。" -ForegroundColor Yellow
+        return $false
+    }
+    $moved = @()
+    try {
+        foreach ($f in $InjectorFiles) {
+            $src = Join-Path $bepOffDir $f
+            $dst = Join-Path $GameDir $f
+            if (-not (Test-Path $src)) { continue }
+            Move-Item -LiteralPath $src -Destination $dst -Force
+            $moved += @{ From = $src; To = $dst; Name = $f }
+            Write-Host "    移回: $f" -ForegroundColor DarkGray
+        }
+    }
+    catch {
+        Write-Host ("    失败: " + $_.Exception.Message) -ForegroundColor Red
+        foreach ($m in $moved) {
+            try { Move-Item -LiteralPath $m.To -Destination $m.From -Force } catch { }
+        }
+        Write-Host "    已回滚" -ForegroundColor Yellow
+        return $false
+    }
+    if (Test-BepInExActive) {
+        Write-Host "  BepInEx 已恢复 —— mod 功能回来了" -ForegroundColor Green
+        return $true
+    }
+    Write-Host "  恢复后校验失败，请手工检查游戏目录。" -ForegroundColor Red
+    return $false
+}
+
 function Show-Status {
     param($Status)
     Write-Host ""
@@ -279,21 +393,62 @@ function Show-Status {
         Write-Host ("   {0,2}. {1,-46} {2}" -f $n, $e.Name, $tag) -ForegroundColor DarkGray
     }
     Write-Host ""
+    # BepInEx 注入器状态（决定游戏是否弹「已修改」提示）
+    if (Test-BepInExActive) {
+        Write-Host '  【BepInEx】 已开启（游戏会提示「检测到非官方修改」）' -ForegroundColor Gray
+    } else {
+        Write-Host '  【BepInEx】 已关闭（完全纯净，无任何 mod）' -ForegroundColor Magenta
+    }
+    Write-Host ""
 }
 
 function Show-Menu {
     Write-Host "════════ 操作 ════════" -ForegroundColor Cyan
     Write-Host "  数字           切换该项（逗号分隔，如 1,3,5）"
     Write-Host "  a              全部启用"
-    Write-Host "  n              全部禁用（= 纯原版）"
+    Write-Host "  n              全部禁用（= 无 mod，但 BepInEx 仍在）"
     Write-Host "  m              只启用「我的」，禁用「三方」"
     Write-Host "  t              只启用「三方」，禁用「我的」"
+    Write-Host "  p              真·原版（禁用全部 + 关闭 BepInEx，消除修改提示）" -ForegroundColor Magenta
+    Write-Host "  r              恢复 BepInEx 注入器（重新获得 mod 能力）" -ForegroundColor Magenta
     Write-Host "  s / 回车       只显示状态，不改动"
     Write-Host "  q              退出"
     Write-Host ""
 }
 
 # ── 非交互式模式 ─────────────────────────────────────────────
+if ($Pure) {
+    Write-Host "→ 真·原版：禁用全部插件 + 关闭 BepInEx 注入器" -ForegroundColor Cyan
+    Write-Host ""
+    Write-Host "[1/2] 禁用全部插件" -ForegroundColor White
+    [array]$all = Get-TopLevelNames $pluginsDir
+    $r = Disable-Entries -Names $all
+    Write-Host ("      禁用 {0} 项，失败 {1} 项" -f $r.Ok, $r.Fail) -ForegroundColor Cyan
+    Write-Host ""
+    Write-Host "[2/2] 关闭 BepInEx 注入器" -ForegroundColor White
+    $ok = Disable-BepInEx
+    Write-Host ""
+    if ($ok) {
+        Write-Host "完成：游戏将以完全纯净状态启动。" -ForegroundColor Green
+        Write-Host "      （不会有任何 mod，也不会再弹「已修改」提示）" -ForegroundColor DarkGray
+        Write-Host "      恢复用: er2-mods.ps1 -RestoreBepInEx" -ForegroundColor DarkGray
+    } else {
+        Write-Host "插件已禁用，但注入器关闭失败 —— 游戏仍会弹「已修改」提示。" -ForegroundColor Yellow
+    }
+    exit 0
+}
+if ($RestoreBepInEx) {
+    Write-Host "→ 恢复 BepInEx 注入器" -ForegroundColor Cyan
+    Write-Host ""
+    $ok = Enable-BepInEx
+    Write-Host ""
+    if ($ok) {
+        Write-Host "完成：mod 能力已恢复。需要重新启用插件就跑 -All。" -ForegroundColor Green
+    } else {
+        Write-Host "恢复失败，请手工检查游戏目录。" -ForegroundColor Red
+    }
+    exit 0
+}
 if ($Vanilla) {
     Write-Host "→ 全部禁用（纯原版）" -ForegroundColor Cyan
     [array]$all = Get-TopLevelNames $pluginsDir
@@ -351,6 +506,28 @@ while ($true) {
 
     if ($ans -eq 'q') { break }
     if ($ans -eq '' -or $ans -eq 's') { continue }
+
+    if ($ans -eq 'p') {
+        Write-Host ""
+        Write-Host "  真·原版会关闭 BepInEx —— 本次切换后游戏将不带任何 mod，" -ForegroundColor Yellow
+        Write-Host "  直到你用 r 键恢复（或手工把 bepinex_off\ 里的文件移回来）。" -ForegroundColor Yellow
+        $c = Read-Host "  继续？(y/N)"
+        if ($c -notmatch '^[yY]') { continue }
+        Write-Host ""
+        $r = Disable-Entries -Names @(Get-TopLevelNames $pluginsDir)
+        Write-Host ("  禁用插件 {0} 项，失败 {1} 项" -f $r.Ok, $r.Fail) -ForegroundColor Cyan
+        [void](Disable-BepInEx)
+        Write-Host ""
+        Start-Sleep -Seconds 2
+        continue
+    }
+    if ($ans -eq 'r') {
+        Write-Host ""
+        [void](Enable-BepInEx)
+        Write-Host ""
+        Start-Sleep -Seconds 1
+        continue
+    }
 
     if ($ans -eq 'a') {
         $r = Enable-Entries  -Names @(Get-TopLevelNames $disabledDir)

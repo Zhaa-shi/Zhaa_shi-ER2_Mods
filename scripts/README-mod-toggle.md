@@ -15,10 +15,37 @@ BepInEx 启动时会扫描 `BepInEx\plugins\` 下的**所有** `*.dll` 并加载
 | 操作 | 命令 |
 |---|---|
 | 打开交互菜单 | 双击 `launch-er2.bat`，或 `powershell -ExecutionPolicy Bypass -File scripts\er2-mods.ps1` |
-| 纯原版启动 | 双击 `launch-er2.bat` 前先选 `n`，或 `launch-er2.bat vanilla` |
+| 真·原版启动 | 双击 `launch-er2.bat` 前先选 `n`，或 `launch-er2.bat vanilla` |
+| 真原版（无提示） | `launch-er2.bat pure` 或 `-Pure` |
+| 恢复 BepInEx | `launch-er2.bat restore` 或 `-RestoreBepInEx` |
 | 只看状态 | `powershell -ExecutionPolicy Bypass -File scripts\er2-mods.ps1 -List` |
 
+### 两种「回到原版」的区别
+
+| 档位 | 做什么 | 游戏内效果 | 「已修改」提示 |
+|---|---|---|---|
+| **vanilla** | 只禁用全部插件 | 没有任何 mod | **仍然会弹** |
+| **pure（真·原版）** | 禁用全部插件 **+ 关闭 BepInEx 注入器** | 完全纯净 | **不再弹** |
+
+**为什么 vanilla 还会弹提示**：游戏检测的是游戏目录下有没有 `winhttp.dll`
+（BepInEx 的注入器），**与加载了哪些插件无关**。只要它还在，游戏就认为被改过。
+证据：游戏程序集 `global-metadata.dat` 里有 `winhttp.dll in game dir` 这条检测文案。
+
+**pure 模式移动的 3 个文件**（都在游戏根目录）：
+
+| 文件 | 作用 |
+|---|---|
+| `winhttp.dll` | 注入器本体（游戏检测的就是它） |
+| `doorstop_config.ini` | Doorstop 配置 |
+| `.doorstop_version` | 版本标记 |
+
+它们会被移到游戏根目录下的 `bepinex_off\`。恢复用 `-RestoreBepInEx` 或菜单 `r` 键。
+
+> ⚠️ **pure 期间任何 mod 都不工作**（BepInEx 根本没启动）。
+> 文件不会丢失 —— 脚本每次移动后都校验，任一步失败立即回滚。
+
 ### 交互菜单
+
 
 ```
    1. commandmarker                        三方 [资源包]
