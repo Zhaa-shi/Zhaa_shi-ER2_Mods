@@ -12,14 +12,14 @@
 | 2 | `WeatherControl` | `er2.weathercontrol` | ER2 Weather Control | **1.7.2** | `ER2_WeatherControl.dll` | 已部署 |
 | 3 | `AIFood` | `er2.aifood` | ER2 AI Food | **1.4.0** | `ER2_AIFood.dll` | 已部署 |
 | 4 | `NoInteractionHints` | `com.ryan.er2.nointeractionhints` | ER2 Hide Anything | **4.5.4** | `ER2_NoInteractionHints_DoneProMaxEnd.dll` | 已部署 |
-| 5 | `ModManager` | `er2.modmanager` | ER2 Mod Manager | **1.5.4** | `ER2_ModManager.dll` | 已部署 |
+| 5 | `ModManager` | `er2.modmanager` | ER2 Mod Manager | **1.7.9** | `ER2_ModManager.dll` | 已部署 |
 | 6 | `ThrowableWheel` | `er2.throwablewheel` | ER2 Throwable Wheel | **1.3.6** | `ER2_ThrowableWheel.dll` | 已部署 |
 | 7 | `CombatTweaks` | `er2.combattweaks` | ER2 Combat Tweaks | **1.2.2** | `ER2_CombatTweaks.dll` | 已部署 |
 | 8 | `ZoomAnywhere` | `er2.zoomanywhere` | ER2 Zoom Anywhere | **1.0.1** | `ER2_ZoomAnywhere.dll` | 已部署 |
 | 9 | `HighValueTarget` | `er2.highvaluetarget` | ER2 Veteran HVT | **1.2.2** | `ER2_VeteranHVT.dll` | 已部署（+ Assets 目录） |
 | 10 | `InventoryPause` | `er2.inventorypause` | ER2 Inventory Pause | **1.0.5** | `ER2_InventoryPause.dll` | 已部署 |
-| 11 | `SquadCommand` | `er2.squadcommand` | ER2 Battlefield Commander | **1.4.46** | `ER2_BattlefieldCommander.dll` | 已发布 |
-| 12 | `UniversalGeneration` | `er2.universalgeneration` | ER2 Universal Generation | **2.5.26** | `ER2_UniversalGeneration.dll` | 已发布 |
+| 11 | `SquadCommand` | `er2.squadcommand` | ER2 Battlefield Commander | **1.4.56** | `ER2_BattlefieldCommander.dll` | **已发布（双语双包 EN 部署）** |
+| 12 | `UniversalGeneration` | `er2.universalgeneration` | ER2 Universal Generation | **2.5.47** | `ER2_UniversalGeneration.dll` | 已部署 |
 | 13 | `UnitCollision` | `er2.morephysics.unitcollision` | ER2 More Physics - Unit Collision | **1.0.8** | `ER2_MorePhysics_UnitCollision.dll` | 已部署 |
 | 14 | `UnitInfoOverlay` | `er2.unitinfooverlay` | ER2 Unit Inspector | **1.0.5** | `ER2_UnitInfoOverlay.dll` | 已部署 |
 | 15 | `FleshWoundsFixed` | `ER2_FleshWounds` | ER2 Flesh Wounds | **1.0.1** | （需手动构建部署，build.ps1 无条目） | 第三方修复版 |
@@ -49,7 +49,624 @@ AI 血量低于 `eatBelowHp`（默认 **40**）自动吃背包食物回血：`Fi
 **关键机制**：`UiGroups` 注册表（Register/IsHidden/ApplyAll/Enforce）；`UiHiders`（ElementHider 记忆式隐藏 + RefCache 5s 冷却）；所有节流用 `Time.unscaledTime`。
 **v4.5.3+ 游戏 2.1.x 兼容**：`FindGameType("PhaseBarGUI")` 运行时探测，类型缺失时该类别跳过（不再 TypeLoadException）。
 
-### 2.5 ModManager `er2.modmanager` v1.5.4
+### 2.5 ModManager `er2.modmanager` v1.7.9（**延迟建页转正：默认开启**——玩家实测通过）
+**v1.7.9（2026-09-26，玩家实测 1.7.8"没问题"后按建议转正）**
+
+`Ui / lazyBuild` 默认值 **false → true**，cfg 描述去掉 "EXPERIMENTAL, not recommended yet"。
+**转正依据（按"改默认值前先确认它当初为什么是那个值"的判据逐条核对）**：
+- 当初默认关闭的理由 = "展开时插行"三次"点开没内容"（v1.5.9/1.5.19/1.5.23）——真因已定案并修复
+  （v1.7.4：插入点被自己的兜底钳掉）；
+- 安全网在位（v1.7.3：结构/布局自检 + 连续两次失败自动弃用并整页重建，最坏 = 一次常规建页）；
+- v1.7.5 探针四采样点全干净（yUniq==active / hitAlphaMax=0 / contentH 恒定 / 无白块告警）；
+- 玩家多轮实测确认（1.7.5"翻页不卡了"、1.7.8"没问题"）。
+收益固化：进页建页 942 行 / 0.3~0.6s → 71 行 / 35~98ms。常规建页路径一字未动（关开关即回）。
+部署 sha256 `4162db70…`（11:44）；双语双包 1.7.9；四份发布文档同步。
+
+### 2.5 ModManager `er2.modmanager` v1.7.8（冲突提示块：**块头计数 + 可隐藏**；行高估算真因 = **按 500px 行宽估，实际只有 ~400px**）
+**v1.7.8（2026-09-26，玩家"本来是因为，这个功能即便有多个按键冲突也只会显示一个，和无法隐藏的"）**
+
+**玩家点的两个问题，机制都已定位**
+1. **"多个冲突只显示一个"的真因是渲染几何**：`AddWarningRow` 的行高按**写死的 500px** 行宽估行数，
+   而标签实际可用只有 ~400px（行宽 425 − 标签左右各 12）→ 行数被低估 → 文本 `verticalOverflow=Overflow`
+   **溢出行底、叠进下一条警告** → 好几条在视觉上糊成一条。修法：可用宽度从 contentPage 实测
+   （`container.parent.rect.width − 8 − 24`，取不到退 380 = 宁可多留空白也不叠加）。
+   1.7.7 的"一键一行聚合"（消除两两配对的重复行）+ 本轮行高修复，两个因素都清掉。
+2. **"无法隐藏"**：新增块头行 `⚠ 热键冲突 N 组` + 右侧小按钮（复用 `MakeSmallTextButton`）。
+   按钮切换 `Ui / hotkeyWarnings`（bool，默认 true）→ `Plugin.OwnConfig.Save()` **立即落盘**（重启保持）
+   → 明细行**原地 SetActive + `RelayoutContainer(blockRows)`**（与分区开合同一条重排链，**不整页重建**）
+   → 按钮文案"隐藏/显示"随态切换。块头**始终显示**：收起了也能看到"共 N 组"（顺带解决"看不到总数"）。
+   同一 cfg 条目也会出现在 ModManager 自己的设置页里 → 两处入口天然同步，不会出现半状态。
+
+**实现要点**：`AddWarningRow` 改为**返回行对象**（块头要登记）；块头行 = `MM_WarnHead`（标签用硬机制 0
+的 B 写法：中线锚点 + 显式尺寸）；`Plugin.OwnConfig`（static ConfigFile 引用）供即时 Save——BepInEx 不保证
+条目变更即时写盘。
+
+**验证**：0 warning 0 error；EN 构建 = 部署 = EN 包 DLL 逐字节一致 sha256 `c6917402…`（113,664 B，11:38）；
+双语双包 1.7.8；四份发布文档 + 台账同步。
+**待实测**：① 页顶应出现块头"⚠ 热键冲突 3 组"与明细 3 行（F / F9 / G 各一行，不再糊成一条）；
+② 点"隐藏"→ 明细消失、块头保留、按钮变"显示"，**重启游戏后仍是隐藏态**；③ 隐藏/显示切换时下方行
+平滑让位（无整页重建闪动，页顶淡入不重放）。
+
+### 2.5 ModManager `er2.modmanager` v1.7.7（按键冲突提示审计：**扫描端比渲染端宽松**；一对多聚合）
+**v1.7.7（2026-09-26，玩家"看看那个按键冲突提示，有没有什么问题"）**
+
+**审计方法**：写脚本按 `IsHotkeyEntry` 的规则扫**本机全部真实 cfg**（`E:\...\BepInEx\config\*.cfg`），
+模拟检测器跑一遍——拿现实数据核对，不靠读代码脑补。
+
+**两个实锤缺陷（都已修）**
+1. **扫描端与渲染端口径不一致（扫描端更宽松）**：String 条目只要键名含 key/toggle 就被当热键扫描，
+   而渲染端还有 `LooksLikeKeyList`（要求条目自带 AcceptableValueList 且候选项像键）这道守卫。
+   本机实锤：`er2.morephysics.cfg [Physics] ExcludedNameKeywords`（String，键名含 "key"，值是逗号分隔的
+   排除名单）一直参与冲突比对——**两个 mod 的名单默认值若相同就会报一条假"热键冲突"**。
+   修法：String 条目在扫描时增加 `LooksLikeKeyValue(value)` 形状校验（单词 F5/Space/Mouse0、A+B 组合、
+   空值算热键；含 `,;\/:=` 或 >24 字符的名单/路径/句子排除）。**只动扫描端，渲染端不碰**
+   （渲染端本来就不会把它画成改键按钮，所以只是虚警，不是功能误伤）。
+2. **一对多配对不全**：A/B/C 三个绑定同用一键，旧实现报"A 与 B""A 与 C"两行（map 不更新），
+   B 与 C 的关系看不到且 A 重复出现。修法：**按键值聚合，一键一行**列出全部绑定（自冲突即同一 mod
+   两个条目同键也会列出）。
+
+**审计顺带的产出（不是缺陷，但玩家该知道）**：本机当前 **3 组真实冲突**（页面上有列出）——
+`F`：AdvancedCombatMovement(Follow Or Marker) × **SC keyScatter**；`F9`：ACM(Restart Mission) × **SC godKey**；
+`G`：**SC keyPack** × **UniGen panelKey**。后两组是自家 mod 之间的（SC 的默认键与 ACM/UniGen 相撞），
+要不要改默认值由用户定，ModManager 只负责把话说清楚。
+
+**核对过没问题的**：渲染端对 String 的改键按钮有 `LooksLikeKeyList` 守卫（ExcludedNameKeywords 显示为
+下拉而非改键按钮 ✓）；`KeyCode=None` 正确跳过 ✓；`AddWarningRow` 的行高按字符宽度估算
+（CJK 16px / 拉丁 9px，fontSize 15）没有实锤问题，未动；全工作区无 `KeyboardShortcut`（BepInEx 5 的
+热键类型）使用，"不认 KeyboardShortcut"不构成本机的漏报。
+
+**验证**：0 warning 0 error；模拟脚本复扫 = `ExcludedNameKeywords` 被排除、3 组聚合输出与预期一致；
+EN 构建 = 部署 = EN 包内 DLL 逐字节一致 sha256 `6f422d79…e1d9`（112,128 B，11:17）；双语双包 1.7.7。
+**待实测**：页顶警告应变成 3 行聚合格式（一键一行）；`debugLog` 下出现
+`hotkey conflict scan: 3 group(s)`；不再有任何把名单当按键的行。
+
+### 2.5 ModManager `er2.modmanager` v1.7.6（淡入推广到翻页/分组/选项 + 翻页闪烁硬化：**`Destroy` 帧末才生效 = 污染行被画一帧**）
+**v1.7.6（2026-09-26，玩家"翻页闪烁又出现了。现在动画我挺满意的，给翻页也加上，和子选项等。"）**
+
+**1.7.5 探针的答卷（展开路径定案干净）**：实测日志里每个展开的 4 个采样点全部满足
+`yUniq == active`（无未落定）、`hitAlphaMax=0.00`（无白块；唯一的 0.01 是悬停过渡进行中的一帧，良性）、
+`contentH` 四点恒定（无整列位移），且全程**零条**"命中区颜色不透明"告警 → 展开路径排除三类成因。
+玩家也确认"现在动画我挺满意的"。剩下的问题在**翻页路径**——它没有展开那套保护。
+
+**翻页闪烁的硬化（修一条实锤机制）**：每帧清理"游戏异步填充协程灌进我们页面的原生行"用的是
+`Object.Destroy(child.gameObject)`——**`Destroy` 要到帧末才生效，那一帧它仍会被渲染**
+→ 原生行被画一帧 = 翻页闪一下（与 v1.5.8 定案的"原生重填整个设置面板 = 白闪"同血统，只是这次从
+"渲染时机"上修）。改为 **`SetActive(false)`（立即生效）+ `Destroy`**。两处调用点（每帧巡检清理、
+`ClearContent`）都改了。
+
+**淡入推广（玩家点名）**：`BeginRevealRows(tag, targets, blockGroup)` 通用化——
+1. **整页**（翻页进入 / 重进设置 / 自愈重建）：`RevealWholePage` 用**容器上的一个 CanvasGroup** 整块淡入
+   （比逐行写 N 个便宜）；带防重放保护（`lastPageRevealAt` + 已有 page reveal 则跳过）——自愈重建可能
+   连着触发，每次都重放会变成"页面反复淡出"，比闪烁更糟。
+2. **设置分组**（`ToggleSection`）、**子选项**（`ToggleEntry` 的简介行 + 还原行）：与展开 mod 同一套
+   （逐行 CanvasGroup）。收起路径一律 `FinishRevealForRows` 立即收尾（防"行在、看不见"）。
+3. 上限保护保留并通用化：单次 >300 行 → gate 模式（只静默一帧，`hold=0.02s dur=0`）——
+   整页 lazy 关闭时约 970 行会自动走这条，动画永远不会成为更贵的选项。
+4. 翻页路径也跑 `ReassertRowHitColors`（白块类在"停用→再启用"路径上会复发，建页=一次上百行的批量启用）。
+
+**探针扩展（翻页路径不再裸奔）**：`[MM-flash]` 现在每次建页也采 4 个点，新增判据
+`foreign`（内容页里非 MM_Container 的子物体个数 = 原生填充污染；因 Destroy 延迟到帧末，同帧采样能看见它）
+与 `f=<帧号>`；`tab` 追踪与 `page built in` 日志同样带 `f=` → "建页比按键晚一帧"这类问题可以直接看出。
+
+**验证**：0 warning 0 error；EN 构建 = 部署 = EN 包内 DLL 逐字节一致 sha256 `d7dd8a58…7d884`（111,104 B，
+10:51 部署，仍走 cp+sha256 以保住 cfg）；双语双包 `ER2_ModManager_v1.7.6.zip` / `_CN_v1.7.6.zip`，
+四份发布文档同步 1.7.6。
+
+**待实测（判据）**：① 翻页进出 MODS 页不应再闪；② 日志 `[MM-flash] 'page'` 四个 stage 应满足
+`yUniq == active`、`hitAlphaMax=0.00`、`foreign=0`（若 `foreign>0` = 原生污染实锤，但已立即隐藏不再可见）、
+`contentH` 恒定；③ 分组/子选项展开有与 mod 展开一致的淡入；④ 若翻页仍闪，日志的 `f=` + `foreign=`
+能直接指名是哪一类。
+
+### 2.5 ModManager `er2.modmanager` v1.7.5（展开闪烁：**修命中区掉色 + 展开淡入（玩家提议做成动画）+ 装定案探针**）
+**v1.7.5（2026-09-26，玩家"展开时选项都会闪一下；本来我都想做一个动画来掩饰一下加载"）**
+
+**本轮取证（用的是现场日志，不是猜）**：日志尾部一整段实测记录（`debugLog=true`、`lazyBuild=true`、页 71 行 / 28 mod）
+把展开路径的每一步都打出来了，据此确认了三件事：
+1. **延迟建页本身现在健康**：`[MM-lazy] 已构建 … insertAt=28 before=71` ✓、`自检通过` ✓（v1.7.4 的正效果）；
+2. **几何在展开后不再变**：`几何 relayout | content 433x1806 container 425x1798` 与 `几何 deferred | … 1806 / 1798`
+   两次采样**数值完全相同** → 延迟重排(+0.12s)与延迟自检(+0.36s)那两拍**不产生位移**，不是"整列被后置重排"那一类；
+3. **行在建行当帧确实处于"未落定"状态**：`[MM-lazy] 状态 … [0]y=0,h=18 [1]y=-380,h=32 [2]y=0,h=46`
+   —— 新建行此时还带着**克隆模板继承来的位置**（克隆来的行继承源锚点 = -380，`new GameObject` 建的是 0），
+   真正的位置要等同帧后面的 `RelayoutContainer` 写下来。
+   即：**"建行当帧"与"落定之后"的外观/几何是两套值**，只要有任何一拍慢一帧就渲染出半成品 = 玩家看到的闪。
+
+**本轮改动（三件，先修最可疑的链、再按玩家建议做动画、再装探针）**
+1. **命中区颜色重新确认（修 + 诊断二合一）** `ReassertRowHitColors(rows)`：每次展开遍历该 mod 的行，
+   读 `HitArea` 的 `canvasRenderer.GetColor().a`；**只读、异常才写**（健康路径零写入零重建）。
+   机理：`Graphic.OnDisable → canvasRenderer.Clear()` 会丢掉渲染色，再启用靠
+   `Selectable.OnEnable → DoStateTransition` 重新写上；这条链只要漏一拍（典型：上一次过渡的协程被停用打断，
+   `TweenRunner.m_Running` 卡在 true → 新的即时过渡不再同步应用），命中区就恢复成**不透明白**
+   —— 与 **v1.5.13 定案的白块同源**。发现异常当场按各自 `ColorBlock.normalColor` 纠正，并打**故障级告警**
+   （不受 `debugLog` 门控，因为这是故障不是诊断）。
+2. **展开淡入**（玩家提议"做个动画掩饰加载"，本轮做成可控的淡入）：`Ui / revealAnim`（默认开）+
+   `Ui / revealMs`（默认 200ms）。`BeginReveal` 只作用于**本次展开新建的行**（`mb.rows[rowsBefore..]`，
+   常规建页路径恒为空 → 不重放动画），给每行挂 `CanvasGroup` 从 alpha 0 起，`hold=0.07s` 静默 + `dur` 淡入；
+   alpha 量化到 1/8 步（只有真的变了才写，避免每帧无意义的 Canvas 重建）。
+   **关键设计：CanvasGroup 不参与布局** → 行照常占位，所以"先隐藏"不会让下面的行多跳一次。
+   安全网：① **收起时 `FinishRevealFor` 立即收尾**（行若带 alpha<1 被停用，下次展开就是"行在、看不见"
+   ——本项目最忌讳的故障形态）；② 硬 deadline（hold+dur+0.8s）兜底；③ 整页重建时 `ClearReveals()` 作废旧引用；
+   ④ 单次 >300 行直接不淡入（宁可瞬时显示，也不能让"掩饰"本身变成卡顿源——本项目已多次为性能付代价）。
+3. **`[MM-flash]` 展开窗口探针**（debugLog 门控）：一次展开采 4 个点——同帧 / +0.03s / +0.13s（延迟重排那拍）
+   / +0.36s（延迟自检那拍），每条给出闪烁三类物理成因的判据：
+   `yUniq`（不同 y 的行数 < active = **未落定**）、`hitAlphaMax`（>0.5 = **白块**）、
+   `contentH`（展开后若再变 = **整列位移**）。**下一轮无论闪不闪，都能直接给出是哪一类，不用再猜。**
+
+**验证**：`dotnet build` 0 warning 0 error；EN 构建 = 部署 = EN 包内 DLL 逐字节一致
+sha256 `29f07a45…1fbb3`（109,056 B，10:37 部署；**本轮刻意不用 `build.ps1 -Mod ModManager` 全量部署**——
+它会 `Remove-Item` 掉 cfg，而本轮复现条件必须保住 `lazyBuild=true` + `debugLog=true`，故改用 `cp` + sha256 核对）。
+双语双包：`ER2_ModManager_v1.7.5.zip`（EN，109,056 B DLL + README.txt + Nexus_description.md）/
+`ER2_ModManager_CN_v1.7.5.zip`（CN，`CN_BUILD` 108,544 B + 中文文档），四份发布文档已同步 1.7.5。
+
+**待实测（两条判据）**：① 展开任意 mod，**不应再有可见闪动**，日志**不应出现**
+`命中区颜色不透明`（出现 = 白块类确实存在，已被当帧修好）；② 日志出现 `[MM-flash]`，
+四个 stage 的 `yUniq == active`、`hitAlphaMax=0.00`、`contentH` **四个点一致**
+→ 三类成因全部排除，剩下若有闪感就是淡入本身的观感（可调 `revealMs` 或用 `revealAnim=false` 关掉）。
+
+### 2.5 ModManager `er2.modmanager` v1.7.4（延迟建页真因：**自己的"兜底"把正确插入点钳掉了**；自检立功）
+**v1.7.4（2026-09-26，玩家"一开始打不开，过了一会再点就开了"）**
+1.7.3 的自检 + 有界回退**按设计工作了**，并在实测中直接抓到真因：
+```
+page built in 281.1ms - rows=71 mods=28 bodiesBuilt=0/28 lazy=on | bodies=0ms fav=36ms warn=18ms other=227ms
+[MM-lazy] 已构建 'ER2 AI Food' 正文: rows=11 insertAt=71 before=71 titleRow=ok
+[MM-lazy] 自检失败（第 1 次）：row[0] 位置不连续(idx=71 ≠ 28)
+[MM-lazy] 自检失败（第 2 次）：…（Battlefield Commander）
+[MM-lazy] 连续两次自检失败 → 本会话弃用延迟建页，整页重建回常规路径
+page built in 800.3ms - rows=970 bodiesBuilt=28/28 lazy=off
+```
+即：**行被插到容器末尾（71）而不是标题下方（28 = 标题行下标+1）** → 玩家"点开看不到"；自检连续两次抓到 →
+自动弃用 + 整页重建 → 他"过了一会再点就开了"（那时所有正文已按常规路径建好）。
+
+**根因：插入点算对了，却被我自己的"兜底"钳掉**
+```csharp
+insertAt = body.titleRow.transform.GetSiblingIndex() + 1;   // = 28，正确
+if (insertAt < before) insertAt = before;                   // before = 71 → 28 < 71 恒成立 → 取 71 = 末尾
+```
+新建的行**总是先追加在容器末尾**，而标题行的下标天然小于 `before` → **这条兜底在延迟路径上必然命中**，
+于是"正确插入点"被换成"末尾"。**它从来不是兜底，它就是行为本身。**
+**为什么常规路径一直正常**：建页时行本来就是在标题之后紧接着建的，`titleIdx+1 == before` → 兜底是**空操作**
+—— 这正是该缺陷只出现在延迟路径、且四轮都没被发现的原因。
+**修法**：删掉这条兜底，位置直接采信；唯一保留的是硬性防御（下标非法 → 退化为追加）。真正的安全网交给自检。
+
+**教训（可复用，已入技能）**
+1. **"保护性钳制"的条件必须实测其命中率**：若它在正常路径上恒命中，它就不是兜底而是行为本身，且必然
+   与它想保护的正确逻辑冲突。**写兜底时要在日志里打出"是否命中"**（本次靠 `insertAt=71 before=71` 一眼看出）。
+2. **自检 + 有界回退的价值被本轮实证**：同一现象过去四轮（v1.5.9/1.5.19/1.5.21/1.5.23）都靠"玩家报症状 →
+   我猜 → 改 → 再测"，这次**一条 `row[0] 位置不连续(idx=71 ≠ 28)` 直接给出物理成因**，且玩家侧最坏只是
+   "一次常规建页"（他甚至以为只是"稍后再点就开了"）。
+
+**建页耗时的意外发现（下一轮的候选）**：lazy 生效时仍要 281ms，其中 `bodies=0ms` 但 **`other=227ms`**
+（28 个 mod 标题行 + 26 个字母分组标题 + 收藏区 36ms + 警告 18ms）。标题行每行约 2.8ms，远高于正文行的
+0.75ms/行 —— 嫌疑是 `AddSectionButton` 里的**文本测量**（`MeasureTextWidth` **每次都 `new TextGenerator()`**，
+配合 `MeasuresWiderThan`/`EllipsizeToFit` 的二分测量）。**典型修法是复用一个 static TextGenerator**；
+本轮不顺手改（保持"一轮只验一个变量"），待 lazy 路径确认后单独做。
+
+**待实测**：`page built in` 应约 120~280ms 且 `lazy=on / bodiesBuilt=0/28`；展开 2~3 个 mod **应当立即**在
+标题下方看到设置，日志出现 `[MM-lazy] 自检通过`、且**不再有**"自检失败"。
+
+### 2.5 ModManager `er2.modmanager` v1.7.3（延迟建页**加装自检与自愈**；建页耗时拆到分阶段）
+**v1.7.3（2026-09-26，用户"正常。继续"）**
+1.7.2 获玩家确认（日志实证：`收藏跳转 → 'ER2 AI Food'（已展开并滚到它，rows=11）`、`收藏已恢复（1 项）`）。
+本轮处理 ModManager **最后一个已知手感问题**：进设置页的建页成本。本轮日志实测
+`page built in 560.3 / 592.9ms - rows=970 mods=28`（早前 351ms；收藏区 + 28 颗星标又添了开销），且**每次进页都付**。
+
+**做法：不"重开"这个优化，而是先给它装安全网**
+延迟建页（`Ui / lazyBuild`）史上三次翻车（v1.5.9 / v1.5.19 / v1.5.23）**均已定案且修好**：
+① v1.5.21 只重建容器一层（宿主未算）→ 两层重建 + 隔帧补排；② v1.5.24 插入锚点用"容器末位"猜 → 改用标题父级；
+③ v1.5.23 的 `active=4` 其实是**分区默认收起**，与延迟建页无关。
+但项目自己的教训是"反复制造同类故障的优化应当回退，不要继续叠修复"，故本轮**不恢复默认**，而是：
+- **每次延迟构建后隔一帧自检**（`PollLazyVerify` + `LazyBuildProblem`，挂在既有每帧链上）：
+  - **结构**：行必须在容器内、且**紧跟在标题行之后连续排列**（直接对应 v1.5.24 的物理成因）；
+  - **布局**：宿主（contentPage）实际高度必须跟上需求高度（对应 v1.5.21）。
+- 失败 → 先 `MarkPendingRelayout()` 补救一次；**连续两次失败 → 本会话 `lazyDisabled = true` + 整页重建**，
+  并把原因写进 `LogWarning`（不受 debugLog 门控）。
+  ⇒ **最坏代价 = 一次常规建页**（玩家今天本来就要付的那一下），而**不是页面坏掉**。
+- **整页重建时清空待自检队列**——否则旧 body 已随页面销毁，自检会拿到"container 已销毁"从而**误判失败**
+  （进而误弃用延迟建页）。这条是本轮自己发现的坑。
+- 建页日志加**分阶段耗时**：`bodies=…ms fav=…ms warn=…ms other=…ms`（不受 debugLog 门控、沿用 5s 节流）——
+  以后"进设置页顿一下"这类反馈直接用数据回答，不必猜。
+- 开关仍**默认关闭**；按项目约定（"能由机器直接改配置就别让玩家去 UI 里找"）已直接把玩家 cfg 置
+  `lazyBuild=true` + `debugLog=true` 供实测，**实测通过再议默认值**（v1.5.19 那次就是让玩家自己去开开关，白测一轮）。
+
+**方法论沉淀**：**给"曾经翻过车的优化"装自动自检 + 有界回退，是恢复它的正确前置条件**——
+把"最坏结果"从"功能坏掉"降级为"付一次老路径的代价"，失败就从事故变成一条日志。自检的判据要直接来自
+历史故障的**物理成因**（结构不连续 / 宿主高度没跟上），而不是泛泛的"看起来对不对"。
+
+**待实测**：进 MODS 页看 `page built in` 应降到约 60~120ms、`lazy=on`、`bodiesBuilt=0/28`；
+展开 2~3 个 mod 应正常显示内容，日志出现 `[MM-lazy] 自检通过`；若出现
+`[MM-lazy] 自检失败 …`（含原因）或"连续两次失败 → 本会话弃用延迟建页"，请把该行发回作者。
+
+### 2.5 ModManager `er2.modmanager` v1.7.2（收藏跳转"要点两下"根因：**状态有两个入口**；收藏区悬停反馈）
+**v1.7.2（2026-09-26，玩家"被收藏的 mod 要点击两下才能展开 + 鼠标放上去没有任何互动效果"）**
+
+**① 两下才能展开——"设置展开态"被拆成两处、各写一半**
+`ToggleMod`（点标题）做全套：`rows.SetActive` + 标题箭头 + `ReapplyInnerVisibility` + `RelayoutContainer`；
+而 `JumpToFav`（点收藏条目）**只改了 `expandedMods` 与 `ModBody.expanded` 两个标志**，没做任何展开动作
+→ 出现"状态已展开、界面仍折叠"。此后点标题：`expandedMods.Add` 失败 → 判定为"收起"（界面毫无变化），
+再点一下才真正展开 —— 玩家体感即"要点两下"。
+**修法**：抽出**唯一入口** `SetModExpanded(mb, now)`（点标题与收藏跳转共用），`ToggleMod` 只负责算"下一个状态"。
+**教训：凡"设置某个东西的状态"的操作，只允许有一个入口。** 两处各写一半必然产生半状态，而半状态从日志和
+界面都很难直接看出来（本次是"点击计数"与"预期差一次"才暴露）。**动手前的判据：搜索该状态的所有写入点，
+多于一个就先合并再改行为。**
+
+**② 悬停没反应——反馈机制/强度选错**
+- 收藏行原本只有"行底色 3.5% 白"一层反馈：深色底上等于看不见（mod 标题行同值，只是一直没人报）。
+- ★ / 还原默认 / 重置全部 / 复制全部这些小按钮是 `Transition.None`（v1.3.1 为规避"创建瞬间被默认配色染白"
+  而干脆关掉过渡）→ 划过**完全没有**反馈。
+**修法**：新增 `ApplyButtonHoverTint`（**normal 纯白 = 原色不变、不闪白**；hover 乘 >1 提亮；pressed 变暗）
+用于所有小按钮；收藏行的 HitArea 改为**彻底透明、只负责接收指针**，并把 `targetGraphic` 指向标签文字 →
+悬停时**文字变亮**。
+**为什么不用 EventTrigger 绑 PointerEnter**：本项目 `UnityAction<T>` 的委托桥接有**已知 marshaling 缺陷**
+（滑条/下拉的注释里早记过），而 `EventTrigger.Entry.callback` 需要 `UnityAction<BaseEventData>`——编译期
+直接报"不是委托类型"，即便绕开也不可靠。**结论：uGUI 的互动反馈优先用 `Selectable` 的 ColorTint（乘法），
+不要绑事件。**
+
+**③ 顺带**：★ 收藏态改**金色**（原先 ★/☆ 同色，列表里看不出哪些已收藏）；收藏跳转加一条动作日志
+`ModManager: 收藏跳转 → 'X'（已展开并滚到它，rows=N）`，下次可直接判定"点击有没有到达控件"。
+
+**待复测**：① 点收藏条目**一下**即展开并滚到它；② 鼠标经过收藏条目文字变亮；③ 划过 ★ / 还原默认等按钮有
+明显明暗变化；④ 收藏过的 mod 星标是金色。
+
+### 2.5 ModManager `er2.modmanager` v1.7.1（**零高度标签**导致收藏区不可见；mod 展开态不再跨启动）
+**v1.7.1（2026-09-26，玩家反馈"收藏后只有一条空白 + 为什么 AI Food 默认展开"）**
+
+**① 收藏区"占着版面却看不见"——标签矩形高度为 0（一类缺陷，共 3 处）**
+玩家给的两张截图（收藏前/后）用**行亮度剖面互相关**测得：**图 2 的内容整体比图 1 低 95px，且那段区域全黑**
+（ASCII 亮度图确认只有右侧滚动条有像素）⇒ 收藏区确实占了高度、却什么都没画。
+
+根因：标签 RectTransform 用的是
+```csharp
+anchorMin = (0, 0.5); anchorMax = (1, 0.5);      // 纵向锚点收紧在中间
+offsetMin = new Vector2(x, 0f); offsetMax = new Vector2(-y, 0f);   // 上下偏移都是 0
+```
+`anchorMin.y == anchorMax.y` 时，两个 offset **直接决定矩形的下边与上边** → **高度恒为 0** → Text（默认
+`verticalOverflow = Truncate`）把整行裁掉：**一个字都不显示，行却照占布局高度**（那 95px 空白）。
+**对照实证**：玩家确认可见的"元信息行"（v1.5.18，`AddMetaRow`）用的是
+`sizeDelta = new Vector2(-(li+ri), 20f)` + `anchoredPosition`，**显式给高度** —— 同一批代码里两种写法并存，
+正是这条区分的活证据。
+
+**修法**：三处标签统一改为元信息行那套定高写法——
+`AddFavArea` 标题（金「★ 收藏的 mod（点击跳转）」）、`AddFavArea` 槽位标签、**`AddRestoreRow` 的"默认值 …"**
+（v1.5.5 起该灰字一直不可见，只是没人报——行里还有"还原默认"按钮，看起来"正常"）。
+另加 `RefreshFavArea` 收尾自检（debugLog 门控）：打印标题行高/激活态、首项标签实测 `w/h` —— **标签高 0
+即该类缺陷的直接判据**，不必再靠截图量像素。
+（核查过：`RefreshFavArea()` 在建页末尾本来就已调用，"重建后不刷新"这条担心不成立。）
+
+**② "AI Food 进游戏就展开"——mod 展开态被跨启动记忆**
+`expanded.txt` 实测 `m\tER2 Combat Tweaks` / `m\tReactive Ragdoll`（会话起始 `展开的 mod=2`）。
+机制：v1.5.17 起的"展开状态记忆"把**mod 展开态与分区展开态写在同一个文件**，于是上个会话展开过的 mod
+下次启动就带着展开打开，把它下面所有 mod 推下去。玩家早前也质疑过这点保存的必要性（"玩家都重启游戏了"）。
+**修法**：**记忆范围收窄到分区** —— `LoadExpandedState` 忽略 `m\t`；`SaveExpandedState` 只写 `s\t`；
+`ToggleMod`/`JumpToFav` 不再落盘（分区仍由 `ToggleSection` 保存）。玩家机器上那份旧文件的 `m\t` 行已清掉。
+**为什么保留分区记忆**：否则每个 mod 里的分组每次启动都要重新点开（v1.5.20 关掉整块记忆导致"点开 mod
+只看到几行分组标题"，即玩家说的"没内容"——那是同一开关的另一半作用）。
+
+**教训（可复用）**
+1. **`anchorMin.y == anchorMax.y` 时不要用 offsetMin/offsetMax 定位**：那等于直接设上下边 → 高度 0。
+   要么改锚点为 `(0,0)-(1,1)`（拉伸），要么用 `sizeDelta` 给显式高度 + `anchoredPosition`。
+   **同"行"不同用途不要混用两套锚点写法**（本项目元信息行对、收藏区错，并存了一周）。
+2. **"看不见"要用像素证据定案**：本次靠"两张截图的互相关位移 + 空白区 ASCII 图"在两分钟内锁定
+   "占了版面但没画东西"，而不是继续读代码猜。位移量（95px）还顺带给出了度量标尺。
+3. **一个持久化开关若同时是两个独立状态的唯一存储，收窄它的作用范围时要显式处理另一半**（本次：分区留、
+   mod 不留）。
+
+### 2.5 ModManager `er2.modmanager` v1.7.0（**搜索整体撤除**；收藏改为**收藏 mod**）
+**v1.7.0（2026-09-26，玩家"回滚。不要搜索功能，收藏不做选项收藏，做 MOD"）**
+
+**① 搜索框整体移除**（v1.6.0 引入 → v1.7.0 撤除；存活一个版本周期，从未对外发布）
+撤除理由（玩家实测结论）：用关键词过滤这个列表**对页面形态的扰动远大于帮助**——列表是近千行的竖向布局，
+任何过滤都会改变可见集合与整体高度；v1.6.0 的"mod 名命中 → 整个 mod 摊开"更让一次按键激活数百行。
+**结论：对"超高密度、单一长列表"的界面，"过滤"不如"直达"。**
+代码侧已全部移除（`AddSearchRow` / `PollSearchField` / `ApplyFilter` / `SetModNormal` / `SetModFiltered` /
+`HideModFiltered` / `EntryMatches` / `LogSearch` / `NormText` / `GetDescriptionSafe`，以及
+`EntryExtras.searchText`、`ReapplyInnerVisibility` 的过滤分支、`PollControls`/`FillContent` 的挂载点、
+`searchField`/`searchQuery`/防抖字段），**残留引用检查 = 0**。
+**同时删掉了 1.6.0/1.6.1 的发布文档条目**（未发布过，留着会让变更史变成"加了又撤"）。
+
+**② 收藏改为"收藏 mod"**（原先做成"收藏设置项"，玩家明确要求改）
+- ★ 从"设置项操作行最左"移到 **mod 标题行右侧**；设置项操作行恢复原样（只在"已改动"时出现）。
+- 收藏键 = mod 全名；页首"★ 收藏的 mod（点击跳转）"区；点击 = 展开该 mod + 滚到它的标题行。
+- 持久化沿用 `er2.modmanager.favorites.txt`（每行一个 mod 名），上限 24 个；旧格式文件已删除。
+- 收藏区仍为**固定槽位**（预建 24 行、只改文本与显隐）。
+
+**教训（跨功能复用）**
+1. **"可搜"的前提是"结果是小集合、且呈现方式稳定"。** 对近千行的长列表做就地过滤，用户看到的不是
+   "筛选结果"而是"页面崩坏"（大幅位移 + 高度跳变 + 无从判断剩下什么）。
+2. **"收藏"比"搜索"更适合这类界面**：它把"常用的几个"提升到固定位置，且**不改变其它任何东西的位置**
+   ——这正是"直达"与"过滤"的区别。
+3. **撤功能时同步撤文档条目**：未发布过的中间版本不必留痕，否则变更史会自相矛盾。
+
+### 2.5 ModManager `er2.modmanager` v1.6.1（**新增收藏**；并修掉搜索的三个毛病）
+**v1.6.1（2026-09-26，玩家"我对收藏有执念"+"搜索糟糕透了"）**
+
+**① 收藏**（按"收藏**设置项**"实现）
+- 展开任一项 → 操作行最左出现 ★；点击加入收藏，页首出现"★ 收藏（点击跳转）"区。
+- 点收藏区条目 → 展开它所属的 mod 与分组 → `ReapplyInnerVisibility` → 重排 → 按
+  `vnp = 1 - (offset-60)/(contentH-vpH)` 滚到该项可见。**跳转前先清空搜索词**（过滤视图会把它藏起来）。
+- 持久化 `BepInEx/config/er2.modmanager.favorites.txt`（每行 `mod 名|条目键`），上限 24 项。
+- **收藏区用固定槽位**（预建 24 行，之后只改文本与显隐）——**不做事后插行**，那是本项目三次翻车的根源。
+- 顺带：操作行（原"还原行"）改为**常驻**（★ 挂在上面），"还原默认"按钮仍由 dirty 门控。
+
+**② 搜索：三个症状一个根因**
+玩家报"过滤结果不对 + 输入卡顿/闪 + 搜索后全部 mod 都被展开"——根因是 v1.6.0 把"mod 名命中"实现成了
+"整个 mod 摊开显示"：**输入一个字母即命中一批 mod、946 行同时激活并重排**。
+三处修正：mod 名命中改用 `SetModNormal`（按该 mod **自己的展开态**显示）／**防抖 0.22s**（停止输入才过滤）／
+逐项搜索文本（键 + 标签 + 描述）**在建页时预拼**进 `EntryExtras.searchText`（此前每次按键都重读 cfg 描述）。
+
+**教训**：**"命中一个容器"不等于"要把它整个展开"**——搜索结果该按用户自己的展开态呈现，否则一次按键就把
+列表撑成几百行：表现出来像"结果不对"，实质是"结果太多、全被摊开"。诊断判据：**输入一个字符后的激活行数**。
+
+### 2.5 ModManager `er2.modmanager` v1.6.0（**新增页首搜索框**：按 mod 名 / 设置项过滤）
+**v1.6.0（2026-09-26，用户"继续更新 modmanager"）**
+装 28 个 mod 之后"想找某一项设置只能靠滚"——补上此前清单里最后一项用户可感知的功能。
+
+**实现要点（三处都可复用）**
+1. **搜索框照搬本项目既有的 InputField 做法**：数值框与文本项已有两处实现，且踩过关键坑——
+   **`onValueChanged` 的事件桥接在 IL2CPP 下不可靠**，所以一律"**每帧轮询 `.text`**"
+   （`PollSearchField` 挂在 `PollControls` 既有每帧链上，只在文本真的变化时才重算）。新控件不必从零试错。
+2. **过滤规则**：mod 名/短名命中 → 该 mod 整体显示；否则按条目的**键 / 显示标签 / 描述**三处匹配 →
+   只显示命中项 + 它们所属的分组标题；都不命中 → 隐藏该 mod。空词回落到 `ReapplyInnerVisibility`（三层展开态）。
+3. **`EntryExtras` 补 `row` 字段**（在 `FinishEntryRow` 里赋值）——此前只记了"行容器"，按条目控制行显隐
+   必须先拿到行本体。
+
+**踩到的两个坑（已处理）**
+- **打开顺序**：`ModBody.rows` 里**同时含分组标题行**，所以"先按命中打开分组标题、之后再整块隐藏所有行"
+  会被后者盖掉。正确顺序是**先整块隐藏、再按模式打开**。
+- **状态联动**：过滤进行中时，展开/折叠会走 `ToggleMod` → `ReapplyInnerVisibility`，把"三层展开态"的常规
+  显隐盖到过滤结果上（搜索后点开一个 mod 就会看到过滤被冲掉）。已在 `ReapplyInnerVisibility` 开头加分支：
+  有搜索词时改为重算过滤（空词分支不会回头调用它，故无递归）。
+
+**待复测**：① 输入关键词实时过滤；② 清空后完整恢复（分组状态不变）；③ 搜索状态下点开 mod 不冲掉过滤。
+
+### 2.5 ModManager `er2.modmanager` v1.5.25（分组默认态**按玩家选择还原为收起**；与恢复的展开记忆配套）
+**v1.5.25（2026-09-26，玩家"为什么现在 mod 子文件夹都是默认打开的"）**
+玩家在 1.5.24 之后**实际手动收起了 17 个分组**（状态文件里 17 条 `c\t` 行）——这个行为本身就是答案：
+他偏好原来的"默认收起"。确认后还原。
+
+**背景（两版之间的取舍记录）**
+v1.5.23 把分组默认态从"收起"翻转成"展开"，是为了绕开"点开 mod 只看到 4~7 行分组标题"的现象。
+但那个现象的真因是 **v1.5.20 关掉了展开记忆**（记忆一关，每次启动都退回从零开始的收起态）；
+记忆在 v1.5.22 已恢复，所以"默认收起"不再有当时的副作用——**展开过的分组会被记住**。
+**"默认收起 + 记忆开启"**才是原始设计意图的正确组合。
+
+**实现**：`expandedSections`（记"展开的分组"）语义还原；持久化行 `c\t` → `s\t`；v1.5.22~24 写下的
+`c\t` 行**忽略**（在新语义下等于默认行为，玩家那 17 条的结果与他的意图一致）；下次保存时文件被整体
+重写，旧行自动清理。
+
+**教训**：**改一个"默认值"之前，先确认它当初为什么是那个值。** v1.5.23 的翻转发生在"真因已由另一处
+修复（记忆）"之后，属于多余的补偿性修改，结果被还原一次——白改一轮。
+
+### 2.5 ModManager `er2.modmanager` v1.5.24（lazyBuild **默认关闭并标记不推荐**；修掉其插入锚点缺陷）
+**v1.5.24（2026-09-26，玩家"还是打不开"）**
+新判据（`activeSpan` + `visible`）一次定案：
+```
+state mod 'ER2 Bullet Penetration' rows=81 active=31
+      activeSpan=1955..3054    ← 31 行已激活（"分区默认展开"生效了）
+      visible=0..642           ← 屏幕只显示内容顶部 642px
+```
+**内容存在、也激活了，但整段落在列表底部 1955~3054px 处**，而玩家看的是顶部 → 他描述的"打不开"。
+
+**根因（`已构建` 行的恒等式）**
+```
+insertAt=27  containerChild=44  (rows=17)     ← 27  = 展开前的 childCount
+insertAt=63  containerChild=74  (rows=11)     ← 63  = 展开前的 childCount
+insertAt=193 containerChild=274 (rows=81)     ← 193 = 展开前的 childCount
+```
+`containerChild = insertAt + rows` **恒成立** ⇒ `insertAt` 永远等于"展开前容器的子物体数" = **末尾**。
+即 `BuildModBody` 的兜底分支（`titleRow == null` → `insertAt = childCount`）被走到 → **新行被追加到列表最后，而不是标题下方**。
+`body.titleRow` 之所以失效：它由 `container.GetChild(container.childCount - 1)` **猜**出来，依赖"这一刻刚建的标题行就是容器末位"这个隐含假设；引用一旦漂移/失效就落空。
+**修法**：改用 `titleTxt.transform.parent`（标题自身的父级 = 该 mod 的标题行），不可能漂移；诊断行补 `before` 与 `titleRow=NULL/ok`。
+
+**止损决定（重要）**
+`lazyBuild` **改为默认关闭并标记"暂不推荐"**（代码与诊断保留）。理由：同一现象已第三次复现（v1.5.9 / v1.5.19 / v1.5.23），而它换来的只是"进页 0.3 秒 → 0.06 秒"。**可用性 > 300 毫秒。** 本轮修复在游戏内确认通过后，再议是否恢复默认。
+玩家侧影响：进 MODS 页恢复约 0.3 秒；展开回到一直稳定的"原地显隐"（不插入行）。
+
+**两条可复用教训**
+1. **别用"容器的最后一个子物体"当锚点**：它只在"刚好就是你要找的那一个"时成立，属于隐含假设。要引用对象就用对象自身的关系（`transform.parent`）。
+2. **诊断要给出"区间"而不是"数量"**：本轮 `activeSpan`（激活行在容器内的偏移区间）与 `visible`（当前可见区间）并排一看就定案；此前只打 `rows`/`active` 数量，三次都看不出"内容其实在屏幕外"。
+3. **反复制造同类故障的优化应当回退，而不是继续叠修复**：三次同类、两轮未确认，成本已超过收益。
+
+### 2.5 ModManager `er2.modmanager` v1.5.23（**"点开 mod 没内容"真因：分区默认收起 × 展开记忆被关**；1.5.22 顺带修诊断本身）
+**v1.5.22 / v1.5.23（2026-09-26，玩家"还是没内容"）**
+日志给出决定性数字：`toggle mod 'ER2 Unit Inspector' -> open rows=67`，但 `state ... rows=67 active=4` —— **建了 67 行、只有 4 行是激活的**。那 4 行是**分区标题**，配置项全部折在下一层。
+
+**根因（两半，其一是自己引入的回归）**
+1. **分区默认收起**（v1.5.0 的设定）：从没动过分区的 mod，展开后必然只显示 4~7 行分区标题 → 玩家读作"没有内容"。
+2. **v1.5.20 把 `rememberExpanded` 默认改成 false**：当时依据"这点记忆只在重启后才有意义"的质疑。误判在于——它同时是"哪些 mod 展开 / 哪些分区被手动收起"的**唯一持久化来源**；关掉后每次启动都从零开始，于是连"以前展开过分区、所以能直接看到配置项"这条退路也一起没了。
+
+**修法**
+- **分区语义反转**：`expandedSections`（记"展开的"、其余一律收起）→ **`collapsedSections`（记"被手动收起的"，其余默认展开）**。持久化行 `s\t` → `c\t`；旧 `s\t` 行直接忽略（新语义下它就等于默认行为）。
+- `rememberExpanded` **恢复默认 true**（默认值改动必须手工改玩家 cfg —— BepInEx 只在新建 cfg 时写默认值）。
+- 折叠能力与记忆都保留：主动收起的分区会保持收起；**分区标题行不在 `sb.rows`**（`secStart` 在 `AddSectionHeader` 之后取），所以收起后仍能点开——这条在动手前先确认过。
+
+**1.5.22 顺带修掉的诊断缺陷**：`LogToggleState` 用 `GetWorldCorners` 判定 `onScreen`，而**本机 IL2CPP 下 `Vector3[]` 出参回不来**（几何诊断里所有对象的 `worldY` 都打印成 `0..0`，我曾据此估算"行落在屏幕外"，方向是错的）。改为在 content 局部坐标系计算：可见区间 `[(1-vnp)*(contentH-viewportH), +viewportH]`、行偏移 `-anchoredPosition.y`；并新增 `activeSpan`（激活行在容器内的偏移区间）——**"展开后只看到标题"的正确判据是 `active` 数，不是行数**。
+
+**教训（§0 级）**
+1. **"只有重启后才需要"不等于"没用"**：一个持久化开关若同时是某块内存状态的**唯一来源**，关掉它会改变每次运行的冷启动行为，而不只是"跨重启"。
+2. **诊断手段本身也要验证**：`GetWorldCorners` 恒返回 0 这件事让我两轮都在错误方向上估算可见性。探针读数必须先对照已知量自证可信，再用于推断。
+3. **"默认收起"这类设计要连同"第一次看到什么"一起复核**：默认收起 + 记忆丢失 = 玩家看到一个空 mod。
+
+**待复测**：展开任意 mod 应直接看到配置项（日志 `state ... active=` 应接近 `rows`，而不是 4~7）。
+
+### 2.5 ModManager `er2.modmanager` v1.5.21（**偶发闪定案**：行内缩状态翻转时同帧重排整列；并修延迟建页"点开没内容"）
+**v1.5.21（2026-09-26，两个问题，都有日志/代码证据）**
+玩家反馈：① lazyBuild 下"mod 展开后不出内容"；② "之前的选项闪烁 bug 又出现了，但触发概率不再是 100%"。
+
+**① 偶发闪 = 行内缩状态翻转 → 同帧强制重排整列（`ApplyScrollbarInset`）**
+`row inset writes=3~4 in last 5s (target right=24.0, content 450) / (target right=8.0, content 433)` —— 原生在"预留滚动条 17px / 不预留"两种 Viewport 状态间来回切换，目标值随之在 24↔8 跳；旧代码每次 `changed` 都写 sizeDelta 并 `ForceRebuildLayoutImmediate(crt)` → **整列行在同一帧重排 = 闪一下**，且只在翻转那一下发生（概率非 100% 的由来）。
+关键观察：**行宽几乎不变（426 ↔ 425）**——补偿本身是对的，错的是"补偿时顺手强制重排"；真正需要的只是让 LayoutGroup 知道宽度变了，那件事 Unity 在正常布局阶段会自己做。
+修法：强制重排只在 **`float.IsNaN(lastInsetW)` 的首次应用**保留（建页后几何未定型时需要），之后改 `MarkLayoutForRebuild`。
+
+**② 延迟建页"点开没内容" = 重建只覆盖一层（`RelayoutContainer`）**
+诊断（v1.5.19 布）证明：行已建（rows=11/119/81/17/70/28）、已激活（active=5~8）、父链干净（`inactiveInHierarchy=0 firstInactiveParent=ok`）、内容高度也增长了（1644→1806）、**无任何异常**——但行世界坐标整体落在**负值区**（`rowY=-1722..-381`；正常路径对照值是 `rowY=129..1060` 正值）。
+根因：`RelayoutContainer` 只 `ForceRebuildLayoutImmediate(container)`。container 带 `ContentSizeFitter`（高度按 preferred 自设），**同时它又是 contentPage 的子物体、位置与高度受 contentPage 那层布局支配**——宿主那层没重算，新行就落在可见范围之外。
+修法：完整重建链 = 重建 container → `Canvas.ForceUpdateCanvases` → 重建 **contentPage**（宿主层）→ `Canvas.ForceUpdateCanvases` → `SelfHealScroll`；并 `MarkPendingRelayout()` 在 **0.12s 后补排一次**（嵌套布局里的 ContentSizeFitter 常需一帧落定），挂在既有 `PollControls` 每帧链上（`PollPendingRelayout`）。
+⚠️ 注意：因为"没有重排"不等于"看得见"，本轮把**同帧（`relayout`）与下一帧（`deferred`）两份几何快照**都写进日志（`LogLazyGeometry`：canvas scale/size、contentPage、viewport、container 的 rect + 世界 Y + anchoredY + childCount），下一轮一次判定。
+
+**可复用教训（写入 §0 级）**：**"重建容器"≠"重建布局"** —— 带 ContentSizeFitter 的容器同时是父级的孩子；只重建它内部会让它的**外表几何**停留在旧值，子物体虽然排好了却整体落在错误位置。凡"插行/改行数"的场合，重建必须覆盖**容器 + 其宿主**两层。
+
+### 2.5 ModManager `er2.modmanager` v1.5.20（展开状态记忆**默认关闭**——玩家质疑成立；并更正 1.5.19 的实测结论）
+**玩家原话**："说实话，玩家都重启游戏了，这点展开页的保存真的有必要吗。" —— **他说得对，默认关掉**（功能与开关都保留，想用随时开）。三个理由：
+1. **会话内本来就不会丢**：`expandedMods` / `expandedSections` 是静态集合，翻页、重开设置菜单都在——落盘只对"重启游戏之后"有意义，收益仅"少点几下展开"。
+2. **与延迟建页互相抵消**：被记住展开的 mod 必须在**进页那一刻**就建出正文（`Combat Tweaks` 一次 70 行、`Limb Tweaks` 28 行），那正是 `lazyBuild` 要省掉的开销；默认开着 = 每次进页替它付账。
+3. 附带：页面开局状态变得不可预测（自己这一局没点开过的 mod 也展开着）。
+**注意**：BepInEx 只在**新建 cfg** 时写默认值，已存在的 cfg 会保留旧值 → 已直接改玩家 cfg 的 `rememberExpanded = false`。
+
+**同时更正 1.5.19 的实测结论**：延迟建页**一次都没跑起来**——日志零 `[MM-lazy]` 行、建页仍 945 行 / 276~354ms，cfg 实测 `lazyBuild = false`（玩家把 `debugLog` 打开了，但没打开这个实验开关）。
+**教训**：**交付"实验开关"时，能由机器直接改配置就不要让玩家去 UI 里找**——本轮已直接写入 cfg（`lazyBuild = true` + `debugLog` 保持 true），下轮启动即可产出诊断。
+
+版本 1.5.20（两处同步，grep 复核）；编译 0/0；部署 sha256 `C7DE5799…` == bin；四份发布文档同步（变更条目 + 功能说明标注"默认关闭"）。
+**待实测**：下轮日志应出现 `[MM-lazy] 已构建 …` 与 `[MM-lazy] 状态 …`，且 `page built in` 应从 ~300-430ms/945 行降到预计 <150ms/约 300 行；展开任意 mod 应正常显示内容。
+
+### 2.5 ModManager `er2.modmanager` v1.5.19（进页顿挫：**延迟建页放进开关后面**，并把 v1.5.9 那个谜所需的量全部写进日志）
+**玩家实测（1.5.18）**："进设置页时顿一下。" 日志已量化：`page built in 288~432ms - rows=942 mods=28 watches=242 extras=258`——**每次进 MODS 页建 942 行、0.3~0.4 秒**；一局建了 3 次（含一次 `reason=container-missing` 的自愈重建）。这是 v1.5.0"建页一次建好、点击只原地显隐"的既定代价。
+
+**做法（不盲改，双轨交付）**
+① **新增 cfg `Ui / lazyBuild`（默认关闭）**：折叠的 mod 只建标题行，正文**首次展开时补建**。实现：把建正文抽成 `BuildModBody(body)`（常规路径与延迟路径共用）；`ModBody` 重新加上 `plugin/container/titleRow/built`（v1.5.12 曾当脚手架删掉，如今是真实功能）；`FillContent` 按开关决定建不建；`ToggleMod` 首次展开补建。**插入点现查标题行的当前下标**（v1.5.10 教训）、**先收集对象引用再搬位置**（`rows` 登记对象而非下标）。
+② **诊断**：开关打开时，每次构建输出
+```
+[MM-lazy] 已构建 '<mod>' 正文: rows=N expanded=… insertAt=… containerChild=…
+[MM-lazy] 状态 '<mod>': containerActive=… containerH=… preferred=… rows=… inactiveInHierarchy=… firstInactiveParent=… [0]y=…,h=…,act=…
+```
+把 v1.5.9"点开没反应"所需的**每个量**都打出来：层级可见性（含父链上第一个停用节点——v1.1.9 的 STUCK-EVIDENCE 就是"建在停用父级下"）、布局有没有算过（`rect` 高 vs **偏好高**）、行是否堆在同一点（浅色值框叠成白块的成因）。配合既有的 `LogToggleState`（按行报告 active/onScreen/rowY/vnp）即可三分法定位：行没激活 / 行在视口外 / 行在视口里却没画。
+
+**为什么默认关闭**：v1.5.9 该方案上线后出现"点开没反应"（日志证明回调到达、rows 非空、无异常，内容却不可见），**谜未解开前不设为默认**。这次把它变成"开关 + 诊断"的可测量实验，而不是又一次盲赌。
+
+**通用教训**：**降低开销的改动若落在既有故障区，必须先能观测再动**——开关与诊断一起交付，让玩家一次测试既验证新路径、又给旧谜提供证据，而默认行为一字不动（回归风险为零）。
+
+版本 1.5.19（两处同步，grep 复核）；编译 0/0；部署 sha256 `739D2DC4…` == bin；四份发布文档同步（含 `Ui / lazyBuild` 说明与变更条目；顺带修掉上一轮漏改的 README 版本头 1.5.17→1.5.19）。
+**待实测**：开 `Ui / lazyBuild` + `Debug / debugLog` → 进 MODS 页，`page built in` 应明显下降（预计 <150ms、行数约 300）；展开任意 mod 应正常显示；若仍"点开没反应"，`[MM-lazy]` + `LogToggleState` 两组日志会直接指出是三种里的哪一种。
+
+### 2.5 ModManager `er2.modmanager` v1.5.18（元信息行排版修复：**单行定高 + 实测宽度截断**）
+**玩家截图反馈**："第一次进入，元信息行排版不好看。" 截图里那行 `ER2 AI FOOD · ER2.AIFOOD · V1.4.0 · 3 SETTINGS` 又高又宽，把下面的条目整体下推。
+**根因**：v1.5.17 图省事复用了给"配置项说明"写的 `AddDescriptionRow`——而它**按字符数估高**（`ceil(宽/400)+1` 行，最少 2 行、另加余量），说明文本可以换行、这个估法没问题，但**元信息行只该是一行**，于是它高了一倍；宽度也用了说明行的 `+18px` 缩进与 `Wrap` 模式。
+**修法（1.5.18）**：
+① 新增 `AddMetaRow`：**定高 18px、字号 12、`MiddleLeft` + `Overflow/Truncate`**，左内缩 = `LabelLeft + RowIndent`（与行标签对齐）、右内缩 = `ControlRight`（避开滚动条）；
+② 超长用**实测宽度**（`MeasureTextWidth`）二分截断 + 省略号，不用字符数猜；
+③ 新增 `BuildModMetaShort`：UI 行**不再重复标题已有的 mod 名**（那部分占了它大半长度），只留 `GUID · v版本 · N 项设置`；完整信息（全名/GUID/版本/条目数）仍进"复制全部"。
+**通用教训**：**同"行"不同用途不要共用同一个测量/布局函数**——说明行可以换行、可以按字符数粗估；单行信息行必须定高 + 实测宽度截断。复用省下的那点代码，代价是玩家一眼就看得出的排版错误。
+版本 1.5.18（两处同步，grep 复核）；编译 0/0；部署 sha256 `1B8DD78A…` == bin；四份发布文档同步。
+
+### 2.5 ModManager `er2.modmanager` v1.5.17（四项体验改进：缩写白名单 / 尊重第三方 CM 属性 / mod 元信息 / 展开状态持久化）
+**本轮（2026-09-26，"继续做 ModManager"）清掉 1.5.5 之后的收尾清单**（**搜索过滤仍未做**——它需要新增控件，值得独立一轮单独验证）。**⚠ 后续更正（v1.7.0）：玩家明确要求撤除搜索功能（"不要搜索功能"），此项作废**；ModManager 当前只剩两项纯工程项：第三方"假页"探测通用化、拆 5225 行单文件。
+1. **缩写白名单**（`HumanizeKey`）：原实现逐词 Title Case → AI→Ai、HUD→Hud、UI→Ui、FOV→Fov、`MG42`→"Mg 42"。现在用 `KnownAcronyms` 白名单保持大写，并把**"缩写 + 紧随数字"合并成一个词**（MG+42→MG42、M+1→M1）。
+   **判据刻意用白名单而不是"整词全大写就保留"**：配置文件里 SCREAMING_SNAKE_CASE 很常见，后者会把 `MAX_COUNT` 变成 "MAX COUNT"（比 Title Case 更不像标签）。
+2. **尊重第三方 `ConfigurationManagerAttributes`**：`Browsable = false` 的配置项不再列出（第三方 mod 用它藏内部/调试项）；`Order` 生效。**全部反射读取**（`CmAttributes` / `EntryBrowsable` / `EntryOrder`），既不引入编译期依赖、也不要求对方真的装了 ConfigurationManager。
+   **只有至少一项声明了 Order 才重排**——否则保持 cfg 绑定顺序（我们自己的 mod 都是刻意排过序的，无差别按字母重排是倒退）。全部项都被隐藏时回退为"没有可调设置"行（否则展开后空无一物）。
+3. **mod 元信息行**（`BuildModMetaText`）：展开 mod 后第一行 = **全名 · GUID · 版本 · 条目数**；"复制全部"头部同款——报 bug 只需截图或贴文本即可定位到具体版本。
+   **踩坑**：`PluginInfo.Metadata.Version` 的类型是 BepInEx 的 `SemanticVersioning.Version`，本工程未引用该程序集 → 直接 `.ToString()` 编译报 **CS0012**；改为反射取 `Version` 属性（`GetValue` 返回 `object`，不把该类型嵌进元数据即可通过）。
+4. **展开状态持久化**：新 cfg `Ui / rememberExpanded`（默认开）+ 小文件 `BepInEx/config/er2.modmanager.expanded.txt`（按行 `m\t<mod 全名>` / `s\t<mod 全名|分区>`）。启动 `LoadExpandedState()`，每次展开/折叠 `SaveExpandedState()`。
+   **刻意不写进 cfg**：状态是一长串内部名，出现在设置页的文本框里既难看又容易被误编辑。
+
+版本 1.5.17（`BepInPlugin` + 启动日志两处 **先 grep 实际值再替换、替换后再 grep 复核**——本轮特意避开 1.5.15/16 与 UniGen 2.5.40/41 那两次 sed no-op 的坑）；编译 0/0；部署 sha256 `023DCF2C…` == bin；四份发布文档（EN/CN × README/Nexus）已同步 1.5.17。
+**待复测**：① 标签显示（AI / HUD / MG42 / M1 等）；② 展开记忆（重开游戏仍保持展开）；③ 元信息行与"复制全部"头部；④ 若装了声明 `Browsable=false` 的第三方 mod，其内部项应从列表消失。
+
+### 2.5 ModManager `er2.modmanager` v1.5.16（翻页音效定案：**延迟播音**；版本号归正 + 发布文档补齐）
+**1.5.14 → 1.5.16（2026-09-26，翻页音效从无声到恢复）**
+- **1.5.14**（诊断）：`PlayClick` 的空 catch 加 `LogWarning`——所有翻页分支都调了 `ClickSound` 且 trace 带 `[sound]`，唯一能吞掉线索的就是那个空 catch。结果探针**零输出**：调用成功、无异常。
+- **1.5.15**（第一次修）：把播音挪到页面动作之后（`EnterMyPage` 重建后 / `LeaveModsBackward`、`WrapToFirstPage` 切页后）——**仍无声**。
+- **1.5.16**（定案）：**延迟播音**——`ScheduleClick()` 入队 0.25 秒，`PollScheduledClick()` 在 `PollControls` 每帧轮询补播。玩家确认音效恢复（"声音正常了"）。
+  **机制**：整页重建（`FillContent` 上千个对象）在一帧内冲击 UI/音频侧，紧跟着的 `ClickSound()` 会被吞掉；而**原生页间翻页有声**（玩家做的对照实验）证明 `ClickSound` 本身在设置菜单里有效，问题只在时机。
+  **通用教训：任何"先播音再做破坏性 UI 操作"都不可靠**——播音必须排在"最后一个可能销毁音频对象/冲击音频系统的操作"之后，必要时延迟一帧以上（本项目 ModManager 与 UniGen 各踩过一次）。
+- **版本号归正**：源码早已含 1.5.16 的修复，但 `BepInPlugin` 与启动日志的版本字符串停在 **1.5.14**（两轮 sed 的源串与文件实际值不匹配 → 静默 no-op）→ 已改为 1.5.16 并重新编译部署（sha256 `0E945768…` == bin）。
+  **教训：批量改版本号必须先 grep 实际值再替换，替换后立即 grep 验证**（本项目在 UniGen 2.5.40/41 上踩过完全相同的坑，两次都是"代码已新、版本号还旧"）。
+- **发布文档补齐（本轮"清文档债"）**：
+  - ModManager：`README.txt` / `Nexus_description.md` 从 1.5.13 → **1.5.16**（补 1.5.14–1.5.16 变更史）；**新建中文版 `README_CN.txt` / `Nexus_description_CN.md`**——此前 ModManager 是唯一没有中文文档的发布 mod，CN 包用户拿到的是全英文说明（长期缺口，本次填上）。
+  - UniGen：中文版 `README_CN.txt`（2.5.34）/ `Nexus_description_CN.md` 同步到 **2.5.46**（上轮只同步了英文版，属遗漏）。
+  - 已核实 **SquadCommand 四份发布文档实际都已是 v1.4.56**（AGENTS.md 快照里"仍停在 v1.4.38"是过时信息，已更正）——本轮无需补。
+
+### 2.5 ModManager `er2.modmanager` v1.5.13（**闪白真凶定案：HitArea 初始白色一帧**——录屏逐帧实锤）
+玩家提供了 4.7s 录屏（`屏幕录制 2026-09-25 231737.mp4`）。**逐帧分析（ffmpeg 4fps 全片 + 30fps 转场段 + 每帧平均亮度）**：
+```
+h001-h013: 亮度 ~125（原生 SETTINGS 页）
+h014-h015: 亮度 343.7/343.5 ← 【闪白帧，暴涨 2.7 倍，持续 2 帧 ≈ 67ms】
+h016-h036: 亮度 ~97（MODS 页正常）
+```
+**闪白帧内容**：MODS 页每个 mod 标题行上盖着**全行宽白色矩形**、mod 名被压在下面——形状正是每行的 `HitArea`（透明点击区：`Image.color=white` + Button ColorBlock 压 alpha）。
+**机制（终于想通，也解释了所有历史现象）**：`ApplyRowHoverTint` 设置 ColorBlock（normal=透明）**只是存储配置、不立即应用**；`AddComponent<Button>()` 那一刻 `OnEnable` 用**默认 ColorBlock（normal=不透明白）**把 CanvasRenderer 染成白色；我们的透明 normal 要等**第一次状态变化**（鼠标划过该行）才被应用 → **凡"创建行/重新显示行"的时刻（进 MODS 页、翻页重建、点击展开），HitArea 白色显形 1-2 帧**。这同时解释了：v1.3.1 的"点击闪烁光污染"（当时修的是常驻灰带，初始白帧问题潜伏至今）、v1.5.0 的"点击后全部选项闪烁变白"、以及用户"闪烁和点击选项后的闪烁完全相同"（本就是同一机制）。
+**修法（一行）**：`ApplyRowHoverTint` 配置完 ColorBlock 后立即 `img.canvasRenderer.SetColor(cb.normalColor)`——创建那一刻就是透明的，不再依赖 OnEnable/状态变化链（该链在 IL2CPP 下不可靠）。
+**方法论教训（高价值）**：**录屏 + 逐帧亮度分析**是定位"瞬时视觉故障"的正解——4fps 全片定位区间 → 30fps 细查 → 帧均值一拉，闪帧立刻现形（125→344）。此前 6 轮静态排查全都错过它，因为这只存在于**某一帧的渲染状态**里，任何"读代码/读布局日志"都看不到。
+版本 1.5.12→1.5.13（四处同步）；编译 0/0；部署 sha256 `26488F32…` == bin。
+**待复测**：录屏同样的操作路径再看——进 MODS 页与点击展开都不应再有白帧。卡顿（"进游戏固定时间后卡几秒"）由 UniGen 2.5.35 探针（`GetAllItemsOfType >150ms` Warning + 补漏重扫总耗时）下一轮日志定案。
+
+### 2.5 ModManager `er2.modmanager` v1.5.12（**回退延迟构建与滚动锚定**，换上能一锤定音的诊断）
+玩家："还是闪烁，这个闪烁和点击选项后的闪烁完全相同。mod 选项完全不能展开（**箭头动了，但是打不开**）"。
+**日志定案（决定性）**：`toggle mod 'ER2 AI Food' -> open rows=10` / `'ER2 Battlefield Commander' -> open rows=118` —— **点击到达了、回调执行了、行集合非空、无任何异常**，但内容看不见。且"打不开"从 v1.5.9（延迟构建）才开始出现。
+**决策：回退两处未经验证的改动**：
+① **回退 v1.5.9 延迟构建**（`FillContent` 恢复"建页一次建好、点击只原地显隐"；`BuildModBody` 与 `ModBody` 的 plugin/container/titleRow/built 一并删除——按"开发脚手架用完即删"约定，死代码不留；两个关键坑已记入本台账备查）。理由：日志证明它以"功能正确性"换"翻页速度"，而 1.5.10 起翻页卡顿的真因（每帧 inset 重写）已另行修复，这个有风险的下策不再必要。代价：翻页成本回升（几十 ms 级），可接受。
+② **移除 v1.5.11 的滚动锚定**（`CaptureScrollOffset/ApplyScrollOffset` 停用）。它是在问题未理解时叠加的未验证猜测，且本身可能移动视口（与"打不开"症状吻合）。
+**换上能一锤定音的诊断 `LogToggleState`**：每次展开后输出 `state mod 'X' rows=118 active=118 onScreen=118 rowY=.. viewportY=.. vnp=.. contentH=..`——直接区分三种失败：**行没激活（active=0）/ 行在视口外（onScreen=0）/ 行在视口里却看不见（onScreen>0，渲染/遮挡/尺寸问题）**。上一轮只有 rows=N，三种情况无法分辨，又白测一轮。
+**教训（已入台账，本次连犯两次同类错）**：在根因未定案前，**不要叠加未验证的修复**——每叠一层，下一轮排查就多一个变量（本轮"打不开"就分不清是延迟构建还是滚动锚定）。正确顺序：先修确认的回归，其余用诊断锁定后再动。
+版本 1.5.11→1.5.12（四处同步）；编译 0/0；部署 sha256 `B4270914…` == bin；cfg `debugLog=true`。
+**待复测**：① mod 选项应恢复正常展开（回退预期）；② 若仍闪，看 `state ...` 日志——active/onScreen/contentH 三个数直接指向根因。
+
+### 2.5 ModManager `er2.modmanager` v1.5.11（闪动机制定案：滚动位置用归一化值导致整屏位移）
+**证据（v1.5.10 实测日志）**：`row inset writes=0/1/5 per 5s` → 行内缩抖动**已止住**（不再是每帧 ~300 次）；`page built in 35.8ms - rows=46 mods=28 bodiesBuilt=0` → 延迟构建生效（28 个 mod 只建 46 行）。但**每次点击后都紧跟一条 `content height jump`**（1644→1784→1644→1856）。
+**根因（本次定案）**：Unity `ScrollRect` 的 `verticalNormalizedPosition` 是**归一化**值。展开/折叠改变 content 高度后，同一个归一化值对应的**绝对位置就变了** → 整屏内容瞬间位移 = 玩家看到的"闪"（所以他才说"和点击选项后的闪烁完全相同"——两者本就是同一机制）。
+**修法**：新增 `FindScrollRect / CaptureScrollOffset / ApplyScrollOffset` —— 在展开/折叠**之前**记录"视口顶部距内容顶部的**像素**偏移"，布局刷新**之后**按新高度换算回去。挂到三处：`ToggleMod`（含延迟构建）、`ToggleSection`、`ToggleEntry`（最高频）。
+**"点了不展开"取证**：新增 `LogToggle(what, name, now, rows)`（debugLog 门控，每次操作一条），用来区分两种可能——① 点击根本没到达回调；② 回调到了但 `rows` 为空。日志形如 `toggle mod 'X' -> open rows=69`。**静查已排除**：`ToggleMod / ToggleSection / ReapplyInnerVisibility / RelayoutContainer` 逻辑完整，`BuildModBody` 也确实构建成功（日志有 `built body of 'ER2 Combat Tweaks' (69 rows, deferred)`），所以只剩"点击没到达"与"行被别的路径关掉"两种可能，靠这一条日志即可分辨。
+版本 1.5.10→1.5.11（四处同步）；编译 0/0；部署 sha256 `67A601A6…` == bin；cfg `debugLog=true`（取证用）。
+**待复测**：① 点击展开时内容不再整体位移（闪是否消失）；② 日志里应出现成对的 `toggle mod/section/entry ... -> open rows=N`，若点某处**完全没有 toggle 日志** → 点击没到达（射线/层级问题）；若有日志但 rows=0 → 行集合为空（构建或登记问题）。
+
+### 2.5 ModManager `er2.modmanager` v1.5.10（修 v1.5.9 回归 + 二修选项闪动）
+**① 修 v1.5.9 引入的回归（玩家："点击这个选项但是展开另一个选项"）**：延迟构建用 `body.titleIndex`（**建页时**记录的静态下标）定位插入点。一旦有别的 mod 先展开、在它前面插入了若干行，**它下面所有 mod 的旧下标全部错位** → 行被插到别的 mod 名下 → 点 A 却展开了 B 的位置。**修法：改成插入时现查标题行的当前下标**（`titleRow.transform.GetSiblingIndex()`，标题行对象不会变），并加兜底（算出的下标早于本批起点时不往前插）。`ModBody` 字段 `titleIndex`（int）→ `titleRow`（GameObject）。
+**② 二修选项闪动（每帧重排）**：`ApplyScrollbarInset` 的写入判据是 `|crt.sizeDelta.x + w| > 0.5`——**与"当前实际值"比**。而容器尺寸归父级布局（contentPage 的 LayoutGroup）管，我们写进去的值**下一帧就被它算回去** → 判据每帧都成立 → 每帧重设 sizeDelta/anchoredPosition 并 `ForceRebuildLayoutImmediate(crt)` → **整列行每帧重排 = 选项持续闪动**。**修法：判据改为与"我们上次写入的目标值"比**（`lastInsetW/lastInsetP`）——目标没变就一个字都不动，不再被别人的覆盖带着反复重写。新容器时重置（FillContent 里置 NaN）保证首次必写。
+**③ 诊断形态修正（重要教训）**：上一版把 inset 日志做成"5 秒节流一条"，**节流恰好把最关键的信息——"每帧写了几次"——遮住了**（这已是第二次犯同类错误）。改为**计数聚合**：每 5 秒输出 `row inset writes=N in last 5s`；N≈1~2 为正常（不再抖动），N≈300 说明仍在每帧重写。
+**教训（已入台账）**：① 延迟/按需插入行时，**任何"建页时记下的下标"都会在后续插入后失效**，必须存对象引用、用时现查下标；② **判定"要不要写"要跟自己的意图比，不要跟被别人改过的当前值比**——后者在有父级布局/Another 控制器时必然抖动；③ **节流只解决"刷屏"，会丢掉频率信息**；要判断"是否每帧发生"，用计数聚合而不是节流。
+版本 1.5.9→1.5.10（四处同步）；编译 0/0；部署 sha256 `B8EEF04E…` == bin；cfg 置 `debugLog=true`（只为了取 `row inset writes` 这一条证据，就位后关掉）。
+**待复测**：① 展开折叠的 mod 不再串位；② 日志里 `row inset writes=` 应为个位数；③ 选项是否还闪（若还闪，说明还有第三条每帧路径，下一步针对每帧路径逐一计数）。
+
+### 2.5 ModManager `er2.modmanager` v1.5.9（选项闪动 + 翻页卡顿，两个根因都来自日志证据）
+玩家反馈（本轮关键）："**从始至终都是选项在闪动**" + "翻页还未响应"——第一次明确了症状位置：**闪的是选项、不是翻页/不是整页重建**。结合 1.5.8 的日志，两个根因都定位到：
+**① 选项闪动 = 高度被写到错的对象上（振荡）**：`SelfHealScroll(contentPage, force)` 的调用点（`ToggleEntry` / `ToggleMod`→`RelayoutContainer` / `ApplyEntryDirtyUi`→`RelayoutRowsOf`）**一直传的是 `MM_Container` 而不是 contentPage** → 函数末尾 `target.sizeDelta` 写到了容器自己身上，而容器挂着 `ContentSizeFitter` → 写入值下一帧被 Fitter 算回真实值覆盖 → **高度来回跳**（日志实锤：`content height jump 1644 -> 1784 (force=True)` 紧接着 `1784 -> 1644`），每次跳变整列行重排 = 选项闪动。**修法：在 `SelfHealScroll` 入口统一纠正**（传进来是 `MM_Container` 就改用其父级 contentPage）——比逐个改调用点更不容易漏。
+**② 翻页不响应 = 每次进页都重建全部条目**：`FillContent` 对每个 mod **无条件** `FillModEntries + AddFooterRow`（v1.5.0 为消灭白闪定的"正文始终建好"），折叠内容也照建 → 二十个 mod ≈ 上千 GameObject/次翻页。**修法：延迟构建** —— `ModBody` 增加 `plugin/container/titleIndex/built`，折叠的 mod 只登记标题行；`ToggleMod` 首次展开时调 `BuildModBody(body)` 只建这一个 mod 的行（并按 `SetSiblingIndex(titleIndex+1+k)` 插到标题之后；**先收集行对象引用再搬**，rows 登记的是对象不是下标，所以改顺序不影响登记）。展开过的仍然原地显隐，不违反 v1.5.0 的"点击不重建"。
+**③ 新增建页成本日志 `page built in Xms - rows=.. mods=.. bodiesBuilt=.. watches=.. extras=..`**（**不受 debugLog 限制**，5s 节流）——玩家报的是性能问题，这条是判定延迟构建收益的证据。
+**顺带**：`debugLog` 已改回 `false`（玩家归因日志；且关键日志本就不受门控）。
+版本 1.5.8→1.5.9（四处同步）；编译 0/0；部署 sha256 `C7B27D62…` == bin。
+**待复测**：① 建页耗时与 `rows` 数应显著下降（翻页应跟手）；② 不应再出现成对的 `content height jump`（A→B 再 B→A）——若还出现，说明还有别的路径在写错对象；③ 展开一个折叠过的 mod 时看是否正常（延迟构建的行序、分区层级、滚动高度）。
+
+### 2.5 ModManager `er2.modmanager` v1.5.8（白闪**真因**：MODS 页左翻被交还原生）
+**v1.5.8（2026-09-25，白闪定案）**：再次实读 `LogOutput.log`，这次盯的是**翻页分支序列**：
+```
+tab left:wrap-mods  cur=0 myIndex=4   ← 第一页左翻进入 MODS（我们接管 ✓）
+tab left:pass-native cur=4 myIndex=4  ← 在 MODS 页按左键 → **交还原生**（×2 次）
+tab right:enter-mods cur=3 myIndex=4  ← 原生把它丢回第 3 页，玩家再右翻才回 MODS
+```
+**根因**：`TabLeftPatch` 只处理了 `cur == myIndex + 1` 与 `cur == 0` 两种情形，**`cur == myIndex`（正站在 MODS 页按左箭头）没有任何分支** → 一路掉到末尾的 `left:pass-native` 并 `return true` → 原生 `SettingsTabLeft` 拿着**越界的 cur=4**（原生只认识 0..3，MODS 是我们追加的末页）执行左翻 → 原生按未知状态**重填整个设置面板** = 整屏重绘 = 玩家看到的那记白闪。每次离开 MODS 页必现。
+**修法（与"末页右翻进入 MODS"完全对称）**：新增 `LeaveModsBackward(s)` —— `RestoreScrollAnchors()`（v1.2.1 教训：不还原会把坏高度泄漏进原生页）→ `currentOpenedMenu = myIndex - 1` → 用容错的 `CallUpdateOpenedMenu(s, true, false)` 切回原生最后一页 → `return false` **拦住原生**。音效与音效规则同 `WrapToFirstPage`；离开前 `ThirdPartyPage.Detach()`。
+**补证据缺口**：会话重开那条 `OpenMyPage`（设置界面重开时重建）**此前没挂探针** → v1.5.7"没有重建"的结论实际只覆盖了巡检那一条路，证据不完整。已补 `LogRebuild("session-reopen")`。
+**教训（两条，已入台账）**：① 追加型页面必须在**每个翻页入口**都自洽处理"正站在自己页上"的情形，漏一个就是"越界交还原生"；② 判定"某类事件没发生"之前，先确认探针覆盖了**该类事件的全部路径**——只覆盖一条就下结论，等于用半个证据定案。
+版本 1.5.7→1.5.8（四处同步）；编译 0/0；部署 sha256 `025A028E…` == bin；cfg 仍置 `debugLog=true`（遗留待玩家定位后关闭）。
+**待复测**：离开 MODS 页（左箭头）时不应再有 `left:pass-native`，应出现 `left:leave-mods`；若日志里还能看到 `rebuilding MODS page ... reason=session-reopen`，说明重开设置时也在闪，下一轮针对它。
+
+### 2.5 ModManager `er2.modmanager` v1.5.7（白闪取证版，**无行为改动**）
+**v1.5.7（2026-09-25，白闪：第二次否定，转"取证优先"）**：玩家复测 v1.5.6 仍报"还是有白闪"。**关键动作：直接读 `<Game>\BepInEx\LogOutput.log` 取证**（不必等玩家贴日志——本机就能读），结果是：
+- **`ModManager: rebuilding MODS page` 一条都没有** → **v1.5.6 的"每帧自愈误杀短列表"假设被证伪**：整页重建根本没发生。白闪另有来源。
+- 静态复核排除两项：① 行 `HitArea` 的 `Image.color=White` 看似可疑（铺满整行的一大块白），但 `ApplyRowHoverTint` 的 normal/selected/disabled **全为 alpha=0**、悬停 0.035 → 不可见；② `AddEntryActions` 内含 `OpenMyPage` 但**无任何调用点**（v1.4.0 起死代码）。
+- 于是改为"取证优先"，加两个**只在 debugLog 下运行**的探针：
+  ① `ProbeStackedRows(cont, where)`（挂在 `SelfHealScroll` 里所有强制重排之后 —— ToggleMod/Section/Entry 最终都会经过这里）：统计可见行里 anchoredPosition.y 相同的最大行数，若 `>=3 且 ≈全部可见行` → 判定"行被摆在同一位置"并打 LogWarning。**这就是白闪的物理成因**：某一帧行位置未定型、浅色值框互叠成一大块白。日志形如 `rows stacked at one y after 'SelfHealScroll' - visible=.. sameY=.. containerH=..`。
+  ② 把 `row inset applied`（原先**每帧一条**）节流到 5 秒一条 —— 玩家一旦开 debugLog，这条会把日志灌满、反而看不到别的信息。
+- 版本 1.5.6→1.5.7（四处同步）；编译 0/0；部署 sha256 `06585DFD…` == bin；**手动写入 cfg 把 `Debug/debugLog` 置 true**（build.ps1 每次会清 cfg），取证结束后由玩家在 MODS 页或 cfg 里关掉。
+- **待复测**：重启游戏 → 操作到白闪 → 我看 `LogOutput.log`（本机可直接读）。判定路径：出现 `rows stacked at one y` → 摞行成立，往下查为什么那一帧 layout 没定型；不出现 → 白闪与我们的重排无关，需截图做像素测量定位。
+
+### 2.5 ModManager `er2.modmanager` v1.5.6
+**v1.5.6（2026-09-25，追查残留白闪）**：玩家实测 feedback"除了残留白闪其他正常"（三项新功能验收通过）。按"不猜、先取证"的原则查剩余重建路径，比对全部 `OpenMyPage` 调用点后锁定 **每帧自愈的"布局死"判定**（`InjectPollPatch.Postfix` 尾部）：
+① **根因（误杀短列表）**：判定只看绝对高度——`容器 rect.height <= 101 && content rect.height <= 201` 即判"布局从未算过"→ 重建。但 `FillContent` 里 content 高是 `Math.Max(200f, pref+8f)`，**content 高恒 >= 200 → 该条件恒真**；于是只要列表"真的短"（装的 mod 少、或大部分折叠），容器高就容易落在 101 以内 → 被判死 → **每帧 OpenMyPage 重建 = 白闪**（熔断只在 0.5s 窗口限流，表现为连闪一小波）。**修法：改判"需求与实际的落差"** —— 只有 `LayoutUtility.GetPreferredHeight(ours) > rect.height + 8`（要的比画出来的高得多）才算真没算出来；preferred 本身就小 = 合法短列表，不再误杀。
+② **每次重建都留下证据**：新增 `LogRebuild(reason)`，**不受 debugLog 限制**（重建 = 玩家看得见的故障），同原因 5 秒节流一条，带 `reason=layout-dead(containerH=.. contentH=.. preferred=..)` / `container-missing` / `empty-container(rows=0)` 与 burst 计数 → 下次再闪可以直接读日志定位，不用猜。
+③ **顺带补料**：`OpenMyPage` 建页后补一次 `Canvas.ForceUpdateCanvases + ForceRebuildLayoutImmediate(容器)`，让首帧布局先落定、不再被巡检误判；`SelfHealScroll` 增加"内容高跳变 >= 40px"诊断（debugLog 门控 + 节流），用来区分"重建造成的闪"与"重排造成的闪"。
+④ 排除项：`AddEntryActions`（内含 OpenMyPage）**无任何调用点**，是 v1.4.0 起的死代码，与本次无关。
+版本 1.5.5→1.5.6（BepInPlugin + 启动日志 + README + Nexus 四处同步）；编译 0 warning 0 error；已部署，`plugins\ER2_ModManager.dll` 与 `bin\Release\net6.0` sha256 一致（`BA5B5C96…`）。**待玩家复测**：看 `LogOutput.log` 里 `ModManager: rebuilding MODS page ... reason=` 是否还出现——出现则按 reason 追下一条原因；不出现说明白闪已不由重建引起，需截图做像素测量定位到高度/重排侧（届时有 `content height jump` 日志兜底）。
+
+### 2.5 ModManager `er2.modmanager` v1.5.5
+**v1.5.5（2026-09-25，可靠性三件套：改动标记 / 单项还原 / 重启提示 + Reset 二次确认）**：用户选题动的是"改了什么、改了算不算、怎么找回"这层（此前 ModManager 只是个渲染器）。四处落地：
+① **改动标记**：`IsDirty(cfg, entry)` 用 `GetStaged(...) != DefaultValue` 判定（必须走 GetStaged——`ApplyAndSave` 之前 `BoxedValue` 还没变），改动过的项标签尾部加 `" •"`。**标记必须是纯文本**：v1.5.0 已实证这些 Text 上富文本 `<color>`/`<size>` 不生效、会原样打印标签串，所以放弃了彩色富文本方案。为此给 `FitRowLabel` 加 `suffix` 参数——**标记不参与截断**（否则 Ellipsize 会把 suffix 割掉）。
+② **单项还原**：新增 `AddRestoreRow`（左灰字显示"默认值 X"，右侧"还原默认"按钮），行体与简介行一样**一次建好、只切 SetActive**（不敢动态插行——`ModBody.rows`/`SectionBody.rows` 是建页时按 childCount 区间登记的，事后插行会漏登记、串层级）。可见性条件 = `dirty && VisibleNow()`，已并入 `ReapplyInnerVisibility`。
+③ **标记/还原的实时刷新**：关键洞察是 **`StageValue` 是所有写值的唯一入口**（含按键捕获、下拉、开关、滑条、输入框、None 按钮、单项还原），所以只在它末尾调 `RefreshEntryDirtyUi` 就覆盖全部路径；内部用 `ex.dirty` 缓存做比较，**只在状态翻转时才动 UI**（滑条每帧 StageValue 但不会重复布局）。
+④ **单项还原不重建页面**：新增 `ApplyValueToControls(cfg, entry, val)` 把值写回 Toggle/Slider/InputField/Dropdown（下拉下标用 `DropdownIndexFor`，与 PollControls 的写回互为逆运算）以及热键行的 `valueButton`（热键控件没有 watch）。**一条都没命中时打 LogWarning**——界面显示旧值这种事必须能被看见。据此把 `ResetModSettings` 与热键 `None` 按钮也从"整页重建"改成原地更新，**消灭了 v1.5.0 之后残留的最后两处白闪源**。
+⑤ **"需重启生效"提示**：`RequiresRestart(entry)` 扫 mod 自带简介里的 restart/reboot/重启/重开游戏/下次启动（宁宽不紧——漏判才是问题）→ 该项简介行追加提示；`FlushAllStaged` 在 **ApplyAndSave 之前**（清 staged 就查不到了）统计这批改动里的重启项，用原生 `Corvostudio.UI.Hint.Display` 提示数量，日志列出具体项 `ModManager: saved, N change(s) require a game restart to take effect: ...`。
+⑥ **Reset all 二次确认**：新增 `ArmItem`/`armedResets` + `IsResetArmed/ArmReset/DisarmReset/PollArmedResets`（挂载在既有 `PollControls` 每帧链里），第一下只把按钮文案换成"确认重置?/Confirm?"，3 秒未确认自动撤销；页面重建会销毁旧 Text，`PollArmedResets` 用 `Equals(null)` 判活并清理。
+**顺带修掉的陈年 bug**：`SetupControl` 在 `FitRowLabel` 之后又无条件 `t.text = label`，把**截断结果覆盖回未截断原文** → v1.5.0 声称的"省略号截断"在原生模板路径上从未生效（长标签照旧压到值控件上）。改为只在 FitRowLabel 没写入时兜底赋值。另删掉 `EntryExtras.actionsRow`（v1.4.0 起的死字段）消除 CS0649。
+版本 1.5.4→1.5.5（BepInPlugin + 启动日志 + README + Nexus 四处同步）；已构建部署，`plugins\ER2_ModManager.dll` 与 `bin\Release\net6.0` sha256 一致（`63A97034…`）。**未实测**（游戏未运行），待验证点：改动标记随输入实时出现/消失、"重置全部"两段式手感与 3 秒撤销、含 restart 的项改后退出时的 Hint。
+
 **v1.5.4（2026-09-24，翻页音效被第三方吞掉）**：玩家接着报"翻页到 mod 管理器页面时没有音效了"。**根因不是我们漏播，而是原生音效被第三方 Prefix 连带吞掉**：`SettingsGUI_V2.SettingsTabRight/TabLeft` **自身会播点击音效**（v1.1.4 已实证——我们拦截原生翻页后必须手动补 `SoundManager.ClickSound()`），而 ACM 的 `SettingsTabRight` Prefix 在原生第 3 页**恒 `return false`** → 原生不执行 → 音效随之消失，而它的 `ResponsiveOrdersNativeSettingsPage.cs`（1629 行）**全文没有任何 `SoundManager` 调用** → 第 3 页 → ACM I → ACM II 整段静音。**修法（规则化，不是打补丁）**：**凡是"这次原生不会执行"的分支，都由我们补一声；会走到原生的分支一律不补**（否则和原生音效叠成双击）。新增 `ModRegistry.TabSound()`（补音 + 分支追踪）/ `TabTrace()`（只追踪不补音），落在 6 个分支上：`right:yield-thirdparty-open`（打开它的首页）/ `right:yield-thirdparty-next`（假页 1→2）/ `left:yield-thirdparty`（从它的假页左翻）补音；`right:enter-mods` / `left:enter-mods` / `left:wrap-mods` / `right:wrap-first` 由 `EnterMyPage`/`WrapToFirstPage` 内部已有的 `ClickSound` 覆盖；`right:pass-native` / `left:pass-native` 交给原生。追踪日志形如 `ModManager: tab <branch> cur=.. myIndex=.. thirdParty=open/2|closed|none`，实测一眼看出走的哪条分支。版本 1.5.3→1.5.4（BepInPlugin + 启动日志 + README + Nexus）。
 
 **v1.5.3（2026-09-24，第三方原生设置页共存）**：玩家来报想让本 mod 与 **Advanced Combat Movement 1.2.2**（GUID `AdvancedCombatMovement`，内含 Responsive Orders / Slower Vehicles）共存。反编译比对补丁目标后的定案：它**在原生第 3 页劫持 `SettingsGUI_V2.SettingsTabRight` 并恒 `return false`**，而它的 DLL 按字母序（A < E）先于我们加载、同优先级下先执行 → 它的补丁先跑并短路 → 我们追加在最末的 MODS 页**再也无法用右箭头翻到**（只剩"第一页左翻绕回"这一条旁路）。**修法（反射桥 `ThirdPartyPage`，无编译期依赖）**：① 我们的 `TabRightPatch`/`TabLeftPatch` 提到 `[HarmonyPriority(Priority.First)]` 先判状态；② 它的假页（`CurrentFakePage` 1=主设置 / 2=续页，都是 **public static 字段**，必须 `GetField`）停在末页时右翻 → 交给我们 `EnterMyPage`；③ 它的假页还没到末页 → 放行走它自己的翻页；④ 停在它的入口页（原生第 3 页）→ 让位，否则我们抢先接管、它的页面永远打不开；⑤ 交接/离开时用 `Detach()` 把它的 `IsOpen=false`/`CurrentFakePage=0` 复位（不清会有两个后果：从 MODS 页左翻被它的 `TabLeft` 抢走、以及下次误判"还在它的末页"而跳过它的页面）。未安装该 mod 时 `Present=false`，原有行为一字不变。版本 1.5.2→1.5.3（BepInPlugin + 启动日志 + README + Nexus）。
@@ -116,7 +733,65 @@ AI 血量低于 `eatBelowHp`（默认 **40**）自动吃背包食物回血：`Fi
 打开背包（自己/尸体）时**真暂停**（延迟 timeScale 冻结，等打开动画完成）；暂停期间丢弃道具自动落地（扫描 `ItemObject.spawnedItems`）。
 **ER2 暂停机制图谱（全部实测定案，做任何暂停功能前必读）**：原生 `Pause.SetPause` = timeScale=0 + 弹菜单 + `disableOnPause`（藏菜单 = 死锁）；手动 `Pause.isPaused=true` 禁用输入但**不冻结世界**；`timeScale=0` 真暂停但**卡 UI 协程动画** + 丢弃武器浮空（解法：延迟冻结等动画完成 + 扫描 `spawnedItems` 拉下道具）；`enableAiBehaviour(false)` **无效**（true 才有效）；背包开关读 `InventoryPanel.isOpen`。
 
-### 2.11 SquadCommand（Battlefield Commander）`er2.squadcommand` v1.4.46
+### 2.11 SquadCommand（Battlefield Commander）`er2.squadcommand` v1.4.56
+**1.4.56（2026-09-25，用户反馈："幽灵单位靠近掩体的判定范围太小了"）**：
+- `formCoverCorridor` 默认 **6 → 10m**（上限仍 25，可继续加）。放宽的底气是 1.4.54 起的两道保证：① 吸附**槽位锚定**（只在自己阵型槽位近旁占用掩体，不是围着锚点抢）；② `GapOk` 强制已选掩体点之间 ≥ `max(1.5, 槽位间距×0.6)`，不会被吸成一堆。超过 12m 后掩体密集地形仍会把整条线拉到掩体边——需要时往下调。
+- 默认值沿革（供后续调参参考）：8（1.4.50，实测整条线被吸上墙）→ 3（1.4.53，太紧）→ 6（1.4.54）→ **10（1.4.56）**。cfg 描述与 Ui.cs EN 词条同步。
+- 验证：编译 0 error；部署 DLL 242,176 B，sha256 `C5A0A4543274136138801D8F5D2E1F7026366A05D8D12F2EFC43E8992204BE0E` 与构建产物逐字节一致；反编译复核：版本双写 **1.4.56** ✓、`Config.Bind<float>("Control","formCoverCorridor", 10f, …)` ✓。
+- **发布（1.4.56，本轮收口版）**：① 四份发布文档（README / Nexus × 中英）版本号同步 1.4.56 并补齐 **1.4.39~1.4.56 共 18 版变更史**；② 日志收口复核——新增诊断（拖动基准/掩体吸附/按槽位判到位）全部 `debugLog` 门控，无条件日志均为"每次操作 1 条"的事件日志；③ **先 `-Cn` 后 EN，EN 最后跑**（部署 = EN）；④ 双语双包 `ER2_BattlefieldCommander_v1.4.56.zip`（EN，242,176 B，`C5A0A454…`）/ `ER2_BattlefieldCommander_CN_v1.4.56.zip`（CN，222,720 B，`059B0F34…`），**构建=部署=包内 DLL 逐字节一致**，包内文档与源文档 sha256 全等（CN 包按语言路由取中文文档），EN/CN 双包反编译版本双写均为 1.4.56 ✓。迭代期 `-SkipPackage` 不出包。
+
+**1.4.55（2026-09-25，用户截图提问："明明有掩体，不应该靠近掩体吗"——线穿过沙袋墙，8 幽灵全在线上、0 吸附）**：
+- **根因（陷阱 118）：`QueryCovers` 的无方向兜底是死代码**——原流程：有向查询空 → 无向兜底再查 → 但兜底结果仍被同一把 `IsCoverAvailable(facing)` 有向过滤器**再杀一遍**。只要朝向过滤全灭（如沙袋墙的掩体点不认当前受敌方向），无论查多少遍可用掩体恒 0。
+- **修法**：① 两段查询**各自过滤**（新增 `FilterCoverStates`：摧毁/被占/载具）；② **摘掉后置 `IsCoverAvailable` 过滤**——其原生语义不可考（interop 仅桩、参数名 `shootDirection`，实现在 GameAssembly 原生层），且有向查询 `GetCovers(center, radius, fac, dir, false)` 本身已带 dir 参数，后置再过滤属双重过滤。朝向适配完全交给原生 dir；无向兜底从此真的兜底。
+- **待观察**：若修复后仍 0 吸附，开 `Debug/debugLog` 看 `[Formation] 掩体吸附 … 可用掩体=N`——**N=0 = 这批沙袋在地图/内容包里根本没注册掩体点**（游戏侧数据问题，非 mod 侧；需 Combat Cover 类内容包或地图自带）。
+- 验证：编译 0 error；部署 DLL 242,176 B，sha256 `CA97B12E8C1F522563E6297C3D4EB893D0799D0643CD8A5D5E9D46F787F9D66A` 与构建产物逐字节一致；反编译复核：版本双写 **1.4.55** ✓、`FilterCoverStates` 两段调用 ✓、`IsCoverAvailable` 引用 **0 处** ✓。迭代期 `-SkipPackage` 不出包。
+
+**1.4.54（2026-09-25，用户反馈："1.拉出的线操作不跟手。2.线拉很长幽灵单位也不靠近掩体"）**：
+- **① 不跟手 = 像素→米比例的参照量取错（陷阱 117）**：`dragPerPx` 原按相机**垂直高度**算，而俯视倾斜时地面 1 像素对应的真实距离按**斜距**（相机→锚点视线距离）算——45° 俯角下系统性偏小约 30%；再叠加 1.4.49 把 `formDragSens` 默认压到 0.5，箭头端点只到光标一半距离。修法：比例改 `camH / sinDep`（俯视度 `|forward.y|` 钳 0.35~1，防近水平视角失真；正俯视时与原式等价），**`formDragSens` 默认 0.5 → 1（跟手）**。
+- **② 长线不近掩体：吸附 3m 太紧 + 只查锚点一个圆心**：吸附半径默认 3 → **6m**；新增 `QueryCoversAlongLine`——沿阵型线**多点采样**（半跨 > 0.8×半径时加两端采样点），结果按掩体指针去重、总量仍受 `MaxCoverResults=24` 限制（此前长线两端根本没被查过掩体）。
+- **③ 防挤堆**：新增 `GapOk`——已选掩体点之间强制保持 `minGap = max(1.5, 槽位间距×0.6)`。掩体点常密集分布在同一段墙上，全吸会让人贴人；有了这个间距，阵型的疏密不会被掩体改写（长线间距大 → 吸附更自由；短线间距小 → 少吸，不会挤）。
+- 验证：编译 0 error；部署 DLL 242,176 B，sha256 `6F1ABCE7BED86E8F3F710D3E5BEAF648DDFE5D2048E29AEFD7C4F2A22F369787` 与构建产物逐字节一致；反编译复核：版本双写 **1.4.54** ✓、`Mathf.Clamp(Abs(forward.y),0.35,1)` 斜距修正 ✓、`QueryCoversAlongLine`/`GapOk` ✓、cfg 默认 `formDragSens=1f`/`formCoverCorridor=6f` ✓。迭代期 `-SkipPackage` 不出包。
+
+**1.4.53（2026-09-25，用户反馈："现在幽灵单位完全不能像之前那样在预定掩体位置展示了"）**：
+- **1.4.51 的"默认 0"关掉了两件东西**（陷阱 116）：行为（阵型单位去抢掩体）+ **它承载的信息**（幽灵显示"这位会进这个掩体点"，还带蹲/趴姿态）。用户要的是**那份信息**，不是那个行为——我把它们一起关掉了。
+- **修法：吸附恢复，但本地化——默认 8 → 3m**：只吸**真正挨着槽位**的掩体（`DistXz(掩体点, 槽位) ≤ 3`，每槽至多一人、每掩体至多一人）。槽位压在沙袋/墙边上的单位 → 幽灵显示在该掩体点并摆出掩体姿态；离得远的单位留在阵型线上。这样"掩体预览"回来了，而 1.4.50 截图里那种"线与墙平行且距 8m → 8 槽全被吸上墙"不会再现（3m 够不着）。
+- cfg 描述与 Ui.cs EN 词条同步改写（键名不变）：**0 = 纯阵型线 / 3（默认）= 只吸挨着槽位的掩体 / 6~8 = 更积极找掩体，但掩体密集地形会把整条线吸到掩体边**。
+- 验证：编译 0 error；部署 DLL 240,640 B，sha256 `9AF194B1F335A582F9C8C0F01A7593158CB2DA8DE5FC9BBC6DB32127FD8524AC` 与构建产物逐字节一致；反编译复核：版本双写 **1.4.53** ✓、`Config.Bind<float>("Control","formCoverCorridor", 3f, …)` 默认值 ✓；cfg 已删待重生成。迭代期 `-SkipPackage` 不出包。
+
+**1.4.52（2026-09-25，用户反馈："没有幽灵单位后那个虚线还显示，这不好看"）**：
+- **根因一（设计）**：阵型下发走 `RegisterMoveObservation(routeOnly:true)` 会画**每个单位 → 锚点**的路线虚线（扇形）——幽灵已经预览过落点，下发后这套虚线只剩杂乱。修法：`RegisterMoveObservation` 新增 `withRouteLines` 参数，阵型下发传 **false**（普通移动/双击防守/登车路线不受影响；`showPathLines` cfg 语义不变）。
+- **根因二（生命周期 bug，更隐蔽）**：到位判定 = 距 `obsTarget`（锚点）≤ `moveRadius`（默认 8m），而阵型单位散在槽位上、距锚点可达**线长一半**（最长 60m）→ **永远判不到位**，观察窗挂满 45s——虚线、"移动 → X/N 已到位"进度行、目标点圈全部滞留。修法：`RegisterMoveObservation` 新增 `unitDests`（与 units 按下标平行的每单位落点），`ObsMoveTick` 优先按各自槽位判到位（无登记回落锚点）→ **全员到槽即清**。`AssaultCovers`（右键建筑进掩体）同样接入（虚线保留——指向建筑有指向意义，但能准时消失了）。
+- 验证：编译 0 error；部署 DLL 240,128 B，sha256 `C9612344FE45F52D5E268CF9A3A5B4782EE745B466841240F26FFF4CA8522DDB` 与构建产物逐字节一致；反编译复核：版本双写 **1.4.52** ✓、`obsUnitDest`/`obsDrawRoutes`/新签名（含默认参数）✓；迭代期 `-SkipPackage` 不出包。
+
+**1.4.51（2026-09-25，用户三轮反馈"还是散不开"+ 截图实锤）**：
+- **截图定案（陷阱 115）**：用户从移动目标圆圈向墙拖线（箭头长约 12m），阵型线（竖直、过锚点）与墙**平行且距约 8m**——1.4.50 吸附半径 8m 内，**墙上每个掩体点对每个槽位都够得着** → 8 槽全被吸上墙，幽灵又贴墙排成一列。结论：**只要吸附默认开，掩体密集地形（村庄/墙边/沙袋线）里阵型必然被吃掉**——这不是半径大小问题，是"阵型拖动里默认做掩体吸附"这个设计本身错了。
+- **修法：`formCoverCorridor` 默认 8 → 0（吸附默认关闭，纯阵型线）**：散开优先；找掩体走专用入口（`keyCover`=N 就近掩体、右键建筑 `AssaultCovers`，均不受影响）。想保留吸附的用户可调 2~8（每槽至多一人、每掩体至多一人的限制保留）。cfg 描述与 Ui.cs EN 词条同步改写（键名不变）。
+- 验证：编译 0 error；部署 DLL 239,104 B，sha256 `B4BB14970F3B7B909E08879EA3153C58A26D39ACBB4E19970C311F67C56C4A88` 与构建产物逐字节一致；反编译复核：版本双写 **1.4.51** ✓、`Config.Bind<float>("Control","formCoverCorridor", 0f, …)` 默认值 ✓；cfg 已删待重生成。迭代期 `-SkipPackage` 不出包。
+
+**1.4.50（2026-09-25，用户二轮反馈："现在很难再让幽灵单位出现了，就算出现了还是会排排站，不散开"）**：
+- **1.4.49 走廊方案的两层缺陷**：① **参数层**——走廊过滤（|纵深|≤8m）+ 沿线匹配≤12m 叠加，可用掩体窗口过窄 → 开阔地几乎抓不到掩体 → 幽灵消失（对 1.4.48"全军挤墙"矫枉过正）；② **设计层（真正根因）**——幽灵只画掩体分配：掩体天然是"一排"，用户以幽灵判断"散没散开"，看到的永远是排排站；真正散开的阵型线槽位只有 0.2m 小黄点，视觉上等于没有预览。
+- **语义反转：阵型优先、掩体吸附（`RebuildCoverAssignment` 重写）**：先给**全部步兵**按 BuildLine 同款数学排好槽位（新 `ComputeLineSlots`，拖多宽散多宽），槽位 `formCoverCorridor` 米内有空闲掩体才"顺势占用"（`DistXz(掩体, 槽位) ≤ snap`，每槽至多一人、每掩体至多一人）；其余单位留在槽位上。无论有没有掩体，整条线的展开始终成立。cfg 描述同步改写（键名/默认值 8m 不变，0=完全不用掩体）。
+- **幽灵覆盖全部步兵槽位（`GhostPreview.Apply` 改签名）**：`Apply(covers, lineSlots, facing)` 两表合一——掩体槽带建议姿态、阵型线槽站姿；**每帧调用**（位置跟随阵型线移动），克隆创建预算 6→2/帧（防 Instantiate 尖刺，16 个约 8 帧建满）。Apply 唯一调用方是 `Formation.DragTick`（UniGen 走反射只调 `Ghostify`，不受影响）。
+- **布局数学收口**：BuildLine 步兵支路抽成 `ComputeLineSlots(units, spacing, dst)`（每帧排线 + 节流吸附判定共用同一份，保证"预览=下发"），载具支路独立为 `BuildVehicleLine`；1.4.49 的 `AssignCoversAlongLine`/`CoverEndMargin`/`CoverAlongMatchMax` 删除。诊断日志改"掩体吸附 X/Y（snap/可用掩体/半径）"（debugLog 门控）。
+- 验证：编译 0 error；部署 DLL 239,104 B，sha256 `842CA49B3BF05065D5EAFF9493AE338C3BC4FDA8E05F8ACA4EA1F9DA04467B4A` 与构建产物逐字节一致；反编译复核：版本双写 **1.4.50** ✓、`ComputeLineSlots(infBuf, 1.4f, snapScratch)`（吸附走全量槽位）✓、旧 `BuildLine(`/`AssignCoversAlongLine` **0 处** ✓；cfg 已删待重生成。迭代期 `-SkipPackage` 不出包。
+
+**1.4.49（2026-09-25，用户反馈："长按右键拖动阵型时灵敏度太高，阵型常常无法展开。拉动让幽灵单位扩散时总是一字排开站在掩体边，根本散不开"）**：
+- **阵型拖动灵敏度 cfg 化（`Control/formDragSens`，默认 0.5，范围 0.1~2）**：`CaptureDragBasis` 的像素→米基准保持不变（锚点地面比例，随镜头高度），再乘 cfg 倍率；代码侧再钳 0.05~4 防手改 cfg 拉出爆长箭头（陷阱 17g52：取值链上每处 clamp 都是第二范围定义）。1 = 旧比例，越小越跟手。
+- **掩体分配改"沿阵型线走廊"（`Control/formCoverCorridor`，默认 8m，范围 0~25，0=关闭掩体优先）**：
+  - 旧行为：`AssignCovers` 以**锚点**为圆心就近贪心、与阵型线形状完全无关 → 掩体密集处（村庄/墙边）全军被吸进锚点旁的同一排掩体，阵型线只剩零星单位——即用户看到的"总是一字排开站在掩体边，散不开"。
+  - 新 `AssignCoversAlongLine`：① **走廊过滤**——掩体投影 |along| ≤ halfSpan+2m（端部余量 `CoverEndMargin`）、纵深 |depth| ≤ corridor 才可用；② 步兵按**沿线投影**排序（与 `BuildLine` 排线同序，减少交叉走位），逐个匹配"沿线投影最近"的空闲掩体（纵深偏移作 0.5 罚项，优先贴近阵型线本体）；③ 最近匹配 > 12m（`CoverAlongMatchMax`）就放弃该单位 → 照常排线，不抢远掩体。
+  - **建筑进掩体（`AssaultCovers`）不受影响**，仍走旧就近贪心（点语义，本就该以点击点为中心）。
+  - 已知限制：查询半径仍受 `MaxCoverQueryRadius=35m` 上限，>60m 的超长阵型线两端查不到掩体——两端单位照常排线，不影响展开。
+- **诊断日志（全部 debugLog 门控，§3.5）**：拖动基准 perPx/sens（每次拖动 1 行）；走廊内掩体 kept/total（0.35s 节流）；covers 分配统计含 halfSpan/corridor/radius。
+- 验证：编译 0 error；部署 DLL 239,104 B，sha256 `08FFBE61E7EEC421A699DA3893CC5A259555520A1DF6C87952DD8BCCE096122E`，与构建产物逐字节一致；反编译复核版本双写 **1.4.49** ✓；cfg 已删待重启重生成（新增 2 键）。按经验文档 D 节纪律，迭代期 `-SkipPackage` 不出包。
+
+**1.4.48（2026-09-25，共享层钳位修复 → 同步重建；用户定案**不出发布包**）**：
+- **共享层 `Shared/Er2Ui.cs` 的 `SetPanelAlpha()` 钳位修正**：陈旧下界 `Mathf.Clamp(v, 0.55f, 1f)` → **`0.40f, 1f`**，与 cfg 的 `AcceptableValueRange(0.40f, 1f)` 对齐。
+  此前 `uiPanelAlpha = 0.50` 被**静默抬成 0.55**，面板从未真正到过 50%，且 cfg 的 0.40~0.55 整段是死区（详见新陷阱 **AGENTS 17g52**）。
+- 本 mod 侧无其它改动。因该文件由两个 mod **源码级共享**（`<Compile Include="..\Shared\Er2Ui.cs">`），SC 的 DLL 内容随之变化 → 按 §7 `z+1` 升版本并重建部署；**用户选择"两个 mod 同步重建"但 SC 不出包**。
+- 验证：编译 0 error；部署 DLL 236,032 B，sha256 `1b63abbf6ad9b21656f374f61de894de394f828cb7fc9c6a06b9655e35542502`，与构建产物逐字节一致；反编译复核版本双写 **1.4.48** ✓ + `SetPanelAlpha` 内 `Mathf.Clamp(v, 0.4f, 1f)` ✓。
+- ✅ **已补（1.4.56 出包时完成）**：SC 的 `README.txt` / `README_CN.txt` / `Nexus_description.md` / `Nexus_description_CN.md` 版本号已同步 **1.4.56**，并补齐 **1.4.39~1.4.56 共 18 版变更史**（中英四份）。本条欠账关闭。
+
 **1.4.46（2026-09-25，用户第 40-42 轮：武器拾取方案反转 + 灰字终审联动）**：
 - **1.4.40-1.4.42 的"武器只进背包"拦截全部撤销（用户定案"只用原生方法"）**：探针实锤单位拿枪路径含 `Lua_Soldier.LoadAndSetWeapon`（且该通道对非玩家静默无效——触发 2 次枪没上手）；地面菜单「Take Into Right Hand」被 1.4.31 防隔空改道送进背包 = "不能拾取并放置于右手"。LootPolicy 只留 4 个只读探针（PickUpCR / PickUpItemFromInventory / AddItemInHand / LoadAndSetWeapon，全部 LogInfo）。
 - **1.4.43**：BackpackPanel 右手类条目（原文含 hand/右手）改 **"走过去 → 到达后执行原生交互本体"**（新 `lootNativeCall` 任务，防隔空初衷保留）；背包武器合成操作改标 **"拿起至右手"**（原"穿上"是穿戴件文案）。
@@ -507,7 +1182,136 @@ AI 血量低于 `eatBelowHp`（默认 **40**）自动吃背包食物回血：`Fi
   2. 枚举型工具函数（`CollectSquads` 这类"遍历全局静态表"的）一律加短缓存，否则被连续调用时浏览器级开销；
   3. OnGUI 路径里 `new List<>`/`new Dictionary<>`/`ToArray()` 逐个清掉，复用静态缓冲区；
   4. 缓存失效点要显式（`InvalidatePlayerSoldier`/`InvalidateMainCam`），并让"拿不到值的缓存"不写入（避免把 null 缓存成半秒的真相）。
-### 2.12 UniversalGeneration `er2.universalgeneration` v2.5.26
+### 2.12 UniversalGeneration `er2.universalgeneration` v2.5.36
+**2.5.36（2026-09-25，"进游戏固定时间卡几秒"定案 + 磁盘物品目录缓存）**：2.5.35 的耗时探针一锤定音——
+```
+GetAllItemsOfType<PropData>(items)      单次 4533ms
+GetAllItemsOfType<ItemObject>(weapons)  单次 5463ms
+GetAllItemsOfType<ItemObject>(ammo)     单次  242ms / attachment 406ms
+物品目录就绪合计 1509 条；探针总耗时 64173ms
+```
+**根因**：游戏 API `ItemsDatabase.GetAllItemsOfType<T>(PropType)` **每次调用都全量过滤数据库，单次最高 5.5 秒且为原子调用（时间片无法切分）**——ilspycmd 反编译确认 `ItemsDatabase` 没有暴露物品集合字段，这是唯一全量入口。而 UniGen 此前调它的次数远超必要：ProbeCR 每轮 SampleCounts 8 次 + EnumerateAll 8 次（最多 5 轮）、就绪 20s 后 EnrichCR 补漏再 8 次、看门狗重启再来。
+**修法（三件套）**：
+① **会话内 API 结果缓存** `typeCache`（key=类型名|propType）：同一 (T, type) 一次会话只调一次真实 API，其余全走缓存；`GetAllCached<T>` 统一入口（>150ms 仍打性能 Warning，但注明"已缓存不再重调"）。
+② **磁盘物品目录缓存** `BepInEx/config/er2.universalgeneration.items.cache.tsv`（TSV：bucket/sub/id/title，转义完备）：ProbeCR 开头 `TryLoadCacheFromDisk()` 命中 → **Ready + 零枚举调用**；枚举成功后 `WriteCacheToDisk()` 写盘（跳过 "mod" 桶——mod 物品每次启动由 ModCatalog 重扫，写盘会陈旧）。cfg 新增 `Catalog.refreshItemCache`（默认 false，游戏更新新增物品后勾一次刷新）。
+③ **废弃"就绪 20s 后自动补漏"**（EnrichCR 保留但无任何自动触发，重扫前 `InvalidateTypeCache()`；其使命由磁盘缓存取代）+ **SampleCounts/Count* 改为只读缓存**（miss 返回 -3，绝不在观测路径触发 5.5 秒原子调用）+ 删除死字段 `Failed/nextEnrichAt/enrichDone`（0 警告）。
+**预期效果**：首次启动（无缓存文件）仍有首轮 8 次原子调用（约 10 秒分散冻结，首次枚举不可避免）；**第二次启动起，进游戏后卡顿完全消失**（读盘 <10ms）。
+版本 2.5.35→2.5.36（BepInPlugin + 启动日志两处；发布文档下轮出包前补 2.5.35/2.5.36 条目——本版仅诊断+缓存，无新功能）；编译 0 警告 0 错误；部署 sha256 `1B53BF17…` == bin。
+**待复测**：第二次启动起，进游戏后不再有固定时间的卡顿；日志出现 `物品目录自磁盘缓存加载: N 条——本次启动零枚举调用`；游戏内物品页签内容与之前一致（1509 条量级）。
+
+### 2.12.1 UniversalGeneration `er2.universalgeneration` v2.5.38（bundle 等待 = 枚举完整性的硬保证）+ v2.5.37（修缓存固化残表回归）+ ModManager 1.5.14（音效取证）
+**玩家报**：① "不知道什么时候开始，翻页到 mod 设置页面没有音效了"；② "mod 物品加载要在战斗开始后，进入不够快列表就少很多"；③（v2.5.37 复测）"好像并没有改善"。
+**② 的根因链（三层，逐层挖出）**：
+- 第一层（v2.5.36 回归）：磁盘缓存固化了主菜单阶段的**不完整枚举**（475/1509 条，写盘条件不问场景）→ 2.5.37 加场景条件；
+- 第二层（v2.5.37 复测发现）：**战斗场景中枚举也只有 560 条**（weapons=229 ammo=204 gear=127，单次调用最高 8362ms）——"战斗场景"判据仍不够；
+- 第三层（v2.5.38 定案）：**物品定义在 `er2bundle` asset bundle 里渐进加载**——任何时刻"顺手枚举"都可能拿到半库。**反编译 ItemsDatabase 找到 `WaitForAssetBundleLoaded(string)`**：挂起等待直到 bundle 完全加载 = 枚举完整性的硬保证。
+**v2.5.38 修法**：
+① ProbeCR 开头 `yield return ItemsDatabase.WaitForAssetBundleLoaded("er2bundle")`；
+② **首轮只枚举核心三类**（ItemObject × weapons/ammo/attachment，实测贡献 1451/1509=96%）→ Ready 后面板立即可用；**删除 PropData(weapons/ammo/attachment) 兜底路径**（2.0.7 实测恒 0，纯浪费 3 次慢调用）；
+③ **items(6) 类**（投掷物/食物/杂项 58 条，两次调用实测 4.5~8 秒是全场最慢）拆成**延迟补漏轮**：Ready 后 30s 由看门狗触发一次 `LateEnrichCR`（InvalidateTypeCache + 枚举 items + 有增长则更新页签并重写磁盘缓存），错峰不占面板首开；
+④ 读盘命中的会话（磁盘缓存已含 items 类）连补漏都不跑。
+**① 音效**：v1.5.14 的 `ClickSound failed` 探针**零输出**——ClickSound 调用成功（无异常）但无声，问题在原生 SoundManager 内部（黑盒）。下一步：反编译其原生实现不可行（IL2CPP 编译后的 C++），改为**行为对照**（让玩家确认原生页间翻页是否有声）+ 必要时改用 `SpawnAndPlayAsync` 播已知音效 id 的替代方案（需先找到 UI click 的 sound_name_id）。
+版本：UniGen 2.5.37→2.5.38（两处同步）；ModManager 1.5.14 已部署（音效探针）；编译 0/0；UniGen 部署 sha256 `697156C1…` == bin。
+**待复测**：① 物品目录应恢复 ~1509 条量级且进战斗后无固定时间卡顿（bundle 加载完成的枚举一次到位；items 类 30s 后补）；② 若日志出现 `er2bundle 已就绪` 后枚举条数仍 <1500 → bundle 加载完也不完整，需再挖；③ 音效等玩家确认 + 日志。
+
+### 2.12.2 UniversalGeneration `er2.universalgeneration` v2.5.37（修 v2.5.36 缓存固化残表回归）+ ModManager 1.5.14（音效取证）
+**玩家报**：① "不知道什么时候开始，翻页到 mod 设置页面没有音效了"；② "mod 物品加载要在战斗开始后，进入不够快列表就少很多"。
+**② 的真相比描述严重**（读日志发现）：磁盘缓存里只有 **475 条（实时枚举是 1509 条）**——**v2.5.36 把主菜单阶段的不完整枚举固化进了缓存**（主菜单时数据库只加载一部分，而写盘条件不问场景），之后每次启动都读这份残表 = **整个物品目录少 2/3**，mod 物品晚到只是次要因素。
+**修法（v2.5.37，三处）**：
+① **主菜单不做探测**（`ProbeWatchdog` 开头 `InBattleScene()` 判定，`MainMenu.instance == null`，与 Endless 同判据）——主菜单枚举既不完整也无意义（面板只在战斗 RTS 内可用）；
+② **只有战斗场景中完成的枚举才写盘**；主菜单枚举仅作预热并打日志"不写磁盘缓存，进入战斗后自动重扫"；
+③ **场景完整性检查**：`Ready && !cacheWritten && InBattleScene()` → `ResetForFullRescan()`（清桶/缓存/复位）→ 战斗场景中完整重扫 → 写盘 → `cacheWritten=true` 永不再扫。**缓存文件头新增 `full=1` 完整标记**：读盘时无标记（旧版/主菜单期写入）不采信——否则旧残表会被"已就绪"标记永久固化。**已手动删除玩家机器上的 475 条坏缓存文件**。
+预期：首次启动进战斗后重扫一次（一次性的数秒冻结）→ 写完整缓存；之后每次启动读盘零调用、目录完整（1509 条量级）。
+**① 音效**：所有翻页分支都调了 `ClickSound`（trace 带 [sound]）但玩家听不到——唯一能吞掉线索的是 `PlayClick` 的**空 catch**。v1.5.14 在 catch 里加 `LogWarning`（失败必留痕）。若下轮日志出现 `ClickSound failed` → 异常定案；若无 Warning 但仍无声 → 问题在原生 SoundManager 侧（届时反编译 `SoundManager.ClickSound` 查它的内部条件）。
+版本：UniGen 2.5.36→2.5.37、ModManager 1.5.13→1.5.14（各两处同步）；双双编译 0/0；部署 sha256 `961EC02D…` / `76F49910…` == bin。
+**待复测**：① 物品目录应恢复 1509 条量级（日志 `物品目录自磁盘缓存加载` 的数字），且**无固定时间卡顿**（第二次启动起）；② 翻页音效——若仍无声，看日志有无 `ClickSound failed`。
+
+### 2.12.3 UniversalGeneration `er2.universalgeneration` v2.5.46（物品目录**真正长齐**；玩家确认"现在全了"）
+**2.5.37→2.5.46 连续 10 个版本都在修同一件事：物品目录条目不完整。** 最终实测（单会话三轮累积）：
+```
+验证第 2 轮: 1164 → 1921（新增 757）  weapons=612 ammo=204 gear=473 food=4 mod=628
+验证第 3 轮: 2109 → 2923（新增 814）  weapons=1164 ammo=209 throwables=49 gear=666 food=18 misc=1 mod=816
+```
+官方条目 **1164 → 2107**（史称"完整"的 1451 其实也是早期快照）；分类也补齐（投掷物 49 / 医疗食物 18 / 其他 1）。玩家确认"现在全了"。
+
+**根因链（四层，每层都被下一轮日志推翻过一次）**
+1. **缓存固化半库**（v2.5.36/37）：写盘条件不问时机，把主菜单阶段（库只加载约 1/3）的枚举结果存成"已就绪"→ 之后每次启动都读残表。修：`full=1` 标记 + 场景条件（后被证伪，见 3）。
+2. **bundle 等待 ≠ 条目完整**（v2.5.38）：`WaitForAssetBundleLoaded("er2bundle")` 只保证**资源包已加载**，不保证 `ItemsDatabase` 已登记全部条目——两件事不是一回事。修：加挂起等待（必要但**不充分**）。
+3. **场景判定连续两次被实测证伪**（v2.5.40/41）：`MainMenu.instance == null`（它是常驻对象，恒 false）→ 换 `BattleManager.IsBattleActive()`（RTS 上帝视角下也是 false）→ 探测/写盘/验证**整体被跳过**，物品页签直接消失（玩家："大选项 4 行变 3 行"）。修：**彻底删除场景判定**，完整性只由 bundle 等待保证。
+4. **触发块是死代码 + 守卫值恒为 0**（v2.5.42/43）：`ProbeWatchdog` 第一行 `if (Ready) return;`，而验证/补漏触发块写在它**之后** → 读盘命中使 Ready 启动即 true → 每秒都在第一行返回；即便挪到前面，守卫 `readyAt > 0f` 也恒 false，因为读盘路径的 `readyAt` 取自**插件 Awake 那一刻**（游戏一帧未跑，`Time.unscaledTime = 0`）。修：触发块前置 + 基线自愈。
+5. **单轮快照 ≠ 全量**（v2.5.45）：官方物品库**随进程逐步长成**（开局 23s 枚举 1164 条，久玩后 2107 条）。修：**多轮累积验证**——单会话最多 3 轮（间隔 30s/120s），每轮只增不减地并入（`Add` 按 Id 去重），某轮无新增才判定稳定。
+6. **验证轮重叠执行**（v2.5.46）：下一轮按固定间隔触发、不等上一轮结束，而单轮耗时 30~60s → 间隔早已过期 → 两轮并发（日志两行同号"第 2 轮"，冻结翻倍）。修：`verifyActive` 计数守卫 + 间隔从**上一轮结束时刻**起算 + 轮次编号在轮内捕获。
+
+**免重复代价的关键设计（v2.5.44，务必保留）**：缓存头记 `verified=<0|1>` + **游戏构建签名**（`GameAssembly.dll` + `global-metadata.dat` + `StreamingAssets/CorvoBundles/er2bundle` 的 大小:修改时间秒）。签名一致且 verified=1 → **本会话完全跳过枚举**（省下 4 次原子调用、实测合计 54.6 秒冻结）；游戏更新则自动重验；cfg `Catalog/refreshItemCache` 手动强制。**只有"某轮无新增"才允许写 verified=1**——未稳定不得声称可信，否则"跳过工作"的标记会把没长齐的快照永久固化（本项目在 2.5.36/2.5.37 已经踩过一次）。
+
+**方法论沉淀（跨 mod 通用）**
+- **数据源逐步长成时，单次采样既不能证明完整、也不能证明稳定**，必须"累积 + 稳定判定"；写入"可跳过重算"的标记前，必须确认当前状态真的达标。
+- **给 early-return 函数加分支要先画控制流**：服务于"已就绪/已完成"状态的逻辑必须放在 `if (Ready) return;` **之前**——就绪态恰恰是它最先吞掉的状态（编译器对不可达语句几乎不警告）。
+- **守卫值必须连同"谁在什么时机写入"一起审**：`x > 0f` 形式的判据，若存在一条路径在"时钟尚未开始"时写入 x，该路径会被静默拒绝。
+- **"某事件没发生"的结论前，先确认探针覆盖了该事件的全部路径**；本段两次因为"半份证据"定错方向。
+- **反编译游戏里实际加载的 DLL（`ilspycmd -t <命名空间>.<类型>`）是排除"部署/构建不一致"的最快手段**——本轮靠它把范围从"代码路径"收敛到"运行时取值"。
+- **瞬时视觉故障用录屏逐帧亮度分析定位**（ModManager 白闪那次：4fps 定区间 → 30fps 细查 → 帧均亮度 125→344 直接抓到闪帧）。
+
+版本：2.5.46（BepInPlugin + 启动日志两处同步）；编译 0/0；部署 sha256 `E29C45CC…` == bin；README / Nexus_description 已同步到 2.5.46（补 2.5.35–2.5.46 变更史，此前停在 2.5.34）；台账版本行已更新。
+
+### 2.12.4 UniversalGeneration `er2.universalgeneration` v2.5.47（**稳定性判据选错了比较对象** → 每次启动都重跑验证枚举）
+**玩家**："不知道为什么进游戏后总是要卡一会。" 日志（08:07 会话）末尾正是元凶：
+```
+[UniGen] 开始验证物品目录（第 1 轮，当前 2222 条，等 er2bundle 加载后实时枚举并并入）…
+[Warning] GetAllItemsOfType<ItemObject>(items) 单次耗时 8616ms（原子调用，结果已缓存）
+```
+**根因**：验证轮的收敛判据是 `TotalCount()` **前后差 > 0 即"仍在增长"**。而 `TotalCount()` **包含 `mod` 桶**——mod 物品由 ModCatalog **异步分轮**补入（每轮几百条），于是每一轮验证都必然"有新增"，**"官方目录已稳定"永远判不出来** → 每会话都跑满 3 轮、每轮数次原子调用（单次最高 8.6 秒）→ 玩家体感的"进游戏后卡一会"。
+**修法（2.5.47）**：
+① 新增 `OfficialCount()`（**排除 mod 桶**），稳定性判定改用它；日志同时打印两侧数字并注明"mod 不计入判定"；
+② 新增 `MaxStableGrowth = 5`：官方新增 ≤ 5 即判稳定。**刻意不是"必须恰好 0"**——游戏内部还会零星登记几条，要求 0 则判据永不成立（正是本轮踩的坑）；漏掉的几条下次验证自然并入；
+③ 稳定那轮写盘并标 `verified=1` → 后续启动（签名不变）**完全跳过枚举：零数据库调用、零冻结**。
+
+**通用教训（本节的第三类"判据"错误，值得单列）**：本节先后栽在三种判据上——
+1. **触发时机判据**（`readyAt > 0` 在读盘路径恒 0）；
+2. **场景启发式判据**（`MainMenu.instance == null`、`BattleManager.IsBattleActive()` 连续被实测证伪）；
+3. **比较对象判据**（用 `TotalCount()` 判"官方目录是否稳定"，被异步的 mod 桶污染）。
+它们表面毫不相干，**归纳起来是同一条**：**判据涉及的每一个量，都必须追问"它由谁写、在什么时机写"**。写的人不对（Awake 时钟为 0）、时机不对（场景状态猜错）、或来源不对（异步旁路写入），判据就会静默失效——而且全都**不报错、日志无痕**，只能靠"把量打印出来"定位。
+版本 2.5.47（两处同步，grep 复核）；编译 0/0；部署 sha256 `34FE5BC5…` == bin；四份发布文档（EN/CN × README/Nexus）同步。
+**实测确认（08:17 会话，玩家反馈「卡顿仍在」= 这一轮一次性代价）**：
+```
+验证第 1 轮: 官方 2107 → 2107（新增 0；判定依据）· mod 0 → 816（不计入判定）耗时 62085ms
+单次原子调用: items 2224ms / PropData(items) 1523ms / weapons 5749ms / ammo 244ms / attachment 196ms
+物品目录已写磁盘缓存: 2923 条（verified=1，签名=35344384…）
+官方目录已稳定（本轮新增 0 ≤ 5）→ 标记 verified=1：后续启动不再做验证枚举，零原子调用、零冻结。
+```
+缓存头已落 `verified=1` + 当前构建签名（实测），数据行 2107（mod 桶按设计不写盘）。**判据修正在首次运行即收敛（新增 0）**——官方库在上一会话三轮累积后已饱和，本轮枚举纯属"再确认一遍"。
+
+**关键认知**：**收敛判据必须先跑一轮才有数据可判**，所以"最后一次卡顿"无法省掉——用户体感的"仍在"其实是这一轮一次性代价。之后启动走 `verified=1 → 跳过` 分支（日志会打 `缓存校验状态: verified=1 签名一致=True → 本会话跳过验证枚举`）。游戏更新使签名变化时会再跑一轮，那是发现新物品的唯一途径，属设计内的必要成本。
+**另一个观察**：本轮单次调用明显小于上一轮（weapons 5.7s vs 8.1s、items 2.2s vs 5.3s），数据库"热"起来后过滤更快——枚举成本本身也随游戏进程下降。
+
+**待复测**：下次启动日志应出现 `缓存校验状态: verified=1 签名一致=True → 本会话跳过验证枚举`，且**完全没有** `开始验证物品目录` 与 `GetAllItemsOfType` 性能 Warning。
+
+### 2.12 UniversalGeneration `er2.universalgeneration` v2.5.34
+**2.5.34（2026-09-25，面板透明度 50% 真正生效 + 发布包重出）**：
+- **修复"设了 50%、实际是 55%"**（用户："应该是50%透明度"）：cfg 侧 2.5.16 起就是 `0.50 / 0.40~1.0`，但共享层 `Er2Ui.SetPanelAlpha()` 仍钳在 `0.55~1.0`（默认 0.85 时代的遗留）→ `SetPanelAlpha(0.50f)` 被**静默抬到 0.55**，且 0.40~0.55 整段是死区；**不报错、不告警、日志无痕**。修法：`Mathf.Clamp(v, 0.40f, 1f)` 与 cfg 范围对齐（新陷阱 **AGENTS 17g52**）。
+- 文档四份（`README.txt` / `README_CN.txt` / `Nexus_description.md` / `Nexus_description_CN.md`）首行版本 + **2.5.34 条目**同步；行尾/编码保持（CRLF、UTF-8 无 BOM）。
+- 双语打包（先 `-Cn` 后默认 EN，**EN 最后跑=最终部署**）：`ER2_UniversalGeneration_v2.5.34.zip`（EN，**当前部署**）/ `ER2_UniversalGeneration_CN_v2.5.34.zip`（CN）。
+  **验收**：EN 构建 = 部署 = EN 包内 DLL **逐字节一致** sha256 `fcc9a489eca8c5d4d99604f0972c794f0f31f19e708388ebba928cb292278c27`（128,000 B）；CN 包 DLL `a5198575…`（120,320 B，`CN_BUILD`）。
+  两包均 = DLL + README.txt + Nexus_description.md，**包内文档与源文档 `cmp` 全等**（按包语言正确路由）；反编译复核版本双写 2.5.34 ✓ + `Mathf.Clamp(v, 0.4f, 1f)` ✓。
+- ⚠️ **2.5.33 双包已被本版取代**（2026-09-25 Downloads 清理一并移除）。
+
+**2.5.33（2026-09-25，**发布版**：诊断日志收口 + 文档补齐 + 双语重打包）**：
+- **发布前日志清理（AGENTS.md §7「高频日志、限频诊断全清」）**：把 UniGen 侧仍未受开关约束的**周期性 / 限频诊断**全部收进 `Debug/debugLog` —— `GenPanel` 阵营行 2s 状态探针、`ItemCatalog.LogProbeDiag`（5s 就绪探测）、`ModCatalog` 第三方内容每轮扫描行（15s/60s 循环）、`ModCatalog` 小队覆盖统计。
+  **保留**（判定为低频锚点或异常触发，不算"限频诊断"）：面板首建 UI 诊断快照（一次性；§3.5#4 明文指定它为例范）、图形状态污染告警（异常才触发，且是 LogWarning 不受门控）、物品库可枚举计数（一次性）。门控写在**调用点 + 函数内两处**（调用点门控顺带省掉字符串拼接开销；`ModCatalog` 的 `probeTicks` 存活计数不受门控影响——它是看门狗信号）。
+- **版本升 2.5.33**（源码改动 → §7 `z+1`），Edit 后回读复核双写 ✓。
+- **文档补齐（§6 发布前查文档三项之①）**：`README.txt` / `README_CN.txt` / `Nexus_description.md` / `Nexus_description_CN.md` 首行版本 + **变更史一次性补齐 2.5.20~2.5.33 共 14 条**（此前 README 停在 2.5.19、本台账 §2.12 停在 2.5.26 = 典型版本漂移）；物品 Shift 连续放置同步进 How to use / Main features。四份文档行尾/编码保持原样（CRLF、UTF-8 无 BOM）。
+- **双语打包**（先 `-Cn` 后默认 EN，**EN 最后跑=最终部署**）：`ER2_UniversalGeneration_v2.5.33.zip`（EN，**当前部署**）/ `ER2_UniversalGeneration_CN_v2.5.33.zip`（CN）。
+  **验收**：EN 构建 = 游戏目录部署 = EN 包内 DLL **逐字节一致** sha256 `f61b8bf617FFE55364E7E32C57A214E173D878CD462B943C239945A7FE28A5EE`（128,000 B）；CN 包 DLL 因 `CN_BUILD` 不同 `f4dd3e3b…`（120,320 B）。
+  两包拆包均 = DLL + `README.txt` + `Nexus_description.md` 3 文件，**包内文档与源文档 `cmp` 全等**，且文档按包语言正确路由（CN 包 README 31,993 B = `README_CN.txt`，EN 包 36,079 B = `README.txt`）。
+  反编译复核：版本双写 2.5.33 ✓；**5 处日志门控全部在位**（`debugLog.Value && …` / `!debugLog.Value` 早退 / `debugLog.Value || passes == 1`）✓；入口三色复位未受影响 ✓。
+
+**2.5.27-2.5.32（2026-09-25，灰字收尾 + 开关按钮 + Shift 连续放置，逐轮）**：
+- **2.5.27**：整数对齐**补全到最后一批裸绘制调用点**（标题行 / 阵营行 / `ItemHelp` / `CrewRow` / `Er2Ui.Pager`）——走 `LabelShadowed` 的文字已对齐，这些裸 `GUI.Label`/`GUI.Button` 仍落在分数像素上（像素实证：Allies 整数位 255 纯白、Neutral 分数位 229 灰）。
+- **2.5.28**：阵营行绘制前**再强制复位**三色状态 + 挂 2s 节流状态探针（分界线 = 是否经过 `LabelShadowed` → 污染发生在入口复位之后、这些裸绘制之前）。
+- **2.5.29**：① 左缘「生成 [G]」开关按钮适配 mono 风格（矩形整数对齐 + `Edge` 描边，与页签/阵营同款）；② **物品 Shift 连续放置**——地面分支在 Shift 按住且生成成功时**不 Cancel、保持携带与幽灵模型**，可连续丢，右键结束。
+- **2.5.30**：**英文版回退中文修复**——2.5.29 把" · Shift 连续"并进原有字面量致字典键缺失（机械比对实锤）；拆回两个 `Tr` 调用，缺失 = 0。`Ui.Tr` 缺失告警**去掉 debugLog 门控**（无条件每键一次 LogWarning），键漂移不再静默。
+- **2.5.31**：探针证实**状态纯白而文字仍灰** → 定性为**无阴影衬底的白字在半透明浅底上对比度天然低一档**；标题 / Clear / × / 阵营三钮 / Crew / 无匹配条目 / `ItemHelp` **全部收编 `LabelShadowed`**（按钮只当点击区），面板内 100% 文字走同一原语。
+- **2.5.32**：用户澄清"灰"从头到尾指的是**左缘开关按钮本身**（2.5.31 的描边已生效）→ 按钮加**纯黑 72% 底板**（`Fill(black, 0.72f)`，与 SC 底部提示条同款配方），按钮本体只当点击区、文字走 `LabelShadowed`、描边保留。
 **2.5.20-2.5.26（2026-09-25，用户第 40-42 轮：灰字三层根因终审 + 与 SC 配置统一）**：
 - **2.5.20**：`uiPanelAlpha` 与 SC 统一 **0.5**（用户拍板）；**删除默认值迁移链**——build.ps1 部署即删 cfg，两边代码默认值必须一字不差，迁移链只会把对齐值改写掉（分叉元凶）。
 - **2.5.21（灰字第一层：色彩空间）**：游戏跑 **Linear 色彩空间**，IMGUI 顶点色与 `SetPixels` 按线性解释 → 深灰被提亮近 3 倍（#282828 显示 ~110）。修复：`Er2Ui.Col()`（sRGB→linear）应用于 Fill/MakeLabel；`Solid()/LeatherTex()` 改 `linear:false` 构造 + `SetPixels32` 写原始字节。纯黑/纯白两端点免疫——这就是 SC 信息面板"看着正常"的原因。
@@ -1092,7 +1896,10 @@ M0 侦察工具，同 `HvtTestDriver` 定位。**刻意不打任何 Harmony 补�
 
 | 包 | 时间 |
 |---|---|
-| `ER2_UniversalGeneration_v2.5.19.zip`（EN，**当前部署**） | 09-25（**最新**：随共享层与指挥官 mod 同批（本 mod 侧无独立变化）。DLL 124,928 B，sha256 `7E6A73A1996F…B92F`，与构建产物逐字节一致；反编译复核版本双写 2.5.19 ✓） | 09-25（**最新**：随共享层与指挥官 mod 同批（本 mod 侧无独立变化，扫描确认文字色源全白）。DLL 124,928 B，sha256 `068EB8B33C9B…CC79`，与构建产物逐字节一致；反编译复核版本双写 2.5.18 ✓） | 09-25（**最新**：随共享层与指挥官 mod 同批（本 mod 侧无独立变化）。DLL 124,928 B，sha256 `A95C1CE6AFE9…CAC9`，与构建产物逐字节一致；反编译复核版本双写 2.5.17 ✓） | 09-25（**最新**：悬停反馈保住（新增 `TextHover`，否则文字全白后悬停变暗静默失效）；`uiPanelAlpha 0.72 → 0.50` + 迁移链。DLL 124,928 B，sha256 `CD7C2B5E43FC…F32B`，与构建产物逐字节一致；反编译复核版本双写 2.5.16 + `TextHover` 7 处 ✓） | 09-25（**最新**：删 tooltip 框；悬停反馈恢复为文字变暗。DLL 124,928 B，sha256 `DB886F4FE291…C35B`，与构建产物逐字节一致；反编译复核版本双写 2.5.15 + 三参 `GUIContent` 0 处 + 悬停变暗 3 处 ✓） | 09-25（**最新**：`uiPanelAlpha` 旧默认 0.85 → 0.72 迁移；文字描边 4 方向 + 列表行 `FontBody+4`。DLL 125,440 B，sha256 `4B815479CFCB…AA51`，与构建产物逐字节一致；反编译复核版本双写 2.5.14 + 迁移判断 + `FontBody + 4` ✓） | 09-25（**最新**：**悬停提示恢复**——`GUIContent.none` 曾把 tooltip 通道一起清掉；控件改 `new GUIContent("", null, tooltip)`（IL2CPP 仅三参构造）+ 帧末 `DrawHoverTip()` 自绘；EN 表补 1 条。DLL 124,928 B，sha256 `65BFF661AE08…6BD2D`，与构建产物逐字节一致；反编译复核版本双写 2.5.13 + `DrawHoverTip` 2 处 + 三参 `GUIContent` ✓） | 09-25（**最新**：与指挥官 mod 共用同一套面板风格（近黑 + 白描边 + 皮革 + 受光边）；玩法无变化。DLL 124,416 B，sha256 `DDD65A0DE5C0…C9C9`，与构建产物逐字节一致；反编译复核版本双写 2.5.12 ✓） | 09-25（**最新**：行文字改描边双绘（空按钮画底 + `LabelOutlined`，字号 `FontBody+3`）；页签同步（共享 `TabGrid`）；面板去蓝调 + α 0.72。DLL 124,416 B，sha256 `30F21190032A…3A57`，与构建产物逐字节一致；反编译复核版本双写 2.5.11 + `GUIContent.none` 4 处 + `LabelOutlined` 3 处 ✓） | 09-25（**最新**：行分隔线**每行都画**（原只在行间画 → 单条目列表无线；文件夹列表原 0 处）；列表文字 **Bold + 字号 +1**；星标 17px + Bold + `#FFE81A`；底色再提亮。DLL 123,392 B，sha256 `F370F678365C…DEA7`，与构建产物逐字节一致；反编译复核版本双写 2.5.10 + `i + 1 < to` 0 处 + `HLine` 4 处 + Bold/17px ✓） | 09-25（**最新**：**收藏改两级文件夹**——主文件夹列分类（`▸ 名称 (数量)`）、点进去看条目 + 面包屑 `◀ 收藏`；移除原 FavTabs 页签行、不再自动跳第一个分类；列表斑马纹；帮助行 wordWrap + 两行高根治溢出。DLL 123,392 B，sha256 `19F54152CC0C…0ABD`，与构建产物逐字节一致；反编译复核版本双写 2.5.9 + 三个收藏成员在位 + FavTabs 三项 0 处 + `RowBgAlt` 3 处 ✓） | 09-25（**最新**：前景纯白 + 透明只作用于背景；星标 textColor 改纯白（相乘致暗根因）+ `StarOn #FFD800`；帮助行**横向**溢出修复（`helpStyle` + `FitSize`、英文 99→66 字符、留白 26→30）。DLL 122,368 B，sha256 `D4A6C05AF11D…E9C7`，与构建产物逐字节一致；反编译复核版本双写 2.5.8 + `helpStyle`/`FitSize` 在位 ✓） | 09-25（**最新**：标记线宽随共享层改固定世界米（近大远小）。DLL 122,368 B，sha256 `5245A86B8812…2E4D`，与构建产物逐字节一致；反编译复核版本双写 2.5.7 ✓） | 09-25（**最新**：底部留白 16→26（修"最下面的字超出菜单"）、帮助行 34→38；面板描边加粗到 ~2px；对比度提升（随共享令牌）；线宽回退。DLL 122,368 B，sha256 `AB482BCC6982…ADBD`，与构建产物逐字节一致；反编译复核版本双写 2.5.6 + `26f`/`38f * Er2Ui.Scale` + `Max(1.5f, 2f*scale)` ✓） | 09-25（**最新**：面板中性黑（随共享令牌去色相）+ 皮革去暖调；新增 `UI/uiPanelAlpha`（默认 0.85）；线宽随共享层再 +60%；EN 表同步。DLL 122,368 B，sha256 `7DD008DF306B…2DDF0`，与构建产物逐字节一致；反编译复核版本双写 2.5.5 + `uiPanelAlpha` 5 处 ✓） | 09-25（**最新**：面板底走 `PanelBase()` 近黑皮革 + 标题条皮革叠加；标题行高 26→34 修顶部按钮重叠；线宽随共享层 +40%。DLL 121,344 B，sha256 `3414B396BD31…0118`，与构建产物逐字节一致；反编译复核版本双写 2.5.4 + `34f * Er2Ui.Scale` Title 行 ✓） | 09-25（**最新**：黑棕半透明 UI + 元素区分 + 文字重叠修复（硬编码像素全部 × Scale、行间距统一加一次）；EN 表补 6 条。DLL 120,320 B，sha256 `66E8858120A4…03EF`，与构建产物逐字节一致；反编译复核版本双写 2.5.3 + 行间 Gap 2 处 + `EdgeSoft` 分隔线 2 处 ✓） | 09-25（**最新**：与宿主同批视觉打磨——面板补结构线（标题条独立底色 + 标题下分隔线 + 外框 + 两个列表内凹边框 + 收藏行左竖条）；配色压回中深灰与宿主完全同一套；修掉 `BuildRows` 6 处漏乘 `Scale` 的固定行高。DLL 118,272 B，sha256 `B157D4F27084…85D`，与构建产物逐字节一致；反编译复核版本双写 2.5.2 + `Frame/HLine/AccentBar` 成员与 6 处调用点 ✓） | 09-25（**最新**：UI 自适应——跟随游戏原生 `ResourcesManager.ResolutionMult`，令牌 `const`→属性（`const` 是"UI 是死的"根因）、入口挂 `GenRunner.Draw()` 总入口、携带徽标 560px 走 `ScreenFit`、样式各判各的重建；配色提亮；携带徽标底/拖拽目标环/生成反馈文字的残留绿色清零。DLL 117,248 B，sha256 `17BACD4266FE…76F4`，与构建产物逐字节一致；反编译复核版本双写 2.5.1 + 自适应成员在位 + 旧亮绿/淡绿 0 处 ✓） |
+| `ER2_BattlefieldCommander_v1.4.56.zip`（EN，**当前部署**）/ `ER2_BattlefieldCommander_CN_v1.4.56.zip`（CN） | 09-25 19:56（**发布版：阵型拖动五轮手感收口**——① 像素→米比例改**斜距**（俯视不再系统性偏短）+ `formDragSens` 默认 1（箭头跟手）；② 幽灵覆盖**全部步兵槽位**（掩体槽+阵型线槽），每帧刷新；③ 掩体**槽位锚定吸附**（默认 `formCoverCorridor` 10m）+ 沿长线多点采样 + 已选掩体点防挤堆；④ 修掩体查询死兜底（`IsCoverAvailable` 后置过滤把无向兜底杀成死代码，陷阱 118）；⑤ 阵型下发不画路线虚线、按各人槽位判到位（修"全员到位永不成立→挂满 45s"）。**四份发布文档补齐 1.4.39~1.4.56 共 18 版变更史**（原停在 1.4.38）。EN DLL 242,176 B，sha256 `C5A0A454…`，**构建=部署=包内逐字节一致**；CN DLL 222,720 B `059B0F34…`（`CN_BUILD`）。两包拆包核对 = DLL + README.txt + Nexus_description.md（**包内文档与源文档 sha256 全等**，按包语言路由：CN 包装的是 README_CN/Nexus_CN，打包时改回通用名）；反编译复核版本双写 1.4.56 ✓（EN/CN 双包均已核对）；诊断日志全部 `debugLog` 门控 ✓） |
+| `ER2_UniversalGeneration_v2.5.34.zip`（EN，**当前部署**）/ `ER2_UniversalGeneration_CN_v2.5.34.zip`（CN） | 09-25 17:44（**面板透明度 50% 真正生效**：`Er2Ui.SetPanelAlpha` 陈旧下界 `0.55f → 0.40f`——此前用户设的 0.50 被静默抬成 0.55，cfg 的 0.40~0.55 是死区（新陷阱 AGENTS 17g52）；同批 **SquadCommand 1.4.48 同步重建、按用户定案不出包**。EN DLL 128,000 B，sha256 `fcc9a489eca8…78c27`，**构建=部署=包内逐字节一致**；CN DLL 120,320 B `a5198575…`（`CN_BUILD`）。两包拆包核对 = DLL + README.txt + Nexus_description.md（**包内文档与源文档 `cmp` 全等**，按包语言路由）；反编译复核版本双写 2.5.34 + `Clamp(v, 0.4f, 1f)` ✓） |
+| `ER2_UniversalGeneration_v2.5.33.zip`（EN，历史 · 已被 2.5.34 取代）/ `ER2_UniversalGeneration_CN_v2.5.33.zip`（CN） | 09-25 17:28（**发布版**：**诊断日志收口**——4 处周期性/限频诊断全进 `Debug/debugLog` 门控（阵营行 2s 探针 / 物品库 5s 就绪探测 / 第三方内容每轮扫描 / 小队覆盖统计），发布版默认安静、排查时开开关即得同样观测；**文档补齐**——README/Nexus 中英四份首行版本 + 变更史补 2.5.20~2.5.33 共 14 条（原 README 停在 2.5.19、台账停在 2.5.26 的漂移）；物品 Shift 连续放置进 How to use / Main features。EN DLL 128,000 B，sha256 `f61b8bf617FF…8A5EE`，**构建=部署=包内逐字节一致**；CN DLL 120,320 B `f4dd3e3b…`（`CN_BUILD`）。两包拆包核对 = DLL + README.txt + Nexus_description.md（**包内文档与源文档 `cmp` 全等**，按包语言正确路由）；反编译复核版本双写 2.5.33 + 5 处日志门控在位 + 入口三色复位未受损 ✓） |
+| `ER2_UniversalGeneration_v2.5.19.zip`（EN，历史） | 09-25（**最新**：随共享层与指挥官 mod 同批（本 mod 侧无独立变化）。DLL 124,928 B，sha256 `7E6A73A1996F…B92F`，与构建产物逐字节一致；反编译复核版本双写 2.5.19 ✓） | 09-25（**最新**：随共享层与指挥官 mod 同批（本 mod 侧无独立变化，扫描确认文字色源全白）。DLL 124,928 B，sha256 `068EB8B33C9B…CC79`，与构建产物逐字节一致；反编译复核版本双写 2.5.18 ✓） | 09-25（**最新**：随共享层与指挥官 mod 同批（本 mod 侧无独立变化）。DLL 124,928 B，sha256 `A95C1CE6AFE9…CAC9`，与构建产物逐字节一致；反编译复核版本双写 2.5.17 ✓） | 09-25（**最新**：悬停反馈保住（新增 `TextHover`，否则文字全白后悬停变暗静默失效）；`uiPanelAlpha 0.72 → 0.50` + 迁移链。DLL 124,928 B，sha256 `CD7C2B5E43FC…F32B`，与构建产物逐字节一致；反编译复核版本双写 2.5.16 + `TextHover` 7 处 ✓） | 09-25（**最新**：删 tooltip 框；悬停反馈恢复为文字变暗。DLL 124,928 B，sha256 `DB886F4FE291…C35B`，与构建产物逐字节一致；反编译复核版本双写 2.5.15 + 三参 `GUIContent` 0 处 + 悬停变暗 3 处 ✓） | 09-25（**最新**：`uiPanelAlpha` 旧默认 0.85 → 0.72 迁移；文字描边 4 方向 + 列表行 `FontBody+4`。DLL 125,440 B，sha256 `4B815479CFCB…AA51`，与构建产物逐字节一致；反编译复核版本双写 2.5.14 + 迁移判断 + `FontBody + 4` ✓） | 09-25（**最新**：**悬停提示恢复**——`GUIContent.none` 曾把 tooltip 通道一起清掉；控件改 `new GUIContent("", null, tooltip)`（IL2CPP 仅三参构造）+ 帧末 `DrawHoverTip()` 自绘；EN 表补 1 条。DLL 124,928 B，sha256 `65BFF661AE08…6BD2D`，与构建产物逐字节一致；反编译复核版本双写 2.5.13 + `DrawHoverTip` 2 处 + 三参 `GUIContent` ✓） | 09-25（**最新**：与指挥官 mod 共用同一套面板风格（近黑 + 白描边 + 皮革 + 受光边）；玩法无变化。DLL 124,416 B，sha256 `DDD65A0DE5C0…C9C9`，与构建产物逐字节一致；反编译复核版本双写 2.5.12 ✓） | 09-25（**最新**：行文字改描边双绘（空按钮画底 + `LabelOutlined`，字号 `FontBody+3`）；页签同步（共享 `TabGrid`）；面板去蓝调 + α 0.72。DLL 124,416 B，sha256 `30F21190032A…3A57`，与构建产物逐字节一致；反编译复核版本双写 2.5.11 + `GUIContent.none` 4 处 + `LabelOutlined` 3 处 ✓） | 09-25（**最新**：行分隔线**每行都画**（原只在行间画 → 单条目列表无线；文件夹列表原 0 处）；列表文字 **Bold + 字号 +1**；星标 17px + Bold + `#FFE81A`；底色再提亮。DLL 123,392 B，sha256 `F370F678365C…DEA7`，与构建产物逐字节一致；反编译复核版本双写 2.5.10 + `i + 1 < to` 0 处 + `HLine` 4 处 + Bold/17px ✓） | 09-25（**最新**：**收藏改两级文件夹**——主文件夹列分类（`▸ 名称 (数量)`）、点进去看条目 + 面包屑 `◀ 收藏`；移除原 FavTabs 页签行、不再自动跳第一个分类；列表斑马纹；帮助行 wordWrap + 两行高根治溢出。DLL 123,392 B，sha256 `19F54152CC0C…0ABD`，与构建产物逐字节一致；反编译复核版本双写 2.5.9 + 三个收藏成员在位 + FavTabs 三项 0 处 + `RowBgAlt` 3 处 ✓） | 09-25（**最新**：前景纯白 + 透明只作用于背景；星标 textColor 改纯白（相乘致暗根因）+ `StarOn #FFD800`；帮助行**横向**溢出修复（`helpStyle` + `FitSize`、英文 99→66 字符、留白 26→30）。DLL 122,368 B，sha256 `D4A6C05AF11D…E9C7`，与构建产物逐字节一致；反编译复核版本双写 2.5.8 + `helpStyle`/`FitSize` 在位 ✓） | 09-25（**最新**：标记线宽随共享层改固定世界米（近大远小）。DLL 122,368 B，sha256 `5245A86B8812…2E4D`，与构建产物逐字节一致；反编译复核版本双写 2.5.7 ✓） | 09-25（**最新**：底部留白 16→26（修"最下面的字超出菜单"）、帮助行 34→38；面板描边加粗到 ~2px；对比度提升（随共享令牌）；线宽回退。DLL 122,368 B，sha256 `AB482BCC6982…ADBD`，与构建产物逐字节一致；反编译复核版本双写 2.5.6 + `26f`/`38f * Er2Ui.Scale` + `Max(1.5f, 2f*scale)` ✓） | 09-25（**最新**：面板中性黑（随共享令牌去色相）+ 皮革去暖调；新增 `UI/uiPanelAlpha`（默认 0.85）；线宽随共享层再 +60%；EN 表同步。DLL 122,368 B，sha256 `7DD008DF306B…2DDF0`，与构建产物逐字节一致；反编译复核版本双写 2.5.5 + `uiPanelAlpha` 5 处 ✓） | 09-25（**最新**：面板底走 `PanelBase()` 近黑皮革 + 标题条皮革叠加；标题行高 26→34 修顶部按钮重叠；线宽随共享层 +40%。DLL 121,344 B，sha256 `3414B396BD31…0118`，与构建产物逐字节一致；反编译复核版本双写 2.5.4 + `34f * Er2Ui.Scale` Title 行 ✓） | 09-25（**最新**：黑棕半透明 UI + 元素区分 + 文字重叠修复（硬编码像素全部 × Scale、行间距统一加一次）；EN 表补 6 条。DLL 120,320 B，sha256 `66E8858120A4…03EF`，与构建产物逐字节一致；反编译复核版本双写 2.5.3 + 行间 Gap 2 处 + `EdgeSoft` 分隔线 2 处 ✓） | 09-25（**最新**：与宿主同批视觉打磨——面板补结构线（标题条独立底色 + 标题下分隔线 + 外框 + 两个列表内凹边框 + 收藏行左竖条）；配色压回中深灰与宿主完全同一套；修掉 `BuildRows` 6 处漏乘 `Scale` 的固定行高。DLL 118,272 B，sha256 `B157D4F27084…85D`，与构建产物逐字节一致；反编译复核版本双写 2.5.2 + `Frame/HLine/AccentBar` 成员与 6 处调用点 ✓） | 09-25（**最新**：UI 自适应——跟随游戏原生 `ResourcesManager.ResolutionMult`，令牌 `const`→属性（`const` 是"UI 是死的"根因）、入口挂 `GenRunner.Draw()` 总入口、携带徽标 560px 走 `ScreenFit`、样式各判各的重建；配色提亮；携带徽标底/拖拽目标环/生成反馈文字的残留绿色清零。DLL 117,248 B，sha256 `17BACD4266FE…76F4`，与构建产物逐字节一致；反编译复核版本双写 2.5.1 + 自适应成员在位 + 旧亮绿/淡绿 0 处 ✓） |
 | `ER2_UniversalGeneration_v2.4.2.zip`（EN，历史） | 09-24（**最新**：无可见改动，为 UI 重绘打底——布局改**行计划单一数据源**（高度 = 行计划求和，绘制遍历同一列表，结构性消灭"画到面板外"复发）；新增 `Shared/Er2Ui.cs` 共享令牌/原语层，两个 csproj 源码级链接；页签适配改 `CalcSize` 精确测量 + 缓存。DLL 110,592 B，sha256 `F6C37E8260F2…A431A`，与构建产物逐字节一致；反编译复核版本双写 2.4.2 + `Er2Ui.*` 成员 + `BuildRows`/`DrawRows` ✓） |
 | `ER2_BattlefieldCommander_v1.4.38.zip`（EN，**当前部署**） | 09-25（**最新**：**纠正 1.4.37 的误读**——"做成左上角显示的样子，不要背景了"指的是【屏幕底的提示条】（用户原话："谁告诉你是信息面板去底板了？我说的是屏幕底的提示"）。修法：信息面板底板**恢复**；提示条**去底板** → `DrawShadowLabel` 白字 + 阴影（与左上角原生信息同款）；互斥规则不变（陷阱 114）。DLL 231,424 B，sha256 `335B45EECCB1…070F`，与构建产物逐字节一致；反编译复核版本双写 1.4.38 + 互斥在位 + 提示条 `DrawShadowLabel` ✓ + `DrawHudPlate` 3 处（提示条 0 处）✓） | 09-25（**最新**：**最后一处灰字**——提示条 `HudStyleSmall()` 与背包 `tipStyle` 硬编码军绿遗产 `(0.85,0.9,0.85)`（不经过 `uiText`，1.4.36 统一漏掉）→ 都改 `Er2Ui.Text`；**全项目扫描**确认无旁路色源（陷阱 113 补：色源收编是"收编 + 扫尾"两步）；**信息面板去底板**（与游戏原生左上角同款，白字 + 阴影叠场景）。DLL 231,424 B，sha256 `E39D2AE7B5EF…4DC7`，与构建产物逐字节一致；反编译复核版本双写 1.4.37 + `HudStyleSmall` 纯白 ✓ + `DrawHudPlate` 3 处（InfoPanel 已删）✓ + 灰绿 0 残留 ✓） | 09-25（**最新**：**文字还是灰色的真因**——HUD 文字色走 cfg `colorText`，而用户 cfg 里是旧灰值（陷阱 109）；修法两层：`colorText` 加入迁移链 + **色源收编**（`uiText = Er2Ui.Text`，HUD 与 UniGen 面板共用同一个纯白令牌，三个颜色 cfg 保留但不再被读取，陷阱 113）；**信息栏与提示条互斥**（没选中不画信息面板、提示条显示；有选中反之，`InfoPanel.Visible`）；`colorBase` 默认 → `#00000080`。DLL 231,424 B，sha256 `00C8213223A8…8DED`，与构建产物逐字节一致；反编译复核版本双写 1.4.36 + `InfoPanel.Visible` + 互斥引用 + `uiText = Er2Ui.Text` ✓） | 09-25（**最新**：**修重叠**——上轮"对称"把底距改成 14，而提示条顶在离底 30，两块 HUD 直接穿过提示条；改 **36**（= 30 + 6 间隙），左右依旧对称（陷阱 112：HUD 垂直空间预算共享）；**背景透明度 50%**（`PanelAlpha 0.72→0.50`、`Scrim` 同步、cfg 范围 0.40~1.0、迁移链补 0.72）；**文字全白**（`TextDim → #FFFFFF`）+ 新增 `TextHover #B4B4BA` 保住悬停变暗反馈。DLL 230,912 B，sha256 `C2779A0FA426…CD23`，与构建产物逐字节一致；反编译复核版本双写 1.4.35 + `BottomGap 36` ✓ + `PanelAlpha 0.5f` ✓ + `Scrim (0,0,0,0.5f)` ✓ + `TextHover` ✓） | 09-25（**最新**：**左下信息面板动态高度 + 左右对称**（`BottomGap 34→14` 与小队列表同；`contentH` 每帧实测内容底部回写，内容少不再留大空白，陷阱 111）；**删悬停提示框**（用户要求）并**恢复悬停反馈 = 文字变暗**（`TabGrid` + 三处列表逐行判鼠标 → `TextDim`）。DLL 230,912 B，sha256 `535BAAB38BA5…2A83`，与构建产物逐字节一致；反编译复核版本双写 1.4.34 + `DrawHoverTip` 0 处 + 悬停变暗 4 处 + `contentH` 3 处 ✓） | 09-25（**最新**：**cfg 默认值迁移**——BepInEx 的 cfg 生成后不随代码默认值更新，老用户 `colorBase`/`colorHover` 仍是军绿旧值 → HUD 按钮"UI 只改了一半"；现命中历史默认值集合才迁移（不覆盖用户自定义）+ 打日志（陷阱 109）；**幽灵全材质槽**——`sharedMaterial` 只改槽 0，多槽模型（士兵装备/履带）保持原色；改 `sharedMaterials` 数组全填（陷阱 110）；**文字对比**——描边 2 → **4 方向**、列表行 `FontBody+4`。DLL 230,912 B，sha256 `F2342D516DA9…2537`，与构建产物逐字节一致；反编译复核版本双写 1.4.33 + `MigrateLegacyUiCfg` 2 处 + `sharedMaterials` 2 处 + `LabelOutlined` 5 次 Label ✓） | 09-25（**最新**：**幽灵修复**——`Sprites/Default` 读**顶点色**不读 `_Color`，Mesh 无顶点色 → 实心亮白；改 `Particles/Standard Unlit` + Fade 显式配置，`WGhost` → `#8C9196@0.20`（陷阱 108）；**左下单位信息加整块底 + 左边缘 `10*Scale`**（与右下小队列表左右对称）；**HUD 统一底板** `DrawHudPlate`（`Scrim` 纯黑 72% + 皮革 + 描边）三处共用（提示条 / 小队列表 / 单位信息），`colorBase` 默认 → `#000000B8`；**悬停提示恢复**（`GUIContent.none` 曾清掉 tooltip 通道，陷阱 107）。DLL 229,376 B，sha256 `AB34EEA85B37…5D64`，与构建产物逐字节一致；反编译复核版本双写 1.4.32 + shader 链 + `_Mode` + `WGhost 0.2f` + `DrawHudPlate` 4 处 + `PanelPad` ✓） | 09-25（**最新**：**捡枪隔空真因＝中文前缀判定在 EN 版失效**（`StartsWith("拾起")` 恒 false → 落回原生 `Call()`（无距离校验））→ 改**结构判据** `Interaction.classType`（比较 gameObject/子物体，与语言无关）+ 中英前缀兜底，新增 `menuInts` 平行列表（陷阱 106）；**光标** `TexSize 32 → 64`（32 是硬件光标上限，被 DPI 缩放拉伸即糊）+ 环半径等比；**光标恢复逐状态语义色**（友军青绿/敌军红/载具亮青/建筑灰白/工事橙/可交互黄/默认白，1.4.19 曾整体压灰阶）；**两 mod UI 统一**——cfg 色值对齐、HUD 按钮描边改 `PanelBorder`、InfoPanel/背包底板补皮革 + 受光边。DLL 228,352 B，sha256 `219915CAC05F…C99D`，与构建产物逐字节一致；反编译复核版本双写 1.4.31 + `IsPickupInteraction`/`classType` 在位 + `menuInts` 9 处 + `TexSize 64` + 六色语义色 ✓） | 09-25（**最新**：**文字改描边双绘**（`Er2Ui.LabelOutlined`，暗色偏移 ×2 + 白色正文）——真因是 `FontStyle.Bold` 被**静默忽略**（游戏字体单字重非 dynamic，见陷阱 105）；Button 文字没法描边 → 改「空按钮画底 + 单独画字」（列表 3 处 + `TabGrid`）；行文字 `FontBody+3`；**面板配色对齐 HUD 提示条**——所有面去蓝调（`#101010` 系）+ `PanelAlpha` 默认 `0.85 → 0.72`（与 `Scrim` 一致）。DLL 227,328 B，sha256 `A26B8AB52DAF…5576`，与构建产物逐字节一致；反编译复核版本双写 1.4.30 + `LabelOutlined` 在位 + `#101010`(R=G=B) ✓ + `PanelAlpha 0.72f` ✓） | 09-25（**最新**：底色再提亮一档（`#1A1A22` 系）；**列表文字改 Bold + 字号 +1**——"文本太暗"的真因是**笔画太细**而非对比不足（纯白叠 `#1A1A22` 已约 15:1，12px Normal 笔画仅 1px 宽，见陷阱 103）；星标 14→17px + Bold + `#FFE81A`；**行分隔线每行都画** + 收藏文件夹列表补线（陷阱 104）。DLL 227,328 B，sha256 `4CFE49D71C5A…5780`，与构建产物逐字节一致；反编译复核版本双写 1.4.29 + `#1A1A22`/`#24242C`/`#2E2E38`/`#FFE81A` ✓） | 09-25（**最新**：面板再提亮一档（`#121218` / `#1C1C24` / `#26262E` / `#1A1A20`）；列表**斑马纹**（新增 `RowBgAlt`）。⚠️ 关于"下面的文字超出"——比对截图确认跑的是旧 DLL（文案仍为 1.4.27 前的 99 字符旧句），已在回复中给出日志版本号核对法；本轮仍把该行做成 **wordWrap + 两行高（56）** 根治。DLL 227,328 B，sha256 `F59AC09D3A54…F442`，与构建产物逐字节一致；反编译复核版本双写 1.4.28 + `#121218` ✓ + `#23232A`(RowBgAlt) ✓） | 09-25（**最新**：**透明只作用于背景**——1.4.24 曾把线条 α 也绑到 `PanelAlpha`（调透明度连边框一起变淡，这是"对比太低"的根因），现在面跟随 `PanelAlpha`、**前景不透明**；文字/描边/分隔线**改纯白**（#FFFFFF / 白@0.85 / 白@0.65 / 白@0.30）；**星标提亮**（`starStyle.textColor` 改纯白——`contentColor` 与 `textColor` 相乘曾把金色乘成 #CAA84D；`StarOn` → #FFD800）；**帮助行溢出真因是横向**（英文 99 字符 ≈570px vs 内宽 450px）→ 缩短文案 + 专用 `helpStyle` 走 `FitSize` + 留白 26→30。DLL 226,816 B，sha256 `B1D65DED6389…7FAD`，与构建产物逐字节一致；反编译复核版本双写 1.4.27 + 前景纯白 ✓ + `StarOn #FFD800` ✓ + 线条不再绑 `PanelAlpha` ✓） | 09-25（**最新**：标记线宽**回到固定世界米**（0.030~0.065m）——"近小圆大"的根因是**两套尺度规则混用**：标记半径是固定世界值（Collider 量出，0.35~1.1m）而线宽是"屏幕像素恒定"（`width_m ∝ dist`），60m 处 1.5px ≈ 0.10m、200m 处 ≈ 0.34m 逼近环半径 0.6m → 环被填成实心圆盘（陷阱 99）；FOV 注入链（`SetCamFov`/`camFovDeg`/`RefScreenH`）一并清掉。DLL 226,816 B，sha256 `C32C79C148DB…D194`，与构建产物逐字节一致；反编译复核版本双写 1.4.26 + `Clamp(baseMeters, 0.003f, 3f)` ✓ + 旧 FOV 链 0 处 ✓ + 13 处世界米线宽 ✓） | 09-25（**最新**：标记线宽**回退到 1.4.23 数值**（1.5~3.0px）——"太细"的真因是**镜头拉太近**（环在世界空间是固定半径，近处屏幕占比大而线宽像素恒定，线宽/孔径比例骤降，陷阱 97）；**修底部文字贴边**（底部留白 8→18、帮助行 34→38）；**对比度一轮**（面板描边 `#555560` + ~2px、选中底 `#52525E`、行底更沉、行分隔线 0.15、列表底 α 0.50）。DLL 227,328 B，sha256 `D30FD7FABA8F…52DC`，与构建产物逐字节一致；反编译复核版本双写 1.4.25 + 13 处线宽回退 ✓ + `#555560`/`#52525E`/`#45454E` ✓） | 09-25（**最新**：面板改**中性半透明黑**（去棕，R=G=B，皮革纹理同步去暖调）；**面板不透明度做成 cfg** `UI/uiPanelAlpha`（默认 0.85 / 0.55~1.0，色板只存 RGB、α 由 `PanelAlpha` 推出，标题条+0.05 / 悬停+0.07 / 选中+0.13 / 行底−0.05）——"透 ↔ 黑"这对矛盾轴交给玩家；标记线宽再 +60%（主力 3.5~4.8px）；EN 表同步 5 条键漂移 + 新增 1 条。DLL 227,328 B，sha256 `A00BF6F38FCC…2DCE`，与构建产物逐字节一致；反编译复核版本双写 1.4.24 + `#08080A` 中性 ✓ + 皮革 `(g,g,g)` ✓ + `PanelAlpha`/`SetPanelAlpha`/`WithA` ✓ + 13 处线宽 ✓） | 09-25（**最新**：近黑皮革面板——"完全是棕色"的根因是 α 0.82 的半透明被棕色地形染色（`dst = src×0.82 + terrain×0.18`），压配色板没用；改 α 0.92 + 底色 `#0C0906`，并新增 `LeatherTex()`/`Leather()`/`PanelBase()` （程序化 64×64 皮革噪声平铺 + 顶部受光边）——皮革观感来自斑驳与受光边、不是颜色；标题行高 26→34 修"最上面的按钮重叠"；标记线宽 +40%。DLL 226,816 B，sha256 `7BC2553ADB…8DA9`，与构建产物逐字节一致；反编译复核版本双写 1.4.23 + 三个皮革成员在位 + `#0C0906@0.92` + 13 处线宽上调 ✓） | 09-25（**最新**：修复"线还是太粗"的真因——相机距离原取 `transform.position.magnitude`（到**世界原点**，地图原点离战区数百米 → 永远是错的大数，旧版被 `Clamp(0.6,2.5)` 掩盖、1.4.21 去掉 clamp 后爆表），改 `CameraGroundDist()`（视线-地面交点真实距离，0.1s 缓存，GodView 与阵型共用）；`Ring` 同款父缩放修复（半径写进顶点 + `lastRadius` 缓存）；抗锯齿——线材质宽度方向羽化贴图 + 圆盘径向羽化 + 环分段 48→64；**黑棕半透明 UI**（#1E1813@0.82 系）；元素区分——页签/阵营/乘员按钮描边 + 列表行分隔线；文字重叠修复——所有硬编码像素 × Scale + 行间距统一加一次；EN 表补 9 条。DLL 225,792 B，sha256 `49C9C886197A…6385`，与构建产物逐字节一致；反编译复核版本双写 1.4.22 + `position.magnitude` 0 处 + `CameraGroundDist` 3 处 + `localScale=Vector3.one` ×2 + `Segments=64` + `Frame` 页签描边 + `Pager` ×Scale ✓） | 09-25（**最新**：视觉打磨——线宽改「1080p 目标像素」语义（旧经验倍率与分辨率强耦合，1440p 粗 1.33×/4K 粗 2×），`Er2Ui.LineWidth(px,dist)=px×2×dist×tan(fov/2)/1080`，FOV 从相机注入；选中角标根因修复——父 `lossyScale` 放大线宽导致载具上两条粗臂糊成三角块（"变成箭头"），改为父 scale 恒 1、半径写进顶点、臂长 0.34→0.42；世界标记 α 0.26~0.48 半透明 → α≥0.80 灰阶实色（层次从 α 移到灰度值）；面板补 `Frame`/`HLine`/`AccentBar` 结构线 + 标题条独立底色 + 列表内凹边框 + 收藏行竖条；配色压回中深灰（1.4.20 提亮过头）。DLL 222,720 B，sha256 `3CFA3DDCF6B2…D1D3`，与构建产物逐字节一致；反编译复核版本双写 1.4.21 + 像素线宽模型 + `SetCamFov` 2 处 + 旧 `WidthScale` 0 处 + `localScale=Vector3.one` + 臂长内联 0.58 + `Frame/HLine/AccentBar` 在位 ✓） | 09-25（**最新**：UI 自适应 + 提亮——跟随游戏原生 UI 倍率、令牌属性化、底部提示条 1400px 走 `ScreenFit`、HUD/背包/信息面板/菜单全量接入、倍率变化时背包保留拖动位置重排；灰黑配色提亮并拉开层次差。DLL 219,648 B，sha256 `8EC63CEBF9A7…28C0`，与构建产物逐字节一致；反编译复核版本双写 1.4.20 + 自适应成员在位 + `positionCount=3` + 旧弧公式 0 处 + `new GUIStyle(带参)` 0 处 ✓） |
 | `ER2_BattlefieldCommander_v1.4.18.zip`（EN，历史） | 09-24（**最新**：内部调整，四处手写 `GUIStyle` 改走共享层 `Er2Ui.MakeLabel`，语义不变。DLL 206,336 B，sha256 `3E306522BDAA…DE9DD2`，与构建产物逐字节一致；反编译复核版本双写 1.4.18 + `Er2Ui.MakeLabel` ✓） |
@@ -1125,6 +1932,21 @@ M0 侦察工具，同 `HvtTestDriver` 定位。**刻意不打任何 Harmony 补�
 
 **历史清理**：SquadCommand 全部中间版本包与暂存目录已删（只留 1.1.0 双语）；工作区根目录 `EasyRed2_BepInEx_Dependencies.zip` 已删。
 **2026-09-13 大清理（玩家要求）**：Downloads 里积压的全部**被取代旧版本包 + build.ps1 打包暂存目录**已删 —— 旧包 34 个（HVT 旧名 `ER2_HighValueTarget_v1.0.0/1.1.0/1.1.1` 及 CN 共 6 个、`ER2_VeteranHVT_v1.1.26` 双包、CombatTweaks v1.2.1 双包、HideAnything v4.5.2 双包、ModManager v1.1.1/v1.1.2/v1.2.0 + CN v1.1.1~v1.4.0 共 13 个、UnitInfoOverlay v1.0.0~v1.0.4 + CN v1.0.1~v1.0.4 共 9 个）+ 暂存目录 23 个（`ER2_*` 目录，build.ps1 生成 zip 后不自动清理，下次构建会重建）。**现 Downloads 只保留各 mod 最新版共 18 个包**。**注意：build.ps1 每次打包都会在 Downloads 留下 `ER2_<pkg>` 暂存目录且不自动删——定期清理或忽略即可。**
+
+### 4.1 2026-09-25 清理（本次会话）
+
+Downloads 里 `ER2_*.zip` 已累计到 **151 个**（09-24 / 09-25 两天 40+ 轮迭代打包的产物），按**"每个 mod 每个语言只留最新一版"**规则：
+
+- **保留 20 个**：BattlefieldCommander `EN v1.4.36` / `CN v1.4.15`、UniversalGeneration `EN v2.5.34` / `CN v2.5.34`、ModManager `EN/CN v1.5.4`、VeteranHVT `EN/CN v1.2.2`，以及其余为单一版本的 mod（LimbTweaks / WeatherControl / AIFood / HideAnything / CombatTweaks / ZoomAnywhere / InventoryPause / UnitCollision / UnitInfoOverlay / MorePhysics / MorePhysics_UnitCollision / Conquest EN+CN）。
+- **移除 131 个**被取代的旧包 + **10 个** `build.ps1` 打包暂存目录（`ER2_BattlefieldCommander[_CN]` / `ER2_Conquest[_CN]` / `ER2_ModManager[_CN]` / `ER2_UniversalGeneration[_CN]` / `ER2_VeteranHVT[_CN]`）。
+
+⚠️ **本表按磁盘实际文件重建**：SquadCommand 的 `1.4.37~1.4.48` 与 UniGen 的 `2.5.18~2.5.33` 均为"**部署了但未出包**"或"已被取代"，**磁盘上并不存在对应文件**——此前本表里凭记忆写下的 `_v1.4.37 / _v1.4.38` 条目是错的，**不要再按记忆补写**。
+
+**新增纪律（防复发，三条）**：① 迭代期一律用 `-SkipPackage`（只构建+部署、不出包）；② **只有"要发出去的那一版"才出包**；③ 定期按"每个 mod 每个语言只留最新一版"清理，并同时删掉 `build.ps1` 的 `ER2_<pkg>` 暂存目录。
+
+**执行结果（2026-09-25 17:52 完成）**：合计移除 **131 个旧包 + 10 个暂存目录**，其中 **49 个由用户手动删除**（`BattlefieldCommander` 的 `EN 1.4.0~1.4.35` 与 `CN 1.4.0~1.4.14`，目录 mtime 17:47:46），其余 **82 个包 + 10 个目录**由脚本分 **10 批（每批 ≤10）** 删除，**每批删除后均校验**（文件确已消失 + 20 个保留包完好），全程无失败。
+**终态**：Downloads 内 `ER2_*.zip` = **20 个**（各 mod 各语言最新版）+ **0 个** `build.ps1` 暂存目录。
+⚠️ 环境限制备查：本机沙箱下 **`Add-Type` 与 `New-Object -ComObject` 均被安全策略拦截 → 无法调用系统回收站**，永久删除前已按安全规则取得用户二次确认。
 
 ## 5. 台账自检（改完 mod 后跑这个核对）
 
