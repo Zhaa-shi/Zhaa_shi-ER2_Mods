@@ -21,13 +21,32 @@ namespace ER2UnitCollision
 	///
 	/// 场景物件物理化 / 物品物理 / 击飞与碰撞伤害等其余功能全部移除。
 	/// </summary>
-	[BepInPlugin("er2.morephysics.unitcollision", "ER2 More Physics - Unit Collision", "1.0.8")]
+	[BepInPlugin("er2.morephysics.unitcollision", "ER2 More Physics - Unit Collision", "1.0.9")]
 	[BepInProcess("Easy Red 2.exe")]
 	public class Plugin : BasePlugin
 	{
 		internal static ManualLogSource ModLog;
 
 		internal static ConfigEntry<bool> Enabled;
+
+		/// <summary>v1.0.9：诊断日志开关（默认关）——单位矩阵探测的心跳日志此前**无条件**每 10 秒
+		/// 打一条，一场战斗几十条，玩家当成了报错刷屏。现在挂到这个开关下。</summary>
+		internal static ConfigEntry<bool> DebugLog;
+
+		internal static bool DebugOn
+		{
+			get
+			{
+				try
+				{
+					return DebugLog != null && DebugLog.Value;
+				}
+				catch
+				{
+					return false;
+				}
+			}
+		}
 
 		internal static ConfigEntry<bool> SingleplayerOnly;
 
@@ -50,6 +69,7 @@ namespace ER2UnitCollision
 		public override void Load()
 		{
 			ModLog = Log;
+			DebugLog = Config.Bind("Debug", "debugLog", false, T("输出诊断日志（单位矩阵探测心跳等）。发布版保持关闭。", "Emit diagnostic logs (unit-matrix probe heartbeat etc.). Keep off in release builds."));
 			Enabled = Config.Bind("General", "Enabled", true, T("总开关：关闭后单位/尸体碰撞效果全部失效。", "Master switch. When false, unit/corpse collision effects are disabled."));
 			SingleplayerOnly = Config.Bind("General", "SingleplayerOnly", true, T("默认仅单机（离线）战斗生效（联机碰撞不同步）；关闭后联机同样生效。", "By default only applies in singleplayer (offline) sessions (collision is not synced online). Disable to also apply in multiplayer."));
 			UnitCollision = Config.Bind("Collision", "UnitCollision", true, T("士兵互相阻挡（不重叠）：复用原版贴合人体的受击碰撞体阻挡玩家/AI 相互穿过。默认开；尸体不参与阻挡（只被推开，不挡活人）。", "Units physically block each other (no overlap): reuses the vanilla body colliders so player/AI can't pass through each other. On by default; corpses don't block (pushed away, don't stop living units)."));
@@ -65,7 +85,7 @@ namespace ER2UnitCollision
 				ModLog.LogWarning((object)("UnitCollision: type registration failed: " + ex.Message));
 			}
 			new Harmony("er2.morephysics.unitcollision").PatchAll(typeof(Plugin).Assembly);
-			ModLog.LogInfo((object)"ER2 More Physics - Unit Collision 1.0.8 loaded.");
+			ModLog.LogInfo((object)"ER2 More Physics - Unit Collision 1.0.9 loaded.");
 		}
 
 		internal static string T(string cn, string en)
@@ -374,7 +394,9 @@ namespace ER2UnitCollision
 
 		private static bool ProbeCcLayer()
 		{
-			bool log = Time.time - _lastProbeLog >= 10f;
+			// v1.0.9：这条心跳是**开发期诊断**（兜底锁定时会永久每帧重探，每 10 秒打一条），
+			// 一场战斗几十条——玩家当成了"报错刷屏"。挂到 Debug/debugLog 门控下，探测逻辑不变。
+			bool log = Plugin.DebugOn && Time.time - _lastProbeLog >= 10f;
 			if (log)
 			{
 				_lastProbeLog = Time.time;

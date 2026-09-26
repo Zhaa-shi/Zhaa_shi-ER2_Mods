@@ -20,7 +20,7 @@
 | 10 | `InventoryPause` | `er2.inventorypause` | ER2 Inventory Pause | **1.0.5** | `ER2_InventoryPause.dll` | 已部署 |
 | 11 | `SquadCommand` | `er2.squadcommand` | **Easy Red Gate**（原 ER2 Battlefield Commander） | **1.4.57** | `ER2_BattlefieldCommander.dll` | **已发布（双语双包 EN 部署）** |
 | 12 | `UniversalGeneration` | `er2.universalgeneration` | ER2 Universal Generation | **2.5.48** | `ER2_UniversalGeneration.dll` | 已部署 |
-| 13 | `UnitCollision` | `er2.morephysics.unitcollision` | ER2 More Physics - Unit Collision | **1.0.8** | `ER2_MorePhysics_UnitCollision.dll` | 已部署 |
+| 13 | `UnitCollision` | `er2.morephysics.unitcollision` | ER2 More Physics - Unit Collision | **1.0.9** | `ER2_MorePhysics_UnitCollision.dll` | 已部署 |
 | 14 | `UnitInfoOverlay` | `er2.unitinfooverlay` | ER2 Unit Inspector | **1.0.5** | `ER2_UnitInfoOverlay.dll` | 已部署 |
 | 15 | `FleshWoundsFixed` | `ER2_FleshWounds` | ER2 Flesh Wounds | **1.0.1** | （需手动构建部署，build.ps1 无条目） | 第三方修复版 |
 | 16 | `MorePhysics` | `er2.morephysics` | ER2 More Physics | **0.1.49** | `ER2_MorePhysics.dll` | 复活（本地未部署，发 Nexus） |
@@ -1740,7 +1740,10 @@ RTS 上帝视角内**自定义生成单位/载具**（作弊向）。详见 `ER2
 - **构建事实**：`UniversalGeneration.csproj` 里 `UnityEngine.SpriteModule` 是**无效引用**（interop 目录下不存在该 dll，只有 SpriteMask/SpriteShape）——它一直只是 MSB3245 警告，本轮顺手删除。`Sprite` 经 `Assembly-CSharp`/`CoreModule` 传递解析。
 - **交付**：`ER2_UniversalGeneration_v2.0.0.zip`（42.5 KB）/ `ER2_UniversalGeneration_CN_v2.0.0.zip`（41.3 KB），双语包内容核对 ✓（EN 包 README 含 "Item spawning"、CN 包含"物品生成"）；反编译核对 EN 构建 `Ui.Tr` 走英文字典且新增物品词条（武器/弹药/投掷物/装备/医疗食物/服装…）**全部有英文值**、CN 构建 `Tr` 直通中文 ✓；DLL 已部署（78 KB）。**待实测**：物品图标解码、拖放入包后弹匣/手雷子类行为、拖到地上的实体能否被拾取。
 
-### 2.13 UnitCollision `er2.morephysics.unitcollision` v1.0.8
+### 2.13 UnitCollision `er2.morephysics.unitcollision` v1.0.9（1.0.9：**心跳日志挂 debugLog 门控**——10 秒一条的 `UC: unit-matrix ...` 被玩家当成报错刷屏）
+**1.0.9（2026-09-26）**：`ProbeCcLayer` 的 10 秒心跳日志挂到新增的 `Debug/debugLog` 门控下（默认关）。背景：兜底锁定（`_fallbackLocked`）时探测条件恒真，心跳永不停止；探测逻辑本身不变。双语双包已出，四份文档（该 mod 仅 EN 两份）版本同步。部署 sha 见 git 记录。
+
+### 2.13 UnitCollision `er2.morephysics.unitcollision` v1.0.8（历史）
 单位/尸体碰撞（MorePhysics 删除后的轻量保留版）。**修复原理 = 开碰撞矩阵**：`Physics.IgnoreLayerCollision(1,9,false)` 活体互碰（复用原版受击碰撞体）+ `(1,10,false)` + 尸体骨骼刚体强制动态 = 尸体可推开不挡活人。诊断模式 `UnitCollisionLayer=-2`（只打矩阵日志不修改）。**排查单位碰撞用 `Physics.GetIgnoreLayerCollision(l1,l2)` 直接读，别猜。**
 **层事实**：CharacterController 层=1、BodyPart 受击碰撞体层=9（实心）、尸体层=10；游戏原本关闭了 `1↔9` 与 `1↔10` 矩阵。子弹 raycast 用 LayerMask，**与碰撞矩阵无关**（所以"受击正常但物理互穿"）。
 **2.1 玩家反馈"还能穿过 AI"调查（2026-09-13，已定案）**：① 轻量版 v1.0.7 在 2.1 **实测无问题**（用户单机实测）。静态+运行时双验证：mod API 签名全部未变；全量反编译确认游戏代码**无任何** `IgnoreLayerCollision`/`IgnoreCollision` 调用点（矩阵纯工程设置，运行时状态与 2.1 前一致）；BodyPart 字段变化全是物品协程编译器字段，碰撞/层级零变化。② **完整版 MorePhysics v0.1.47 在 2.1 也能正常加载**（6 个 Harmony patch 目标全存活：`Corvostudio.Weapons.BulletInstance.OnHit/RaycastAll`、`Corvostudio.Weapons.Explosion.CreateExplosion`、`Soldier.Melee`、`PlayerController.Update`、`TargetPractice.OnHitted`；静态 API `Creature.aliveCreatures`/`ItemObject.spawnedItems`/`RagdollManager.ragdollizedLayer` 全存活；tick 全程 try/catch）——但它的单位碰撞是**旧机制：没有 `ResolveOverlaps`/AI 位置级软推**（那是轻量版 v1.0.1 才补的），AI 走 NavMeshAgent 直写 transform 不受任何阻挡，**AI 穿玩家/互相穿是 v0.1.47 的固有行为**，不是 2.1 回归。③ **玩家反馈最可能 = 用了完整版**。处置：建议玩家改装独立的轻量版 Unit Collision v1.0.6+；另注意 `SingleplayerOnly` 默认开（联机下两个 mod 都静默不生效）。④ v1.0.7 顺带修了 CC 层探测的兜底锁定问题（开局单位未生成时锁进固定层 1 后永不重探 → 现在兜底后保持重探自动改判），并给诊断模式（`-2`）加了活体受击碰撞体状态 dump（`UC: living-dump` 行）。未发 Nexus。

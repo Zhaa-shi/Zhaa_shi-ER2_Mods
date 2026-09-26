@@ -1,7 +1,14 @@
 # ER2 More Physics - Unit Collision
 
 ## Description
+
 A lightweight companion mod to ER2 More Physics that ONLY keeps the unit and corpse collision features. Living soldiers physically block each other (no overlap) by reusing the vanilla body colliders, and corpses no longer stop living units — soldiers and the player shove them aside instead of walking over them. All other More Physics features (scene-object physicalization, item physics, knockback, impact damage) are removed, so this mod is tiny, predictable, and has no effect on props or the environment.
+
+## Changelog
+
+**1.0.9** — fixed log spam: the unit-matrix probe heartbeat (`UC: unit-matrix ...`) logged unconditionally
+every 10 seconds during battles, reading like an error flood. It now lives behind a new `Debug / debugLog`
+switch (off by default); the probe logic itself is unchanged.
 
 ## Installation instructions
 1. Install BepInEx 6 (IL2CPP) for Easy Red 2.

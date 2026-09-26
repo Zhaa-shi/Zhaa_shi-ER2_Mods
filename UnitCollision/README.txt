@@ -1,4 +1,4 @@
-ER2 More Physics - Unit Collision v1.0.8
+ER2 More Physics - Unit Collision v1.0.9
 =========================================
 
 【中文】
@@ -10,6 +10,13 @@ ER2 More Physics 的轻量附属模组：只保留"单位/尸体碰撞"功能，
   玩家/AI 不再互相穿过（零新增体积）。
 - 尸体不挡活人：士兵/玩家撞到尸体时把它推开，不会从尸体上直接走过。
 - 独立开关：士兵互碰（UnitCollision）与推开尸体（PushCorpses）可分别关闭。
+
+v1.0.9 改动
+-----------
+- **修复：日志刷屏**。单位矩阵探测的心跳日志此前**无条件**每 10 秒打一条
+  （`UC: unit-matrix playerCcLayer=... `），一场战斗几十条，看起来像报错刷屏。
+  现在挂到新的 `Debug / debugLog` 开关下（默认关）——探测逻辑一字未动，只是不再刷日志。
+  排查碰撞问题时把开关打开即可恢复这些诊断。
 
 v1.0.8 改动
 -----------
@@ -109,7 +116,7 @@ Collision：
 
 =======================================================================
 
-ER2 More Physics - Unit Collision v1.0.8
+ER2 More Physics - Unit Collision v1.0.9
 =========================================
 
 A lightweight companion mod to ER2 More Physics that ONLY keeps the
