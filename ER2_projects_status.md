@@ -26,7 +26,7 @@
 | 16 | `MorePhysics` | `er2.morephysics` | ER2 More Physics | **0.1.49** | `ER2_MorePhysics.dll` | 复活（本地未部署，发 Nexus） |
 | 17 | `Conquest` | `er2.conquest` | ER2 Conquest | **0.2.0** | — | **已终止并删除（2026-09-19）**——战略层复杂度失控 + 战斗桥接未实测；源码快照在 `research_out/conquest_salvage/`（回收清单见其 README），复盘见 §2.18，续作 = 无尽模式 |
 | — | `HvtTestDriver` | `er2.hvt.testdriver` | HVT Test Driver | **1.0.0** | — | **内部自测工具，不发布** |
-| 18 | `Endless` | `er2.endless` | ER2 Endless | **0.3.0** | `ER2_Endless.dll` | **M0 尖峰 v16（待实测）**：0.2.2 实测=交接链全通（设置面板弹出，文件日志实证）；用户要求**原生战役页全程不可见 + mod 任务不出现在战役页**→ v16=交接全程在本页遮罩后进行（自动点行/卡/「开始」）+ 战役注册临时制（主档在 endless/，交接时复制进 mission_editor，战斗开始后删除注册），原版战役页永久干净（详见方案 §14.16） |
+| 18 | `Endless` | `er2.endless` | ER2 Endless | **0.3.0** | `ER2_Endless.dll` | **已终止（2026-09-26）**：源码已删除 —— 全流程复杂度失控（非技术不可行）。方案与 16 轮实测复盘保留在 `ER2_无尽模式_设计方案.md`；可回收资产提取到 `Shared/NativeUi/` |
 
 **注意**：`NoInteractionHints` 的 DLL 名 `ER2_NoInteractionHints_DoneProMaxEnd.dll` 与显示名 "Hide Anything" 完全不同——**DLL 名 ≠ 插件名**，按 GUID 识别。`HighValueTarget` 目录产出 `ER2_VeteranHVT.dll`（v1.1.20 起改名 "Veteran HVT"），旧发布包名 `ER2_HighValueTarget_*` 是历史遗留。
 

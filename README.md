@@ -26,7 +26,6 @@
 | [`UnitInfoOverlay/`](UnitInfoOverlay/README.md) | `er2.unitinfooverlay` | ER2 Unit Inspector | 1.0.5 | 单位状态悬浮显示（开发者调试工具） |
 | [`MorePhysics/`](MorePhysics/README.md) | `er2.morephysics` | ER2 More Physics | 0.1.49 | 完整物理化 |
 | [`UnitCollision/`](UnitCollision/README.md) | `er2.morephysics.unitcollision` | ER2 More Physics - Unit Collision | 1.0.9 | 单位 / 尸体碰撞（MorePhysics 轻量版） |
-| [`Endless/`](Endless/README.md) | `er2.endless` | ER2 Endless | 0.3.0 | 无尽模式（开发中，M0 战斗尖峰） |
 | [`HvtTestDriver/`](HvtTestDriver/README.md) | `er2.hvt.testdriver` | HVT Test Driver | 1.0.0 | HVT 自测工具（内部，不发布） |
 | [`FleshWoundsFixed/`](FleshWoundsFixed/README.md) | `ER2_FleshWounds` | ER2 Flesh Wounds | 1.0.1 | 第三方 Flesh Wounds 重建修复（紫贴图 bug） |
 

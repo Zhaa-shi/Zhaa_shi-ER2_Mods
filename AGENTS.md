@@ -56,9 +56,9 @@ ER2_Mods/
 ├── MorePhysics/          er2.morephysics                 完整物理化（v0.1.48 复活：源码自反编译重建 + 单位碰撞对齐轻量版）
 ├── UnitInfoOverlay/      er2.unitinfooverlay          单位状态悬浮显示（开发者调试工具）
 ├── HvtTestDriver/        er2.hvt.testdriver           HVT 自测工具（内部，不发布）
-├── Endless/              er2.endless                  ER2 Endless：无尽模式（**当前主项目**，方案见 ER2_无尽模式_设计方案.md；M0 战斗尖峰已实现待实测——F6/F7/F8）
 ├── FleshWoundsFixed/     ER2_FleshWounds              第三方 Flesh Wounds 重建修复（紫贴图 bug）
 ├── Shared/NoHintsHudLink.cs                           跨 mod F5 隐藏联动（反射，无编译期依赖）
+├── Shared/NativeUi/                                    原生 UI 适配层（回收自 Endless，见其 README）
 ├── scripts/build.ps1                                   一体化构建：编译+部署+清cfg+打包
 ├── research_out/                                       反编译/解包研究 + conquest_salvage/（Conquest 源码快照，回收清单见其 README）
 └── *.md                                                知识文档（见 §1）
@@ -305,3 +305,8 @@ if (ER2Shared.NoHintsHudLink.IsHidden("er2.你的modid", "显示名")) return; /
 - **BattleJournal（勋章/战报 mod）已放弃**：做完全流程后被用户发现 Nexus 有平替 → **提新 mod 方向前先确认生态里没有现成方案**（先搜 Nexus/问用户），别再主动提"勋章/战报/生涯统计"方向。
 - **需求理解偏差的代价**：`DirectControl` 在错误理解（"接管单单位" vs 用户要的"框选多单位 RTS 指挥"）上做了 3 个版本才对齐 → **指挥/控制类需求先问清是「接管单个」还是「RTS 框选指挥」**（两者技术跨度天差地别）。
 - **功能减法比加法更难也更重要**：Hide Anything 从"F5 热键+锁定+保存按钮"演化到"勾选制"，三个概念全被砍掉——每个存废都来自实际使用体验。
+- **Endless（无尽模式）已放弃**（2026-09-26）：走完 v1–v16 共 16 版迭代，M0 战斗尖峰打通（合成战斗文件 + 原生加载链 + 自建页隐形交接），但**全流程复杂度失控**而终止——**源码已删**，方案与逐轮实测复盘保留在 `ER2_无尽模式_设计方案.md`（§14 是完整的踩坑实录）。**可回收资产已提取到 `Shared/NativeUi/`**（原生字体/旗帜/日期排版/页签宿主/输入拦截，见其 README）。三条通用教训：
+  1. **手工 `new` 原生数据对象是半成品**——形能画出来但内部状态（注册表/完成度扫描）缺失，点击链静默失败。原生**控件**可克隆，原生**数据对象**不能手工造。
+  2. **原生工厂会拒绝外来输入**——`AddToCampaignData(独立目录, 文件名, 0, 内存meb)` 直接返回 null。必须落盘成真实文件让原生自己包装。
+  3. **别和原生页生命周期抢控制权**——原生在页签打开时会重建对象，手里的指针必然失配。最终解法是"遮罩 + 隐形交接"：借原生页干活但全程不让用户看见。
+  - **提新 mod 方向前先评估复杂度**：本 mod 的失败不是技术不可行，而是**设计野心超过了单人可维护的规模**。
