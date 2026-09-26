@@ -14,8 +14,8 @@ BepInEx 启动时会扫描 `BepInEx\plugins\` 下的**所有** `*.dll` 并加载
 
 | 操作 | 命令 |
 |---|---|
-| 打开交互菜单 | 双击 `启动ER2.bat`，或 `powershell -ExecutionPolicy Bypass -File scripts\er2-mods.ps1` |
-| 纯原版启动 | 双击 `启动ER2.bat` 前先选 `n`，或 `启动ER2.bat vanilla` |
+| 打开交互菜单 | 双击 `launch-er2.bat`，或 `powershell -ExecutionPolicy Bypass -File scripts\er2-mods.ps1` |
+| 纯原版启动 | 双击 `launch-er2.bat` 前先选 `n`，或 `launch-er2.bat vanilla` |
 | 只看状态 | `powershell -ExecutionPolicy Bypass -File scripts\er2-mods.ps1 -List` |
 
 ### 交互菜单
@@ -52,7 +52,7 @@ BepInEx 启动时会扫描 `BepInEx\plugins\` 下的**所有** `*.dll` 并加载
 ## 切换后要重启游戏
 
 BepInEx 在**启动时**扫描插件目录，所以切换对**当前已运行的游戏无效**。
-`启动ER2.bat` 已把「切换 → 启动」串成一步。
+`launch-er2.bat` 已把「切换 → 启动」串成一步。
 
 ## 安全设计
 
@@ -97,6 +97,19 @@ $Bundles = @(
 
 **配置不会丢** —— 切换只动插件目录，`config\*.cfg` 原封不动。所以你来回切换后，
 每个 mod 的设置还是原来的。
+
+## 维护须知：bat 文件必须保持纯 ASCII
+
+`launch-er2.bat` **不能加中文注释**。`cmd.exe` 按 ANSI/GBK 读取 .bat，
+而文件是 UTF-8 保存的，中文会变成乱码并被当作命令执行（报一堆
+`'xxx' is not recognized as an internal or external command`）。
+
+所以该文件里所有说明都用英文写，文件名也用 ASCII（`launch-er2.bat`
+而非 `启动ER2.bat`）。要改它的话请保持这个约定。
+
+> 另：PowerShell 脚本（`er2-mods.ps1`）相反 —— 它**含中文，必须以
+> UTF-8 BOM 保存**，否则 PS 5.1 会按 GBK 读取导致中文乱码、语法报错。
+> 两者要求正好相反，别搞混。
 
 ## 与 ModManager 的分工
 
