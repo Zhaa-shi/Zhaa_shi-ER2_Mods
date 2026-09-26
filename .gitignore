@@ -1,31 +1,39 @@
-# 构建产物
+# ── 构建产物 ──────────────────────────────────────────────
 [Bb]in/
 [Oo]bj/
 *.user
 *.suo
+*.pdb
+*.deps.json
 
-# 临时研究/反编译输出（用完即删或并入 research_out 根目录）
-research_out/tmp_*/
-research_out/ai_*/
-research_out/deployed_dump/
-research_out/thirdparty/
-research_out/killfeed_ref/
-research_out/goh_conquest/
-research_out/goh_unpack/
-research_out/conquest_recon/
-research_out/conquest_salvage/
+# ── 本地开发环境（含机器绝对路径，勿公开）────────────────
+*.csproj.user
+.vs/
+.idea/
+*.sln.DotSettings.user
 
-# 临时文件
+# ── 反编译 / 解包研究产物 ────────────────────────────────
+# 均为游戏本体（Corvostudio）与第三方游戏的版权内容，
+# 不入公开仓库；本地保留自行参考。
+research_out/
+*.decompiled.cs
+
+# ── AI 工具产生的本地状态（含本地路径/会话历史）──────────
+.zcode/
+.jspace/
+.workbuddy/*.log
+.workbuddy/tmp/
+CLAUDE.md
+
+# ── 临时文件 ─────────────────────────────────────────────
 *.tmp
 patch_*.py
 rebuild_*.py
 mm_toggle_dump/
-
-# AI 工具产生的本地状态（zcode 计划/会话产物，不入库）
-.zcode/
-.jspace/
-
-# AI 会话临时产物（构建/验证日志、临时脚本；.workbuddy/memory 仍入库）
-.workbuddy/*.log
-.workbuddy/tmp/
 d1.log
+
+# ── 发布包 / 压缩包 ──────────────────────────────────────
+*.zip
+!*.pak
+*.rar
+*.7z

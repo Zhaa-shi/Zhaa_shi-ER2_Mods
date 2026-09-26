@@ -1,5 +1,12 @@
 {
+  // 游戏根目录。改成本机 Easy Red 2 安装路径即可，其余任务全部引用此变量。
+  // 默认值对应 Steam 默认库；自定义库请改成例如 "D:/SteamLibrary/steamapps/common/Easy Red 2"
   "version": "2.0.0",
+  "options": {
+    "env": {
+      "ER2_GAME_DIR": "E:/SteamLibrary/steamapps/common/Easy Red 2"
+    }
+  },
   "tasks": [
     {
       "label": "Build LimbTweaks",
@@ -43,14 +50,14 @@
     {
       "label": "Deploy LimbTweaks",
       "type": "shell",
-      "command": "powershell -NoProfile -Command \"$src='${workspaceFolder}/LimbTweaks/bin/Release/net6.0/ER2_LimbTweaks.dll'; $dst='E:/SteamLibrary/steamapps/common/Easy Red 2/BepInEx/plugins/ER2_LimbTweaks.dll'; $deadline=(Get-Date).AddMinutes(5); $ok=$false; while((Get-Date)-lt $deadline){ try { Copy-Item $src $dst -Force -ErrorAction Stop; $ok=$true; break } catch { Start-Sleep -Seconds 10 } }; if($ok){ Write-Host 'Deployed' } else { Write-Host 'FAILED: locked' }; Remove-Item 'E:/SteamLibrary/steamapps/common/Easy Red 2/BepInEx/config/er2.limbtweaks.cfg' -Force -ErrorAction SilentlyContinue\"",
+      "command": "powershell -NoProfile -Command \"$src='${workspaceFolder}/LimbTweaks/bin/Release/net6.0/ER2_LimbTweaks.dll'; $dst='${env:ER2_GAME_DIR}/BepInEx/plugins/ER2_LimbTweaks.dll'; $deadline=(Get-Date).AddMinutes(5); $ok=$false; while((Get-Date)-lt $deadline){ try { Copy-Item $src $dst -Force -ErrorAction Stop; $ok=$true; break } catch { Start-Sleep -Seconds 10 } }; if($ok){ Write-Host 'Deployed' } else { Write-Host 'FAILED: locked' }; Remove-Item '${env:ER2_GAME_DIR}/BepInEx/config/er2.limbtweaks.cfg' -Force -ErrorAction SilentlyContinue\"",
       "dependsOn": ["Build LimbTweaks"],
       "problemMatcher": []
     },
     {
       "label": "Deploy WeatherControl",
       "type": "shell",
-      "command": "powershell -NoProfile -Command \"$src='${workspaceFolder}/WeatherControl/bin/Release/net6.0/ER2_WeatherControl.dll'; $dst='E:/SteamLibrary/steamapps/common/Easy Red 2/BepInEx/plugins/ER2_WeatherControl.dll'; $deadline=(Get-Date).AddMinutes(5); $ok=$false; while((Get-Date)-lt $deadline){ try { Copy-Item $src $dst -Force -ErrorAction Stop; $ok=$true; break } catch { Start-Sleep -Seconds 10 } }; if($ok){ Write-Host 'Deployed' } else { Write-Host 'FAILED: locked' }; Remove-Item 'E:/SteamLibrary/steamapps/common/Easy Red 2/BepInEx/config/er2.weathercontrol.cfg' -Force -ErrorAction SilentlyContinue\"",
+      "command": "powershell -NoProfile -Command \"$src='${workspaceFolder}/WeatherControl/bin/Release/net6.0/ER2_WeatherControl.dll'; $dst='${env:ER2_GAME_DIR}/BepInEx/plugins/ER2_WeatherControl.dll'; $deadline=(Get-Date).AddMinutes(5); $ok=$false; while((Get-Date)-lt $deadline){ try { Copy-Item $src $dst -Force -ErrorAction Stop; $ok=$true; break } catch { Start-Sleep -Seconds 10 } }; if($ok){ Write-Host 'Deployed' } else { Write-Host 'FAILED: locked' }; Remove-Item '${env:ER2_GAME_DIR}/BepInEx/config/er2.weathercontrol.cfg' -Force -ErrorAction SilentlyContinue\"",
       "dependsOn": ["Build WeatherControl"],
       "problemMatcher": []
     },
@@ -70,13 +77,13 @@
     {
       "label": "View Game Log",
       "type": "shell",
-      "command": "powershell -NoProfile -Command \"Get-Content 'E:/SteamLibrary/steamapps/common/Easy Red 2/BepInEx/LogOutput.log' -Tail 100\"",
+      "command": "powershell -NoProfile -Command \"Get-Content '${env:ER2_GAME_DIR}/BepInEx/LogOutput.log' -Tail 100\"",
       "problemMatcher": []
     },
     {
       "label": "View SquadCommand Log",
       "type": "shell",
-      "command": "powershell -NoProfile -Command \"Select-String 'E:/SteamLibrary/steamapps/common/Easy Red 2/BepInEx/LogOutput.log' -Pattern 'SquadCmd' | Select-Object -Last 80\"",
+      "command": "powershell -NoProfile -Command \"Select-String '${env:ER2_GAME_DIR}/BepInEx/LogOutput.log' -Pattern 'SquadCmd' | Select-Object -Last 80\"",
       "problemMatcher": []
     },
     {
@@ -89,7 +96,7 @@
     {
       "label": "Package LimbTweaks",
       "type": "shell",
-      "command": "powershell -NoProfile -Command \"Copy-Item '${workspaceFolder}/LimbTweaks/bin/Release/net6.0/ER2_LimbTweaks.dll' 'C:/Users/71011/Downloads/ER2_LimbTweaks/ER2_LimbTweaks.dll' -Force; Compress-Archive -Path 'C:/Users/71011/Downloads/ER2_LimbTweaks/*' -DestinationPath 'C:/Users/71011/Downloads/ER2_LimbTweaks_v2.13.54.zip' -Force\"",
+      "command": "powershell -NoProfile -Command \"$out=Join-Path $env:TEMP 'ER2_LimbTweaks'; New-Item -ItemType Directory -Force $out | Out-Null; Copy-Item '${workspaceFolder}/LimbTweaks/bin/Release/net6.0/ER2_LimbTweaks.dll' $out -Force; Compress-Archive -Path (Join-Path $out '*') -DestinationPath (Join-Path $out 'ER2_LimbTweaks.zip') -Force\"",
       "dependsOn": ["Build LimbTweaks"],
       "problemMatcher": []
     }

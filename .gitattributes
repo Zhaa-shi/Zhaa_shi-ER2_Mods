@@ -1,0 +1,35 @@
+# 默认：自动识别文本文件，仓库内统一 LF
+* text=auto eol=lf
+
+# ── 源码（UTF-8，含大量中文注释，禁止行尾转换引发 diff 噪声）──
+*.cs     text eol=lf
+*.csproj text eol=lf
+*.sln    text eol=lf
+*.ps1    text eol=crlf
+*.py     text eol=lf
+
+# ── 文档 ─────────────────────────────────────────────────
+*.md     text eol=lf
+*.txt    text eol=lf
+*.json   text eol=lf
+*.html   text eol=lf
+
+# ── 二进制（禁止任何转换与 diff）────────────────────────
+*.dll    binary
+*.pdb    binary
+*.zip    binary
+*.png    binary
+*.jpg    binary
+*.jpeg   binary
+*.webp   binary
+*.pak    binary
+
+# ── GitHub 语言统计：把 .cs 之外的算作文档，避免文档撑爆占比 ──
+research_out/** linguist-vendored
+ER2_*.md        linguist-documentation
+*.md            linguist-documentation
+
+# ── 其他 ─────────────────────────────────────────────────
+.gitignore     text eol=lf
+.gitattributes text eol=lf
+LICENSE        text eol=lf

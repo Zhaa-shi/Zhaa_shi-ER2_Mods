@@ -1,6 +1,6 @@
 {
   "folders": [
-    { "name": "ER2_Mods", "path": "D:/Users/71011/Documents/ER2_Mods" }
+    { "name": "ER2_Mods", "path": "." }
   ],
   "settings": {
     "files.encoding": "utf8",
