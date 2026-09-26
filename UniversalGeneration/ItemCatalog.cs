@@ -393,6 +393,7 @@ internal static class ItemCatalog
 	{
 		Buckets.Clear();
 		typeCache.Clear();
+		MappedNameFailed.Clear(); // v2.5.48：手动刷新 = 全部重问一次（用户明确要求重建）
 		Ready = false;
 		probeState = 0;
 		probeRestarts = 0;
@@ -696,6 +697,18 @@ internal static class ItemCatalog
 	}
 
 	/// <summary>
+	/// v2.5.48：**映射名负缓存**——`GetMappedResourcesName()` 对映射表里没有的道具（WW1 制服、
+	/// `Ger_Schutze Rifleman(1916)` 这类士兵/制服道具）**每次调用都会让游戏打一条
+	/// `[Error] Prop ID '...' not found! - MappedResources contains: False`**；而查不到时返回空，
+	/// 本来就走 `io.name` 兜底。目录 2.5.44 起扩到 2107 条 + **多轮累积枚举**，失败调用一轮一轮重复，
+	/// 玩家看到的就是"启动一直报错，很多很多"。
+	/// 这里把"查不到"的 id 记下来（本会话 + 随磁盘缓存持久化 `#u` 行），之后**不再问游戏**，
+	/// 直接走兜底名——显示结果与今天完全一致，只是零错误、零浪费调用。
+	/// `ResetForFullRescan`（手动刷新缓存）时清空重试。
+	/// </summary>
+	private static readonly HashSet<string> MappedNameFailed = new HashSet<string>(System.StringComparer.Ordinal);
+
+	/// <summary>
 	/// 逐类目枚举四个 PropType（时间片 3ms/帧，可跨帧 yield）。
 	///
 	/// **2.0.7：两类数据源都枚举** —— ① `ItemObject`（主）② `PropData`（兜底）。
@@ -733,8 +746,15 @@ internal static class ItemCatalog
 						//（MappedResources.prefs → PropData.name，游戏 UI 的 4 处原生调用方都用它），
 						// 退回 `io.name`（GameObject 名，常是 "arisaka t38carbine" 这类内部小写名），
 						// 再退回 id。mod 物品的注册名是什么就显示什么（第三方数据，本 mod 不改写）。
+						// v2.5.48：**查不到的 id 走负缓存**（MappedNameFailed）——游戏对映射表里没有的
+						// 道具每次调用都会打一条 Error（玩家："启动一直报错"），而结果必然为空、
+						// 本来就走 io.name 兜底；不问 = 显示结果一字不差，只是零错误。
 						string display = null;
-						try { display = io.GetMappedResourcesName(); } catch { }
+						if (!MappedNameFailed.Contains(id))
+						{
+							try { display = io.GetMappedResourcesName(); } catch { }
+							if (string.IsNullOrEmpty(display)) MappedNameFailed.Add(id);
+						}
 						if (string.IsNullOrEmpty(display)) { try { display = io.name; } catch { } }
 
 						Add(id, display, BucketFor((PropData.PropType)t, id), SubFor(io));
@@ -913,6 +933,13 @@ internal static class ItemCatalog
 			{
 				string line = lines[i];
 				if (string.IsNullOrEmpty(line)) continue;
+				// v2.5.48：负缓存行 `#u\t<id>`——上次枚举时映射表里查不到的道具 id，恢复后不再问游戏
+				//（每次问都会让游戏打一条 Prop not found 的 Error）。
+				if (line.StartsWith("#u\t", StringComparison.Ordinal))
+				{
+					MappedNameFailed.Add(UnescapeField(line.Substring(3)));
+					continue;
+				}
 				string[] parts = line.Split('\t');
 				if (parts.Length < 4) continue;
 				Add(UnescapeField(parts[2]), UnescapeField(parts[3]), parts[0], UnescapeField(parts[1]));
@@ -961,6 +988,13 @@ internal static class ItemCatalog
 					sb.Append(k).Append('\t').Append(EscapeField(e.Sub)).Append('\t')
 					  .Append(EscapeField(e.Id)).Append('\t').Append(EscapeField(e.Title)).AppendLine();
 				}
+			}
+			// v2.5.48：负缓存持久化——`#u\t<id>` 行，读回后这些 id 不再调用游戏的映射接口
+			//（每次调用对映射表里没有的道具都会打一条 Prop not found 的 Error）。
+			foreach (string u in MappedNameFailed)
+			{
+				if (string.IsNullOrEmpty(u)) continue;
+				sb.Append("#u\t").Append(EscapeField(u)).AppendLine();
 			}
 			string path = CacheFilePath();
 			System.IO.File.WriteAllText(path, sb.ToString(), new System.Text.UTF8Encoding(false));

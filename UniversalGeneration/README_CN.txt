@@ -1,13 +1,13 @@
-ER2 Universal Generation v2.5.47
+ER2 Universal Generation v2.5.48
 ================================
 
-在战场指挥官（ER2 Battlefield Commander）的 RTS 上帝视角内，按你的意愿生成任何单位、载具与物品。
+在 Easy Red Gate（原「战场指挥官」）的 RTS 上帝视角内，按你的意愿生成任何单位、载具与物品。
 作弊向小工具：无平衡惩罚，全部走游戏原生管线，生成即可用。
 
 需求（Requirements）
 --------------------------------
 - Easy Red 2（BepInEx IL2CPP）
-- ER2 Battlefield Commander v1.2.19 或更新（本 mod 仅在其 RTS 上帝视角内工作，宿主缺失时保持休眠）
+- Easy Red Gate v1.2.19 或更新（原「ER2 Battlefield Commander」；本 mod 仅在其 RTS 上帝视角内工作，宿主缺失时保持休眠）
 
 安装（Installation instructions）
 --------------------------------
@@ -41,6 +41,16 @@ ER2 Universal Generation v2.5.47
 
 更新日志（Changelog）
 --------------------------------
+2.5.48
+- **修复启动时的报错刷屏**（`Prop ID '...' not found! - MappedResources contains: False`）。显示名走
+  游戏自己的映射接口，而游戏对映射表里没有的道具（一战制服、`Ger_Schutze Rifleman(1916)` 这类士兵/
+  制服道具）**每次查询都打一条 Error**；目录扩到 2107 条 + 多轮累积枚举后，这些失败调用一轮一轮重复，
+  启动时刷屏。现在查不到的 id 会被记住（本会话 + 随磁盘缓存持久化），之后不再问——显示结果与过去
+  一字不差（查不到本来就走内部名兜底），只是不再有几百条报错。`Catalog / refreshItemCache` 会清掉
+  这份记忆，手动重建时全部重问一次。
+- 宿主 mod 更名为 **Easy Red Gate**（原 ER2 Battlefield Commander），依赖说明同步；宿主 1.4.57 起
+  上帝视角默认键为 **F8**。
+
 2.5.47
 - **修复：物品目录在每次启动都被重新验证——这正是"进游戏后总是要卡一会"的来源。** 判断"目录现在是否
   完整"的判据比较的是**总条目数**，而总数里包含第三方（mod）物品——那部分由一个独立扫描器**异步分轮**
@@ -473,4 +483,4 @@ ER2 Universal Generation v2.5.47
 --------------------------------
 - Corvostudio：Easy Red 2 与对 modding 的开放态度
 - BepInEx / Il2CppInterop / Harmony 团队
-- 战场指挥官 mod——本工具构建于其 RTS 视角之上
+- Easy Red Gate mod（原「战场指挥官」）——本工具构建于其 RTS 视角之上

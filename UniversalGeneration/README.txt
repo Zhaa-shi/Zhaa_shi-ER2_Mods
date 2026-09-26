@@ -1,13 +1,13 @@
-ER2 Universal Generation v2.5.47
+ER2 Universal Generation v2.5.48
 ================================
 
-Spawn any unit, vehicle, or item anywhere, right from Battlefield Commander's RTS god view.
+Spawn any unit, vehicle, or item anywhere, right from Easy Red Gate's (formerly ER2 Battlefield Commander) RTS god view.
 A sandbox/cheat tool: no balance gating, just clean spawning through the game's own native pipelines.
 
 Requirements
 --------------------------------
 - Easy Red 2 (BepInEx IL2CPP)
-- ER2 Battlefield Commander v1.2.19 or newer (this mod only works inside its RTS god view; it stays dormant otherwise)
+- Easy Red Gate v1.2.19 or newer, renamed from "ER2 Battlefield Commander" (this mod only works inside its RTS god view; it stays dormant otherwise)
 
 Installation instructions
 --------------------------------
@@ -42,6 +42,18 @@ How to use
 
 Changelog
 --------------------------------
+2.5.48
+- **Fixed the startup error spam** (`Prop ID '...' not found! - MappedResources contains: False`). Display
+  names are resolved through the game's own mapping API, and the game logs an error for every prop that has
+  no entry in its mapping table (WW1 uniforms, soldier props like `Ger_Schutze Rifleman(1916)`). With the
+  catalog at 2,107 items and the multi-pass cumulative enumeration, those failing calls repeated over and
+  over during startup. Ids that come back empty are now remembered - for the session and in the disk cache -
+  and never asked again; the shown names are exactly what they always were (empty results already fell back
+  to the internal name), just without hundreds of error lines. `Catalog / refreshItemCache` clears the
+  memory so a manual rebuild asks everything once more.
+- The host mod is now called **Easy Red Gate** (formerly ER2 Battlefield Commander); requirement lines
+  updated. Note the host's god-view key defaults to **F8** from its 1.4.57.
+
 2.5.47
 - **Fixed: the item catalog was re-verified on every launch - and that is the stutter you feel right after
   entering a battle.** The check that decides "is the catalog complete now" compared total entry counts,
@@ -436,4 +448,4 @@ Shout outs
 --------------------------------
 - Corvostudio: Easy Red 2 and its open attitude towards modding
 - BepInEx / Il2CppInterop / Harmony teams
-- The Battlefield Commander mod — this tool is built on top of its RTS view
+- The Easy Red Gate mod (formerly ER2 Battlefield Commander) — this tool is built on top of its RTS view

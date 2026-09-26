@@ -51,6 +51,17 @@ Items go into backpacks as their **proper subclass** — magazines hold the righ
 
 ## Changelog
 
+**2.5.48**
+- **Fixed the startup error spam** (`Prop ID '...' not found! - MappedResources contains: False`). Display
+  names are resolved through the game's own mapping API, and the game logs an error for every prop that has
+  no entry in its mapping table (WW1 uniforms, soldier props like `Ger_Schutze Rifleman(1916)`); with the
+  catalog at 2,107 items and the multi-pass cumulative enumeration, those failing calls repeated over and
+  over during startup. Ids that come back empty are now remembered for the session and in the disk cache and
+  never asked again - the displayed names are unchanged (empty results always fell back to the internal name),
+  just without hundreds of error lines. `Catalog / refreshItemCache` clears the memory for a manual rebuild.
+- The host mod is now called **Easy Red Gate** (formerly ER2 Battlefield Commander); its god-view key
+  defaults to F8 from 1.4.57.
+
 **2.5.47**
 - **Fixed: the item catalog was re-verified on every launch - that is the stutter right after entering a
   battle.** The "is the catalog complete now" test compared total entry counts, and that total includes

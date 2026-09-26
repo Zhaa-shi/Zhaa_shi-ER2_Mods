@@ -19,7 +19,7 @@
 | 9 | `HighValueTarget` | `er2.highvaluetarget` | ER2 Veteran HVT | **1.2.2** | `ER2_VeteranHVT.dll` | 已部署（+ Assets 目录） |
 | 10 | `InventoryPause` | `er2.inventorypause` | ER2 Inventory Pause | **1.0.5** | `ER2_InventoryPause.dll` | 已部署 |
 | 11 | `SquadCommand` | `er2.squadcommand` | **Easy Red Gate**（原 ER2 Battlefield Commander） | **1.4.57** | `ER2_BattlefieldCommander.dll` | **已发布（双语双包 EN 部署）** |
-| 12 | `UniversalGeneration` | `er2.universalgeneration` | ER2 Universal Generation | **2.5.47** | `ER2_UniversalGeneration.dll` | 已部署 |
+| 12 | `UniversalGeneration` | `er2.universalgeneration` | ER2 Universal Generation | **2.5.48** | `ER2_UniversalGeneration.dll` | 已部署 |
 | 13 | `UnitCollision` | `er2.morephysics.unitcollision` | ER2 More Physics - Unit Collision | **1.0.8** | `ER2_MorePhysics_UnitCollision.dll` | 已部署 |
 | 14 | `UnitInfoOverlay` | `er2.unitinfooverlay` | ER2 Unit Inspector | **1.0.5** | `ER2_UnitInfoOverlay.dll` | 已部署 |
 | 15 | `FleshWoundsFixed` | `ER2_FleshWounds` | ER2 Flesh Wounds | **1.0.1** | （需手动构建部署，build.ps1 无条目） | 第三方修复版 |
@@ -2015,3 +2015,20 @@ Get-ChildItem "E:\SteamLibrary\steamapps\common\Easy Red 2\BepInEx\plugins" -Fil
 `ER2_UniversalGeneration_CN_v2.5.47.zip`（CN，130,048 B，`C8C93CC3…`）；文档四件套本就已同步 2.5.47（变更史
 2.5.30~2.5.47 齐全）。因重编译哈希漂移，部署已重新对齐 EN 构建（构建=部署=EN 包内 DLL 逐字节一致）；
 拆包核对全 PASS（条目三件/文档=源/版本双写/显示名写入）。
+
+### 2.12.5 UniversalGeneration `er2.universalgeneration` v2.5.48（**启动报错刷屏真因：映射名负缓存缺失**）
+**2.5.48（2026-09-26，玩家："启动游戏一直报错，很多很多"——`Prop ID '...' not found! - MappedResources contains: False`）**：
+1. **真因**：显示名优先走游戏自己的 `ItemObject.GetMappedResourcesName()`（2.4.0 起），而游戏对映射表
+   （MappedResources）里没有的道具**每次调用都打一条 Error**——WW1 制服（`uniforms.ww1_It_*`）、
+   `Ger_Schutze Rifleman(1916)` 这类士兵/制服道具不在映射表里。目录 2.5.44 起扩到 2107 条 + **多轮累积
+   枚举**，失败调用一轮一轮重复 → 启动刷屏。缓存命中时不枚举（零调用），所以有的启动干净——这正是
+   "有的会话报有的不报"的原因。**纯日志噪声**：显示名本来就会回退 `io.name`，功能无损失。
+2. **修法（映射名负缓存）**：`MappedNameFailed`（HashSet，本会话）+ 磁盘缓存持久化（`#u\t<id>` 行，
+   读回恢复）——查不到的 id 此后**不再问游戏**，直接走 `io.name` 兜底（显示结果与过去一字不差）。
+   `ResetForFullRescan`（cfg `refreshItemCache` 手动重建）清空重试。旧缓存文件无 `#u` 行 = 兼容。
+3. 顺带：宿主更名 Easy Red Gate——UniGen 四份文档的**当前态**引用同步（历史变更条目保留原名），
+   并注明宿主 1.4.57 起上帝键默认 F8。
+4. 验证：0 error；双语双包 `ER2_UniversalGeneration_v2.5.48.zip`（EN，138,240 B，`9EACB3C8…`）/
+   `_CN_v2.5.48.zip`（CN，130,560 B，`332B844E…`），拆包核对 PASS；部署 = 构建 = EN 包内 DLL
+   （`9EACB3C8…`，cp+sha）。
+**待实测**：启动日志不再出现 `MappedResources contains` 刷屏；物品列表显示名与 2.5.47 完全一致。
